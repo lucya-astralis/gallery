@@ -163,10 +163,11 @@ main { padding: 16px; max-width: 1400px; margin: 0 auto; }
   overflow: hidden;
   border-radius: 6px;
   background: var(--bg-elev-2);
+  aspect-ratio: 1 / 1;
 }
 .image-tile img {
   width: 100%;
-  aspect-ratio: 1 / 1;
+  height: 100%;
   object-fit: cover;
   display: block;
   transition: transform 0.2s ease;
