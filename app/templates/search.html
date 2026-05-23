@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Suche: {{ query }} · lucya.systems gallery{% endblock %}
+{% block title %}Search: {{ query }} · lucya.systems gallery{% endblock %}
 {% block content %}
 <section>
   <div class="crumb">
-    <a href="/">ALBEN</a>
+    <a href="/">ALBUMS</a>
     <span class="sep">/</span>
-    <b>SUCHE / {{ query | upper }}</b>
+    <b>SEARCH / {{ query | upper }}</b>
   </div>
 
   <div class="section__doc">
@@ -21,7 +21,7 @@
   <header class="section__head">
     <div class="section__slug">
       <span class="ix">??</span>
-      <span class="name">SUCHE</span>
+      <span class="name">SEARCH</span>
       <span class="jp">検索</span>
     </div>
   </header>
@@ -29,8 +29,8 @@
   {% if not images %}
     <div class="empty">
       <span class="stamp">NO MATCH</span>
-      <p>Keine Treffer für <code>{{ query }}</code>.</p>
-      <p class="note">Versucht wird in Album-, Datei- und Tagnamen.</p>
+      <p>No matches for <code>{{ query }}</code>.</p>
+      <p class="note">Searches album names, filenames and tags.</p>
     </div>
   {% else %}
     <ul class="image-grid">

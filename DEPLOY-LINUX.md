@@ -1,43 +1,42 @@
-# Deployment auf Linux-Server mit SMB-Share
+# Deploying on a Linux server with an SMB share
 
-Setup: Bilder liegen auf `\\vega\media\Pictures\gallery`, Galerie läuft auf einem Linux-Server (Docker).
+Setup: images live on `\\vega\media\Pictures\gallery`, gallery runs on a Linux server (Docker).
 
-## 1. Projekt auf den Server kopieren
+## 1. Copy the project to the server
 
 ```bash
-# z.B. per scp, git, oder rsync
 scp -r imageslucya/ user@prod:/opt/
 ssh user@prod
 cd /opt/imageslucya
 ```
 
-## 2. SMB-Share auf dem Linux-Host mounten
+## 2. Mount the SMB share on the Linux host
 
-Pakete installieren:
+Install packages:
 
 ```bash
 sudo apt update
 sudo apt install -y cifs-utils
 ```
 
-Credentials-Datei (falls die Share Auth braucht):
+Credentials file (if the share needs auth):
 
 ```bash
 sudo install -m 600 /dev/null /etc/samba/vega-credentials
 sudo tee /etc/samba/vega-credentials >/dev/null <<'EOF'
-username=DEIN_USER
-password=DEIN_PASS
+username=YOUR_USER
+password=YOUR_PASS
 domain=WORKGROUP
 EOF
 ```
 
-Mountpoint anlegen:
+Mountpoint:
 
 ```bash
 sudo mkdir -p /mnt/vega-gallery
 ```
 
-In `/etc/fstab` permanent eintragen, damit der Mount auch nach Reboot da ist:
+Add a permanent entry to `/etc/fstab` so the mount survives reboots:
 
 ```bash
 sudo tee -a /etc/fstab <<'EOF'
@@ -45,75 +44,76 @@ sudo tee -a /etc/fstab <<'EOF'
 EOF
 ```
 
-Wichtig:
-- `ro` (read-only) — die Galerie schreibt nie in den Bilder-Ordner
-- `_netdev,nofail` — falls vega nicht erreichbar ist, bootet der Server trotzdem
-- `uid=1000,gid=1000` — passt auf deinen User, falls anders: `id` ausführen und anpassen
+Notes:
+- `ro` (read-only) — the gallery never writes into the photos folder
+- `_netdev,nofail` — if vega is unreachable, the server still boots
+- `uid=1000,gid=1000` — adjust to your user; run `id` to check
 
-Mounten:
+Mount it:
 
 ```bash
 sudo mount -a
-ls /mnt/vega-gallery   # sollte die Album-Ordner zeigen
+ls /mnt/vega-gallery   # should list the album folders
 ```
 
-Falls die Share ohne Auth geht, vereinfacht sich der fstab-Eintrag zu:
+If the share is guest-accessible, the fstab line simplifies to:
 
 ```
 //vega/media/Pictures/gallery  /mnt/vega-gallery  cifs  guest,uid=1000,gid=1000,iocharset=utf8,vers=3.0,ro,_netdev,nofail  0  0
 ```
 
-## 3. `.env` konfigurieren
+## 3. Configure `.env`
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-Mindestens das hier:
+Minimum:
 
 ```env
 PHOTOS_PATH=/mnt/vega-gallery
 THUMBS_PATH=./thumbnails
+PREVIEWS_PATH=./previews
 DATA_PATH=./data
 PORT=8000
 SCAN_INTERVAL=300
 ENABLE_WATCHER=0
 ```
 
-Warum `ENABLE_WATCHER=0` und `SCAN_INTERVAL=300`:
+Why `ENABLE_WATCHER=0` and `SCAN_INTERVAL=300`:
 
-> `inotify` (die Linux-Kernel-API für Datei-Events) **funktioniert über SMB/CIFS nicht zuverlässig** — neue Bilder lösen oft keine Events aus. Deshalb deaktivieren wir den Watcher und scannen stattdessen alle 5 Minuten neu. Den manuellen Rescan-Button gibt es weiterhin.
+> `inotify` (the Linux kernel file-event API) **does not reliably fire over SMB/CIFS** — new images often don't trigger events. So we disable the watcher and rescan every 5 minutes instead.
 
-## 4. Starten
+## 4. Start
 
 ```bash
 docker compose up -d --build
 docker compose logs -f
 ```
 
-Galerie erreichbar unter: `http://prod-server:8000`
+Reachable at: `http://prod-server:8000`
 
 ## 5. Updates
 
 ```bash
-git pull   # oder rsync/scp
+git pull   # or rsync/scp
 docker compose up -d --build
 ```
 
-Thumbnails und DB bleiben in `./thumbnails` und `./data` erhalten.
+Thumbnails, previews, and the DB persist in `./thumbnails`, `./previews`, and `./data`.
 
 ## Troubleshooting
 
-**Container sieht `/photos` leer:**
-- Prüfen: `ls /mnt/vega-gallery` auf dem Host — muss die Album-Ordner zeigen
-- Falls leer: SMB-Mount kaputt → `sudo mount -a` und `dmesg | tail` checken
+**Container sees `/photos` empty:**
+- Check on the host: `ls /mnt/vega-gallery` — must show the album folders
+- If empty: SMB mount broken → `sudo mount -a` and `dmesg | tail`
 
-**Neue Bilder werden nicht gefunden:**
-- Mit `SCAN_INTERVAL=300` dauert es bis zu 5 Min. Sofort über den ↻ Rescan-Button auslösen.
+**New images not appearing:**
+- With `SCAN_INTERVAL=300` it takes up to 5 minutes.
 
 **Permissions:**
-- Container läuft als `root`, kann also alles lesen. Die `uid`-Option im Mount betrifft nur, wie Dateien dem Host-Benutzer angezeigt werden — für den Container irrelevant, solange der Mount lesbar ist.
+- The container runs as `root` so it can read everything. The `uid` option in the mount only affects how files appear to the host user — irrelevant for the container as long as the mount is readable.
 
-**SMB-Performance:**
-- Erster Scan über die Share kann dauern (EXIF parsen erfordert das Lesen des Bild-Headers). Danach ist alles im Cache (SQLite), nur Thumbnails werden bei Bedarf nachgezogen.
+**SMB performance:**
+- The first scan over the share takes a while (parsing EXIF requires reading the image header). After that the SQLite cache + local thumbnails make everything fast; only previews/originals are fetched over SMB on demand.

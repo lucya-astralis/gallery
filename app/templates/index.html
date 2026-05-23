@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Alben · lucya.systems gallery{% endblock %}
+{% block title %}Albums · lucya.systems gallery{% endblock %}
 {% block content %}
 <section>
   <div class="section__doc">
-    <span>FILE / IMAGES.LUCYA</span>
+    <span>FILE / LUCYA.GALLERY</span>
     <span>CLASS / <b>PUBLIC</b></span>
     <span>ALBUMS / <b>{{ albums | length }}</b></span>
     <span class="stamp stamp--ok">RDY</span>
@@ -11,7 +11,7 @@
   <header class="section__head">
     <div class="section__slug">
       <span class="ix">01</span>
-      <span class="name">ALBEN</span>
+      <span class="name">ALBUMS</span>
       <span class="jp">アルバム</span>
     </div>
   </header>
@@ -19,8 +19,8 @@
   {% if not albums %}
     <div class="empty">
       <span class="stamp">NO INDEX</span>
-      <p>Noch keine Bilder im System.</p>
-      <p class="note">Lege Unterordner in <code>photos/</code> an — jeder Unterordner = Album.<br>Beispiel: <code>photos/urlaub-2025/dsc_0001.jpg</code></p>
+      <p>No images indexed yet.</p>
+      <p class="note">Drop subfolders into <code>photos/</code> — each subfolder is an album.<br>Example: <code>photos/holiday-2025/dsc_0001.jpg</code></p>
     </div>
   {% else %}
     <ul class="album-grid">
@@ -37,7 +37,7 @@
             <div class="album-card__cap">
               <span class="album-card__tag">ALBUM / {{ '%02d' | format(loop.index) }}</span>
               <span class="album-card__name">{{ a.album }}</span>
-              <span class="album-card__count">{{ a.count }} {% if a.count == 1 %}Bild{% else %}Bilder{% endif %}</span>
+              <span class="album-card__count">{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
             </div>
           </a>
         </li>

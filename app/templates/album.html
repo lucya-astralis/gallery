@@ -3,7 +3,7 @@
 {% block content %}
 <section>
   <div class="crumb">
-    <a href="/">ALBEN</a>
+    <a href="/">ALBUMS</a>
     <span class="sep">/</span>
     <b>{{ album }}</b>
   </div>
@@ -35,7 +35,7 @@
   {% if not images %}
     <div class="empty">
       <span class="stamp">EMPTY</span>
-      <p>Keine Bilder{% if active_tag %} mit Tag <code>#{{ active_tag }}</code>{% endif %}.</p>
+      <p>No images{% if active_tag %} tagged <code>#{{ active_tag }}</code>{% endif %}.</p>
     </div>
   {% else %}
     <ul class="image-grid">

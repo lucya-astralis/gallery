@@ -6,9 +6,10 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import db, scanner, watcher
 
@@ -35,11 +36,51 @@ THUMBS_DIR.mkdir(parents=True, exist_ok=True)
 PREVIEWS_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="imageslucya")
+app = FastAPI(title="lucya.systems gallery", docs_url=None, redoc_url=None, openapi_url=None)
 
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+
+
+CSP = (
+    "default-src 'self'; "
+    "img-src 'self' data:; "
+    "style-src 'self'; "
+    "font-src 'self'; "
+    "script-src 'self'; "
+    "connect-src 'self'; "
+    "media-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "frame-ancestors 'none'; "
+    "upgrade-insecure-requests"
+)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("Content-Security-Policy", CSP)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "interest-cohort=(), browsing-topics=()")
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+    return response
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        return templates.TemplateResponse(
+            "404.html",
+            {"request": request, "path": request.url.path},
+            status_code=404,
+        )
+    return Response(content=str(exc.detail), status_code=exc.status_code)
 
 
 def _run_scan():
@@ -195,20 +236,20 @@ def _prettify_exif(exif: dict) -> list[tuple[str, str]]:
     if not exif:
         return []
     keys = [
-        ("Make", "Kamera-Hersteller"),
-        ("Model", "Kamera-Modell"),
-        ("LensModel", "Objektiv"),
-        ("DateTimeOriginal", "Aufnahmedatum"),
-        ("ExposureTime", "Belichtungszeit"),
-        ("FNumber", "Blende"),
+        ("Make", "Camera make"),
+        ("Model", "Camera model"),
+        ("LensModel", "Lens"),
+        ("DateTimeOriginal", "Date taken"),
+        ("ExposureTime", "Exposure"),
+        ("FNumber", "Aperture"),
         ("ISOSpeedRatings", "ISO"),
-        ("FocalLength", "Brennweite"),
-        ("FocalLengthIn35mmFilm", "Brennweite (KB)"),
-        ("Flash", "Blitz"),
-        ("WhiteBalance", "Weißabgleich"),
-        ("ExposureProgram", "Belichtungsprogramm"),
-        ("MeteringMode", "Messmethode"),
-        ("Orientation", "Orientierung"),
+        ("FocalLength", "Focal length"),
+        ("FocalLengthIn35mmFilm", "Focal length (35mm eq.)"),
+        ("Flash", "Flash"),
+        ("WhiteBalance", "White balance"),
+        ("ExposureProgram", "Exposure program"),
+        ("MeteringMode", "Metering mode"),
+        ("Orientation", "Orientation"),
         ("Software", "Software"),
     ]
     out: list[tuple[str, str]] = []

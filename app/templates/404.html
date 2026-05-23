@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}404 / not found · lucya.systems gallery{% endblock %}
+{% block body_class %}page-404{% endblock %}
+{% block content %}
+<section class="notfound">
+  <div class="section__doc">
+    <span>SIG / <b>ERR_404</b></span>
+    <span>PATH / <b>{{ path }}</b></span>
+    <span class="stamp stamp--red">NO MATCH</span>
+  </div>
+
+  <div class="notfound__body">
+    <div class="notfound__code">
+      <span class="notfound__big">404</span>
+      <span class="notfound__jp">ファイル不明</span>
+    </div>
+    <div class="notfound__text">
+      <h1 class="notfound__title">NOT FOUND</h1>
+      <p class="notfound__lead">The resource <code>{{ path }}</code> does not exist in this index.</p>
+      <p class="note">It may have been removed, renamed, or never existed in the first place.</p>
+      <div class="notfound__actions">
+        <a href="/" class="btn-link">← back to albums</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

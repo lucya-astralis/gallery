@@ -1,118 +1,134 @@
-# imageslucya
+# lucya.systems gallery
 
-Eine schlanke, read-only Web-Bildergalerie mit ordnerbasierten Alben, EXIF-Anzeige, Tags via Sidecar-Dateien und automatischer Thumbnail-Erstellung. Deployment per Docker. Safe für öffentliches Hosting hinter Cloudflare.
+A lean, read-only web image gallery with folder-based albums, EXIF display, sidecar-file tags, and automatic thumbnail/preview generation. Deployed via Docker. Safe for public hosting behind Cloudflare.
 
 ## Features
 
-- **Ordner = Alben:** Jeder Unterordner in `photos/` ist automatisch ein Album. Bild reinkopieren → es erscheint im Album.
-- **Indexierung läuft komplett automatisch:** Watcher (lokal) und/oder periodischer Rescan (für SMB/NFS). Kein manueller Button im Web-UI.
-- **Thumbnails:** Vorschaubilder (max. 480 px, JPEG q82) werden on-demand und im Hintergrund erstellt — die Galerie lädt schnell, auch bei großen Originalen.
-- **EXIF:** Kamera, Objektiv, Belichtung, ISO, Brennweite, … im Bilddetail. GPS-Daten werden per Default ausgeblendet (Privacy).
-- **Tags via Sidecar:** Lege neben einem Bild eine `.tags`-Datei mit kommagetrennten Tags an, z.B. `IMG_0001.jpg.tags` mit Inhalt `urlaub, strand, sunset`. Filterung per Klick im Album.
-- **Suche:** Top-Bar durchsucht Album-, Datei- und Tagnamen.
-- **Mobile-friendly:** Responsives Grid, große Touch-Targets, Tastatur-Navigation (← → ESC) am Desktop.
-- **Dark/Light:** Folgt dem System-Theme.
-- **Read-only:** Keine Schreib-Endpunkte. Die App schreibt nie in den `photos/`-Ordner (`:ro` Mount). Damit gibt es keine Angriffsfläche für Upload-/Manipulation-Exploits.
+- **Folder = album:** every subfolder in `photos/` is automatically an album. Drop an image in → it appears in the album.
+- **Fully automatic indexing:** filesystem watcher (local) and/or periodic rescan (for SMB/NFS). No manual buttons in the web UI.
+- **Two-tier images:** `/thumb/...` (480 px) for grids, `/preview/...` (1600 px) for the detail view stage. The original (`/full/...`) only loads when you click *Load original*.
+- **EXIF:** camera, lens, exposure, ISO, focal length, … on the detail page. GPS coordinates are stripped by default (privacy).
+- **Tags via sidecar files:** drop a `.tags` file next to an image (e.g. `IMG_0001.jpg.tags` containing `holiday, beach, sunset`). Click a tag in the album view to filter.
+- **Search:** top bar searches album, file, and tag names.
+- **Mobile-friendly:** responsive grid, large touch targets, keyboard navigation (← → ESC) on desktop.
+- **Read-only:** no write endpoints, no uploads. The `photos/` mount is `:ro`. No attack surface for upload/tag-injection exploits.
+- **Security headers:** CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy — all set by built-in middleware.
+- **Custom 404 page** with megacorp-terminal aesthetic.
 
-## Schnellstart
+## Quick start
 
 ```bash
-cp .env.example .env   # Pfade & Optionen anpassen
+cp .env.example .env   # adjust paths & options
 docker compose up -d --build
 ```
 
-Galerie öffnen: <http://localhost:8000>
+Open: <http://localhost:8000>
 
-Bilder hinzufügen:
+Add images:
 
 ```
 photos/
-├── urlaub-2025/
+├── holiday-2025/
 │   ├── DSC_0001.jpg
-│   ├── DSC_0001.jpg.tags     # optional: "strand, italien"
+│   ├── DSC_0001.jpg.tags     # optional: "beach, italy"
 │   └── DSC_0002.jpg
-├── familie/
+├── family/
 │   └── …
-└── städtetrip-rom/
+└── rome-trip/
     └── …
 ```
 
-Jeder Unterordner ist ein Album. Unterstützt: JPG/JPEG, PNG, WebP, GIF, BMP, TIFF, HEIC*.
+Each subfolder is one album. Supported: JPG/JPEG, PNG, WebP, GIF, BMP, TIFF, HEIC*.
 
-(*HEIC erfordert ggf. zusätzliche Pillow-Plugins.)
+(*HEIC may need extra Pillow plugins.)
 
-Für Linux-Server-Deployment mit SMB-Share siehe [DEPLOY-LINUX.md](DEPLOY-LINUX.md).
+For Linux server deployment with an SMB share see [DEPLOY-LINUX.md](DEPLOY-LINUX.md).
 
 ## Tags
 
-Tags werden über Sidecar-Dateien im Filesystem verwaltet — passt zum Rest des Workflows:
+Tags live as sidecar files in the filesystem — same workflow as the rest of the gallery:
 
 ```bash
-# Neben dem Bild eine .tags-Datei anlegen
-echo "urlaub, italien, strand" > photos/urlaub-2025/DSC_0001.jpg.tags
+# Drop a .tags file next to the image
+echo "holiday, italy, beach" > photos/holiday-2025/DSC_0001.jpg.tags
 ```
 
-Der Scanner liest die Datei beim nächsten Indexierungslauf und verknüpft die Tags. Datei leeren oder löschen → Tags weg. Watcher reagiert live auf Änderungen, periodischer Scan greift sie spätestens beim nächsten Lauf auf.
+The scanner reads the file on the next indexing pass and links the tags. Empty or delete the file → tags disappear. The watcher reacts to changes live; the periodic scan picks them up at the next interval at the latest.
 
-## Ordnerstruktur
+## Folder structure
 
-| Pfad           | Zweck                                                    |
+| Path           | Purpose                                                  |
 |----------------|----------------------------------------------------------|
-| `photos/`      | Deine Originale + `.tags`-Sidecars (read-only gemountet) |
-| `thumbnails/`  | Generierte Vorschaubilder (Cache, kann jederzeit weg)    |
-| `data/`        | SQLite-DB mit EXIF-Cache und Tag-Index                   |
+| `photos/`      | Your originals + `.tags` sidecars (mounted read-only)    |
+| `thumbnails/`  | Generated grid thumbnails (cache, can be wiped anytime)  |
+| `previews/`    | Generated stage previews (cache, can be wiped anytime)   |
+| `data/`        | SQLite DB with EXIF cache and tag index                  |
 
-## Konfiguration
+## Configuration
 
-| Variable        | Default       | Bedeutung                                                  |
+| Variable        | Default       | Meaning                                                    |
 |-----------------|---------------|------------------------------------------------------------|
-| `PHOTOS_DIR`    | `/photos`     | Wo die Original-Ordner liegen                              |
-| `THUMBS_DIR`    | `/thumbnails` | Wo Thumbnails gespeichert werden                           |
-| `DATA_DIR`      | `/data`       | SQLite-Datenbank                                           |
-| `THUMB_SIZE`    | `480`         | Maximalkante der Thumbnails in Pixeln                      |
-| `SCAN_INTERVAL` | `0`           | Periodischer Rescan in Sekunden (0 = aus). Auf SMB ~300.   |
-| `ENABLE_WATCHER`| `1`           | inotify-Watcher (auf SMB/NFS sinnvollerweise `0`)          |
-| `HIDE_GPS`      | `1`           | GPS aus EXIF-Anzeige entfernen                             |
+| `PHOTOS_DIR`    | `/photos`     | Where the original folders live                            |
+| `THUMBS_DIR`    | `/thumbnails` | Where grid thumbnails are stored                           |
+| `PREVIEWS_DIR`  | `/previews`   | Where stage previews are stored                            |
+| `DATA_DIR`      | `/data`       | SQLite database                                            |
+| `THUMB_SIZE`    | `480`         | Max edge of grid thumbnails (px)                           |
+| `PREVIEW_SIZE`  | `1600`        | Max edge of stage previews (px)                            |
+| `SCAN_INTERVAL` | `0`           | Periodic rescan in seconds (0 = off). For SMB use ~300.    |
+| `ENABLE_WATCHER`| `1`           | inotify watcher (on SMB/NFS, prefer `0` and use interval)  |
+| `HIDE_GPS`      | `1`           | Strip GPS from EXIF display                                |
 
-## Sicherheit / Hosting
+## Security / hosting
 
-Die App ist **komplett read-only** ausgelegt:
+The app is fully **read-only** by design:
 
-- Keine Schreib-API, kein Upload, kein Tag-Edit im Web
-- `photos/` ist als `:ro` gemountet — selbst wenn jemand einen Code-Bug findet, kann er nicht in die Originale schreiben
-- Tags und Thumbnails leben in `data/` bzw. `thumbnails/` — nichts davon ist sicherheitskritisch
-- Path-Traversal blockiert (`_safe_rel`)
-- GPS-Stripping aktiv (`HIDE_GPS=1`)
+- No write API, no uploads, no tag editing via the web
+- `photos/` is mounted `:ro` — even a hypothetical code bug can't touch the originals
+- Tags and thumbnails live in `data/` and `thumbnails/` — none of it is security-critical
+- Path traversal blocked (`_safe_rel`)
+- GPS stripping on (`HIDE_GPS=1`)
 
-Für public Hosting empfehlenswert (über Cloudflare):
-- **Bot Fight Mode** an
-- **Rate Limiting** auf `/full/*` falls du Bandbreite begrenzen willst (Originale können groß sein)
-- **Cache Rules** für `/thumb/*` und `/static/*` (lange TTL — die Dateien sind unveränderlich pro URL)
+**Built-in security headers** (set by middleware in `app/main.py`):
 
-## Endpunkte
+- `Content-Security-Policy` — strict `'self'`-only policy, no inline scripts/styles, no external resources. `frame-ancestors 'none'` (clickjacking protection)
+- `X-Frame-Options: DENY` — same, for older browsers
+- `X-Content-Type-Options: nosniff` — disables MIME sniffing
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: interest-cohort=(), browsing-topics=()` — opts out of FLoC/Topics
+- `Cross-Origin-Opener-Policy: same-origin`
+- `Cross-Origin-Resource-Policy: same-origin`
 
-Alle GET, alle public:
+**Recommended Cloudflare setup** for public hosting:
 
-- `GET /` — Albenübersicht
-- `GET /album/{album}` — Bilder eines Albums (optional `?tag=foo`)
-- `GET /image/{album}/{datei}` — Detailansicht
-- `GET /thumb/{album}/{datei}` — Thumbnail (lazy generiert)
-- `GET /full/{album}/{datei}` — Originaldatei
-- `GET /search?q=…` — Suche
+- **Bot Fight Mode** on
+- **Rate Limiting** on `/full/*` if you want to cap bandwidth on originals
+- **Cache Rules** for `/thumb/*`, `/preview/*`, `/static/*` (long TTL — those URLs are content-addressed and immutable)
 
-## Lokal entwickeln (ohne Docker)
+## Endpoints
+
+All GET, all public:
+
+- `GET /` — album overview
+- `GET /album/{album}` — images in an album (optional `?tag=foo`)
+- `GET /image/{album}/{file}` — detail view (stage shows preview by default)
+- `GET /thumb/{album}/{file}` — grid thumbnail (lazy generated)
+- `GET /preview/{album}/{file}` — stage preview (lazy generated)
+- `GET /full/{album}/{file}` — original file
+- `GET /search?q=…` — search
+
+## Local development (without Docker)
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-mkdir -p photos thumbnails data
+mkdir -p photos thumbnails previews data
 uvicorn app.main:app --reload
 ```
 
-## Hinweise
+## Notes
 
-- Erster Scan auf großer Bibliothek dauert (EXIF + Thumbs). Danach Cache.
-- Bilder löschen: aus `photos/` entfernen — Watcher/Scan räumen DB-Eintrag und Thumbnail auf.
-- Tags umbenennen: alte `.tags`-Datei ändern, fertig.
-- Thumbnails/DB können jederzeit weggeworfen werden, werden beim nächsten Scan neu erzeugt.
+- First scan over a large library takes a while (EXIF + two thumbnail sizes). After that everything is cached.
+- Delete an image: remove it from `photos/` — watcher/scan clean up DB entry, thumbnail, and preview.
+- Rename a tag: edit the `.tags` file.
+- Thumbnails, previews, and DB can be wiped any time — they are regenerated on the next scan.
