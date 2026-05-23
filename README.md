@@ -16,8 +16,11 @@ Eine schlanke, mobile-freundliche Web-Bildergalerie mit ordnerbasierten Alben, E
 ## Schnellstart
 
 ```bash
+cp .env.example .env   # Pfade anpassen, optional
 docker compose up -d --build
 ```
+
+Für Deployment auf einem Linux-Server mit Bildern auf einer SMB-Share siehe [DEPLOY-LINUX.md](DEPLOY-LINUX.md).
 
 Galerie öffnen: <http://localhost:8000>
 

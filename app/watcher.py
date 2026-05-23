@@ -80,7 +80,10 @@ class _Handler(FileSystemEventHandler):
 
 
 def start(photos_dir: Path, thumbs_dir: Path, thumb_size: int) -> Observer:
-    photos_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        photos_dir.mkdir(parents=True, exist_ok=True)
+    except (OSError, PermissionError):
+        pass
     handler = _Handler(photos_dir, thumbs_dir, thumb_size)
     obs = Observer()
     obs.schedule(handler, str(photos_dir), recursive=True)

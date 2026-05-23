@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import threading
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Form
@@ -18,8 +19,13 @@ PHOTOS_DIR = Path(os.environ.get("PHOTOS_DIR", "./photos")).resolve()
 THUMBS_DIR = Path(os.environ.get("THUMBS_DIR", "./thumbnails")).resolve()
 DATA_DIR = Path(os.environ.get("DATA_DIR", "./data")).resolve()
 THUMB_SIZE = int(os.environ.get("THUMB_SIZE", "480"))
+SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL", "0"))  # seconds; 0 disables periodic rescan
+ENABLE_WATCHER = os.environ.get("ENABLE_WATCHER", "1") not in ("0", "false", "False", "")
 
-PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+except (OSError, PermissionError):
+    pass  # read-only mount is fine
 THUMBS_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -30,18 +36,36 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
+def _periodic_scan_loop():
+    while True:
+        time.sleep(SCAN_INTERVAL)
+        try:
+            result = scanner.full_scan(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE)
+            if result["indexed"] or result["thumbnails"] or result["removed"]:
+                log.info("periodic scan: %s", result)
+        except Exception as e:
+            log.warning("periodic scan failed: %s", e)
+
+
 @app.on_event("startup")
 def _startup():
     db.init(DATA_DIR)
-    log.info("photos=%s thumbs=%s data=%s thumb_size=%d", PHOTOS_DIR, THUMBS_DIR, DATA_DIR, THUMB_SIZE)
+    log.info(
+        "photos=%s thumbs=%s data=%s thumb_size=%d watcher=%s scan_interval=%ds",
+        PHOTOS_DIR, THUMBS_DIR, DATA_DIR, THUMB_SIZE, ENABLE_WATCHER, SCAN_INTERVAL,
+    )
     threading.Thread(
         target=lambda: scanner.full_scan(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE),
         daemon=True,
     ).start()
-    try:
-        watcher.start(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE)
-    except Exception as e:
-        log.warning("watcher failed to start: %s", e)
+    if ENABLE_WATCHER:
+        try:
+            watcher.start(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE)
+        except Exception as e:
+            log.warning("watcher failed to start: %s", e)
+    if SCAN_INTERVAL > 0:
+        threading.Thread(target=_periodic_scan_loop, daemon=True).start()
+        log.info("periodic rescan every %d seconds", SCAN_INTERVAL)
 
 
 def _safe_rel(album: str, filename: str) -> Path:

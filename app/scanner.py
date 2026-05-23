@@ -155,7 +155,11 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int) -> dict:
     thumbed = 0
     seen: set[str] = set()
     if not photos_dir.exists():
-        photos_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            photos_dir.mkdir(parents=True, exist_ok=True)
+        except (OSError, PermissionError):
+            log.warning("photos dir does not exist and is not writable: %s", photos_dir)
+            return {"indexed": 0, "thumbnails": 0, "removed": 0, "total_seen": 0}
     for album_dir in sorted(p for p in photos_dir.iterdir() if p.is_dir()):
         for file in sorted(album_dir.iterdir()):
             if not file.is_file() or not is_image(file):
