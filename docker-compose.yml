@@ -1,0 +1,16 @@
+services:
+  gallery:
+    build: .
+    container_name: imageslucya
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./photos:/photos
+      - ./thumbnails:/thumbnails
+      - ./data:/data
+    environment:
+      - PHOTOS_DIR=/photos
+      - THUMBS_DIR=/thumbnails
+      - DATA_DIR=/data
+      - THUMB_SIZE=480
+    restart: unless-stopped

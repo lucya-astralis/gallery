@@ -1,0 +1,11 @@
+photos/
+thumbnails/
+data/
+__pycache__/
+*.pyc
+.git
+.venv
+venv/
+.idea/
+.vscode/
+*.md

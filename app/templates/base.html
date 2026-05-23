@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>{% block title %}imageslucya{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a href="/" class="brand">imageslucya</a>
+    <form action="/search" method="get" class="search">
+      <input type="search" name="q" placeholder="Suche: Album, Datei, Tag…" value="{{ query or '' }}">
+    </form>
+    <button id="rescan-btn" class="btn ghost" type="button" title="Ordner neu scannen &amp; Thumbnails erstellen">↻ Rescan</button>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
