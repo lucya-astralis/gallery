@@ -95,6 +95,43 @@ def make_thumbnail(src: Path, dst: Path, size: int) -> bool:
         return False
 
 
+def _read_sidecar_tags(image_path: Path) -> list[str]:
+    sidecar = image_path.with_suffix(image_path.suffix + ".tags")
+    if not sidecar.exists():
+        return []
+    try:
+        raw = sidecar.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    tags: list[str] = []
+    seen: set[str] = set()
+    for chunk in raw.replace("\n", ",").split(","):
+        t = chunk.strip()
+        if not t:
+            continue
+        key = t.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        tags.append(t)
+    return tags
+
+
+def _sync_tags(image_id: int, tag_names: list[str]):
+    c = db.conn()
+    with db.lock():
+        c.execute("DELETE FROM image_tags WHERE image_id = ?", (image_id,))
+        for name in tag_names:
+            c.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", (name,))
+            tag_id = c.execute("SELECT id FROM tags WHERE name = ?", (name,)).fetchone()["id"]
+            c.execute(
+                "INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)",
+                (image_id, tag_id),
+            )
+        c.execute("DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM image_tags)")
+        c.commit()
+
+
 def index_image(photos_dir: Path, file: Path) -> bool:
     rel = file.relative_to(photos_dir).as_posix()
     parts = file.relative_to(photos_dir).parts
@@ -104,11 +141,14 @@ def index_image(photos_dir: Path, file: Path) -> bool:
     filename = parts[-1]
     stat = file.stat()
     mtime = stat.st_mtime
+    sidecar = file.with_suffix(file.suffix + ".tags")
+    sidecar_mtime = sidecar.stat().st_mtime if sidecar.exists() else 0.0
+    effective_mtime = max(mtime, sidecar_mtime)
 
     c = db.conn()
     with db.lock():
         row = c.execute("SELECT id, mtime FROM images WHERE rel_path = ?", (rel,)).fetchone()
-        if row and abs(row["mtime"] - mtime) < 1.0:
+        if row and abs(row["mtime"] - effective_mtime) < 1.0:
             return False
 
     width = height = None
@@ -133,9 +173,11 @@ def index_image(photos_dir: Path, file: Path) -> bool:
                  album=excluded.album, filename=excluded.filename, mtime=excluded.mtime,
                  size=excluded.size, width=excluded.width, height=excluded.height,
                  exif_json=excluded.exif_json, taken_at=excluded.taken_at""",
-            (album, filename, rel, mtime, stat.st_size, width, height, json.dumps(exif), taken),
+            (album, filename, rel, effective_mtime, stat.st_size, width, height, json.dumps(exif), taken),
         )
+        image_id = c.execute("SELECT id FROM images WHERE rel_path = ?", (rel,)).fetchone()["id"]
         c.commit()
+    _sync_tags(image_id, _read_sidecar_tags(file))
     return True
 
 

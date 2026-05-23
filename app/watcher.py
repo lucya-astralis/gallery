@@ -37,6 +37,15 @@ class _Handler(FileSystemEventHandler):
                         del self._pending[p]
             for p in ready:
                 fp = Path(p)
+                if fp.suffix == ".tags":
+                    image = fp.with_suffix("")
+                    if image.exists() and scanner.is_image(image):
+                        try:
+                            scanner.index_image(self.photos_dir, image)
+                            log.info("re-indexed tags for %s", image.name)
+                        except Exception as e:
+                            log.warning("tag reindex failed for %s: %s", image, e)
+                    continue
                 if not fp.exists():
                     scanner.remove_image(self.photos_dir, fp)
                     continue
@@ -69,9 +78,18 @@ class _Handler(FileSystemEventHandler):
     def on_deleted(self, event):
         if event.is_directory:
             return
-        scanner.remove_image(self.photos_dir, Path(event.src_path))
+        fp = Path(event.src_path)
+        if fp.suffix == ".tags":
+            image = fp.with_suffix("")
+            if image.exists() and scanner.is_image(image):
+                try:
+                    scanner.index_image(self.photos_dir, image)
+                except Exception as e:
+                    log.warning("tag-removal reindex failed for %s: %s", image, e)
+            return
+        scanner.remove_image(self.photos_dir, fp)
         try:
-            rel = Path(event.src_path).relative_to(self.photos_dir).as_posix()
+            rel = fp.relative_to(self.photos_dir).as_posix()
             dst = (self.thumbs_dir / rel).with_suffix(".jpg")
             if dst.exists():
                 dst.unlink()

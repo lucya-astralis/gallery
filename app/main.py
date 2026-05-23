@@ -1,4 +1,3 @@
-import hmac
 import json
 import logging
 import os
@@ -6,8 +5,8 @@ import threading
 import time
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Form
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -20,18 +19,16 @@ PHOTOS_DIR = Path(os.environ.get("PHOTOS_DIR", "./photos")).resolve()
 THUMBS_DIR = Path(os.environ.get("THUMBS_DIR", "./thumbnails")).resolve()
 DATA_DIR = Path(os.environ.get("DATA_DIR", "./data")).resolve()
 THUMB_SIZE = int(os.environ.get("THUMB_SIZE", "480"))
-SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL", "0"))  # seconds; 0 disables periodic rescan
+SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL", "0"))
 ENABLE_WATCHER = os.environ.get("ENABLE_WATCHER", "1") not in ("0", "false", "False", "")
-ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "").strip()
 HIDE_GPS = os.environ.get("HIDE_GPS", "1") not in ("0", "false", "False", "")
 
 _scan_lock = threading.Lock()
-_scan_running = threading.Event()
 
 try:
     PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
 except (OSError, PermissionError):
-    pass  # read-only mount is fine
+    pass
 THUMBS_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -42,34 +39,33 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
+def _run_scan():
+    if not _scan_lock.acquire(blocking=False):
+        return
+    try:
+        result = scanner.full_scan(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE)
+        if result["indexed"] or result["thumbnails"] or result["removed"]:
+            log.info("scan: %s", result)
+    except Exception as e:
+        log.warning("scan failed: %s", e)
+    finally:
+        _scan_lock.release()
+
+
 def _periodic_scan_loop():
     while True:
         time.sleep(SCAN_INTERVAL)
-        if not _scan_lock.acquire(blocking=False):
-            continue
-        try:
-            _scan_running.set()
-            result = scanner.full_scan(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE)
-            if result["indexed"] or result["thumbnails"] or result["removed"]:
-                log.info("periodic scan: %s", result)
-        except Exception as e:
-            log.warning("periodic scan failed: %s", e)
-        finally:
-            _scan_running.clear()
-            _scan_lock.release()
+        _run_scan()
 
 
 @app.on_event("startup")
 def _startup():
     db.init(DATA_DIR)
     log.info(
-        "photos=%s thumbs=%s data=%s thumb_size=%d watcher=%s scan_interval=%ds",
-        PHOTOS_DIR, THUMBS_DIR, DATA_DIR, THUMB_SIZE, ENABLE_WATCHER, SCAN_INTERVAL,
+        "photos=%s thumbs=%s data=%s thumb_size=%d watcher=%s scan_interval=%ds hide_gps=%s",
+        PHOTOS_DIR, THUMBS_DIR, DATA_DIR, THUMB_SIZE, ENABLE_WATCHER, SCAN_INTERVAL, HIDE_GPS,
     )
-    threading.Thread(
-        target=lambda: scanner.full_scan(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE),
-        daemon=True,
-    ).start()
+    threading.Thread(target=_run_scan, daemon=True).start()
     if ENABLE_WATCHER:
         try:
             watcher.start(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE)
@@ -78,14 +74,6 @@ def _startup():
     if SCAN_INTERVAL > 0:
         threading.Thread(target=_periodic_scan_loop, daemon=True).start()
         log.info("periodic rescan every %d seconds", SCAN_INTERVAL)
-
-
-def require_admin(x_admin_token: str | None = Header(default=None)):
-    if not ADMIN_TOKEN:
-        raise HTTPException(403, "admin features disabled (set ADMIN_TOKEN to enable)")
-    if not x_admin_token or not hmac.compare_digest(x_admin_token, ADMIN_TOKEN):
-        raise HTTPException(401, "invalid or missing admin token")
-    return True
 
 
 def _safe_rel(album: str, filename: str) -> Path:
@@ -274,56 +262,6 @@ def serve_full(album: str, filename: str):
     if not src.exists():
         raise HTTPException(404, "not found")
     return FileResponse(str(src), headers={"Cache-Control": "public, max-age=31536000"})
-
-
-@app.get("/api/auth/status")
-def api_auth_status(x_admin_token: str | None = Header(default=None)):
-    if not ADMIN_TOKEN:
-        return {"admin_required": False, "authenticated": False, "admin_enabled": False}
-    authed = bool(x_admin_token and hmac.compare_digest(x_admin_token, ADMIN_TOKEN))
-    return {"admin_required": True, "authenticated": authed, "admin_enabled": True}
-
-
-@app.post("/api/scan")
-def api_scan(_: bool = Depends(require_admin)):
-    if _scan_running.is_set():
-        raise HTTPException(429, "scan already in progress")
-    if not _scan_lock.acquire(blocking=False):
-        raise HTTPException(429, "scan already in progress")
-    try:
-        _scan_running.set()
-        result = scanner.full_scan(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE)
-    finally:
-        _scan_running.clear()
-        _scan_lock.release()
-    return JSONResponse(result)
-
-
-@app.post("/api/image/{album}/{filename}/tags")
-def api_set_tags(album: str, filename: str, tags: str = Form(""), _: bool = Depends(require_admin)):
-    rel = _safe_rel(album, filename).as_posix()
-    c = db.conn()
-    row = c.execute("SELECT id FROM images WHERE rel_path = ?", (rel,)).fetchone()
-    if not row:
-        raise HTTPException(404, "image not found")
-    image_id = row["id"]
-    names = [t.strip() for t in tags.split(",") if t.strip()]
-    seen: set[str] = set()
-    dedup: list[str] = []
-    for n in names:
-        key = n.lower()
-        if key not in seen:
-            seen.add(key)
-            dedup.append(n)
-    with db.lock():
-        c.execute("DELETE FROM image_tags WHERE image_id = ?", (image_id,))
-        for name in dedup:
-            c.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", (name,))
-            tag_id = c.execute("SELECT id FROM tags WHERE name = ?", (name,)).fetchone()["id"]
-            c.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
-        c.execute("DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM image_tags)")
-        c.commit()
-    return JSONResponse({"tags": dedup})
 
 
 @app.get("/search", response_class=HTMLResponse)
