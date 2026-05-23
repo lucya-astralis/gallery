@@ -2,6 +2,79 @@
    IMAGESLUCYA  —  megacorp terminal aesthetic (after lucya.sh)
    ================================================================ */
 
+@font-face {
+  font-family: 'Space Grotesk';
+  src: local('Space Grotesk'),
+       url('/static/fonts/SpaceGrotesk-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: local('Noto Sans JP'),
+       url('/static/fonts/NotoSansJP-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: local('JetBrains Mono'),
+       url('/static/fonts/JetBrainsMono-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: local('JetBrains Mono Italic'),
+       url('/static/fonts/JetBrainsMono-Italic-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 100 800;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Proto Nerd Font';
+  src: local('0xProto Nerd Font'),
+       url('/static/fonts/0xProtoNerdFont-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ethnocentric';
+  src: local('Ethnocentric'),
+       url('/static/fonts/Ethnocentric-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  src: local('Chakra Petch'),
+       url('/static/fonts/ChakraPetch-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  src: local('Chakra Petch Medium'),
+       url('/static/fonts/ChakraPetch-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  src: local('Chakra Petch Bold'),
+       url('/static/fonts/ChakraPetch-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root{
   --bg:         #07070b;
   --bg-2:       #0d0d14;
@@ -71,7 +144,10 @@ body::after{
   pointer-events:none;
   mix-blend-mode:overlay;
   animation: scan 8s linear infinite;
+  opacity: var(--scan-opacity, 1);
+  transition: opacity .3s ease;
 }
+body.page-image::after{ --scan-opacity: 0.35; }
 
 @keyframes scan{
   from{ background-position: 0 0, 0 0; }
@@ -83,13 +159,13 @@ a:hover{ color:var(--acc-cy); }
 
 img{ user-select:none; -webkit-user-drag:none; }
 
-.mono{ font-family:"JetBrains Mono", ui-monospace, monospace; letter-spacing:0; }
+.mono{ font-family:"Proto Nerd Font", "JetBrains Mono", ui-monospace, monospace; letter-spacing:0; }
 .jp  { font-family:"Noto Sans JP", "Space Grotesk", sans-serif; }
 .dim { color:var(--text-dim); }
 .small{ font-size:12px; }
 
 code{
-  font-family:"JetBrains Mono", ui-monospace, monospace;
+  font-family:"Proto Nerd Font", "JetBrains Mono", ui-monospace, monospace;
   font-size:.88em;
   background:rgba(255,255,255,.05);
   border:1px solid var(--line);
@@ -117,29 +193,49 @@ code{
   min-width:0;
 }
 .nav__brand{
-  display:flex; align-items:baseline; gap:10px;
-  font-family:"Ethnocentric","Space Grotesk", sans-serif;
-  font-size:16px;
-  letter-spacing:.18em;
-  text-transform:uppercase;
+  display:flex; align-items:center; gap:12px;
   color:var(--text);
   white-space:nowrap;
+  min-width:0;
+}
+.nav__brand:hover{ color:var(--text); }
+.nav__brand img{
+  height:28px;
+  width:auto;
+  display:block;
+  filter: drop-shadow(0 0 12px rgba(91,138,255,.35));
+}
+.nav__brand .brand-text{
+  display:flex; flex-direction:column;
+  line-height:1.05;
+  min-width:0;
+}
+.nav__brand .brand-name{
+  font-family:"Ethnocentric","Space Grotesk", sans-serif;
+  font-size:13px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--text);
+}
+.nav__brand .brand-sub{
+  font-family:"Proto Nerd Font", "JetBrains Mono", monospace;
+  font-size:10px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--acc-cy);
+  margin-top:2px;
+  transition:color .2s;
 }
 .nav__brand .jp{
   font-family:"Noto Sans JP", sans-serif;
   color:var(--text-ghost);
   font-size:10px;
   letter-spacing:.3em;
+  align-self:center;
+  border-left:1px solid var(--line);
+  padding-left:12px;
 }
-.nav__brand:hover{ color:var(--text); }
-.nav__brand:hover .ix{ color:var(--acc-mag); }
-.nav__brand .ix{
-  font-family:"JetBrains Mono", monospace;
-  color:var(--acc-cy);
-  font-size:11px;
-  letter-spacing:.16em;
-  transition:color .2s;
-}
+.nav__brand:hover .brand-sub{ color:var(--acc-mag); }
 
 .nav__search{
   flex:1; min-width:0;
@@ -655,9 +751,11 @@ details[open] > summary::before{ content:"▾ "; }
    MOBILE
    ================================================================ */
 @media (max-width:760px){
-  .nav__inner{ gap:14px; }
-  .nav__brand{ font-size:13px; }
+  .nav__inner{ gap:12px; }
   .nav__brand .jp{ display:none; }
+  .nav__brand .brand-name{ font-size:12px; }
+  .nav__brand .brand-sub{ font-size:9px; }
+  .nav__brand img{ height:24px; }
   .nav__status{ display:none; }
   .section__doc{ font-size:9.5px; }
   .section__doc > span{ padding:6px 9px; }
@@ -665,10 +763,91 @@ details[open] > summary::before{ content:"▾ "; }
   .kv{ grid-template-columns: 100px 1fr; }
 }
 @media (max-width:480px){
+  .nav__brand .brand-text{ display:none; }
   .nav__search::before{ content:"❯"; margin-right:6px; font-size:10px; }
   .nav__search input{ font-size:11px; padding:8px 0; }
   .album-grid{ grid-template-columns:1fr; }
   .image-grid{ grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); }
   .nav-arrow{ width:38px; height:52px; font-size:18px; }
   .section__doc > span{ padding:5px 8px; font-size:9px; }
+}
+
+/* ================================================================
+   ORIGINAL / FULL-LOAD BUTTON
+   ================================================================ */
+.stage__loader{
+  position:absolute;
+  bottom:8px; left:50%;
+  transform:translateX(-50%);
+  display:flex; align-items:center; gap:10px;
+  background:rgba(7,7,11,.78);
+  border:1px solid var(--line-strong);
+  padding:0;
+  z-index:4;
+  font-family:"Proto Nerd Font", "JetBrains Mono", monospace;
+  font-size:11px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.stage__loader button{
+  background:transparent;
+  border:0;
+  color:var(--text);
+  padding:8px 14px;
+  cursor:pointer;
+  font:inherit;
+  letter-spacing:inherit;
+  text-transform:inherit;
+  transition: color .15s, background .15s;
+}
+.stage__loader button:hover{
+  color:var(--acc-cy);
+  background:rgba(91,138,255,.08);
+}
+.stage__loader .sep{
+  width:1px; align-self:stretch;
+  background:var(--line);
+}
+.stage__loader.is-loading button{ color:var(--acc-amb); pointer-events:none; }
+.stage__loader.is-done{ display:none; }
+
+.stage img.is-preview{ filter: saturate(.92) brightness(.96); }
+
+/* ================================================================
+   FOOTER
+   ================================================================ */
+.foot{
+  position:relative; z-index:10;
+  margin-top:48px;
+  border-top:1px solid var(--line);
+  background:#05050a;
+}
+.foot__inner{
+  max-width:var(--page-max);
+  margin:0 auto;
+  padding:22px var(--page-pad);
+  display:flex; align-items:center; justify-content:space-between;
+  gap:24px;
+  flex-wrap:wrap;
+  font-family:"Proto Nerd Font", "JetBrains Mono", monospace;
+  font-size:10.5px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--text-ghost);
+}
+.foot__brand{ display:flex; align-items:center; gap:10px; color:var(--text-dim); }
+.foot__brand img{ height:18px; opacity:.85; }
+.foot__links{ display:flex; gap:18px; align-items:center; }
+.foot__links a{
+  color:var(--text-dim);
+  transition: color .15s;
+  border-bottom:1px solid transparent;
+  padding-bottom:1px;
+}
+.foot__links a:hover{ color:var(--acc-cy); border-bottom-color:var(--acc-cy); }
+.foot__meta{ color:var(--text-ghost); }
+.foot__meta b{ color:var(--text-dim); font-weight:400; }
+
+@media (max-width:600px){
+  .foot__inner{ flex-direction:column; align-items:flex-start; gap:12px; }
 }

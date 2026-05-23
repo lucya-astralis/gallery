@@ -4,18 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <title>{% block title %}imageslucya{% endblock %}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500&display=swap">
+  <title>{% block title %}lucya.systems gallery{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/logo/lucya_logo.svg">
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
   <nav class="nav">
     <div class="nav__inner">
-      <a href="/" class="nav__brand">
-        <span class="ix">[01]</span>
-        <span>imageslucya</span>
+      <a href="/" class="nav__brand" aria-label="lucya.systems gallery">
+        <img src="/static/logo/lucya_logo.svg" alt="">
+        <span class="brand-text">
+          <span class="brand-name">lucya.systems</span>
+          <span class="brand-sub">/ gallery</span>
+        </span>
         <span class="jp">画像庫</span>
       </a>
       <form action="/search" method="get" class="nav__search" role="search">
@@ -30,6 +31,21 @@
   <main>
     {% block content %}{% endblock %}
   </main>
+  <footer class="foot">
+    <div class="foot__inner">
+      <div class="foot__brand">
+        <img src="/static/logo/lucya_logo.svg" alt="">
+        <span>lucya.systems / gallery</span>
+      </div>
+      <div class="foot__links">
+        <a href="https://lucya.sh/privacy" target="_blank" rel="noopener">Datenschutz</a>
+        <a href="https://lucya.sh" target="_blank" rel="noopener">lucya.sh ↗</a>
+      </div>
+      <div class="foot__meta">
+        <b>SIG</b> / IMAGESLUCYA &nbsp;·&nbsp; <b>BUILD</b> / READONLY
+      </div>
+    </div>
+  </footer>
   <script src="/static/app.js"></script>
 </body>
 </html>

@@ -7,12 +7,15 @@ services:
     volumes:
       - ${PHOTOS_PATH:-./photos}:/photos:ro
       - ${THUMBS_PATH:-./thumbnails}:/thumbnails
+      - ${PREVIEWS_PATH:-./previews}:/previews
       - ${DATA_PATH:-./data}:/data
     environment:
       - PHOTOS_DIR=/photos
       - THUMBS_DIR=/thumbnails
+      - PREVIEWS_DIR=/previews
       - DATA_DIR=/data
       - THUMB_SIZE=${THUMB_SIZE:-480}
+      - PREVIEW_SIZE=${PREVIEW_SIZE:-1600}
       - SCAN_INTERVAL=${SCAN_INTERVAL:-0}
       - ENABLE_WATCHER=${ENABLE_WATCHER:-1}
       - HIDE_GPS=${HIDE_GPS:-1}

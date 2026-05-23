@@ -1,6 +1,8 @@
 photos/
 thumbnails/
+previews/
 data/
+import/
 __pycache__/
 *.pyc
 .git
@@ -9,3 +11,4 @@ venv/
 .idea/
 .vscode/
 *.md
+.env

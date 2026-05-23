@@ -12,10 +12,13 @@ log = logging.getLogger("watcher")
 
 
 class _Handler(FileSystemEventHandler):
-    def __init__(self, photos_dir: Path, thumbs_dir: Path, thumb_size: int):
+    def __init__(self, photos_dir: Path, thumbs_dir: Path, thumb_size: int,
+                 previews_dir: Path | None = None, preview_size: int = 1600):
         self.photos_dir = photos_dir
         self.thumbs_dir = thumbs_dir
         self.thumb_size = thumb_size
+        self.previews_dir = previews_dir
+        self.preview_size = preview_size
         self._pending: dict[str, float] = {}
         self._lock = threading.Lock()
         self._worker = threading.Thread(target=self._drain, daemon=True)
@@ -54,8 +57,11 @@ class _Handler(FileSystemEventHandler):
                 try:
                     scanner.index_image(self.photos_dir, fp)
                     rel = fp.relative_to(self.photos_dir).as_posix()
-                    dst = (self.thumbs_dir / rel).with_suffix(".jpg")
-                    scanner.make_thumbnail(fp, dst, self.thumb_size)
+                    thumb_dst = (self.thumbs_dir / rel).with_suffix(".jpg")
+                    scanner.make_thumbnail(fp, thumb_dst, self.thumb_size)
+                    if self.previews_dir is not None:
+                        prev_dst = (self.previews_dir / rel).with_suffix(".jpg")
+                        scanner.make_thumbnail(fp, prev_dst, self.preview_size)
                     log.info("indexed %s", rel)
                 except Exception as e:
                     log.warning("process failed for %s: %s", p, e)
@@ -90,19 +96,23 @@ class _Handler(FileSystemEventHandler):
         scanner.remove_image(self.photos_dir, fp)
         try:
             rel = fp.relative_to(self.photos_dir).as_posix()
-            dst = (self.thumbs_dir / rel).with_suffix(".jpg")
-            if dst.exists():
-                dst.unlink()
+            for d in (self.thumbs_dir, self.previews_dir):
+                if d is None:
+                    continue
+                f = (d / rel).with_suffix(".jpg")
+                if f.exists():
+                    f.unlink()
         except Exception:
             pass
 
 
-def start(photos_dir: Path, thumbs_dir: Path, thumb_size: int) -> Observer:
+def start(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
+          previews_dir: Path | None = None, preview_size: int = 1600) -> Observer:
     try:
         photos_dir.mkdir(parents=True, exist_ok=True)
     except (OSError, PermissionError):
         pass
-    handler = _Handler(photos_dir, thumbs_dir, thumb_size)
+    handler = _Handler(photos_dir, thumbs_dir, thumb_size, previews_dir, preview_size)
     obs = Observer()
     obs.schedule(handler, str(photos_dir), recursive=True)
     obs.daemon = True

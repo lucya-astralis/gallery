@@ -192,16 +192,18 @@ def remove_image(photos_dir: Path, file: Path):
         c.commit()
 
 
-def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int) -> dict:
+def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
+              previews_dir: Path | None = None, preview_size: int = 1600) -> dict:
     added = 0
     thumbed = 0
+    previewed = 0
     seen: set[str] = set()
     if not photos_dir.exists():
         try:
             photos_dir.mkdir(parents=True, exist_ok=True)
         except (OSError, PermissionError):
             log.warning("photos dir does not exist and is not writable: %s", photos_dir)
-            return {"indexed": 0, "thumbnails": 0, "removed": 0, "total_seen": 0}
+            return {"indexed": 0, "thumbnails": 0, "previews": 0, "removed": 0, "total_seen": 0}
     for album_dir in sorted(p for p in photos_dir.iterdir() if p.is_dir()):
         for file in sorted(album_dir.iterdir()):
             if not file.is_file() or not is_image(file):
@@ -210,11 +212,16 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int) -> dict:
             seen.add(rel)
             if index_image(photos_dir, file):
                 added += 1
-            thumb_path = thumbs_dir / rel
-            thumb_path = thumb_path.with_suffix(".jpg")
-            if not thumb_path.exists() or thumb_path.stat().st_mtime < file.stat().st_mtime:
+            mtime = file.stat().st_mtime
+            thumb_path = (thumbs_dir / rel).with_suffix(".jpg")
+            if not thumb_path.exists() or thumb_path.stat().st_mtime < mtime:
                 if make_thumbnail(file, thumb_path, thumb_size):
                     thumbed += 1
+            if previews_dir is not None:
+                preview_path = (previews_dir / rel).with_suffix(".jpg")
+                if not preview_path.exists() or preview_path.stat().st_mtime < mtime:
+                    if make_thumbnail(file, preview_path, preview_size):
+                        previewed += 1
 
     c = db.conn()
     with db.lock():
@@ -225,7 +232,13 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int) -> dict:
                 c.execute("DELETE FROM images WHERE rel_path = ?", (rel,))
                 removed += 1
         c.commit()
-    return {"indexed": added, "thumbnails": thumbed, "removed": removed, "total_seen": len(seen)}
+    return {
+        "indexed": added,
+        "thumbnails": thumbed,
+        "previews": previewed,
+        "removed": removed,
+        "total_seen": len(seen),
+    }
 
 
 def ensure_thumb(photos_dir: Path, thumbs_dir: Path, rel_path: str, size: int) -> Path | None:

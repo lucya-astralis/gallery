@@ -17,8 +17,10 @@ log = logging.getLogger("main")
 
 PHOTOS_DIR = Path(os.environ.get("PHOTOS_DIR", "./photos")).resolve()
 THUMBS_DIR = Path(os.environ.get("THUMBS_DIR", "./thumbnails")).resolve()
+PREVIEWS_DIR = Path(os.environ.get("PREVIEWS_DIR", "./previews")).resolve()
 DATA_DIR = Path(os.environ.get("DATA_DIR", "./data")).resolve()
 THUMB_SIZE = int(os.environ.get("THUMB_SIZE", "480"))
+PREVIEW_SIZE = int(os.environ.get("PREVIEW_SIZE", "1600"))
 SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL", "0"))
 ENABLE_WATCHER = os.environ.get("ENABLE_WATCHER", "1") not in ("0", "false", "False", "")
 HIDE_GPS = os.environ.get("HIDE_GPS", "1") not in ("0", "false", "False", "")
@@ -30,6 +32,7 @@ try:
 except (OSError, PermissionError):
     pass
 THUMBS_DIR.mkdir(parents=True, exist_ok=True)
+PREVIEWS_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="imageslucya")
@@ -43,8 +46,11 @@ def _run_scan():
     if not _scan_lock.acquire(blocking=False):
         return
     try:
-        result = scanner.full_scan(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE)
-        if result["indexed"] or result["thumbnails"] or result["removed"]:
+        result = scanner.full_scan(
+            PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE,
+            previews_dir=PREVIEWS_DIR, preview_size=PREVIEW_SIZE,
+        )
+        if result["indexed"] or result["thumbnails"] or result["previews"] or result["removed"]:
             log.info("scan: %s", result)
     except Exception as e:
         log.warning("scan failed: %s", e)
@@ -68,7 +74,8 @@ def _startup():
     threading.Thread(target=_run_scan, daemon=True).start()
     if ENABLE_WATCHER:
         try:
-            watcher.start(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE)
+            watcher.start(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE,
+                          previews_dir=PREVIEWS_DIR, preview_size=PREVIEW_SIZE)
         except Exception as e:
             log.warning("watcher failed to start: %s", e)
     if SCAN_INTERVAL > 0:
@@ -251,6 +258,21 @@ def serve_thumb(album: str, filename: str):
         t = scanner.ensure_thumb(PHOTOS_DIR, THUMBS_DIR, rel, THUMB_SIZE)
         if not t:
             raise HTTPException(500, "thumb generation failed")
+        dst = t
+    return FileResponse(str(dst), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=31536000"})
+
+
+@app.get("/preview/{album}/{filename:path}")
+def serve_preview(album: str, filename: str):
+    rel = _safe_rel(album, filename).as_posix()
+    src = PHOTOS_DIR / rel
+    if not src.exists():
+        raise HTTPException(404, "not found")
+    dst = (PREVIEWS_DIR / rel).with_suffix(".jpg")
+    if not dst.exists() or dst.stat().st_mtime < src.stat().st_mtime:
+        t = scanner.ensure_thumb(PHOTOS_DIR, PREVIEWS_DIR, rel, PREVIEW_SIZE)
+        if not t:
+            raise HTTPException(500, "preview generation failed")
         dst = t
     return FileResponse(str(dst), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=31536000"})
 
