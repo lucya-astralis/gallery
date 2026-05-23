@@ -1,3 +1,4 @@
+import hmac
 import json
 import logging
 import os
@@ -5,7 +6,7 @@ import threading
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, Form
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Form
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -21,6 +22,11 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "./data")).resolve()
 THUMB_SIZE = int(os.environ.get("THUMB_SIZE", "480"))
 SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL", "0"))  # seconds; 0 disables periodic rescan
 ENABLE_WATCHER = os.environ.get("ENABLE_WATCHER", "1") not in ("0", "false", "False", "")
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "").strip()
+HIDE_GPS = os.environ.get("HIDE_GPS", "1") not in ("0", "false", "False", "")
+
+_scan_lock = threading.Lock()
+_scan_running = threading.Event()
 
 try:
     PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
@@ -39,12 +45,18 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 def _periodic_scan_loop():
     while True:
         time.sleep(SCAN_INTERVAL)
+        if not _scan_lock.acquire(blocking=False):
+            continue
         try:
+            _scan_running.set()
             result = scanner.full_scan(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE)
             if result["indexed"] or result["thumbnails"] or result["removed"]:
                 log.info("periodic scan: %s", result)
         except Exception as e:
             log.warning("periodic scan failed: %s", e)
+        finally:
+            _scan_running.clear()
+            _scan_lock.release()
 
 
 @app.on_event("startup")
@@ -66,6 +78,14 @@ def _startup():
     if SCAN_INTERVAL > 0:
         threading.Thread(target=_periodic_scan_loop, daemon=True).start()
         log.info("periodic rescan every %d seconds", SCAN_INTERVAL)
+
+
+def require_admin(x_admin_token: str | None = Header(default=None)):
+    if not ADMIN_TOKEN:
+        raise HTTPException(403, "admin features disabled (set ADMIN_TOKEN to enable)")
+    if not x_admin_token or not hmac.compare_digest(x_admin_token, ADMIN_TOKEN):
+        raise HTTPException(401, "invalid or missing admin token")
+    return True
 
 
 def _safe_rel(album: str, filename: str) -> Path:
@@ -143,6 +163,8 @@ def image_view(request: Request, album: str, filename: str):
     if not row:
         raise HTTPException(404, "image not found")
     exif = json.loads(row["exif_json"]) if row["exif_json"] else {}
+    if HIDE_GPS:
+        exif.pop("GPSInfo", None)
     tags = [
         r["name"]
         for r in c.execute(
@@ -254,14 +276,31 @@ def serve_full(album: str, filename: str):
     return FileResponse(str(src), headers={"Cache-Control": "public, max-age=31536000"})
 
 
+@app.get("/api/auth/status")
+def api_auth_status(x_admin_token: str | None = Header(default=None)):
+    if not ADMIN_TOKEN:
+        return {"admin_required": False, "authenticated": False, "admin_enabled": False}
+    authed = bool(x_admin_token and hmac.compare_digest(x_admin_token, ADMIN_TOKEN))
+    return {"admin_required": True, "authenticated": authed, "admin_enabled": True}
+
+
 @app.post("/api/scan")
-def api_scan():
-    result = scanner.full_scan(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE)
+def api_scan(_: bool = Depends(require_admin)):
+    if _scan_running.is_set():
+        raise HTTPException(429, "scan already in progress")
+    if not _scan_lock.acquire(blocking=False):
+        raise HTTPException(429, "scan already in progress")
+    try:
+        _scan_running.set()
+        result = scanner.full_scan(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE)
+    finally:
+        _scan_running.clear()
+        _scan_lock.release()
     return JSONResponse(result)
 
 
 @app.post("/api/image/{album}/{filename}/tags")
-def api_set_tags(album: str, filename: str, tags: str = Form("")):
+def api_set_tags(album: str, filename: str, tags: str = Form(""), _: bool = Depends(require_admin)):
     rel = _safe_rel(album, filename).as_posix()
     c = db.conn()
     row = c.execute("SELECT id FROM images WHERE rel_path = ?", (rel,)).fetchone()

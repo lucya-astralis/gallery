@@ -51,14 +51,43 @@ Jeder Unterordner ist ein Album. Unterstützt: JPG/JPEG, PNG, WebP, GIF, BMP, TI
 
 ## Konfiguration
 
-Per Umgebungsvariablen in `docker-compose.yml`:
+Per Umgebungsvariablen (`docker-compose.yml` oder `.env`):
 
-| Variable      | Default | Bedeutung                                    |
-|---------------|---------|----------------------------------------------|
-| `PHOTOS_DIR`  | `/photos` | Wo die Original-Ordner liegen              |
-| `THUMBS_DIR`  | `/thumbnails` | Wo Thumbnails gespeichert werden       |
-| `DATA_DIR`    | `/data` | SQLite-Datenbank                             |
-| `THUMB_SIZE`  | `480`   | Maximalkante der Thumbnails in Pixeln        |
+| Variable        | Default       | Bedeutung                                                  |
+|-----------------|---------------|------------------------------------------------------------|
+| `PHOTOS_DIR`    | `/photos`     | Wo die Original-Ordner liegen                              |
+| `THUMBS_DIR`    | `/thumbnails` | Wo Thumbnails gespeichert werden                           |
+| `DATA_DIR`      | `/data`       | SQLite-Datenbank                                           |
+| `THUMB_SIZE`    | `480`         | Maximalkante der Thumbnails in Pixeln                      |
+| `SCAN_INTERVAL` | `0`           | Periodischer Rescan in Sekunden (0 = aus)                  |
+| `ENABLE_WATCHER`| `1`           | inotify-Watcher aktiv (auf SMB/NFS am besten `0`)          |
+| `ADMIN_TOKEN`   | _(leer)_      | Token f�r Schreib-Endpunkte. Leer = Endpunkte deaktiviert. |
+| `HIDE_GPS`      | `1`           | GPS aus EXIF-Anzeige entfernen                             |
+
+## Sicherheit f�r �ffentliches Hosting
+
+Diese Galerie ist als **Read-only-Public + Auth-protected-Admin** Modell ausgelegt:
+
+- **�ffentlich (ohne Auth):** Albenliste, Bilder anschauen, Suche, EXIF lesen
+- **Admin-only (mit `ADMIN_TOKEN`):** Rescan ausl�sen, Tags editieren
+
+**Vor dem Public-Stellen unbedingt:**
+
+1. **`ADMIN_TOKEN` setzen** � z.B. mit `openssl rand -hex 32` einen starken Token erzeugen.
+   Wenn die Variable leer bleibt, sind Rescan und Tag-Edit komplett deaktiviert (sicher, aber dann nur noch Read-only).
+2. **`HIDE_GPS=1`** lassen, sofern du nicht m�chtest, dass Besucher die Aufnahmeorte deiner Bilder sehen.
+3. **Hinter Cloudflare** � gut. Zus�tzlich empfehlenswert:
+   - **Cloudflare Access** vor `/api/scan` und `/api/image/.../tags` (Header/Cookie-basierte Auth, st�rker als der eingebaute Token)
+   - **Cloudflare Rate Limiting** auf `/api/*` (z.B. 30 Requests/Minute)
+   - **Bot Fight Mode** aktivieren
+4. **Bilder-Mount auf `:ro`** � die App schreibt nie in den Photos-Ordner. Bereits in `docker-compose.yml` so eingestellt.
+5. **Pfad-Traversal** ist durch `_safe_rel()` blockiert; nur `photos/<album>/<datei>` ist erreichbar.
+
+**Was bewusst NICHT eingebaut ist:**
+
+- Kein Upload-Endpunkt � Bilder werden nur per Filesystem hinzugef�gt. Damit gibt es keinen Weg, �ber das Web Schadcode/Bilder einzuschleusen.
+- Keine Cookie-Sessions � der Admin-Token wird im `sessionStorage` des Browsers gehalten und per `X-Admin-Token`-Header gesendet (kein CSRF-Risiko).
+- Kein Rate-Limiting in der App � daf�r ist Cloudflare zust�ndig.
 
 ## Lokal entwickeln (ohne Docker)
 

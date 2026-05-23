@@ -13,7 +13,9 @@
     <form action="/search" method="get" class="search">
       <input type="search" name="q" placeholder="Suche: Album, Datei, Tag…" value="{{ query or '' }}">
     </form>
-    <button id="rescan-btn" class="btn ghost" type="button" title="Ordner neu scannen &amp; Thumbnails erstellen">↻ Rescan</button>
+    <button id="rescan-btn" class="btn ghost admin-only" type="button" title="Ordner neu scannen &amp; Thumbnails erstellen" hidden>↻ Rescan</button>
+    <button id="login-btn" class="btn ghost" type="button" hidden>🔓 Login</button>
+    <button id="logout-btn" class="btn ghost admin-only" type="button" hidden>Logout</button>
   </header>
   <main>
     {% block content %}{% endblock %}

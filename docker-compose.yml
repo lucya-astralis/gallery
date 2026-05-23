@@ -15,4 +15,6 @@ services:
       - THUMB_SIZE=${THUMB_SIZE:-480}
       - SCAN_INTERVAL=${SCAN_INTERVAL:-0}
       - ENABLE_WATCHER=${ENABLE_WATCHER:-1}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
+      - HIDE_GPS=${HIDE_GPS:-1}
     restart: unless-stopped

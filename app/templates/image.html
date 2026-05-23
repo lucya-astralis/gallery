@@ -35,7 +35,7 @@
 
     <section class="panel">
       <h2>Tags</h2>
-      <form id="tag-form" data-album="{{ image.album }}" data-filename="{{ image.filename }}">
+      <form id="tag-form" class="admin-only" data-album="{{ image.album }}" data-filename="{{ image.filename }}" hidden>
         <input type="text" name="tags" id="tag-input"
                value="{{ tags | join(', ') }}"
                placeholder="komma, getrennt, tags"
@@ -49,6 +49,7 @@
         {% for t in tags %}
           <a href="/album/{{ image.album }}?tag={{ t }}" class="tag-chip">#{{ t }}</a>
         {% endfor %}
+        {% if not tags %}<span class="muted small">Keine Tags.</span>{% endif %}
       </div>
     </section>
 

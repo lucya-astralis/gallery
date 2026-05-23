@@ -8,7 +8,7 @@
     <p>Keine Bilder gefunden.</p>
     <p class="muted">Lege Unterordner in den <code>photos/</code>-Ordner. Jeder Unterordner ist ein Album.</p>
     <p class="muted">Beispiel: <code>photos/urlaub-2025/dsc_0001.jpg</code></p>
-    <button class="btn" type="button" onclick="rescan()">Jetzt scannen</button>
+    <button class="btn admin-only" type="button" onclick="rescan()" hidden>Jetzt scannen</button>
   </div>
 {% else %}
 <ul class="album-grid">

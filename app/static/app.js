@@ -1,11 +1,80 @@
+const TOKEN_KEY = 'imageslucya.admin_token';
+
+function getToken() {
+  return sessionStorage.getItem(TOKEN_KEY) || '';
+}
+function setToken(t) {
+  if (t) sessionStorage.setItem(TOKEN_KEY, t);
+  else sessionStorage.removeItem(TOKEN_KEY);
+}
+
+function adminHeaders() {
+  const t = getToken();
+  return t ? { 'X-Admin-Token': t } : {};
+}
+
+function showAdminUI(authed) {
+  document.querySelectorAll('.admin-only').forEach((el) => {
+    if (authed) el.removeAttribute('hidden');
+    else el.setAttribute('hidden', '');
+  });
+  const loginBtn = document.getElementById('login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+  if (loginBtn) loginBtn.toggleAttribute('hidden', authed);
+  if (logoutBtn) logoutBtn.toggleAttribute('hidden', !authed);
+}
+
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/auth/status', { headers: adminHeaders() });
+    const data = await r.json();
+    if (!data.admin_enabled) {
+      // No admin token configured server-side -> hide all admin UI permanently
+      document.querySelectorAll('.admin-only').forEach((el) => el.setAttribute('hidden', ''));
+      const loginBtn = document.getElementById('login-btn');
+      const logoutBtn = document.getElementById('logout-btn');
+      if (loginBtn) loginBtn.setAttribute('hidden', '');
+      if (logoutBtn) logoutBtn.setAttribute('hidden', '');
+      return;
+    }
+    if (!data.authenticated && getToken()) {
+      setToken('');
+    }
+    showAdminUI(data.authenticated);
+  } catch (e) {
+    console.warn('auth check failed', e);
+  }
+}
+
+function promptLogin() {
+  const token = window.prompt('Admin-Token eingeben:');
+  if (!token) return;
+  setToken(token.trim());
+  checkAuth();
+}
+
+function logout() {
+  setToken('');
+  showAdminUI(false);
+}
+
 function rescan() {
   const btn = document.getElementById('rescan-btn');
   if (btn) {
     btn.disabled = true;
     btn.textContent = '↻ Scanne…';
   }
-  fetch('/api/scan', { method: 'POST' })
-    .then((r) => r.json())
+  fetch('/api/scan', { method: 'POST', headers: adminHeaders() })
+    .then(async (r) => {
+      if (r.status === 401 || r.status === 403) {
+        setToken('');
+        showAdminUI(false);
+        throw new Error('nicht eingeloggt');
+      }
+      if (r.status === 429) throw new Error('Scan läuft bereits');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
     .then((data) => {
       if (btn) {
         btn.textContent = `✓ ${data.indexed} neu, ${data.thumbnails} Thumbs`;
@@ -23,13 +92,19 @@ function rescan() {
         btn.disabled = false;
         btn.textContent = '↻ Rescan';
       }
-      alert('Scan fehlgeschlagen: ' + err);
+      alert('Scan fehlgeschlagen: ' + err.message);
     });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('rescan-btn');
-  if (btn) btn.addEventListener('click', rescan);
+  checkAuth();
+
+  const rescanBtn = document.getElementById('rescan-btn');
+  if (rescanBtn) rescanBtn.addEventListener('click', rescan);
+  const loginBtn = document.getElementById('login-btn');
+  if (loginBtn) loginBtn.addEventListener('click', promptLogin);
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) logoutBtn.addEventListener('click', logout);
 
   const form = document.getElementById('tag-form');
   if (form) {
@@ -45,8 +120,14 @@ document.addEventListener('DOMContentLoaded', () => {
       fetch(`/api/image/${encodeURIComponent(album)}/${encodeURIComponent(filename)}/tags`, {
         method: 'POST',
         body: fd,
+        headers: adminHeaders(),
       })
-        .then((r) => {
+        .then(async (r) => {
+          if (r.status === 401 || r.status === 403) {
+            setToken('');
+            showAdminUI(false);
+            throw new Error('nicht eingeloggt');
+          }
           if (!r.ok) throw new Error('HTTP ' + r.status);
           return r.json();
         })
