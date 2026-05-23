@@ -1,32 +1,53 @@
 {% extends "base.html" %}
-{% block title %}{{ album }} – imageslucya{% endblock %}
+{% block title %}{{ album }} — imageslucya{% endblock %}
 {% block content %}
-<nav class="breadcrumb">
-  <a href="/">Alben</a> <span>›</span> <strong>{{ album }}</strong>
-</nav>
+<section>
+  <div class="crumb">
+    <a href="/">ALBEN</a>
+    <span class="sep">/</span>
+    <b>{{ album }}</b>
+  </div>
 
-<h1 class="page-title">{{ album }}</h1>
+  <div class="section__doc">
+    <span>FILE / {{ album | upper }}</span>
+    <span>COUNT / <b>{{ images | length }}</b></span>
+    {% if active_tag %}<span class="stamp stamp--cy">FILTER / #{{ active_tag | upper }}</span>{% endif %}
+    <span class="stamp stamp--ok">OK</span>
+  </div>
 
-{% if tags %}
-<div class="tag-bar">
-  <a href="/album/{{ album }}" class="tag-chip {% if not active_tag %}active{% endif %}">Alle</a>
-  {% for t in tags %}
-    <a href="/album/{{ album }}?tag={{ t }}" class="tag-chip {% if active_tag == t %}active{% endif %}">#{{ t }}</a>
-  {% endfor %}
-</div>
-{% endif %}
+  <header class="section__head">
+    <div class="section__slug">
+      <span class="ix">02</span>
+      <span class="name">{{ album }}</span>
+      <span class="jp">ギャラリー</span>
+    </div>
+  </header>
 
-{% if not images %}
-  <p class="muted">Keine Bilder{% if active_tag %} mit Tag <code>#{{ active_tag }}</code>{% endif %}.</p>
-{% else %}
-<ul class="image-grid">
-  {% for img in images %}
-    <li class="image-tile">
-      <a href="/image/{{ img.rel_path }}">
-        <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
-      </a>
-    </li>
-  {% endfor %}
-</ul>
-{% endif %}
+  {% if tags %}
+    <div class="tag-bar">
+      <a href="/album/{{ album }}" class="tag {% if not active_tag %}active{% endif %}">ALL</a>
+      {% for t in tags %}
+        <a href="/album/{{ album }}?tag={{ t }}" class="tag {% if active_tag == t %}active{% endif %}">#{{ t }}</a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if not images %}
+    <div class="empty">
+      <span class="stamp">EMPTY</span>
+      <p>Keine Bilder{% if active_tag %} mit Tag <code>#{{ active_tag }}</code>{% endif %}.</p>
+    </div>
+  {% else %}
+    <ul class="image-grid">
+      {% for img in images %}
+        <li class="image-tile">
+          <a href="/image/{{ img.rel_path }}">
+            <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
+            <div class="image-tile__overlay"><span>OPEN ↗</span></div>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
 {% endblock %}

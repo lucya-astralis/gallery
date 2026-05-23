@@ -3,17 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="dark light">
+  <meta name="color-scheme" content="dark">
   <title>{% block title %}imageslucya{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500&display=swap">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header class="topbar">
-    <a href="/" class="brand">imageslucya</a>
-    <form action="/search" method="get" class="search">
-      <input type="search" name="q" placeholder="Suche: Album, Datei, Tag…" value="{{ query or '' }}">
-    </form>
-  </header>
+  <nav class="nav">
+    <div class="nav__inner">
+      <a href="/" class="nav__brand">
+        <span class="ix">[01]</span>
+        <span>imageslucya</span>
+        <span class="jp">画像庫</span>
+      </a>
+      <form action="/search" method="get" class="nav__search" role="search">
+        <input type="search" name="q" placeholder="Suche / Album, Datei, Tag" value="{{ query or '' }}" autocomplete="off">
+      </form>
+      <div class="nav__status">
+        <span class="dot"></span>
+        <span>ONLINE</span>
+      </div>
+    </div>
+  </nav>
   <main>
     {% block content %}{% endblock %}
   </main>

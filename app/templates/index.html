@@ -1,31 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Alben – imageslucya{% endblock %}
+{% block title %}Alben — imageslucya{% endblock %}
 {% block content %}
-<h1 class="page-title">Alben</h1>
-
-{% if not albums %}
-  <div class="empty">
-    <p>Keine Bilder gefunden.</p>
-    <p class="muted">Lege Unterordner in den <code>photos/</code>-Ordner. Jeder Unterordner ist ein Album.</p>
-    <p class="muted">Beispiel: <code>photos/urlaub-2025/dsc_0001.jpg</code></p>
+<section>
+  <div class="section__doc">
+    <span>FILE / IMAGES.LUCYA</span>
+    <span>CLASS / <b>PUBLIC</b></span>
+    <span>ALBUMS / <b>{{ albums | length }}</b></span>
+    <span class="stamp stamp--ok">RDY</span>
   </div>
-{% else %}
-<ul class="album-grid">
-  {% for a in albums %}
-    <li class="album-card">
-      <a href="/album/{{ a.album }}">
-        {% if a.cover %}
-          <img src="/thumb/{{ a.cover }}" alt="{{ a.album }}" loading="lazy">
-        {% else %}
-          <div class="cover-empty"></div>
-        {% endif %}
-        <div class="album-meta">
-          <span class="album-name">{{ a.album }}</span>
-          <span class="album-count">{{ a.count }} Bild{% if a.count != 1 %}er{% endif %}</span>
-        </div>
-      </a>
-    </li>
-  {% endfor %}
-</ul>
-{% endif %}
+  <header class="section__head">
+    <div class="section__slug">
+      <span class="ix">01</span>
+      <span class="name">ALBEN</span>
+      <span class="jp">アルバム</span>
+    </div>
+  </header>
+
+  {% if not albums %}
+    <div class="empty">
+      <span class="stamp">NO INDEX</span>
+      <p>Noch keine Bilder im System.</p>
+      <p class="note">Lege Unterordner in <code>photos/</code> an — jeder Unterordner = Album.<br>Beispiel: <code>photos/urlaub-2025/dsc_0001.jpg</code></p>
+    </div>
+  {% else %}
+    <ul class="album-grid">
+      {% for a in albums %}
+        <li class="album-card">
+          <a href="/album/{{ a.album }}">
+            <div class="album-card__img">
+              {% if a.cover %}
+                <img src="/thumb/{{ a.cover }}" alt="{{ a.album }}" loading="lazy">
+              {% else %}
+                <div class="album-card__cover-empty">NO COVER</div>
+              {% endif %}
+            </div>
+            <div class="album-card__cap">
+              <span class="album-card__tag">ALBUM / {{ '%02d' | format(loop.index) }}</span>
+              <span class="album-card__name">{{ a.album }}</span>
+              <span class="album-card__count">{{ a.count }} {% if a.count == 1 %}Bild{% else %}Bilder{% endif %}</span>
+            </div>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
 {% endblock %}

@@ -1,25 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Suche: {{ query }} – imageslucya{% endblock %}
+{% block title %}Suche: {{ query }} — imageslucya{% endblock %}
 {% block content %}
-<nav class="breadcrumb">
-  <a href="/">Alben</a> <span>›</span> <strong>Suche: „{{ query }}"</strong>
-</nav>
+<section>
+  <div class="crumb">
+    <a href="/">ALBEN</a>
+    <span class="sep">/</span>
+    <b>SUCHE / {{ query | upper }}</b>
+  </div>
 
-<h1 class="page-title">Suche: <span class="muted">{{ query }}</span></h1>
+  <div class="section__doc">
+    <span>QUERY / <b>{{ query }}</b></span>
+    <span>HITS / <b>{{ images | length }}</b></span>
+    {% if images %}
+      <span class="stamp stamp--ok">{{ images | length }} MATCH{% if images | length != 1 %}ES{% endif %}</span>
+    {% else %}
+      <span class="stamp stamp--red">NO MATCH</span>
+    {% endif %}
+  </div>
 
-{% if not images %}
-  <p class="muted">Keine Treffer.</p>
-{% else %}
-  <p class="muted small">{{ images | length }} Treffer</p>
-  <ul class="image-grid">
-    {% for img in images %}
-      <li class="image-tile">
-        <a href="/image/{{ img.rel_path }}" title="{{ img.album }} / {{ img.filename }}">
-          <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
-          <span class="tile-label">{{ img.album }}</span>
-        </a>
-      </li>
-    {% endfor %}
-  </ul>
-{% endif %}
+  <header class="section__head">
+    <div class="section__slug">
+      <span class="ix">??</span>
+      <span class="name">SUCHE</span>
+      <span class="jp">検索</span>
+    </div>
+  </header>
+
+  {% if not images %}
+    <div class="empty">
+      <span class="stamp">NO MATCH</span>
+      <p>Keine Treffer für <code>{{ query }}</code>.</p>
+      <p class="note">Versucht wird in Album-, Datei- und Tagnamen.</p>
+    </div>
+  {% else %}
+    <ul class="image-grid">
+      {% for img in images %}
+        <li class="image-tile">
+          <a href="/image/{{ img.rel_path }}" title="{{ img.album }} / {{ img.filename }}">
+            <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
+            <div class="image-tile__overlay"><span>{{ img.album }}</span></div>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
 {% endblock %}
