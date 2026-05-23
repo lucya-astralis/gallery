@@ -13,12 +13,14 @@ log = logging.getLogger("watcher")
 
 class _Handler(FileSystemEventHandler):
     def __init__(self, photos_dir: Path, thumbs_dir: Path, thumb_size: int,
-                 previews_dir: Path | None = None, preview_size: int = 1600):
+                 previews_dir: Path | None = None, preview_size: int = 1600,
+                 fulls_dir: Path | None = None):
         self.photos_dir = photos_dir
         self.thumbs_dir = thumbs_dir
         self.thumb_size = thumb_size
         self.previews_dir = previews_dir
         self.preview_size = preview_size
+        self.fulls_dir = fulls_dir
         self._pending: dict[str, float] = {}
         self._lock = threading.Lock()
         self._worker = threading.Thread(target=self._drain, daemon=True)
@@ -96,7 +98,7 @@ class _Handler(FileSystemEventHandler):
         scanner.remove_image(self.photos_dir, fp)
         try:
             rel = fp.relative_to(self.photos_dir).as_posix()
-            for d in (self.thumbs_dir, self.previews_dir):
+            for d in (self.thumbs_dir, self.previews_dir, self.fulls_dir):
                 if d is None:
                     continue
                 f = (d / rel).with_suffix(".jpg")
@@ -107,12 +109,13 @@ class _Handler(FileSystemEventHandler):
 
 
 def start(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
-          previews_dir: Path | None = None, preview_size: int = 1600) -> Observer:
+          previews_dir: Path | None = None, preview_size: int = 1600,
+          fulls_dir: Path | None = None) -> Observer:
     try:
         photos_dir.mkdir(parents=True, exist_ok=True)
     except (OSError, PermissionError):
         pass
-    handler = _Handler(photos_dir, thumbs_dir, thumb_size, previews_dir, preview_size)
+    handler = _Handler(photos_dir, thumbs_dir, thumb_size, previews_dir, preview_size, fulls_dir)
     obs = Observer()
     obs.schedule(handler, str(photos_dir), recursive=True)
     obs.daemon = True

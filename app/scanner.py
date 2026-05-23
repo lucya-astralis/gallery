@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from datetime import datetime
 from fractions import Fraction
 from pathlib import Path
@@ -10,11 +11,25 @@ from . import db
 
 log = logging.getLogger("scanner")
 
-IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif", ".heic"}
+STRIP_GPS = os.environ.get("STRIP_GPS", "1") not in ("0", "false", "False", "")
+GPS_IFD_TAG = 0x8825
+
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    log.warning("pillow-heif not installed; HEIC/HEIF support disabled")
+
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif", ".heic", ".heif"}
+JPEG_CONVERT_EXTS = {".heic", ".heif"}
 
 
 def is_image(p: Path) -> bool:
     return p.suffix.lower() in IMAGE_EXTS
+
+
+def needs_jpeg_conversion(p: Path) -> bool:
+    return p.suffix.lower() in JPEG_CONVERT_EXTS
 
 
 def _coerce(v):
@@ -77,6 +92,45 @@ def extract_exif(img: Image.Image) -> tuple[dict, str | None]:
     return out, taken
 
 
+def _has_gps(exif) -> bool:
+    if not exif:
+        return False
+    if GPS_IFD_TAG in exif:
+        return True
+    try:
+        gps = exif.get_ifd(ExifTags.IFD.GPSInfo)
+        return bool(gps)
+    except Exception:
+        return False
+
+
+def strip_gps_inplace(path: Path) -> bool:
+    """Remove GPS EXIF from the original file in place. Returns True if modified."""
+    try:
+        with Image.open(path) as img:
+            exif = img.getexif()
+            if not _has_gps(exif):
+                return False
+            if GPS_IFD_TAG in exif:
+                del exif[GPS_IFD_TAG]
+            try:
+                gps_ifd = exif.get_ifd(ExifTags.IFD.GPSInfo)
+                if gps_ifd:
+                    gps_ifd.clear()
+            except Exception:
+                pass
+            fmt = img.format
+            save_kwargs = {"exif": exif.tobytes()}
+            if fmt == "JPEG":
+                save_kwargs["quality"] = "keep"
+            img.save(path, format=fmt, **save_kwargs)
+        log.info("stripped GPS from %s", path.name)
+        return True
+    except (UnidentifiedImageError, OSError, ValueError) as e:
+        log.warning("gps strip failed for %s: %s", path, e)
+        return False
+
+
 def make_thumbnail(src: Path, dst: Path, size: int) -> bool:
     try:
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -93,6 +147,35 @@ def make_thumbnail(src: Path, dst: Path, size: int) -> bool:
     except (UnidentifiedImageError, OSError) as e:
         log.warning("thumb failed for %s: %s", src, e)
         return False
+
+
+def make_full_jpeg(src: Path, dst: Path) -> bool:
+    try:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(src) as img:
+            if img.mode in ("RGBA", "P", "LA"):
+                bg = Image.new("RGB", img.size, (20, 20, 20))
+                bg.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
+                img = bg
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
+            img.save(dst, "JPEG", quality=92, optimize=True, progressive=True)
+        return True
+    except (UnidentifiedImageError, OSError) as e:
+        log.warning("full jpeg conversion failed for %s: %s", src, e)
+        return False
+
+
+def ensure_full_jpeg(photos_dir: Path, fulls_dir: Path, rel_path: str) -> Path | None:
+    src = photos_dir / rel_path
+    if not src.exists() or not is_image(src):
+        return None
+    dst = (fulls_dir / rel_path).with_suffix(".jpg")
+    if dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime:
+        return dst
+    if make_full_jpeg(src, dst):
+        return dst
+    return None
 
 
 def _read_sidecar_tags(image_path: Path) -> list[str]:
@@ -150,6 +233,11 @@ def index_image(photos_dir: Path, file: Path) -> bool:
         row = c.execute("SELECT id, mtime FROM images WHERE rel_path = ?", (rel,)).fetchone()
         if row and abs(row["mtime"] - effective_mtime) < 1.0:
             return False
+
+    if STRIP_GPS and strip_gps_inplace(file):
+        stat = file.stat()
+        mtime = stat.st_mtime
+        effective_mtime = max(mtime, sidecar_mtime)
 
     width = height = None
     exif: dict = {}

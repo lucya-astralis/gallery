@@ -19,12 +19,14 @@ log = logging.getLogger("main")
 PHOTOS_DIR = Path(os.environ.get("PHOTOS_DIR", "./photos")).resolve()
 THUMBS_DIR = Path(os.environ.get("THUMBS_DIR", "./thumbnails")).resolve()
 PREVIEWS_DIR = Path(os.environ.get("PREVIEWS_DIR", "./previews")).resolve()
+FULLS_DIR = Path(os.environ.get("FULLS_DIR", str(PREVIEWS_DIR / "_full"))).resolve()
 DATA_DIR = Path(os.environ.get("DATA_DIR", "./data")).resolve()
 THUMB_SIZE = int(os.environ.get("THUMB_SIZE", "480"))
 PREVIEW_SIZE = int(os.environ.get("PREVIEW_SIZE", "1600"))
 SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL", "0"))
 ENABLE_WATCHER = os.environ.get("ENABLE_WATCHER", "1") not in ("0", "false", "False", "")
 HIDE_GPS = os.environ.get("HIDE_GPS", "1") not in ("0", "false", "False", "")
+STRIP_GPS = os.environ.get("STRIP_GPS", "1") not in ("0", "false", "False", "")
 
 _scan_lock = threading.Lock()
 
@@ -34,6 +36,7 @@ except (OSError, PermissionError):
     pass
 THUMBS_DIR.mkdir(parents=True, exist_ok=True)
 PREVIEWS_DIR.mkdir(parents=True, exist_ok=True)
+FULLS_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="lucya.systems gallery", docs_url=None, redoc_url=None, openapi_url=None)
@@ -109,14 +112,15 @@ def _periodic_scan_loop():
 def _startup():
     db.init(DATA_DIR)
     log.info(
-        "photos=%s thumbs=%s data=%s thumb_size=%d watcher=%s scan_interval=%ds hide_gps=%s",
-        PHOTOS_DIR, THUMBS_DIR, DATA_DIR, THUMB_SIZE, ENABLE_WATCHER, SCAN_INTERVAL, HIDE_GPS,
+        "photos=%s thumbs=%s data=%s thumb_size=%d watcher=%s scan_interval=%ds hide_gps=%s strip_gps=%s",
+        PHOTOS_DIR, THUMBS_DIR, DATA_DIR, THUMB_SIZE, ENABLE_WATCHER, SCAN_INTERVAL, HIDE_GPS, STRIP_GPS,
     )
     threading.Thread(target=_run_scan, daemon=True).start()
     if ENABLE_WATCHER:
         try:
             watcher.start(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE,
-                          previews_dir=PREVIEWS_DIR, preview_size=PREVIEW_SIZE)
+                          previews_dir=PREVIEWS_DIR, preview_size=PREVIEW_SIZE,
+                          fulls_dir=FULLS_DIR)
         except Exception as e:
             log.warning("watcher failed to start: %s", e)
     if SCAN_INTERVAL > 0:
@@ -324,6 +328,11 @@ def serve_full(album: str, filename: str):
     src = PHOTOS_DIR / rel
     if not src.exists():
         raise HTTPException(404, "not found")
+    if scanner.needs_jpeg_conversion(src):
+        dst = scanner.ensure_full_jpeg(PHOTOS_DIR, FULLS_DIR, rel)
+        if not dst:
+            raise HTTPException(500, "full conversion failed")
+        return FileResponse(str(dst), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=31536000"})
     return FileResponse(str(src), headers={"Cache-Control": "public, max-age=31536000"})
 
 

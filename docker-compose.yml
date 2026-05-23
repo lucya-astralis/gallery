@@ -5,7 +5,7 @@ services:
     ports:
       - "${PORT:-8000}:8000"
     volumes:
-      - ${PHOTOS_PATH:-./photos}:/photos:ro
+      - ${PHOTOS_PATH:-./photos}:/photos
       - ${THUMBS_PATH:-./thumbnails}:/thumbnails
       - ${PREVIEWS_PATH:-./previews}:/previews
       - ${DATA_PATH:-./data}:/data
@@ -19,4 +19,5 @@ services:
       - SCAN_INTERVAL=${SCAN_INTERVAL:-0}
       - ENABLE_WATCHER=${ENABLE_WATCHER:-1}
       - HIDE_GPS=${HIDE_GPS:-1}
+      - STRIP_GPS=${STRIP_GPS:-1}
     restart: unless-stopped
