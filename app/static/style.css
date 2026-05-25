@@ -1341,7 +1341,9 @@ details[open] > summary::before{ content:"▾ "; }
   -webkit-backdrop-filter: blur(6px);
   border:1px solid var(--line-strong);
   padding:0;
-  z-index:4;
+  /* must beat .stage (z:1500) which lifts itself above the scanline overlay,
+     otherwise this sibling loader gets hidden behind the stage. */
+  z-index:1600;
   font-family:"Proto Nerd Font", "JetBrains Mono", monospace;
   font-size:11px;
   letter-spacing:.18em;
