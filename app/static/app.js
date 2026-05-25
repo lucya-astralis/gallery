@@ -34,6 +34,7 @@ async function spaLoadImage(href) {
     try { history.pushState({ spa: true }, '', href); } catch (e) {}
     if (typeof window.__initImagePage === 'function') window.__initImagePage();
     if (typeof window.__lightboxReload === 'function') window.__lightboxReload();
+    if (typeof window.__scrambleSwapped === 'function') window.__scrambleSwapped();
     window.scrollTo(0, 0);
     success = true;
   } catch (e) {
@@ -96,6 +97,36 @@ window.__scrambleTo = (el, text) => {
   if (!s){ s = new TextScrambler(el); __scramblers.set(el, s); }
   return s.setText(String(text));
 };
+// re-scramble the changing texts in the image detail view after an SPA swap.
+// the elements are fresh DOM nodes (replaceWith), so they already display the
+// new target text — we blank them and scramble back in for the decoder effect.
+window.__scrambleSwapped = () => {
+  if (!window.__scrambleTo) return;
+  const els = new Set();
+  document.querySelectorAll('.crumb b, .stage__corner, .section__doc b').forEach(el => els.add(el));
+  document.querySelectorAll('.section__doc span').forEach(span => {
+    if (!span.querySelector('b') && !span.classList.contains('stamp')) els.add(span);
+  });
+  document.querySelectorAll('.sidebar .kv dd').forEach(dd => {
+    const a = dd.querySelector('a');
+    if (a && !a.querySelector('*')) els.add(a);
+    else if (!dd.querySelector('*')) els.add(dd);
+  });
+  document.querySelectorAll('.sidebar .tag-list .tag').forEach(t => {
+    if (!t.querySelector('*')) els.add(t);
+  });
+  const desc = document.querySelector('.sidebar .description');
+  if (desc && !desc.querySelector('*')) els.add(desc);
+  els.forEach(el => {
+    const target = el.textContent;
+    if (!target.trim()) return;
+    el.dataset.scrambleSetup = '1';
+    el.dataset.scrambleTarget = target;
+    el.textContent = '';
+    window.__scrambleTo(el, target);
+  });
+};
+
 window.__scrambleOnView = (els) => {
   const list = els.filter(el => el && !el.dataset.scrambleSetup);
   list.forEach(el => {
