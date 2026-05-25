@@ -1,3 +1,54 @@
+// ---------- SHARED HELPERS -------------------------------------
+function readAlbumData() {
+  const el = document.getElementById('album-data');
+  if (!el) return null;
+  try { return JSON.parse(el.textContent); }
+  catch (e) { return null; }
+}
+
+// SPA-style navigation between images on the same detail page.
+// Fetches the target page, swaps the per-image sections in place and
+// keeps the URL in sync via pushState. Returns true on success.
+async function spaLoadImage(href) {
+  if (!document.querySelector('.detail')) return false;
+  const oldStage = document.querySelector('.stage');
+  if (oldStage) oldStage.classList.add('is-spa-loading');
+  let success = false;
+  try {
+    const resp = await fetch(href, {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'text/html' },
+    });
+    if (!resp.ok) throw new Error('bad status ' + resp.status);
+    const html = await resp.text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const selectors = ['.crumb', '.section__doc', '.detail', '#album-data'];
+    let swapped = 0;
+    selectors.forEach(sel => {
+      const newEl = doc.querySelector(sel);
+      const oldEl = document.querySelector(sel);
+      if (newEl && oldEl) { oldEl.replaceWith(newEl); swapped++; }
+    });
+    if (!swapped) throw new Error('nothing swapped');
+    document.title = doc.title || document.title;
+    try { history.pushState({ spa: true }, '', href); } catch (e) {}
+    if (typeof window.__initImagePage === 'function') window.__initImagePage();
+    if (typeof window.__lightboxReload === 'function') window.__lightboxReload();
+    window.scrollTo(0, 0);
+    success = true;
+  } catch (e) {
+    success = false;
+  } finally {
+    if (!success) {
+      // on success the old .stage is replaced so the loading class is gone
+      const s = document.querySelector('.stage');
+      if (s) s.classList.remove('is-spa-loading');
+    }
+  }
+  return success;
+}
+window.__spaLoadImage = spaLoadImage;
+
 // ---------- TEXT SCRAMBLE --------------------------------------
 // decoder-style transition. Random glyphs flicker, then resolve to the
 // target text one char at a time.
@@ -221,29 +272,40 @@ document.addEventListener('keydown', (e) => {
   if (lb && !lb.hidden) return;
   if (e.key === 'ArrowLeft') {
     const prev = document.querySelector('.nav-arrow.prev');
-    if (prev) window.location.href = prev.href;
+    if (prev) prev.click(); // triggers the SPA-aware click handler
   } else if (e.key === 'ArrowRight') {
     const next = document.querySelector('.nav-arrow.next');
-    if (next) window.location.href = next.href;
+    if (next) next.click();
   } else if (e.key === 'Escape') {
     const crumb = document.querySelector('.crumb a:last-of-type');
     if (crumb) window.location.href = crumb.href;
   }
 });
 
-document.addEventListener('DOMContentLoaded', () => {
+// ---------- IMAGE-PAGE INIT (re-callable after SPA swap) -------
+function initImagePage() {
   const btn = document.getElementById('load-full-btn');
   const img = document.getElementById('stage-img');
   const loader = document.getElementById('stage-loader');
   const stamp = document.getElementById('quality-stamp');
   if (!btn || !img || !loader) return;
 
+  // reset stage state — DOM was just (re)rendered
+  loader.classList.remove('is-loading', 'is-done');
+  img.classList.add('is-preview');
+  btn.textContent = 'Load original';
+  if (stamp) {
+    stamp.textContent = 'PREVIEW';
+    stamp.classList.add('stamp--cy');
+    stamp.classList.remove('stamp--ok');
+  }
+
+  // load-original swaps preview → full quality inside the stage
   btn.addEventListener('click', () => {
     const fullUrl = img.dataset.full;
     if (!fullUrl) return;
     loader.classList.add('is-loading');
     btn.textContent = 'Loading…';
-
     const full = new Image();
     full.onload = () => {
       img.src = fullUrl;
@@ -262,7 +324,17 @@ document.addEventListener('DOMContentLoaded', () => {
     full.src = fullUrl;
   });
 
-  // swipe gestures on the stage → use existing prev/next nav-arrow hrefs
+  // fullscreen / lightbox triggers
+  const fsBtn = document.getElementById('open-fullscreen-btn');
+  if (fsBtn) fsBtn.addEventListener('click', () => {
+    if (typeof window.__lightboxOpen === 'function') window.__lightboxOpen();
+  });
+  img.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (typeof window.__lightboxOpen === 'function') window.__lightboxOpen();
+  });
+
+  // swipe gestures on the stage — SPA-load next/prev
   const stage = img.closest('.stage');
   if (stage) {
     let sStartX = 0, sStartY = 0, sStartT = 0, sTracking = false;
@@ -273,24 +345,47 @@ document.addEventListener('DOMContentLoaded', () => {
       sStartY = e.touches[0].clientY;
       sStartT = Date.now();
     }, { passive: true });
-    stage.addEventListener('touchend', (e) => {
+    stage.addEventListener('touchend', async (e) => {
       if (!sTracking) return;
       sTracking = false;
+      if (window.visualViewport && window.visualViewport.scale > 1.05) return;
       const t = e.changedTouches[0];
       const dx = t.clientX - sStartX;
       const dy = t.clientY - sStartY;
       const dt = Date.now() - sStartT;
       if (dt > 700) return;
       if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
-      // suppress the synthetic click so the lightbox doesn't open mid-navigation
       e.preventDefault();
       const link = dx < 0
         ? document.querySelector('.nav-arrow.next')
         : document.querySelector('.nav-arrow.prev');
-      if (link) location.replace(link.href);
+      if (!link) return;
+      const ok = await spaLoadImage(link.href);
+      if (!ok) location.replace(link.href);
     }, { passive: false });
   }
-});
+
+  // nav-arrow clicks → SPA load instead of full page navigation
+  document.querySelectorAll('.nav-arrow.prev, .nav-arrow.next').forEach(a => {
+    a.addEventListener('click', async (ev) => {
+      if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button === 1) return;
+      ev.preventDefault();
+      const ok = await spaLoadImage(a.href);
+      if (!ok) location.replace(a.href);
+    });
+  });
+
+  // warm the cache for neighbours so SPA nav feels instant
+  document.querySelectorAll('.nav-arrow.prev, .nav-arrow.next').forEach(a => {
+    try {
+      const u = new URL(a.href, location.href);
+      const m = u.pathname.match(/^\/image\/(.+)$/);
+      if (m) { const p = new Image(); p.src = '/preview/' + m[1]; }
+    } catch (e) {}
+  });
+}
+window.__initImagePage = initImagePage;
+document.addEventListener('DOMContentLoaded', initImagePage);
 
 // ---------- SORT DROPDOWN --------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
@@ -317,6 +412,16 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.setAttribute('aria-expanded', 'false');
       if (backdrop) backdrop.classList.remove('is-open');
       document.body.classList.remove('sort-open');
+      // restore menu to its original parent if we lifted it
+      if (menu._origParent && menu.parentNode === document.body) {
+        if (menu._origNext && menu._origNext.parentNode === menu._origParent) {
+          menu._origParent.insertBefore(menu, menu._origNext);
+        } else {
+          menu._origParent.appendChild(menu);
+        }
+        menu._origParent = null;
+        menu._origNext = null;
+      }
     }
     function open(){
       // close any other open menu
@@ -332,6 +437,14 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.setAttribute('aria-expanded', 'true');
       if (isMobile()) {
         ensureBackdrop().classList.add('is-open');
+        // Lift the menu out of <main>'s stacking context (z-index:10),
+        // otherwise the backdrop at body level (z:200) sits *above* it
+        // and intercepts every tap.
+        if (menu.parentNode !== document.body) {
+          menu._origParent = menu.parentNode;
+          menu._origNext = menu.nextSibling;
+          document.body.appendChild(menu);
+        }
       }
       document.body.classList.add('sort-open');
     }
@@ -402,29 +515,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const qs = passthrough.toString();
       location.replace(qs ? albumBase + '?' + qs : albumBase);
     });
-
-    // intercept stage nav-arrow clicks to replace history rather than push,
-    // so we don't accumulate one history entry per prev/next step
-    document.querySelectorAll('.nav-arrow.prev, .nav-arrow.next').forEach(a => {
-      a.addEventListener('click', (ev) => {
-        if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button === 1) return;
-        ev.preventDefault();
-        location.replace(a.href);
-      });
-    });
+    // nav-arrow click interception is now handled by initImagePage()
+    // (which uses SPA navigation instead of full reload).
   });
 })();
 
 // ---------- LIGHTBOX -------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
   const lb = document.getElementById('lightbox');
-  const dataEl = document.getElementById('album-data');
-  if (!lb || !dataEl) return;
-
-  let data;
-  try { data = JSON.parse(dataEl.textContent); }
-  catch (e) { return; }
-  if (!data || !Array.isArray(data.rels) || data.rels.length === 0) return;
+  if (!lb) return;
 
   // Reparent to body so the lightbox escapes <main>'s stacking context
   // (main has z-index:10, which would cap our z:1000 under body::after's
@@ -441,16 +540,31 @@ document.addEventListener('DOMContentLoaded', () => {
   const fullBtn = document.getElementById('lb-full');
   const dlBtn = document.getElementById('lb-dl');
   const bar = lb.querySelector('.lightbox__bar');
-  const stageImg = document.getElementById('stage-img');
-  const fsBtn = document.getElementById('open-fullscreen-btn');
 
-  const rels = data.rels;
-  const total = rels.length;
-  let index = Math.max(0, Math.min(data.current | 0, total - 1));
-  const initialIndex = index;
-  // preserve query string (e.g. ?sort=name_asc) across in-lightbox navigation
-  const initialSearch = location.search;
+  // mutable state — refreshed whenever the underlying #album-data changes
+  // (initial page load + after every SPA swap).
+  let rels = [];
+  let total = 0;
+  let index = 0;
+  let initialIndex = 0;
+  let initialSearch = '';
   let showingFull = false;
+
+  function reload() {
+    const data = readAlbumData();
+    if (!data || !Array.isArray(data.rels) || data.rels.length === 0) {
+      rels = []; total = 0; index = 0; initialIndex = 0;
+      return;
+    }
+    rels = data.rels;
+    total = rels.length;
+    index = Math.max(0, Math.min(data.current | 0, total - 1));
+    initialIndex = index;
+    initialSearch = location.search;
+  }
+  reload();
+  window.__lightboxReload = reload;
+  if (rels.length === 0) return;
 
   const IDLE_MS = 2500;
   let idleTimer = null;
@@ -561,12 +675,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }, true);
   lb.addEventListener('wheel', bumpIdle, { passive: true });
 
-  // open triggers
-  if (stageImg) stageImg.addEventListener('click', (e) => {
-    e.preventDefault();
-    open();
-  });
-  if (fsBtn) fsBtn.addEventListener('click', open);
+  // open triggers — wired by initImagePage() via window.__lightboxOpen
+  window.__lightboxOpen = open;
 
   // nav / close
   if (prevBtn) prevBtn.addEventListener('click', (e) => { e.stopPropagation(); navigate(-1); });
@@ -621,10 +731,11 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (e.key === 'ArrowRight') { e.stopPropagation(); navigate(1); }
   }, true);
 
-  // swipe gestures
+  // swipe gestures (lightbox)
   let tStartX = 0, tStartY = 0, tStartT = 0, tracking = false;
   stage.addEventListener('touchstart', (e) => {
-    if (e.touches.length !== 1) return;
+    // multi-touch = pinch in progress, let the browser handle it
+    if (e.touches.length !== 1) { tracking = false; return; }
     tracking = true;
     tStartX = e.touches[0].clientX;
     tStartY = e.touches[0].clientY;
@@ -633,6 +744,8 @@ document.addEventListener('DOMContentLoaded', () => {
   stage.addEventListener('touchend', (e) => {
     if (!tracking) return;
     tracking = false;
+    // while user is zoomed in, treat one-finger drags as panning, not nav
+    if (window.visualViewport && window.visualViewport.scale > 1.05) return;
     const t = e.changedTouches[0];
     const dx = t.clientX - tStartX;
     const dy = t.clientY - tStartY;
