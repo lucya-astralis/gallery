@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}WELCOME // LUCYA.SYSTEMS GALLERY{% endblock %}
+{% block body_class %}page-welcome{% endblock %}
+{% block meta %}
+  {% set og_desc = 'Personal photo archive · ' ~ image_count ~ ' images in ' ~ album_count ~ ' albums.' %}
+  <meta property="og:site_name" content="lucya.systems gallery">
+  <meta property="og:title" content="lucya.systems / gallery">
+  <meta property="og:description" content="{{ og_desc }}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ request.url }}">
+  {% if shuffle %}
+    {% set og_image = (request.base_url | string) ~ 'preview/' ~ shuffle[0].rel_path %}
+    <meta property="og:image" content="{{ og_image }}">
+    <meta property="og:image:alt" content="Random photo from gallery">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="{{ og_image }}">
+  {% else %}
+    <meta name="twitter:card" content="summary">
+  {% endif %}
+  <meta name="twitter:title" content="lucya.systems / gallery">
+  <meta name="twitter:description" content="{{ og_desc }}">
+  <meta name="theme-color" content="#5b8aff">
+{% endblock %}
+{% block content %}
+<section class="welcome">
+  <div class="section__doc">
+    <span>SIG / LUCYA.GALLERY</span>
+    <span>IDX / <b>{{ image_count }}</b> IMG</span>
+    <span>SET / <b>{{ album_count }}</b> ALB</span>
+    <span class="stamp stamp--ok">ONLINE</span>
+  </div>
+
+  <div class="welcome__grid">
+    <div class="welcome__hero">
+      {% if shuffle %}
+        <div class="shuffle-deck" id="shuffle-deck" data-count="{{ shuffle | length }}">
+          <span class="shuffle-deck__label">FEED / <b>RANDOM</b> / <span data-shuffle-idx>01</span>·{{ '%02d' | format(shuffle | length) }}</span>
+          <span class="shuffle-deck__frame" aria-hidden="true"></span>
+          {% for img in shuffle %}
+            <a class="shuffle-card" href="/image/{{ img.rel_path }}" data-rel="{{ img.rel_path }}">
+              <img src="/preview/{{ img.rel_path }}" alt="{{ img.filename }}" loading="{% if loop.index0 < 2 %}eager{% else %}lazy{% endif %}">
+              <div class="shuffle-card__meta">
+                <span class="shuffle-card__tag" data-scramble-static>RND / {{ '%02d' | format(loop.index) }}</span>
+                <span class="shuffle-card__name" data-scramble>{{ img.album }} / {{ img.filename }}</span>
+              </div>
+              <span class="shuffle-card__corner">FRAME</span>
+            </a>
+          {% endfor %}
+        </div>
+        <div class="shuffle-ctl">
+          <button type="button" class="shuffle-btn" id="shuffle-next" aria-label="Next frame">NEXT ›</button>
+          <button type="button" class="shuffle-btn" id="shuffle-refresh" aria-label="Reshuffle feed">⟳ RESHUFFLE</button>
+          <span class="shuffle-status" id="shuffle-status">AUTO · 3.0s</span>
+        </div>
+      {% else %}
+        <div class="empty">
+          <span class="stamp">NO INDEX</span>
+          <p>No images indexed yet.</p>
+          <p class="note">Drop subfolders into <code>photos/</code> — each subfolder becomes an album.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <aside class="welcome__intro">
+      <div class="welcome__slug">
+        <span class="ix">00</span>
+        <span class="jp">画像庫</span>
+      </div>
+      <h1 class="welcome__title">LUCYA<span>.</span>GALLERY</h1>
+      <p class="welcome__lead">
+        Personal photo archive. Indexed locally, served statically,
+        GPS metadata stripped on import.
+      </p>
+      <div class="welcome__actions">
+        <a href="/albums" class="btn-link btn-link--primary">BROWSE ALBUMS →</a>
+        {% if shuffle %}
+          <a href="/image/{{ shuffle[0].rel_path }}" class="btn-link">OPEN RANDOM ↗</a>
+        {% endif %}
+      </div>
+      <dl class="welcome__kv">
+        <dt>IMG</dt><dd>{{ image_count }}</dd>
+        <dt>ALB</dt><dd>{{ album_count }}</dd>
+        <dt>MODE</dt><dd>READONLY</dd>
+      </dl>
+    </aside>
+  </div>
+</section>
+{% endblock %}

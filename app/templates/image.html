@@ -1,10 +1,33 @@
 {% extends "base.html" %}
 {% block title %}{{ image.filename | upper }} // {{ image.album | upper }} // LUCYA.SYSTEMS GALLERY{% endblock %}
 {% block body_class %}page-image{% endblock %}
+{% block meta %}
+  {% set og_title = image.filename ~ ' — ' ~ image.album %}
+  {% set og_desc = description if description else 'Photo from album “' ~ image.album ~ '” · lucya.systems gallery' %}
+  {% set og_image = (request.base_url | string) ~ 'preview/' ~ image.rel_path %}
+  <meta property="og:site_name" content="lucya.systems gallery">
+  <meta property="og:title" content="{{ og_title }}">
+  <meta property="og:description" content="{{ og_desc | truncate(200) }}">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="{{ request.url }}">
+  <meta property="og:image" content="{{ og_image }}">
+  <meta property="og:image:alt" content="{{ image.filename }}">
+  {% if image.width and image.height %}
+    <meta property="og:image:width" content="{{ image.width }}">
+    <meta property="og:image:height" content="{{ image.height }}">
+  {% endif %}
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ og_title }}">
+  <meta name="twitter:description" content="{{ og_desc | truncate(200) }}">
+  <meta name="twitter:image" content="{{ og_image }}">
+  <meta name="theme-color" content="#5b8aff">
+{% endblock %}
 {% block content %}
 <section>
   <div class="crumb">
-    <a href="/">ALBUMS</a>
+    <a href="/">HOME</a>
+    <span class="sep">/</span>
+    <a href="/albums">ALBUMS</a>
     <span class="sep">/</span>
     <a href="/album/{{ image.album }}">{{ image.album | upper }}</a>
     <span class="sep">/</span>
@@ -20,22 +43,26 @@
   </div>
 
   <div class="detail">
-    <div class="stage">
-      <span class="stage__corner stage__corner--tl">FRAME / 01</span>
-      <span class="stage__corner stage__corner--tr">{% if image.width and image.height %}{{ image.width }}×{{ image.height }}{% else %}IMG{% endif %}</span>
-      {% if prev_rel %}<a class="nav-arrow prev" href="/image/{{ prev_rel }}" aria-label="Previous">‹</a>{% endif %}
-      <img id="stage-img"
-           class="is-preview"
-           src="/preview/{{ image.rel_path }}"
-           data-full="/full/{{ image.rel_path }}"
-           alt="{{ image.filename }}">
-      {% if next_rel %}<a class="nav-arrow next" href="/image/{{ next_rel }}" aria-label="Next">›</a>{% endif %}
-      <span class="stage__corner stage__corner--br">{{ image.filename }}</span>
+    <div class="stage-wrap">
+      <div class="stage">
+        <span class="stage__corner stage__corner--tl">FRAME / 01</span>
+        <span class="stage__corner stage__corner--tr">{% if image.width and image.height %}{{ image.width }}×{{ image.height }}{% else %}IMG{% endif %}</span>
+        {% if prev_rel %}<a class="nav-arrow prev" href="/image/{{ prev_rel }}" aria-label="Previous">‹</a>{% endif %}
+        <img id="stage-img"
+             class="is-preview"
+             src="/preview/{{ image.rel_path }}"
+             data-full="/full/{{ image.rel_path }}"
+             alt="{{ image.filename }}">
+        {% if next_rel %}<a class="nav-arrow next" href="/image/{{ next_rel }}" aria-label="Next">›</a>{% endif %}
+        <span class="stage__corner stage__corner--br">{{ image.filename }}</span>
+      </div>
 
       <div class="stage__loader" id="stage-loader">
-        <button type="button" id="load-full-btn">Load original</button>
+        <button type="button" id="load-full-btn" class="loader-btn">Load original</button>
         <span class="sep"></span>
         <a href="/full/{{ image.rel_path }}" target="_blank" rel="noopener" class="loader-link">New tab ↗</a>
+        <span class="sep"></span>
+        <a href="/full/{{ image.rel_path }}" download="{{ image.filename }}" class="loader-link">Download ↓</a>
       </div>
     </div>
 
@@ -47,9 +74,16 @@
           <dt>Filename</dt><dd>{{ image.filename }}</dd>
           {% if image.width and image.height %}<dt>Dimensions</dt><dd>{{ image.width }} × {{ image.height }} px</dd>{% endif %}
           {% if image.size %}<dt>Size</dt><dd>{{ (image.size / 1024 / 1024) | round(2) }} MB</dd>{% endif %}
-          <dt>Original</dt><dd><a href="/full/{{ image.rel_path }}" target="_blank" rel="noopener">open ↗</a></dd>
+          <dt>Original</dt><dd><a href="/full/{{ image.rel_path }}" target="_blank" rel="noopener">open ↗</a> · <a href="/full/{{ image.rel_path }}" download="{{ image.filename }}">download ↓</a></dd>
         </dl>
       </section>
+
+      {% if description %}
+      <section class="panel">
+        <h2>DESCRIPTION</h2>
+        <p class="description">{{ description }}</p>
+      </section>
+      {% endif %}
 
       {% if tags %}
       <section class="panel">

@@ -1,9 +1,34 @@
 {% extends "base.html" %}
 {% block title %}{{ album | upper }} // LUCYA.SYSTEMS GALLERY{% endblock %}
+{% block meta %}
+  {% set og_title = album ~ ' — lucya.systems gallery' %}
+  {% set img_count = images | length %}
+  {% set og_desc = img_count ~ (' image' if img_count == 1 else ' images') ~ ' in “' ~ album ~ '”' %}
+  {% set cover_rel = images[0].rel_path if images else None %}
+  <meta property="og:site_name" content="lucya.systems gallery">
+  <meta property="og:title" content="{{ og_title }}">
+  <meta property="og:description" content="{{ og_desc }}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ request.url }}">
+  {% if cover_rel %}
+    {% set og_image = (request.base_url | string) ~ 'preview/' ~ cover_rel %}
+    <meta property="og:image" content="{{ og_image }}">
+    <meta property="og:image:alt" content="{{ album }}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="{{ og_image }}">
+  {% else %}
+    <meta name="twitter:card" content="summary">
+  {% endif %}
+  <meta name="twitter:title" content="{{ og_title }}">
+  <meta name="twitter:description" content="{{ og_desc }}">
+  <meta name="theme-color" content="#5b8aff">
+{% endblock %}
 {% block content %}
 <section>
   <div class="crumb">
-    <a href="/">ALBUMS</a>
+    <a href="/">HOME</a>
+    <span class="sep">/</span>
+    <a href="/albums">ALBUMS</a>
     <span class="sep">/</span>
     <b>{{ album }}</b>
   </div>

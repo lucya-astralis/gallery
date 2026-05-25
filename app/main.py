@@ -141,7 +141,29 @@ def _safe_rel(album: str, filename: str) -> Path:
 
 
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request):
+def welcome(request: Request):
+    c = db.conn()
+    shuffle = [
+        dict(r) for r in c.execute(
+            "SELECT album, filename, rel_path FROM images ORDER BY RANDOM() LIMIT 8"
+        ).fetchall()
+    ]
+    counts = c.execute(
+        "SELECT COUNT(*) AS images, COUNT(DISTINCT album) AS albums FROM images"
+    ).fetchone()
+    return templates.TemplateResponse(
+        "welcome.html",
+        {
+            "request": request,
+            "shuffle": shuffle,
+            "image_count": counts["images"] if counts else 0,
+            "album_count": counts["albums"] if counts else 0,
+        },
+    )
+
+
+@app.get("/albums", response_class=HTMLResponse)
+def albums_index(request: Request):
     c = db.conn()
     rows = c.execute(
         """SELECT album, COUNT(*) AS count, MAX(taken_at) AS latest,
@@ -153,6 +175,17 @@ def index(request: Request):
     return templates.TemplateResponse(
         "index.html", {"request": request, "albums": albums}
     )
+
+
+@app.get("/api/shuffle")
+def api_shuffle(limit: int = 8):
+    limit = max(1, min(24, limit))
+    c = db.conn()
+    rows = c.execute(
+        "SELECT album, filename, rel_path FROM images ORDER BY RANDOM() LIMIT ?",
+        (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]
 
 
 @app.get("/album/{album}", response_class=HTMLResponse)
@@ -222,6 +255,7 @@ def image_view(request: Request, album: str, filename: str):
     prev_rel = rel_list[idx - 1] if idx > 0 else None
     next_rel = rel_list[idx + 1] if 0 <= idx < len(rel_list) - 1 else None
     pretty_exif = _prettify_exif(exif)
+    description = _extract_description(exif)
     return templates.TemplateResponse(
         "image.html",
         {
@@ -232,8 +266,27 @@ def image_view(request: Request, album: str, filename: str):
             "tags": tags,
             "prev_rel": prev_rel,
             "next_rel": next_rel,
+            "description": description,
         },
     )
+
+
+def _extract_description(exif: dict) -> str | None:
+    if not exif:
+        return None
+    for key in ("ImageDescription", "XPComment", "XPSubject", "XPTitle", "UserComment"):
+        v = exif.get(key)
+        if v in (None, "", [], {}):
+            continue
+        if isinstance(v, (list, tuple)):
+            try:
+                v = bytes(v).decode("utf-16-le", errors="ignore")
+            except Exception:
+                v = " ".join(str(x) for x in v)
+        s = str(v).replace("\x00", "").strip()
+        if s:
+            return s
+    return None
 
 
 def _prettify_exif(exif: dict) -> list[tuple[str, str]]:
@@ -341,7 +394,7 @@ def search(request: Request, q: str = ""):
     q = q.strip()
     c = db.conn()
     if not q:
-        return RedirectResponse("/")
+        return RedirectResponse("/albums")
     like = f"%{q}%"
     rows = c.execute(
         """SELECT DISTINCT i.* FROM images i

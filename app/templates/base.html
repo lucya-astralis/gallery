@@ -7,6 +7,18 @@
   <title>{% block title %}LUCYA.SYSTEMS GALLERY{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="/static/logo/lucya_logo.svg">
   <link rel="stylesheet" href="/static/style.css">
+
+  {% block meta %}
+  <meta property="og:site_name" content="lucya.systems gallery">
+  <meta property="og:title" content="lucya.systems / gallery">
+  <meta property="og:description" content="Personal photo archive.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ request.url }}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="lucya.systems / gallery">
+  <meta name="twitter:description" content="Personal photo archive.">
+  <meta name="theme-color" content="#5b8aff">
+  {% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
   <video class="bg-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
