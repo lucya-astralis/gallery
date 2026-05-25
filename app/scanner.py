@@ -14,19 +14,31 @@ log = logging.getLogger("scanner")
 STRIP_GPS = os.environ.get("STRIP_GPS", "1") not in ("0", "false", "False", "")
 GPS_IFD_TAG = 0x8825
 
-# Showcase marker: any filename (without extension) or album folder name
-# whose first character matches this prefix is treated as a showcase item.
-# Default is an underscore; configurable via the SHOWCASE_MARKER env var.
+# Showcase marker: prefix character used to flag featured items.
+#   - A *photo* whose filename (without extension) starts with the marker
+#     is a showcase photo (featured in the welcome CRT, in /api/showcase
+#     and in its own album's "featured" strip).
+#   - An *album* whose folder name starts with the marker is a showcase
+#     album (surfaced in the dedicated section on /albums).
+# The two flags are INDEPENDENT — putting a photo inside a showcase
+# album does NOT auto-feature it. Default marker is an underscore;
+# configurable via the SHOWCASE_MARKER env var. Set to empty to disable.
 SHOWCASE_MARKER = os.environ.get("SHOWCASE_MARKER", "_")
 
 
-def is_showcase(album: str, filename: str) -> bool:
+def is_showcase_photo(filename: str) -> bool:
+    """True if a photo's filename marks it as a showcase item."""
     if not SHOWCASE_MARKER:
         return False
-    if album.startswith(SHOWCASE_MARKER):
-        return True
     stem = filename.rsplit(".", 1)[0] if "." in filename else filename
     return stem.startswith(SHOWCASE_MARKER)
+
+
+def is_showcase_album(album: str) -> bool:
+    """True if an album's folder name marks it as a showcase album."""
+    if not SHOWCASE_MARKER:
+        return False
+    return album.startswith(SHOWCASE_MARKER)
 
 try:
     from pillow_heif import register_heif_opener
@@ -267,7 +279,7 @@ def index_image(photos_dir: Path, file: Path) -> bool:
         log.warning("open failed for %s: %s", file, e)
         return False
 
-    showcase_flag = 1 if is_showcase(album, filename) else 0
+    showcase_flag = 1 if is_showcase_photo(filename) else 0
     with db.lock():
         c.execute(
             """INSERT INTO images (album, filename, rel_path, mtime, size, width, height, exif_json, taken_at, is_showcase)

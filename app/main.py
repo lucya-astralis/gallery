@@ -234,9 +234,10 @@ def _periodic_scan_loop():
 
 def _backfill_showcase():
     """
-    Recompute `is_showcase` for every indexed image based on the current
-    SHOWCASE_MARKER. Runs on every startup so marker changes (or first
-    rollout of the column) propagate without forcing a re-scan.
+    Recompute `is_showcase` for every indexed photo based on the current
+    SHOWCASE_MARKER (which is checked against the filename only — being
+    inside a showcase album does NOT auto-feature a photo). Runs on every
+    startup so marker changes propagate without forcing a re-scan.
     """
     c = db.conn()
     marker = scanner.SHOWCASE_MARKER
@@ -248,11 +249,10 @@ def _backfill_showcase():
             c.execute(
                 """UPDATE images
                    SET is_showcase = CASE
-                     WHEN substr(album, 1, ?) = ?
-                       OR substr(filename, 1, ?) = ?
-                     THEN 1 ELSE 0
+                     WHEN substr(filename, 1, ?) = ? THEN 1
+                     ELSE 0
                    END""",
-                (ml, marker, ml, marker),
+                (ml, marker),
             )
         c.commit()
 
@@ -343,13 +343,14 @@ def albums_index(request: Request, sort: str | None = None):
            FROM images GROUP BY album ORDER BY {order_sql}"""
     ).fetchall()
     albums = [dict(r) for r in rows]
-    featured = _showcase_rows(limit=12, random_order=False)
+    is_show = lambda name: bool(SHOWCASE_MARKER) and name.startswith(SHOWCASE_MARKER)
+    showcase_albums = [a for a in albums if is_show(a["album"])]
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "albums": albums,
-            "featured": featured,
+            "showcase_albums": showcase_albums,
             "current_sort": current_sort,
             "default_sort": SORT_ALBUM_DEFAULT,
             "sort_options": _album_sort_options_for_template(current_sort),
@@ -437,12 +438,10 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
         (album,),
     ).fetchall()
     album_is_showcase = bool(SHOWCASE_MARKER) and album.startswith(SHOWCASE_MARKER)
-    # within-album featured strip (skip when the whole album is already a
-    # showcase — every photo would just duplicate the grid)
-    if album_is_showcase:
-        featured = []
-    else:
-        featured = _showcase_rows(album=album, limit=8, random_order=False)
+    # Featured strip = photos in this album with their own filename marker.
+    # A showcase ALBUM doesn't auto-promote its contents — each photo opts
+    # in independently with a `_` filename prefix.
+    featured = _showcase_rows(album=album, limit=8, random_order=False)
     return templates.TemplateResponse(
         "album.html",
         {

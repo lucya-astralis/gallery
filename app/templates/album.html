@@ -96,9 +96,10 @@
   {% else %}
     <ul class="image-grid">
       {% for img in images %}
-        <li class="image-tile">
+        <li class="image-tile{% if img.is_showcase %} image-tile--showcase{% endif %}">
           <a href="/image/{{ img.rel_path }}{{ img_qs }}">
-            <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
+            <img src="/thumb/{{ img.rel_path }}" alt="{{ display_name(img.filename) }}" loading="lazy">
+            {% if img.is_showcase %}<span class="image-tile__star" aria-label="Featured">★</span>{% endif %}
             <div class="image-tile__overlay"><span>OPEN ↗</span></div>
           </a>
         </li>
