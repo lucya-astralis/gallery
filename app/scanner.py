@@ -14,6 +14,32 @@ log = logging.getLogger("scanner")
 STRIP_GPS = os.environ.get("STRIP_GPS", "1") not in ("0", "false", "False", "")
 GPS_IFD_TAG = 0x8825
 
+# Showcase marker: prefix character used to flag featured items.
+#   - A *photo* whose filename (without extension) starts with the marker
+#     is a showcase photo (featured in the welcome CRT, in /api/showcase
+#     and in its own album's "featured" strip).
+#   - An *album* whose folder name starts with the marker is a showcase
+#     album (surfaced in the dedicated section on /albums).
+# The two flags are INDEPENDENT — putting a photo inside a showcase
+# album does NOT auto-feature it. Default marker is an underscore;
+# configurable via the SHOWCASE_MARKER env var. Set to empty to disable.
+SHOWCASE_MARKER = os.environ.get("SHOWCASE_MARKER", "_")
+
+
+def is_showcase_photo(filename: str) -> bool:
+    """True if a photo's filename marks it as a showcase item."""
+    if not SHOWCASE_MARKER:
+        return False
+    stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+    return stem.startswith(SHOWCASE_MARKER)
+
+
+def is_showcase_album(album: str) -> bool:
+    """True if an album's folder name marks it as a showcase album."""
+    if not SHOWCASE_MARKER:
+        return False
+    return album.startswith(SHOWCASE_MARKER)
+
 try:
     from pillow_heif import register_heif_opener
     register_heif_opener()
@@ -253,15 +279,17 @@ def index_image(photos_dir: Path, file: Path) -> bool:
         log.warning("open failed for %s: %s", file, e)
         return False
 
+    showcase_flag = 1 if is_showcase_photo(filename) else 0
     with db.lock():
         c.execute(
-            """INSERT INTO images (album, filename, rel_path, mtime, size, width, height, exif_json, taken_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """INSERT INTO images (album, filename, rel_path, mtime, size, width, height, exif_json, taken_at, is_showcase)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(rel_path) DO UPDATE SET
                  album=excluded.album, filename=excluded.filename, mtime=excluded.mtime,
                  size=excluded.size, width=excluded.width, height=excluded.height,
-                 exif_json=excluded.exif_json, taken_at=excluded.taken_at""",
-            (album, filename, rel, effective_mtime, stat.st_size, width, height, json.dumps(exif), taken),
+                 exif_json=excluded.exif_json, taken_at=excluded.taken_at,
+                 is_showcase=excluded.is_showcase""",
+            (album, filename, rel, effective_mtime, stat.st_size, width, height, json.dumps(exif), taken, showcase_flag),
         )
         image_id = c.execute("SELECT id FROM images WHERE rel_path = ?", (rel,)).fetchone()["id"]
         c.commit()

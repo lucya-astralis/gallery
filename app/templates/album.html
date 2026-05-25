@@ -31,12 +31,13 @@
     <span class="sep">/</span>
     <a href="/albums">ALBUMS</a>
     <span class="sep">/</span>
-    <b>{{ album }}</b>
+    <b>{{ display_name(album) }}</b>
   </div>
 
   <div class="section__doc">
-    <span>FILE / {{ album | upper }}</span>
+    <span>FILE / {{ display_name(album) | upper }}</span>
     <span>COUNT / <b>{{ images | length }}</b></span>
+    {% if album_is_showcase %}<span class="stamp stamp--cy">★ SHOWCASE ALBUM</span>{% endif %}
     {% if active_tag %}<span class="stamp stamp--cy">FILTER / #{{ active_tag | upper }}</span>{% endif %}
     <span class="stamp stamp--ok">OK</span>
   </div>
@@ -44,10 +45,14 @@
   <header class="section__head">
     <div class="section__slug">
       <span class="ix">02</span>
-      <span class="name">{{ album }}</span>
+      <span class="name">{{ display_name(album) }}</span>
       <span class="jp">ギャラリー</span>
     </div>
   </header>
+
+  {% if featured %}
+    {% include "_featured.html" %}
+  {% endif %}
 
   {% set sort_qs = '' if current_sort == default_sort else ('sort=' ~ current_sort) %}
   {% set tag_qs = ('tag=' ~ active_tag) if active_tag else '' %}
@@ -91,9 +96,10 @@
   {% else %}
     <ul class="image-grid">
       {% for img in images %}
-        <li class="image-tile">
+        <li class="image-tile{% if img.is_showcase %} image-tile--showcase{% endif %}">
           <a href="/image/{{ img.rel_path }}{{ img_qs }}">
-            <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
+            <img src="/thumb/{{ img.rel_path }}" alt="{{ display_name(img.filename) }}" loading="lazy">
+            {% if img.is_showcase %}<span class="image-tile__star" aria-label="Featured">★</span>{% endif %}
             <div class="image-tile__overlay"><span>OPEN ↗</span></div>
           </a>
         </li>

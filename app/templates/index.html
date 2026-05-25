@@ -24,6 +24,34 @@
       <p class="note">Drop subfolders into <code>photos/</code> — each subfolder is an album.<br>Example: <code>photos/holiday-2025/dsc_0001.jpg</code></p>
     </div>
   {% else %}
+    {% if showcase_albums %}
+      <section class="featured featured--albums" aria-label="Showcase albums">
+        <header class="featured__head">
+          <span class="featured__label">★ SHOWCASE ALBUMS</span>
+          <span class="featured__count">{{ showcase_albums | length }} · CURATED</span>
+        </header>
+        <ul class="showcase-albums">
+          {% for a in showcase_albums %}
+            <li class="showcase-album">
+              <a href="/album/{{ a.album }}">
+                <div class="showcase-album__img">
+                  {% if a.cover %}
+                    <img src="/thumb/{{ a.cover }}" alt="{{ display_name(a.album) }}" loading="lazy">
+                  {% else %}
+                    <div class="album-card__cover-empty">NO COVER</div>
+                  {% endif %}
+                  <span class="album-card__badge">★ FEATURED</span>
+                </div>
+                <div class="showcase-album__cap">
+                  <span class="showcase-album__name">{{ display_name(a.album) }}</span>
+                  <span class="showcase-album__count">{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
+                </div>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
     <div class="toolbar">
       <span class="toolbar__spacer"></span>
       <div class="sort" data-sort>
@@ -46,18 +74,20 @@
 
     <ul class="album-grid">
       {% for a in albums %}
-        <li class="album-card">
+        {% set is_show = showcase_marker and a.album.startswith(showcase_marker) %}
+        <li class="album-card{% if is_show %} album-card--showcase{% endif %}">
           <a href="/album/{{ a.album }}">
             <div class="album-card__img">
               {% if a.cover %}
-                <img src="/thumb/{{ a.cover }}" alt="{{ a.album }}" loading="lazy">
+                <img src="/thumb/{{ a.cover }}" alt="{{ display_name(a.album) }}" loading="lazy">
               {% else %}
                 <div class="album-card__cover-empty">NO COVER</div>
               {% endif %}
+              {% if is_show %}<span class="album-card__badge">★ FEATURED</span>{% endif %}
             </div>
             <div class="album-card__cap">
               <span class="album-card__tag">ALBUM / {{ '%02d' | format(loop.index) }}</span>
-              <span class="album-card__name">{{ a.album }}</span>
+              <span class="album-card__name">{{ display_name(a.album) }}</span>
               <span class="album-card__count">{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
             </div>
           </a>
