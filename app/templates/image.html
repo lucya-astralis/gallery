@@ -4,12 +4,12 @@
 {% block meta %}
   {% set og_title = image.filename ~ ' — ' ~ image.album %}
   {% set og_desc = description if description else 'Photo from album “' ~ image.album ~ '” · lucya.systems gallery' %}
-  {% set og_image = (request.base_url | string) ~ 'preview/' ~ image.rel_path %}
+  {% set og_image = public_base_url(request) ~ '/preview/' ~ image.rel_path %}
   <meta property="og:site_name" content="lucya.systems gallery">
   <meta property="og:title" content="{{ og_title }}">
   <meta property="og:description" content="{{ og_desc | truncate(200) }}">
   <meta property="og:type" content="article">
-  <meta property="og:url" content="{{ request.url }}">
+  <meta property="og:url" content="{{ public_base_url(request) }}{{ request.url.path }}">
   <meta property="og:image" content="{{ og_image }}">
   <meta property="og:image:alt" content="{{ image.filename }}">
   {% if image.width and image.height %}

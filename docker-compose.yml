@@ -20,4 +20,8 @@ services:
       - ENABLE_WATCHER=${ENABLE_WATCHER:-1}
       - HIDE_GPS=${HIDE_GPS:-1}
       - STRIP_GPS=${STRIP_GPS:-1}
+      # Public base URL used for OG / Twitter link previews.
+      # Set this when behind a reverse proxy that terminates TLS,
+      # e.g. PUBLIC_BASE_URL=https://gallery.lucya.systems
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
     restart: unless-stopped

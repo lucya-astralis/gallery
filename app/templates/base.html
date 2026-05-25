@@ -13,7 +13,7 @@
   <meta property="og:title" content="lucya.systems / gallery">
   <meta property="og:description" content="Personal photo archive.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="{{ request.url }}">
+  <meta property="og:url" content="{{ public_base_url(request) }}{{ request.url.path }}">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="lucya.systems / gallery">
   <meta name="twitter:description" content="Personal photo archive.">

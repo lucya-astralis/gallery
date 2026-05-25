@@ -27,6 +27,7 @@ SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL", "0"))
 ENABLE_WATCHER = os.environ.get("ENABLE_WATCHER", "1") not in ("0", "false", "False", "")
 HIDE_GPS = os.environ.get("HIDE_GPS", "1") not in ("0", "false", "False", "")
 STRIP_GPS = os.environ.get("STRIP_GPS", "1") not in ("0", "false", "False", "")
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 
 _scan_lock = threading.Lock()
 
@@ -44,6 +45,15 @@ app = FastAPI(title="lucya.systems gallery", docs_url=None, redoc_url=None, open
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+
+
+def _public_base_url(request: Request) -> str:
+    if PUBLIC_BASE_URL:
+        return PUBLIC_BASE_URL
+    return str(request.base_url).rstrip("/")
+
+
+templates.env.globals["public_base_url"] = _public_base_url
 
 
 CSP = (

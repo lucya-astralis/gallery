@@ -7,9 +7,9 @@
   <meta property="og:title" content="lucya.systems / gallery">
   <meta property="og:description" content="{{ og_desc }}">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="{{ request.url }}">
+  <meta property="og:url" content="{{ public_base_url(request) }}{{ request.url.path }}">
   {% if shuffle %}
-    {% set og_image = (request.base_url | string) ~ 'preview/' ~ shuffle[0].rel_path %}
+    {% set og_image = public_base_url(request) ~ '/preview/' ~ shuffle[0].rel_path %}
     <meta property="og:image" content="{{ og_image }}">
     <meta property="og:image:alt" content="Random photo from gallery">
     <meta name="twitter:card" content="summary_large_image">
