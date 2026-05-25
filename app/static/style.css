@@ -1431,7 +1431,8 @@ details[open] > summary::before{ content:"▾ "; }
    ================================================================ */
 .lightbox{
   position:fixed; inset:0;
-  z-index:1000;
+  /* must beat .stage (z:1500), which lifts itself above the scanline overlay */
+  z-index:2000;
   background:#000;
   display:flex; flex-direction:column;
   align-items:center; justify-content:center;

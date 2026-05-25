@@ -68,7 +68,25 @@ def _display_name(s: str) -> str:
     return s
 
 
+def _strip_marker_segment(s: str) -> str:
+    if SHOWCASE_MARKER and s.startswith(SHOWCASE_MARKER):
+        return s[len(SHOWCASE_MARKER):] or s
+    return s
+
+
+def _pretty_rel(rel_path: str) -> str:
+    """Strip the leading showcase marker from each segment of a rel_path so
+    featured links don't expose the internal `_` prefix."""
+    if not SHOWCASE_MARKER:
+        return rel_path
+    parts = rel_path.split("/")
+    if not parts:
+        return rel_path
+    return "/".join(_strip_marker_segment(p) for p in parts)
+
+
 templates.env.globals["display_name"] = _display_name
+templates.env.globals["pretty_rel"] = _pretty_rel
 templates.env.globals["showcase_marker"] = SHOWCASE_MARKER
 
 
@@ -290,6 +308,30 @@ def _safe_rel(album: str, filename: str) -> Path:
     return rel
 
 
+def _resolve_showcase_path(album: str, filename: str) -> tuple[str, str]:
+    """Featured items expose marker-stripped URLs (see _pretty_rel). When a
+    request comes in for a pretty path, try the marker-prefixed variants so
+    the original file is found."""
+    if not SHOWCASE_MARKER:
+        return album, filename
+    pm = SHOWCASE_MARKER
+    variants = [(album, filename)]
+    if not filename.startswith(pm):
+        variants.append((album, pm + filename))
+    if not album.startswith(pm):
+        variants.append((pm + album, filename))
+        if not filename.startswith(pm):
+            variants.append((pm + album, pm + filename))
+    for a, f in variants:
+        try:
+            rel = _safe_rel(a, f)
+        except HTTPException:
+            continue
+        if (PHOTOS_DIR / rel).exists():
+            return a, f
+    return album, filename
+
+
 @app.get("/", response_class=HTMLResponse)
 def welcome(request: Request):
     c = db.conn()
@@ -465,6 +507,7 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
 
 @app.get("/image/{album}/{filename}", response_class=HTMLResponse)
 def image_view(request: Request, album: str, filename: str, sort: str | None = None):
+    album, filename = _resolve_showcase_path(album, filename)
     rel = _safe_rel(album, filename).as_posix()
     c = db.conn()
     row = c.execute("SELECT * FROM images WHERE rel_path = ?", (rel,)).fetchone()
@@ -588,6 +631,7 @@ def _gps_to_deg(coord, ref):
 
 @app.get("/thumb/{album}/{filename:path}")
 def serve_thumb(album: str, filename: str):
+    album, filename = _resolve_showcase_path(album, filename)
     rel = _safe_rel(album, filename).as_posix()
     src = PHOTOS_DIR / rel
     if not src.exists():
@@ -603,6 +647,7 @@ def serve_thumb(album: str, filename: str):
 
 @app.get("/preview/{album}/{filename:path}")
 def serve_preview(album: str, filename: str):
+    album, filename = _resolve_showcase_path(album, filename)
     rel = _safe_rel(album, filename).as_posix()
     src = PHOTOS_DIR / rel
     if not src.exists():
@@ -618,6 +663,7 @@ def serve_preview(album: str, filename: str):
 
 @app.get("/full/{album}/{filename:path}")
 def serve_full(album: str, filename: str):
+    album, filename = _resolve_showcase_path(album, filename)
     rel = _safe_rel(album, filename).as_posix()
     src = PHOTOS_DIR / rel
     if not src.exists():

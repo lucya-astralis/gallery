@@ -8,11 +8,12 @@
   </header>
   <ul class="featured__strip">
     {% for img in featured %}
+      {% set pretty = pretty_rel(img.rel_path) %}
       <li class="featured__tile">
-        <a href="/image/{{ img.rel_path }}"
+        <a href="/image/{{ pretty }}"
            title="{{ display_name(img.filename) }}"
            aria-label="{{ display_name(img.filename) }}">
-          <img src="/thumb/{{ img.rel_path }}"
+          <img src="/thumb/{{ pretty }}"
                alt="{{ display_name(img.filename) }}"
                loading="lazy">
           <span class="featured__tile-corner" aria-hidden="true">★</span>
