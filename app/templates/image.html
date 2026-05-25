@@ -60,7 +60,7 @@
       <div class="stage__loader" id="stage-loader">
         <button type="button" id="load-full-btn" class="loader-btn">Load original</button>
         <span class="sep"></span>
-        <a href="/full/{{ image.rel_path }}" target="_blank" rel="noopener" class="loader-link">New tab ↗</a>
+        <button type="button" id="open-fullscreen-btn" class="loader-btn">Fullscreen ⛶</button>
         <span class="sep"></span>
         <a href="/full/{{ image.rel_path }}" download="{{ image.filename }}" class="loader-link">Download ↓</a>
       </div>
@@ -74,7 +74,7 @@
           <dt>Filename</dt><dd>{{ image.filename }}</dd>
           {% if image.width and image.height %}<dt>Dimensions</dt><dd>{{ image.width }} × {{ image.height }} px</dd>{% endif %}
           {% if image.size %}<dt>Size</dt><dd>{{ (image.size / 1024 / 1024) | round(2) }} MB</dd>{% endif %}
-          <dt>Original</dt><dd><a href="/full/{{ image.rel_path }}" target="_blank" rel="noopener">open ↗</a> · <a href="/full/{{ image.rel_path }}" download="{{ image.filename }}">download ↓</a></dd>
+          <dt>Original</dt><dd><a href="/full/{{ image.rel_path }}" download="{{ image.filename }}">download ↓</a></dd>
         </dl>
       </section>
 
@@ -115,4 +115,28 @@
     </aside>
   </div>
 </section>
+
+<script id="album-data" type="application/json">
+{
+  "album": {{ image.album | tojson }},
+  "current": {{ current_index | tojson }},
+  "rels": {{ album_rels | tojson }}
+}
+</script>
+
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Fullscreen viewer">
+  <button type="button" class="lightbox__close" id="lb-close" aria-label="Close (Esc)">✕</button>
+  <button type="button" class="lightbox__nav lightbox__nav--prev" id="lb-prev" aria-label="Previous">‹</button>
+  <button type="button" class="lightbox__nav lightbox__nav--next" id="lb-next" aria-label="Next">›</button>
+  <div class="lightbox__stage" id="lb-stage">
+    <img class="lightbox__img" id="lb-img" alt="">
+    <div class="lightbox__spinner" id="lb-spinner" aria-hidden="true"></div>
+  </div>
+  <div class="lightbox__bar">
+    <span class="lightbox__count" id="lb-count">01 / 01</span>
+    <span class="lightbox__title" id="lb-title"></span>
+    <button type="button" class="lightbox__btn" id="lb-full">Load original</button>
+    <a class="lightbox__btn" id="lb-dl" href="" download="">Download ↓</a>
+  </div>
+</div>
 {% endblock %}

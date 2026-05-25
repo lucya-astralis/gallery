@@ -277,6 +277,8 @@ def image_view(request: Request, album: str, filename: str):
             "prev_rel": prev_rel,
             "next_rel": next_rel,
             "description": description,
+            "album_rels": rel_list,
+            "current_index": idx,
         },
     )
 

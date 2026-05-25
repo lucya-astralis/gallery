@@ -82,130 +82,119 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
   window.__scrambleOnView(onViewEls);
 
-  const deck = document.getElementById('shuffle-deck');
-  if (!deck) return;
-  const cards = Array.from(deck.querySelectorAll('.shuffle-card'));
-  if (cards.length === 0) return;
+  const crt = document.getElementById('crt-deck');
+  if (!crt) return;
+  const frames = Array.from(crt.querySelectorAll('.crt__frame'));
+  if (frames.length === 0) return;
 
-  const order = cards.map((_, i) => i);
+  const screen = crt.querySelector('.crt__screen');
+  const osdName = crt.querySelector('.crt__osd-name');
+  const chEl = crt.querySelector('[data-shuffle-idx]');
+  const openLink = document.querySelector('[data-shuffle-open]');
   const AUTO_MS = 3000;
+  const SWITCH_MS = 280;
 
-  function applyStack({ animate = true, snapIdx = null } = {}) {
-    order.forEach((idx, pos) => {
-      const card = cards[idx];
-      const depth = pos;
-      const ox = depth * 6;
-      const oy = depth * -5;
-      const rot = depth * -0.9;
-      const sc = 1 - depth * 0.025;
-      const op = depth > 4 ? 0 : 1;
-      const snap = !animate || idx === snapIdx;
-      if (snap) {
-        const prev = card.style.transition;
-        card.style.transition = 'none';
-        card.style.setProperty('--ox', ox);
-        card.style.setProperty('--oy', oy);
-        card.style.setProperty('--rot', rot);
-        card.style.setProperty('--sc', sc.toFixed(3));
-        card.style.setProperty('--op', op);
-        card.style.setProperty('--z', 100 - depth);
-        card.classList.toggle('is-top', pos === 0);
-        card.offsetWidth;
-        card.style.transition = prev;
-      } else {
-        card.style.setProperty('--ox', ox);
-        card.style.setProperty('--oy', oy);
-        card.style.setProperty('--rot', rot);
-        card.style.setProperty('--sc', sc.toFixed(3));
-        card.style.setProperty('--op', op);
-        card.style.setProperty('--z', 100 - depth);
-        card.classList.toggle('is-top', pos === 0);
-      }
-    });
+  let current = 0;
+  let switching = false;
+
+  function setOsdFor(frame) {
+    if (!osdName) return;
+    const album = frame.dataset.album || '';
+    const filename = frame.dataset.filename || '';
+    const text = album + ' / ' + filename;
+    osdName.dataset.scrambleTarget = text;
+    if (window.__scrambleTo) window.__scrambleTo(osdName, text);
+    else osdName.textContent = text;
   }
 
-  function advance() {
-    if (order.length < 2) return;
-    const topIdx = order[0];
-    const topCard = cards[topIdx];
-    const dir = Math.random() > 0.5 ? 1 : -1;
-    topCard.classList.add('is-flying');
-    topCard.style.setProperty('--ox', dir * 120);
-    topCard.style.setProperty('--oy', -20);
-    topCard.style.setProperty('--rot', dir * 6);
-    topCard.style.setProperty('--sc', 0.96);
-    topCard.style.setProperty('--op', 0);
-    topCard.style.setProperty('--z', 200);
+  function setChannel(idx) {
+    if (!chEl) return;
+    const next = String(idx + 1).padStart(2, '0');
+    if (window.__scrambleTo) window.__scrambleTo(chEl, next);
+    else chEl.textContent = next;
+  }
+
+  function switchTo(idx, dir = 1) {
+    if (switching) return;
+    const target = ((idx % frames.length) + frames.length) % frames.length;
+    if (target === current && frames.length > 1) return;
+    switching = true;
+    crt.classList.add('is-switching');
     setTimeout(() => {
-      order.shift();
-      order.push(topIdx);
-      topCard.classList.remove('is-flying');
-      applyStack({ animate: true, snapIdx: topIdx });
-      onTopChanged();
-    }, 380);
+      frames[current].classList.remove('is-on');
+      current = target;
+      frames[current].classList.add('is-on');
+      if (screen) screen.dataset.href = frames[current].href;
+      if (openLink) openLink.href = frames[current].href;
+      setOsdFor(frames[current]);
+      setChannel(current);
+    }, Math.round(SWITCH_MS * 0.45));
+    setTimeout(() => {
+      crt.classList.remove('is-switching');
+      switching = false;
+    }, SWITCH_MS + 40);
   }
 
-  function onTopChanged() {
-    const topIdx = order[0];
-    const topCard = cards[topIdx];
-    const idxEl = deck.querySelector('[data-shuffle-idx]');
-    if (idxEl) {
-      const next = String(topIdx + 1).padStart(2, '0');
-      if (window.__scrambleTo) window.__scrambleTo(idxEl, next);
-      else idxEl.textContent = next;
-    }
-    if (window.__scrambleTo) {
-      const name = topCard.querySelector('[data-scramble]');
-      if (name) {
-        const target = name.dataset.scrambleTarget || name.textContent;
-        window.__scrambleTo(name, target);
-      }
-    }
-  }
+  function advance() { switchTo(current + 1); }
+  function regress() { switchTo(current - 1, -1); }
 
-  applyStack({ animate: false });
+  // init: ensure first frame is on and OSD/channel match
+  frames.forEach((f, i) => f.classList.toggle('is-on', i === current));
+  setChannel(current);
+  if (screen) screen.dataset.href = frames[current].href;
 
   let timer = setInterval(advance, AUTO_MS);
   const reset = () => { clearInterval(timer); timer = setInterval(advance, AUTO_MS); };
 
   const nextBtn = document.getElementById('shuffle-next');
+  const prevBtn = document.getElementById('shuffle-prev');
   const refreshBtn = document.getElementById('shuffle-refresh');
 
   if (nextBtn) nextBtn.addEventListener('click', () => { advance(); reset(); });
+  if (prevBtn) prevBtn.addEventListener('click', () => { regress(); reset(); });
+
+  // clicking the screen opens the currently-on frame
+  if (screen) {
+    screen.addEventListener('click', (e) => {
+      const link = e.target.closest('.crt__frame');
+      if (link) return; // anchor handles it
+      const href = screen.dataset.href;
+      if (href) window.location.href = href;
+    });
+  }
 
   if (refreshBtn) {
     refreshBtn.addEventListener('click', async () => {
       refreshBtn.disabled = true;
       const prevText = refreshBtn.textContent;
-      refreshBtn.textContent = '… LOADING';
+      refreshBtn.textContent = '… TUNING';
+      crt.classList.add('is-switching');
       try {
-        const resp = await fetch('/api/shuffle?limit=' + cards.length);
+        const resp = await fetch('/api/shuffle?limit=' + frames.length);
         if (!resp.ok) throw new Error('bad status');
         const items = await resp.json();
-        items.slice(0, cards.length).forEach((item, i) => {
-          const card = cards[i];
-          card.href = '/image/' + item.rel_path;
-          card.dataset.rel = item.rel_path;
-          const img = card.querySelector('img');
+        items.slice(0, frames.length).forEach((item, i) => {
+          const f = frames[i];
+          f.href = '/image/' + item.rel_path;
+          f.dataset.rel = item.rel_path;
+          f.dataset.album = item.album;
+          f.dataset.filename = item.filename;
+          const img = f.querySelector('img');
           if (img) {
             img.src = '/preview/' + item.rel_path;
             img.alt = item.filename;
           }
-          const name = card.querySelector('.shuffle-card__name');
-          if (name) {
-            const text = item.album + ' / ' + item.filename;
-            name.dataset.scrambleTarget = text;
-            name.textContent = text;
-          }
         });
-        // restore natural order after reshuffle
-        order.length = 0;
-        for (let i = 0; i < cards.length; i++) order.push(i);
-        applyStack({ animate: true });
-        onTopChanged();
+        frames.forEach((f, i) => f.classList.toggle('is-on', i === 0));
+        current = 0;
+        setChannel(current);
+        setOsdFor(frames[current]);
+        if (screen) screen.dataset.href = frames[current].href;
+        if (openLink) openLink.href = frames[current].href;
       } catch (e) {
         // ignore
       } finally {
+        setTimeout(() => crt.classList.remove('is-switching'), SWITCH_MS);
         refreshBtn.disabled = false;
         refreshBtn.textContent = prevText;
         reset();
@@ -213,13 +202,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // pause auto-shuffle while user hovers the deck
-  deck.addEventListener('mouseenter', () => clearInterval(timer));
-  deck.addEventListener('mouseleave', reset);
+  // pause auto-cycle while user hovers the viewport
+  crt.addEventListener('mouseenter', () => clearInterval(timer));
+  crt.addEventListener('mouseleave', reset);
+
+  // keyboard: ← → cycles channels when CRT is in viewport
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'ArrowLeft') { regress(); reset(); }
+    else if (e.key === 'ArrowRight') { advance(); reset(); }
+  });
 });
 
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  // when the lightbox is open, its own handler takes over
+  const lb = document.getElementById('lightbox');
+  if (lb && !lb.hidden) return;
   if (e.key === 'ArrowLeft') {
     const prev = document.querySelector('.nav-arrow.prev');
     if (prev) window.location.href = prev.href;
@@ -262,4 +261,192 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     full.src = fullUrl;
   });
+});
+
+// ---------- LIGHTBOX -------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+  const lb = document.getElementById('lightbox');
+  const dataEl = document.getElementById('album-data');
+  if (!lb || !dataEl) return;
+
+  let data;
+  try { data = JSON.parse(dataEl.textContent); }
+  catch (e) { return; }
+  if (!data || !Array.isArray(data.rels) || data.rels.length === 0) return;
+
+  const stage = document.getElementById('lb-stage');
+  const imgEl = document.getElementById('lb-img');
+  const titleEl = document.getElementById('lb-title');
+  const countEl = document.getElementById('lb-count');
+  const prevBtn = document.getElementById('lb-prev');
+  const nextBtn = document.getElementById('lb-next');
+  const closeBtn = document.getElementById('lb-close');
+  const fullBtn = document.getElementById('lb-full');
+  const dlBtn = document.getElementById('lb-dl');
+  const bar = lb.querySelector('.lightbox__bar');
+  const stageImg = document.getElementById('stage-img');
+  const fsBtn = document.getElementById('open-fullscreen-btn');
+
+  const rels = data.rels;
+  const total = rels.length;
+  let index = Math.max(0, Math.min(data.current | 0, total - 1));
+  const initialIndex = index;
+  let showingFull = false;
+
+  function relToPreview(rel){ return '/preview/' + rel; }
+  function relToFull(rel){ return '/full/' + rel; }
+  function relToFilename(rel){
+    const parts = rel.split('/');
+    return parts[parts.length - 1];
+  }
+  function relToTitle(rel){
+    const parts = rel.split('/');
+    if (parts.length >= 2) return parts[0] + ' / ' + parts.slice(1).join('/');
+    return rel;
+  }
+
+  function preload(rel){
+    if (!rel) return;
+    const p = new Image();
+    p.src = relToPreview(rel);
+  }
+
+  function setLoading(on){ lb.classList.toggle('is-loading', !!on); }
+
+  function render(){
+    const rel = rels[index];
+    const filename = relToFilename(rel);
+    titleEl.textContent = relToTitle(rel);
+    countEl.textContent = String(index + 1).padStart(2, '0') + ' / ' + String(total).padStart(2, '0');
+    dlBtn.href = relToFull(rel);
+    dlBtn.setAttribute('download', filename);
+    fullBtn.textContent = 'Load original';
+    bar.classList.remove('is-loading-full', 'is-full');
+    showingFull = false;
+
+    setLoading(true);
+    const next = new Image();
+    next.onload = () => {
+      imgEl.src = next.src;
+      imgEl.alt = filename;
+      setLoading(false);
+    };
+    next.onerror = () => setLoading(false);
+    next.src = relToPreview(rel);
+
+    if (prevBtn) prevBtn.disabled = (index <= 0);
+    if (nextBtn) nextBtn.disabled = (index >= total - 1);
+
+    // preload neighbours
+    if (index + 1 < total) preload(rels[index + 1]);
+    if (index - 1 >= 0) preload(rels[index - 1]);
+
+    // update URL bar to reflect the currently-viewed image
+    try { history.replaceState(null, '', '/image/' + rel); } catch(e){}
+  }
+
+  function navigate(delta){
+    const target = index + delta;
+    if (target < 0 || target >= total) return;
+    index = target;
+    render();
+  }
+
+  function open(){
+    if (!lb.hidden) return;
+    lb.hidden = false;
+    document.body.classList.add('lightbox-open');
+    render();
+  }
+
+  function close(){
+    if (lb.hidden) return;
+    // if user navigated to a different image, reload so the
+    // page metadata (EXIF, tags, breadcrumbs) matches the URL.
+    if (index !== initialIndex){
+      window.location.reload();
+      return;
+    }
+    lb.hidden = true;
+    document.body.classList.remove('lightbox-open');
+    setLoading(false);
+  }
+
+  // open triggers
+  if (stageImg) stageImg.addEventListener('click', (e) => {
+    e.preventDefault();
+    open();
+  });
+  if (fsBtn) fsBtn.addEventListener('click', open);
+
+  // nav / close
+  if (prevBtn) prevBtn.addEventListener('click', (e) => { e.stopPropagation(); navigate(-1); });
+  if (nextBtn) nextBtn.addEventListener('click', (e) => { e.stopPropagation(); navigate(1); });
+  if (closeBtn) closeBtn.addEventListener('click', (e) => { e.stopPropagation(); close(); });
+
+  // click outside image / on stage padding closes
+  lb.addEventListener('click', (e) => {
+    if (e.target === lb || e.target === stage) close();
+  });
+
+  // click on image itself zooms out / closes too (cursor:zoom-out vibe)
+  imgEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    close();
+  });
+
+  // bar shouldn't close
+  if (bar) bar.addEventListener('click', (e) => e.stopPropagation());
+
+  // load original / download buttons
+  if (fullBtn) fullBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (showingFull) return;
+    const rel = rels[index];
+    const fullUrl = relToFull(rel);
+    bar.classList.add('is-loading-full');
+    fullBtn.textContent = 'Loading…';
+    const full = new Image();
+    full.onload = () => {
+      imgEl.src = fullUrl;
+      showingFull = true;
+      bar.classList.remove('is-loading-full');
+      bar.classList.add('is-full');
+    };
+    full.onerror = () => {
+      bar.classList.remove('is-loading-full');
+      fullBtn.textContent = 'Error — retry?';
+    };
+    full.src = fullUrl;
+  });
+
+  // keyboard (capture so it beats the global arrow-nav handler)
+  document.addEventListener('keydown', (e) => {
+    if (lb.hidden) return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'Escape')      { e.stopPropagation(); close(); }
+    else if (e.key === 'ArrowLeft')  { e.stopPropagation(); navigate(-1); }
+    else if (e.key === 'ArrowRight') { e.stopPropagation(); navigate(1); }
+  }, true);
+
+  // swipe gestures
+  let tStartX = 0, tStartY = 0, tStartT = 0, tracking = false;
+  stage.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    tracking = true;
+    tStartX = e.touches[0].clientX;
+    tStartY = e.touches[0].clientY;
+    tStartT = Date.now();
+  }, { passive: true });
+  stage.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - tStartX;
+    const dy = t.clientY - tStartY;
+    const dt = Date.now() - tStartT;
+    if (dt > 700) return;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx < 0) navigate(1); else navigate(-1);
+  }, { passive: true });
 });
