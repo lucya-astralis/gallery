@@ -274,6 +274,11 @@ document.addEventListener('DOMContentLoaded', () => {
   catch (e) { return; }
   if (!data || !Array.isArray(data.rels) || data.rels.length === 0) return;
 
+  // Reparent to body so the lightbox escapes <main>'s stacking context
+  // (main has z-index:10, which would cap our z:1000 under body::after's
+  // scanline layer at z:200). Living directly under body, z:1000 wins.
+  if (lb.parentNode !== document.body) document.body.appendChild(lb);
+
   const stage = document.getElementById('lb-stage');
   const imgEl = document.getElementById('lb-img');
   const titleEl = document.getElementById('lb-title');
