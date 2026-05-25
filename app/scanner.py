@@ -14,6 +14,20 @@ log = logging.getLogger("scanner")
 STRIP_GPS = os.environ.get("STRIP_GPS", "1") not in ("0", "false", "False", "")
 GPS_IFD_TAG = 0x8825
 
+# Showcase marker: any filename (without extension) or album folder name
+# whose first character matches this prefix is treated as a showcase item.
+# Default is an underscore; configurable via the SHOWCASE_MARKER env var.
+SHOWCASE_MARKER = os.environ.get("SHOWCASE_MARKER", "_")
+
+
+def is_showcase(album: str, filename: str) -> bool:
+    if not SHOWCASE_MARKER:
+        return False
+    if album.startswith(SHOWCASE_MARKER):
+        return True
+    stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+    return stem.startswith(SHOWCASE_MARKER)
+
 try:
     from pillow_heif import register_heif_opener
     register_heif_opener()
@@ -253,15 +267,17 @@ def index_image(photos_dir: Path, file: Path) -> bool:
         log.warning("open failed for %s: %s", file, e)
         return False
 
+    showcase_flag = 1 if is_showcase(album, filename) else 0
     with db.lock():
         c.execute(
-            """INSERT INTO images (album, filename, rel_path, mtime, size, width, height, exif_json, taken_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """INSERT INTO images (album, filename, rel_path, mtime, size, width, height, exif_json, taken_at, is_showcase)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(rel_path) DO UPDATE SET
                  album=excluded.album, filename=excluded.filename, mtime=excluded.mtime,
                  size=excluded.size, width=excluded.width, height=excluded.height,
-                 exif_json=excluded.exif_json, taken_at=excluded.taken_at""",
-            (album, filename, rel, effective_mtime, stat.st_size, width, height, json.dumps(exif), taken),
+                 exif_json=excluded.exif_json, taken_at=excluded.taken_at,
+                 is_showcase=excluded.is_showcase""",
+            (album, filename, rel, effective_mtime, stat.st_size, width, height, json.dumps(exif), taken, showcase_flag),
         )
         image_id = c.execute("SELECT id FROM images WHERE rel_path = ?", (rel,)).fetchone()["id"]
         c.commit()

@@ -309,7 +309,10 @@ code{
 /* ================================================================
    LAYOUT
    ================================================================ */
-main{ position:relative; z-index:10; }
+/* main has no z-index so children can opt into their own stacking layer
+   above body::after (the scanline overlay at z:200) when they want a
+   clean canvas — see .stage below. */
+main{ position:relative; }
 
 section{
   position:relative;
@@ -437,6 +440,124 @@ section{
   border-color:var(--acc-cy);
 }
 .tag.active:hover{ color:var(--bg); background:var(--acc-cy); }
+
+/* ================================================================
+   FEATURED STRIP (showcase)
+   ================================================================ */
+.featured{
+  position:relative;
+  margin-bottom:26px;
+  border:1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(91,138,255,.05), transparent 60%),
+    rgba(255,255,255,.01);
+}
+.featured::before,
+.featured::after{
+  content:"";
+  position:absolute;
+  width:14px; height:14px;
+  border:1px solid var(--acc-cy);
+  pointer-events:none;
+}
+.featured::before{ top:-1px; left:-1px; border-right:0; border-bottom:0; }
+.featured::after{ bottom:-1px; right:-1px; border-left:0; border-top:0; }
+.featured__head{
+  display:flex; align-items:center; gap:10px;
+  padding:8px 14px;
+  border-bottom:1px dashed var(--line);
+  font-family:"JetBrains Mono", monospace;
+  font-size:10.5px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--text-ghost);
+}
+.featured__label{ color:var(--acc-cy); letter-spacing:.24em; }
+.featured__count{ margin-left:auto; }
+.featured__strip{
+  list-style:none;
+  margin:0;
+  padding:10px 14px;
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+  scrollbar-color: var(--line-strong) transparent;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.featured__strip::-webkit-scrollbar{ height:6px; }
+.featured__strip::-webkit-scrollbar-thumb{ background: var(--line-strong); }
+.featured__strip::-webkit-scrollbar-track{ background: transparent; }
+.featured__tile{
+  flex:0 0 auto;
+  scroll-snap-align: start;
+  margin:0;
+}
+.featured__tile a{
+  position:relative;
+  display:block;
+  width:170px;
+  aspect-ratio: 4 / 3;
+  background:var(--bg-2);
+  border:1px solid var(--line);
+  overflow:hidden;
+  transition: border-color .15s ease;
+}
+.featured__tile a:hover{ border-color: var(--acc-cy); }
+.featured__tile img{
+  width:100%; height:100%;
+  object-fit:cover;
+  display:block;
+  filter: saturate(.9) brightness(.92);
+  transition: transform .35s ease, filter .35s ease;
+}
+.featured__tile a:hover img{
+  transform: scale(1.05);
+  filter: saturate(1) brightness(1);
+}
+.featured__tile-meta{
+  position:absolute;
+  left:0; right:0; bottom:0;
+  padding:6px 10px;
+  font-family:"JetBrains Mono", monospace;
+  font-size:9.5px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--text);
+  background: linear-gradient(to top, rgba(0,0,0,.78) 0%, transparent 100%);
+  pointer-events:none;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+@media (max-width:760px){
+  .featured__tile a{ width:130px; }
+  .featured__strip{ padding:8px 10px; gap:6px; }
+  .featured__head{ padding:6px 10px; font-size:9.5px; }
+}
+
+/* showcase indicators on album cards */
+.album-card--showcase{
+  outline: 1px solid rgba(91,138,255,.35);
+  outline-offset: -1px;
+}
+.album-card__badge{
+  position:absolute;
+  top:8px; right:8px;
+  z-index:3;
+  font-family:"JetBrains Mono", monospace;
+  font-size:9px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--acc-cy);
+  background: rgba(7,7,11,.78);
+  border:1px solid var(--acc-cy);
+  padding:3px 7px;
+  pointer-events:none;
+}
 
 /* ================================================================
    TOOLBAR + SORT DROPDOWN
@@ -766,6 +887,10 @@ section{
 }
 .stage{
   position:relative;
+  /* lifts the stage above body::after's scanline overlay (z:200) so
+     the photo itself isn't tinted by them. nav-arrows and corner labels
+     inside still appear above the image via their own local z. */
+  z-index:1500;
   background:#000;
   border:1px solid var(--line);
   overflow:hidden;
@@ -1454,6 +1579,8 @@ body.page-welcome::after{ --scan-opacity: 0.55; }
 .crt__ch{ color:var(--text-dim); }
 .crt__ch b{ color:var(--acc-cy); font-weight:400; }
 .crt__ch-of{ color:var(--text-ghost); }
+.crt__feed{ color:var(--text-dim); }
+.crt__feed b{ color:var(--acc-cy); font-weight:400; }
 .crt__sig{
   margin-left:auto;
   display:inline-flex; align-items:center; gap:6px;
@@ -1616,8 +1743,7 @@ body.page-welcome::after{ --scan-opacity: 0.55; }
 
 /* ---- READOUT (welcome stats) ---- */
 .readout{
-  display:grid;
-  grid-template-columns: 1fr auto 1fr;
+  display:flex;
   align-items:stretch;
   margin-top:24px;
   border:1px solid var(--line-strong);
@@ -1647,8 +1773,10 @@ body.page-welcome::after{ --scan-opacity: 0.55; }
   gap:4px;
   padding:18px 20px;
   min-width:0;
+  flex: 1 1 0;
 }
 .readout__divider{
+  flex: 0 0 1px;
   width:1px;
   background:linear-gradient(180deg,
     transparent,
@@ -1658,7 +1786,7 @@ body.page-welcome::after{ --scan-opacity: 0.55; }
 }
 .readout__digits{
   font-family:"Ethnocentric","JetBrains Mono", monospace;
-  font-size:clamp(36px, 5.4vw, 56px);
+  font-size:clamp(32px, 4.8vw, 52px);
   line-height:1;
   letter-spacing:.04em;
   color:var(--acc-cy);
@@ -1667,6 +1795,12 @@ body.page-welcome::after{ --scan-opacity: 0.55; }
     0 0 2px rgba(91,138,255,.7);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
+}
+.readout__digits--accent{
+  color: var(--acc-amb);
+  text-shadow:
+    0 0 12px rgba(255,181,71,.45),
+    0 0 2px rgba(255,181,71,.7);
 }
 .readout__caption{
   font-family:"JetBrains Mono", monospace;

@@ -25,7 +25,8 @@
 <section class="welcome">
   <div class="section__doc">
     <span>SIG / LUCYA.GALLERY</span>
-    <span>FEED / <b>RANDOM</b></span>
+    <span>FEED / <b>{{ feed_label }}</b></span>
+    {% if showcase_count %}<span>SHOWCASE / <b>{{ showcase_count }}</b></span>{% endif %}
     <span class="stamp stamp--ok">ONLINE</span>
   </div>
 
@@ -36,6 +37,8 @@
           <div class="crt__bezel">
             <div class="crt__topbar">
               <span class="crt__brand">LCYA-CRT 240</span>
+              <span class="crt__sep">·</span>
+              <span class="crt__feed">FEED / <b>{{ feed_label }}</b></span>
               <span class="crt__sep">·</span>
               <span class="crt__ch">CH <b data-shuffle-idx>01</b><span class="crt__ch-of">/{{ '%02d' | format(shuffle | length) }}</span></span>
               <span class="crt__sep">·</span>
@@ -98,6 +101,13 @@
           <span class="readout__digits" data-count-to="{{ album_count }}">{{ album_count }}</span>
           <span class="readout__caption">Albums</span>
         </div>
+        {% if showcase_count %}
+          <span class="readout__divider" aria-hidden="true"></span>
+          <div class="readout__cell">
+            <span class="readout__digits readout__digits--accent" data-count-to="{{ showcase_count }}">{{ showcase_count }}</span>
+            <span class="readout__caption">Featured</span>
+          </div>
+        {% endif %}
       </div>
     </aside>
   </div>

@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -54,6 +54,76 @@ def _public_base_url(request: Request) -> str:
 
 
 templates.env.globals["public_base_url"] = _public_base_url
+
+
+# ----- showcase helpers -------------------------------------------------
+SHOWCASE_MARKER = scanner.SHOWCASE_MARKER
+
+
+def _display_name(s: str) -> str:
+    """Strip a single leading showcase-marker char for human display."""
+    if SHOWCASE_MARKER and s.startswith(SHOWCASE_MARKER):
+        stripped = s[len(SHOWCASE_MARKER):].lstrip("-_ ")
+        return stripped or s
+    return s
+
+
+templates.env.globals["display_name"] = _display_name
+templates.env.globals["showcase_marker"] = SHOWCASE_MARKER
+
+
+def _showcase_rows(album: str | None = None, limit: int = 50, random_order: bool = False):
+    c = db.conn()
+    if album is not None:
+        where = "WHERE is_showcase = 1 AND album = ?"
+        params: tuple = (album,)
+    else:
+        where = "WHERE is_showcase = 1"
+        params = ()
+    order = (
+        "ORDER BY RANDOM()"
+        if random_order
+        else "ORDER BY taken_at IS NULL, taken_at DESC, mtime DESC, filename ASC"
+    )
+    rows = c.execute(
+        f"SELECT * FROM images {where} {order} LIMIT ?",
+        params + (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _serialize_showcase_item(row: dict, base: str) -> dict:
+    rel = row["rel_path"]
+    return {
+        "rel_path": rel,
+        "album": row["album"],
+        "filename": row["filename"],
+        "display_album": _display_name(row["album"]),
+        "display_filename": _display_name(row["filename"]),
+        "width": row.get("width"),
+        "height": row.get("height"),
+        "size": row.get("size"),
+        "taken_at": row.get("taken_at"),
+        "urls": {
+            "thumb": f"/thumb/{rel}",
+            "preview": f"/preview/{rel}",
+            "full": f"/full/{rel}",
+            "page": f"/image/{rel}",
+            "thumb_abs": f"{base}/thumb/{rel}",
+            "preview_abs": f"{base}/preview/{rel}",
+            "full_abs": f"{base}/full/{rel}",
+            "page_abs": f"{base}/image/{rel}",
+        },
+    }
+
+
+def _json_cors(payload, max_age: int = 300) -> JSONResponse:
+    resp = JSONResponse(payload)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    resp.headers["Cache-Control"] = f"public, max-age={max_age}"
+    return resp
 
 
 # ----- sort options -----------------------------------------------------
@@ -162,12 +232,38 @@ def _periodic_scan_loop():
         _run_scan()
 
 
+def _backfill_showcase():
+    """
+    Recompute `is_showcase` for every indexed image based on the current
+    SHOWCASE_MARKER. Runs on every startup so marker changes (or first
+    rollout of the column) propagate without forcing a re-scan.
+    """
+    c = db.conn()
+    marker = scanner.SHOWCASE_MARKER
+    with db.lock():
+        if not marker:
+            c.execute("UPDATE images SET is_showcase = 0 WHERE is_showcase != 0")
+        else:
+            ml = len(marker)
+            c.execute(
+                """UPDATE images
+                   SET is_showcase = CASE
+                     WHEN substr(album, 1, ?) = ?
+                       OR substr(filename, 1, ?) = ?
+                     THEN 1 ELSE 0
+                   END""",
+                (ml, marker, ml, marker),
+            )
+        c.commit()
+
+
 @app.on_event("startup")
 def _startup():
     db.init(DATA_DIR)
+    _backfill_showcase()
     log.info(
-        "photos=%s thumbs=%s data=%s thumb_size=%d watcher=%s scan_interval=%ds hide_gps=%s strip_gps=%s",
-        PHOTOS_DIR, THUMBS_DIR, DATA_DIR, THUMB_SIZE, ENABLE_WATCHER, SCAN_INTERVAL, HIDE_GPS, STRIP_GPS,
+        "photos=%s thumbs=%s data=%s thumb_size=%d watcher=%s scan_interval=%ds hide_gps=%s strip_gps=%s showcase_marker=%r",
+        PHOTOS_DIR, THUMBS_DIR, DATA_DIR, THUMB_SIZE, ENABLE_WATCHER, SCAN_INTERVAL, HIDE_GPS, STRIP_GPS, scanner.SHOWCASE_MARKER,
     )
     threading.Thread(target=_run_scan, daemon=True).start()
     if ENABLE_WATCHER:
@@ -197,21 +293,40 @@ def _safe_rel(album: str, filename: str) -> Path:
 @app.get("/", response_class=HTMLResponse)
 def welcome(request: Request):
     c = db.conn()
-    shuffle = [
-        dict(r) for r in c.execute(
-            "SELECT album, filename, rel_path FROM images ORDER BY RANDOM() LIMIT 8"
-        ).fetchall()
-    ]
+    # Prefer showcase photos; if none are marked, fall back to random.
+    showcase_feed = _showcase_rows(limit=12, random_order=True)
+    if showcase_feed:
+        feed = [
+            {"album": r["album"], "filename": r["filename"], "rel_path": r["rel_path"]}
+            for r in showcase_feed
+        ]
+        feed_label = "FEATURED"
+        feed_mode = "showcase"
+    else:
+        feed = [
+            dict(r)
+            for r in c.execute(
+                "SELECT album, filename, rel_path FROM images ORDER BY RANDOM() LIMIT 8"
+            ).fetchall()
+        ]
+        feed_label = "RANDOM"
+        feed_mode = "random"
     counts = c.execute(
         "SELECT COUNT(*) AS images, COUNT(DISTINCT album) AS albums FROM images"
+    ).fetchone()
+    showcase_count = c.execute(
+        "SELECT COUNT(*) AS n FROM images WHERE is_showcase = 1"
     ).fetchone()
     return templates.TemplateResponse(
         "welcome.html",
         {
             "request": request,
-            "shuffle": shuffle,
+            "shuffle": feed,
+            "feed_label": feed_label,
+            "feed_mode": feed_mode,
             "image_count": counts["images"] if counts else 0,
             "album_count": counts["albums"] if counts else 0,
+            "showcase_count": showcase_count["n"] if showcase_count else 0,
         },
     )
 
@@ -228,11 +343,13 @@ def albums_index(request: Request, sort: str | None = None):
            FROM images GROUP BY album ORDER BY {order_sql}"""
     ).fetchall()
     albums = [dict(r) for r in rows]
+    featured = _showcase_rows(limit=12, random_order=False)
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "albums": albums,
+            "featured": featured,
             "current_sort": current_sort,
             "default_sort": SORT_ALBUM_DEFAULT,
             "sort_options": _album_sort_options_for_template(current_sort),
@@ -242,6 +359,35 @@ def albums_index(request: Request, sort: str | None = None):
             ),
         },
     )
+
+
+@app.get("/api/showcase")
+def api_showcase(request: Request, limit: int = 50, album: str | None = None, random: bool = False):
+    """
+    Returns showcased photos as JSON. CORS-enabled for cross-origin embedding.
+
+    Query params:
+      limit:  max number of items, 1..200 (default 50)
+      album:  optional album-name filter
+      random: pass `?random=1` to randomise order; default is newest-first
+    """
+    limit = max(1, min(200, limit))
+    rows = _showcase_rows(album=album, limit=limit, random_order=bool(random))
+    base = _public_base_url(request)
+    items = [_serialize_showcase_item(r, base) for r in rows]
+    return _json_cors(
+        {
+            "count": len(items),
+            "marker": SHOWCASE_MARKER,
+            "items": items,
+        }
+    )
+
+
+@app.options("/api/showcase")
+def api_showcase_options():
+    # CORS pre-flight (most simple GETs don't trigger this but be polite)
+    return _json_cors({})
 
 
 @app.get("/api/shuffle")
@@ -290,11 +436,20 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
            WHERE i.album = ? ORDER BY t.name""",
         (album,),
     ).fetchall()
+    album_is_showcase = bool(SHOWCASE_MARKER) and album.startswith(SHOWCASE_MARKER)
+    # within-album featured strip (skip when the whole album is already a
+    # showcase — every photo would just duplicate the grid)
+    if album_is_showcase:
+        featured = []
+    else:
+        featured = _showcase_rows(album=album, limit=8, random_order=False)
     return templates.TemplateResponse(
         "album.html",
         {
             "request": request,
             "album": album,
+            "album_is_showcase": album_is_showcase,
+            "featured": featured,
             "images": [dict(r) for r in rows],
             "tags": [r["name"] for r in tag_rows],
             "active_tag": tag,

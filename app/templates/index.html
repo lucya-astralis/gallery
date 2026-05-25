@@ -24,6 +24,9 @@
       <p class="note">Drop subfolders into <code>photos/</code> — each subfolder is an album.<br>Example: <code>photos/holiday-2025/dsc_0001.jpg</code></p>
     </div>
   {% else %}
+    {% if featured %}
+      {% include "_featured.html" %}
+    {% endif %}
     <div class="toolbar">
       <span class="toolbar__spacer"></span>
       <div class="sort" data-sort>
@@ -46,18 +49,20 @@
 
     <ul class="album-grid">
       {% for a in albums %}
-        <li class="album-card">
+        {% set is_show = showcase_marker and a.album.startswith(showcase_marker) %}
+        <li class="album-card{% if is_show %} album-card--showcase{% endif %}">
           <a href="/album/{{ a.album }}">
             <div class="album-card__img">
               {% if a.cover %}
-                <img src="/thumb/{{ a.cover }}" alt="{{ a.album }}" loading="lazy">
+                <img src="/thumb/{{ a.cover }}" alt="{{ display_name(a.album) }}" loading="lazy">
               {% else %}
                 <div class="album-card__cover-empty">NO COVER</div>
               {% endif %}
+              {% if is_show %}<span class="album-card__badge">★ FEATURED</span>{% endif %}
             </div>
             <div class="album-card__cap">
               <span class="album-card__tag">ALBUM / {{ '%02d' | format(loop.index) }}</span>
-              <span class="album-card__name">{{ a.album }}</span>
+              <span class="album-card__name">{{ display_name(a.album) }}</span>
               <span class="album-card__count">{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
             </div>
           </a>

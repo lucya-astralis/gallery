@@ -47,6 +47,13 @@ def init(data_dir: Path) -> sqlite3.Connection:
         );
         """
     )
+
+    # additive migrations
+    existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(images)").fetchall()}
+    if "is_showcase" not in existing_cols:
+        conn.execute("ALTER TABLE images ADD COLUMN is_showcase INTEGER NOT NULL DEFAULT 0")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_images_showcase ON images(is_showcase)")
+
     conn.commit()
     _conn = conn
     return conn

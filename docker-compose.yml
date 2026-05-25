@@ -20,6 +20,12 @@ services:
       - ENABLE_WATCHER=${ENABLE_WATCHER:-1}
       - HIDE_GPS=${HIDE_GPS:-1}
       - STRIP_GPS=${STRIP_GPS:-1}
+      # Prefix character used to mark showcase items. Any photo whose
+      # filename starts with this prefix — or any photo inside an album
+      # whose folder name starts with it — is featured on the welcome
+      # screen, in the album overview, on its own album page and via
+      # /api/showcase. Set to empty string to disable.
+      - SHOWCASE_MARKER=${SHOWCASE_MARKER:-_}
       # Public base URL used for OG / Twitter link previews.
       # Set this when behind a reverse proxy that terminates TLS,
       # e.g. PUBLIC_BASE_URL=https://gallery.lucya.systems

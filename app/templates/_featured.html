@@ -1,0 +1,21 @@
+{# Re-usable horizontal strip of showcased photos.
+   Expects a list named `featured` (each item has rel_path/album/filename). #}
+<section class="featured" aria-label="Featured photos">
+  <header class="featured__head">
+    <span class="featured__label">★ FEATURED</span>
+    <span class="featured__count">{{ featured | length }} · CURATED</span>
+  </header>
+  <ul class="featured__strip">
+    {% for img in featured %}
+      <li class="featured__tile">
+        <a href="/image/{{ img.rel_path }}"
+           title="{{ display_name(img.album) }} / {{ display_name(img.filename) }}">
+          <img src="/thumb/{{ img.rel_path }}"
+               alt="{{ display_name(img.filename) }}"
+               loading="lazy">
+          <span class="featured__tile-meta">{{ display_name(img.album) }}</span>
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+</section>
