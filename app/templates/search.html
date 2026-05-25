@@ -35,10 +35,30 @@
       <p class="note">Searches album names, filenames and tags.</p>
     </div>
   {% else %}
+    <div class="toolbar">
+      <span class="toolbar__spacer"></span>
+      <div class="sort" data-sort>
+        <button type="button" class="sort__btn" aria-haspopup="true" aria-expanded="false">
+          <span class="sort__btn-label">SORT</span>
+          <b>{{ sort_label }}</b>
+        </button>
+        <div class="sort__menu" hidden role="menu">
+          <div class="sort__head">SORT BY</div>
+          {% for opt in sort_options %}
+            <a class="sort__option{% if opt.active %} is-active{% endif %}"
+               role="menuitem"
+               href="/search?q={{ query | urlencode }}&sort={{ opt.key }}">
+              {{ opt.label }}
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
     <ul class="image-grid">
       {% for img in images %}
         <li class="image-tile">
-          <a href="/image/{{ img.rel_path }}" title="{{ img.album }} / {{ img.filename }}">
+          <a href="/image/{{ img.rel_path }}{% if current_sort != default_sort %}?sort={{ current_sort }}{% endif %}" title="{{ img.album }} / {{ img.filename }}">
             <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
             <div class="image-tile__overlay"><span>{{ img.album }}</span></div>
           </a>

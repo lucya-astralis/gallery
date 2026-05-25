@@ -287,10 +287,133 @@ document.addEventListener('DOMContentLoaded', () => {
       const link = dx < 0
         ? document.querySelector('.nav-arrow.next')
         : document.querySelector('.nav-arrow.prev');
-      if (link) window.location.href = link.href;
+      if (link) location.replace(link.href);
     }, { passive: false });
   }
 });
+
+// ---------- SORT DROPDOWN --------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+  const sorts = document.querySelectorAll('[data-sort]');
+  if (!sorts.length) return;
+
+  const isMobile = () => window.matchMedia('(max-width: 760px)').matches;
+  let backdrop = null;
+  function ensureBackdrop(){
+    if (backdrop) return backdrop;
+    backdrop = document.createElement('div');
+    backdrop.className = 'sort__backdrop';
+    document.body.appendChild(backdrop);
+    return backdrop;
+  }
+
+  sorts.forEach(sort => {
+    const btn = sort.querySelector('.sort__btn');
+    const menu = sort.querySelector('.sort__menu');
+    if (!btn || !menu) return;
+
+    function close(){
+      menu.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+      if (backdrop) backdrop.classList.remove('is-open');
+      document.body.classList.remove('sort-open');
+    }
+    function open(){
+      // close any other open menu
+      sorts.forEach(s => {
+        if (s !== sort) {
+          const m = s.querySelector('.sort__menu');
+          const b = s.querySelector('.sort__btn');
+          if (m) m.hidden = true;
+          if (b) b.setAttribute('aria-expanded', 'false');
+        }
+      });
+      menu.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      if (isMobile()) {
+        ensureBackdrop().classList.add('is-open');
+      }
+      document.body.classList.add('sort-open');
+    }
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (menu.hidden) open(); else close();
+    });
+
+    // outside click closes
+    document.addEventListener('click', (e) => {
+      if (menu.hidden) return;
+      if (!sort.contains(e.target) && (!backdrop || e.target === backdrop || !backdrop.contains(e.target))) {
+        close();
+      }
+    });
+
+    if (backdrop || true) {
+      // backdrop click also closes (once it exists)
+      document.addEventListener('click', (e) => {
+        if (backdrop && e.target === backdrop) close();
+      });
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    sorts.forEach(s => {
+      const m = s.querySelector('.sort__menu');
+      const b = s.querySelector('.sort__btn');
+      if (m && !m.hidden) {
+        m.hidden = true;
+        if (b) b.setAttribute('aria-expanded', 'false');
+        if (backdrop) backdrop.classList.remove('is-open');
+        document.body.classList.remove('sort-open');
+      }
+    });
+  });
+});
+
+// ---------- BACK-BUTTON GUARD (image view → album) -------------
+// On any /image/ page, ensure the browser back button takes the user
+// straight to the corresponding /album/... view, regardless of how they
+// navigated between images. Achieved by pushing a duplicate history
+// entry and redirecting to the album on popstate. Also intercepts the
+// stage nav-arrows so prev/next within the same album replace the
+// current entry instead of stacking up.
+(function setupBackGuard(){
+  document.addEventListener('DOMContentLoaded', () => {
+    const dataEl = document.getElementById('album-data');
+    if (!dataEl) return;
+    let data;
+    try { data = JSON.parse(dataEl.textContent); }
+    catch (e) { return; }
+    if (!data || !data.album) return;
+    const albumBase = '/album/' + encodeURIComponent(data.album).replace(/%2F/g, '/');
+
+    try { history.pushState({ albumGuard: true }, '', location.pathname + location.search); }
+    catch (e) { return; }
+
+    window.addEventListener('popstate', (e) => {
+      // any back from this view shortcuts to the album.
+      // preserve ?sort= so the user lands on the same ordering.
+      const params = new URLSearchParams(location.search);
+      const passthrough = new URLSearchParams();
+      const sort = params.get('sort');
+      if (sort) passthrough.set('sort', sort);
+      const qs = passthrough.toString();
+      location.replace(qs ? albumBase + '?' + qs : albumBase);
+    });
+
+    // intercept stage nav-arrow clicks to replace history rather than push,
+    // so we don't accumulate one history entry per prev/next step
+    document.querySelectorAll('.nav-arrow.prev, .nav-arrow.next').forEach(a => {
+      a.addEventListener('click', (ev) => {
+        if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button === 1) return;
+        ev.preventDefault();
+        location.replace(a.href);
+      });
+    });
+  });
+})();
 
 // ---------- LIGHTBOX -------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
@@ -325,6 +448,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const total = rels.length;
   let index = Math.max(0, Math.min(data.current | 0, total - 1));
   const initialIndex = index;
+  // preserve query string (e.g. ?sort=name_asc) across in-lightbox navigation
+  const initialSearch = location.search;
   let showingFull = false;
 
   const IDLE_MS = 2500;
@@ -390,8 +515,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (index + 1 < total) preload(rels[index + 1]);
     if (index - 1 >= 0) preload(rels[index - 1]);
 
-    // update URL bar to reflect the currently-viewed image
-    try { history.replaceState(null, '', '/image/' + rel); } catch(e){}
+    // update URL bar to reflect the currently-viewed image (keep sort etc.)
+    try { history.replaceState(null, '', '/image/' + rel + initialSearch); } catch(e){}
   }
 
   function navigate(delta){

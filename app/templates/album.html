@@ -49,14 +49,39 @@
     </div>
   </header>
 
-  {% if tags %}
-    <div class="tag-bar">
-      <a href="/album/{{ album }}" class="tag {% if not active_tag %}active{% endif %}">ALL</a>
-      {% for t in tags %}
-        <a href="/album/{{ album }}?tag={{ t }}" class="tag {% if active_tag == t %}active{% endif %}">#{{ t }}</a>
-      {% endfor %}
+  {% set sort_qs = '' if current_sort == default_sort else ('sort=' ~ current_sort) %}
+  {% set tag_qs = ('tag=' ~ active_tag) if active_tag else '' %}
+  {% set img_qs = ('?' ~ sort_qs) if sort_qs else '' %}
+
+  <div class="toolbar">
+    {% if tags %}
+      <div class="tag-bar">
+        <a href="/album/{{ album }}{% if sort_qs %}?{{ sort_qs }}{% endif %}" class="tag {% if not active_tag %}active{% endif %}">ALL</a>
+        {% for t in tags %}
+          <a href="/album/{{ album }}?tag={{ t }}{% if sort_qs %}&{{ sort_qs }}{% endif %}" class="tag {% if active_tag == t %}active{% endif %}">#{{ t }}</a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <span class="toolbar__spacer"></span>
+    {% endif %}
+
+    <div class="sort" data-sort>
+      <button type="button" class="sort__btn" aria-haspopup="true" aria-expanded="false">
+        <span class="sort__btn-label">SORT</span>
+        <b>{{ sort_label }}</b>
+      </button>
+      <div class="sort__menu" hidden role="menu">
+        <div class="sort__head">SORT BY</div>
+        {% for opt in sort_options %}
+          <a class="sort__option{% if opt.active %} is-active{% endif %}"
+             role="menuitem"
+             href="/album/{{ album }}?sort={{ opt.key }}{% if active_tag %}&tag={{ active_tag }}{% endif %}">
+            {{ opt.label }}
+          </a>
+        {% endfor %}
+      </div>
     </div>
-  {% endif %}
+  </div>
 
   {% if not images %}
     <div class="empty">
@@ -67,7 +92,7 @@
     <ul class="image-grid">
       {% for img in images %}
         <li class="image-tile">
-          <a href="/image/{{ img.rel_path }}">
+          <a href="/image/{{ img.rel_path }}{{ img_qs }}">
             <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
             <div class="image-tile__overlay"><span>OPEN ↗</span></div>
           </a>

@@ -24,6 +24,26 @@
       <p class="note">Drop subfolders into <code>photos/</code> — each subfolder is an album.<br>Example: <code>photos/holiday-2025/dsc_0001.jpg</code></p>
     </div>
   {% else %}
+    <div class="toolbar">
+      <span class="toolbar__spacer"></span>
+      <div class="sort" data-sort>
+        <button type="button" class="sort__btn" aria-haspopup="true" aria-expanded="false">
+          <span class="sort__btn-label">SORT</span>
+          <b>{{ sort_label }}</b>
+        </button>
+        <div class="sort__menu" hidden role="menu">
+          <div class="sort__head">SORT BY</div>
+          {% for opt in sort_options %}
+            <a class="sort__option{% if opt.active %} is-active{% endif %}"
+               role="menuitem"
+               href="/albums?sort={{ opt.key }}">
+              {{ opt.label }}
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
     <ul class="album-grid">
       {% for a in albums %}
         <li class="album-card">

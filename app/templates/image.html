@@ -42,18 +42,19 @@
     <span class="stamp stamp--cy" id="quality-stamp">PREVIEW</span>
   </div>
 
+  {% set img_qs = ('?sort=' ~ current_sort) if current_sort != default_sort else '' %}
   <div class="detail">
     <div class="stage-wrap">
       <div class="stage">
         <span class="stage__corner stage__corner--tl">FRAME / 01</span>
         <span class="stage__corner stage__corner--tr">{% if image.width and image.height %}{{ image.width }}×{{ image.height }}{% else %}IMG{% endif %}</span>
-        {% if prev_rel %}<a class="nav-arrow prev" href="/image/{{ prev_rel }}" aria-label="Previous">‹</a>{% endif %}
+        {% if prev_rel %}<a class="nav-arrow prev" href="/image/{{ prev_rel }}{{ img_qs }}" aria-label="Previous">‹</a>{% endif %}
         <img id="stage-img"
              class="is-preview"
              src="/preview/{{ image.rel_path }}"
              data-full="/full/{{ image.rel_path }}"
              alt="{{ image.filename }}">
-        {% if next_rel %}<a class="nav-arrow next" href="/image/{{ next_rel }}" aria-label="Next">›</a>{% endif %}
+        {% if next_rel %}<a class="nav-arrow next" href="/image/{{ next_rel }}{{ img_qs }}" aria-label="Next">›</a>{% endif %}
         <span class="stage__corner stage__corner--br">{{ image.filename }}</span>
       </div>
 

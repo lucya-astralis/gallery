@@ -56,6 +56,50 @@ def _public_base_url(request: Request) -> str:
 templates.env.globals["public_base_url"] = _public_base_url
 
 
+# ----- sort options -----------------------------------------------------
+# image grid (inside an album / search results)
+SORT_IMAGE_OPTIONS = [
+    ("date_desc", "Newest first",      "taken_at IS NULL, taken_at DESC, mtime DESC, filename ASC"),
+    ("date_asc",  "Oldest first",      "taken_at IS NULL, taken_at ASC,  mtime ASC,  filename ASC"),
+    ("name_asc",  "Filename A → Z",    "filename COLLATE NOCASE ASC"),
+    ("name_desc", "Filename Z → A",    "filename COLLATE NOCASE DESC"),
+    ("size_desc", "Largest first",     "size DESC, filename ASC"),
+    ("size_asc",  "Smallest first",    "size ASC, filename ASC"),
+]
+SORT_IMAGE_DEFAULT = "date_desc"
+SORT_IMAGE_SQL = {k: sql for k, _, sql in SORT_IMAGE_OPTIONS}
+
+# album list (front page)
+SORT_ALBUM_OPTIONS = [
+    ("latest_desc", "Most recent",      "MAX(taken_at) IS NULL, MAX(taken_at) DESC, album COLLATE NOCASE ASC"),
+    ("latest_asc",  "Oldest activity",  "MAX(taken_at) IS NULL, MAX(taken_at) ASC,  album COLLATE NOCASE ASC"),
+    ("name_asc",    "Name A → Z",       "album COLLATE NOCASE ASC"),
+    ("name_desc",   "Name Z → A",       "album COLLATE NOCASE DESC"),
+    ("count_desc",  "Most photos",      "count DESC, album COLLATE NOCASE ASC"),
+    ("count_asc",   "Fewest photos",    "count ASC, album COLLATE NOCASE ASC"),
+]
+SORT_ALBUM_DEFAULT = "latest_desc"
+SORT_ALBUM_SQL = {k: sql for k, _, sql in SORT_ALBUM_OPTIONS}
+
+
+def _pick_sort(value: str | None, allowed: dict[str, str], default: str) -> str:
+    return value if value in allowed else default
+
+
+def _image_sort_options_for_template(current: str) -> list[dict]:
+    return [
+        {"key": k, "label": label, "active": k == current}
+        for k, label, _ in SORT_IMAGE_OPTIONS
+    ]
+
+
+def _album_sort_options_for_template(current: str) -> list[dict]:
+    return [
+        {"key": k, "label": label, "active": k == current}
+        for k, label, _ in SORT_ALBUM_OPTIONS
+    ]
+
+
 CSP = (
     "default-src 'self'; "
     "img-src 'self' data:; "
@@ -173,17 +217,30 @@ def welcome(request: Request):
 
 
 @app.get("/albums", response_class=HTMLResponse)
-def albums_index(request: Request):
+def albums_index(request: Request, sort: str | None = None):
+    current_sort = _pick_sort(sort, SORT_ALBUM_SQL, SORT_ALBUM_DEFAULT)
+    order_sql = SORT_ALBUM_SQL[current_sort]
     c = db.conn()
     rows = c.execute(
-        """SELECT album, COUNT(*) AS count, MAX(taken_at) AS latest,
+        f"""SELECT album, COUNT(*) AS count, MAX(taken_at) AS latest,
                   (SELECT rel_path FROM images i2 WHERE i2.album = images.album
-                   ORDER BY taken_at DESC, mtime DESC LIMIT 1) AS cover
-           FROM images GROUP BY album ORDER BY album"""
+                   ORDER BY taken_at IS NULL, taken_at DESC, mtime DESC LIMIT 1) AS cover
+           FROM images GROUP BY album ORDER BY {order_sql}"""
     ).fetchall()
     albums = [dict(r) for r in rows]
     return templates.TemplateResponse(
-        "index.html", {"request": request, "albums": albums}
+        "index.html",
+        {
+            "request": request,
+            "albums": albums,
+            "current_sort": current_sort,
+            "default_sort": SORT_ALBUM_DEFAULT,
+            "sort_options": _album_sort_options_for_template(current_sort),
+            "sort_label": next(
+                (label for k, label, _ in SORT_ALBUM_OPTIONS if k == current_sort),
+                "",
+            ),
+        },
     )
 
 
@@ -199,20 +256,27 @@ def api_shuffle(limit: int = 8):
 
 
 @app.get("/album/{album}", response_class=HTMLResponse)
-def album_view(request: Request, album: str, tag: str | None = None):
+def album_view(request: Request, album: str, tag: str | None = None, sort: str | None = None):
+    current_sort = _pick_sort(sort, SORT_IMAGE_SQL, SORT_IMAGE_DEFAULT)
+    # qualify column names so the JOIN query below isn't ambiguous
+    qualified_sql = SORT_IMAGE_SQL[current_sort].replace("filename", "i.filename")
+    qualified_sql = qualified_sql.replace("taken_at", "i.taken_at")
+    qualified_sql = qualified_sql.replace("mtime", "i.mtime")
+    qualified_sql = qualified_sql.replace("size", "i.size")
     c = db.conn()
     if tag:
         rows = c.execute(
-            """SELECT i.* FROM images i
+            f"""SELECT i.* FROM images i
                JOIN image_tags it ON it.image_id = i.id
                JOIN tags t ON t.id = it.tag_id
                WHERE i.album = ? AND t.name = ?
-               ORDER BY i.taken_at DESC, i.mtime DESC""",
+               ORDER BY {qualified_sql}""",
             (album, tag),
         ).fetchall()
     else:
+        order_sql = SORT_IMAGE_SQL[current_sort]
         rows = c.execute(
-            "SELECT * FROM images WHERE album = ? ORDER BY taken_at DESC, mtime DESC",
+            f"SELECT * FROM images WHERE album = ? ORDER BY {order_sql}",
             (album,),
         ).fetchall()
     if not rows and tag is None:
@@ -234,12 +298,19 @@ def album_view(request: Request, album: str, tag: str | None = None):
             "images": [dict(r) for r in rows],
             "tags": [r["name"] for r in tag_rows],
             "active_tag": tag,
+            "current_sort": current_sort,
+            "default_sort": SORT_IMAGE_DEFAULT,
+            "sort_options": _image_sort_options_for_template(current_sort),
+            "sort_label": next(
+                (label for k, label, _ in SORT_IMAGE_OPTIONS if k == current_sort),
+                "",
+            ),
         },
     )
 
 
 @app.get("/image/{album}/{filename}", response_class=HTMLResponse)
-def image_view(request: Request, album: str, filename: str):
+def image_view(request: Request, album: str, filename: str, sort: str | None = None):
     rel = _safe_rel(album, filename).as_posix()
     c = db.conn()
     row = c.execute("SELECT * FROM images WHERE rel_path = ?", (rel,)).fetchone()
@@ -256,8 +327,10 @@ def image_view(request: Request, album: str, filename: str):
             (row["id"],),
         ).fetchall()
     ]
+    current_sort = _pick_sort(sort, SORT_IMAGE_SQL, SORT_IMAGE_DEFAULT)
+    order_sql = SORT_IMAGE_SQL[current_sort]
     neighbours = c.execute(
-        "SELECT rel_path FROM images WHERE album = ? ORDER BY taken_at DESC, mtime DESC",
+        f"SELECT rel_path FROM images WHERE album = ? ORDER BY {order_sql}",
         (album,),
     ).fetchall()
     rel_list = [r["rel_path"] for r in neighbours]
@@ -279,6 +352,8 @@ def image_view(request: Request, album: str, filename: str):
             "description": description,
             "album_rels": rel_list,
             "current_index": idx,
+            "current_sort": current_sort,
+            "default_sort": SORT_IMAGE_DEFAULT,
         },
     )
 
@@ -402,21 +477,37 @@ def serve_full(album: str, filename: str):
 
 
 @app.get("/search", response_class=HTMLResponse)
-def search(request: Request, q: str = ""):
+def search(request: Request, q: str = "", sort: str | None = None):
     q = q.strip()
     c = db.conn()
     if not q:
         return RedirectResponse("/albums")
+    current_sort = _pick_sort(sort, SORT_IMAGE_SQL, SORT_IMAGE_DEFAULT)
+    qualified_sql = SORT_IMAGE_SQL[current_sort].replace("filename", "i.filename")
+    qualified_sql = qualified_sql.replace("taken_at", "i.taken_at")
+    qualified_sql = qualified_sql.replace("mtime", "i.mtime")
+    qualified_sql = qualified_sql.replace("size", "i.size")
     like = f"%{q}%"
     rows = c.execute(
-        """SELECT DISTINCT i.* FROM images i
+        f"""SELECT DISTINCT i.* FROM images i
            LEFT JOIN image_tags it ON it.image_id = i.id
            LEFT JOIN tags t ON t.id = it.tag_id
            WHERE i.album LIKE ? OR i.filename LIKE ? OR t.name LIKE ?
-           ORDER BY i.taken_at DESC, i.mtime DESC""",
+           ORDER BY {qualified_sql}""",
         (like, like, like),
     ).fetchall()
     return templates.TemplateResponse(
         "search.html",
-        {"request": request, "query": q, "images": [dict(r) for r in rows]},
+        {
+            "request": request,
+            "query": q,
+            "images": [dict(r) for r in rows],
+            "current_sort": current_sort,
+            "default_sort": SORT_IMAGE_DEFAULT,
+            "sort_options": _image_sort_options_for_template(current_sort),
+            "sort_label": next(
+                (label for k, label, _ in SORT_IMAGE_OPTIONS if k == current_sort),
+                "",
+            ),
+        },
     )
