@@ -1020,6 +1020,19 @@ body.lightbox-open{ overflow:hidden; }
 }
 @keyframes lb-spin { to { transform: rotate(360deg); } }
 
+.lightbox.is-idle{ cursor:none; }
+.lightbox.is-idle .lightbox__close,
+.lightbox.is-idle .lightbox__nav,
+.lightbox.is-idle .lightbox__bar{
+  opacity:0;
+  pointer-events:none;
+}
+.lightbox__close,
+.lightbox__nav,
+.lightbox__bar{
+  transition: opacity .35s ease, color .15s, border-color .15s, background .15s, transform .15s;
+}
+
 .lightbox__close{
   position:absolute;
   top:14px; right:14px;

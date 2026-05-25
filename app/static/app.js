@@ -261,6 +261,35 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     full.src = fullUrl;
   });
+
+  // swipe gestures on the stage → use existing prev/next nav-arrow hrefs
+  const stage = img.closest('.stage');
+  if (stage) {
+    let sStartX = 0, sStartY = 0, sStartT = 0, sTracking = false;
+    stage.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) { sTracking = false; return; }
+      sTracking = true;
+      sStartX = e.touches[0].clientX;
+      sStartY = e.touches[0].clientY;
+      sStartT = Date.now();
+    }, { passive: true });
+    stage.addEventListener('touchend', (e) => {
+      if (!sTracking) return;
+      sTracking = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sStartX;
+      const dy = t.clientY - sStartY;
+      const dt = Date.now() - sStartT;
+      if (dt > 700) return;
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+      // suppress the synthetic click so the lightbox doesn't open mid-navigation
+      e.preventDefault();
+      const link = dx < 0
+        ? document.querySelector('.nav-arrow.next')
+        : document.querySelector('.nav-arrow.prev');
+      if (link) window.location.href = link.href;
+    }, { passive: false });
+  }
 });
 
 // ---------- LIGHTBOX -------------------------------------------
@@ -297,6 +326,21 @@ document.addEventListener('DOMContentLoaded', () => {
   let index = Math.max(0, Math.min(data.current | 0, total - 1));
   const initialIndex = index;
   let showingFull = false;
+
+  const IDLE_MS = 2500;
+  let idleTimer = null;
+  function bumpIdle(){
+    if (lb.hidden) return;
+    lb.classList.remove('is-idle');
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (!lb.hidden) lb.classList.add('is-idle');
+    }, IDLE_MS);
+  }
+  function cancelIdle(){
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    lb.classList.remove('is-idle');
+  }
 
   function relToPreview(rel){ return '/preview/' + rel; }
   function relToFull(rel){ return '/full/' + rel; }
@@ -355,6 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (target < 0 || target >= total) return;
     index = target;
     render();
+    bumpIdle();
   }
 
   function open(){
@@ -362,10 +407,12 @@ document.addEventListener('DOMContentLoaded', () => {
     lb.hidden = false;
     document.body.classList.add('lightbox-open');
     render();
+    bumpIdle();
   }
 
   function close(){
     if (lb.hidden) return;
+    cancelIdle();
     // if user navigated to a different image, reload so the
     // page metadata (EXIF, tags, breadcrumbs) matches the URL.
     if (index !== initialIndex){
@@ -376,6 +423,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.remove('lightbox-open');
     setLoading(false);
   }
+
+  // any interaction inside the lightbox keeps the UI alive.
+  // wasIdle flag lets the immediate click after a wake-up tap be
+  // swallowed — so tapping a hidden UI brings it back instead of
+  // closing the viewer.
+  let wasIdle = false;
+  lb.addEventListener('mousemove', bumpIdle);
+  lb.addEventListener('pointerdown', (e) => {
+    wasIdle = lb.classList.contains('is-idle');
+    bumpIdle();
+  }, true);
+  lb.addEventListener('wheel', bumpIdle, { passive: true });
 
   // open triggers
   if (stageImg) stageImg.addEventListener('click', (e) => {
@@ -391,12 +450,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // click outside image / on stage padding closes
   lb.addEventListener('click', (e) => {
+    if (wasIdle) { wasIdle = false; return; }
     if (e.target === lb || e.target === stage) close();
   });
 
   // click on image itself zooms out / closes too (cursor:zoom-out vibe)
   imgEl.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (wasIdle) { wasIdle = false; return; }
     close();
   });
 
@@ -429,6 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', (e) => {
     if (lb.hidden) return;
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    bumpIdle();
     if (e.key === 'Escape')      { e.stopPropagation(); close(); }
     else if (e.key === 'ArrowLeft')  { e.stopPropagation(); navigate(-1); }
     else if (e.key === 'ArrowRight') { e.stopPropagation(); navigate(1); }
