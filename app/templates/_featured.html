@@ -1,9 +1,10 @@
-{# Re-usable horizontal strip of showcased photos.
+{# Re-usable horizontal contact-reel of showcased photos.
    Used inside /album/{name}, so the filename alone is enough context —
    the album name would just repeat what the page header already says. #}
-<section class="featured" aria-label="Featured photos">
+<section class="featured featured--reel" aria-label="Featured photos">
   <header class="featured__head">
     <span class="featured__label">★ FEATURED</span>
+    <span class="featured__hint" aria-hidden="true">CONTACT REEL</span>
     <span class="featured__count">{{ featured | length }} {% if featured | length == 1 %}PHOTO{% else %}PHOTOS{% endif %}</span>
   </header>
   <ul class="featured__strip">
@@ -17,6 +18,11 @@
                alt="{{ display_name(img.filename) }}"
                loading="lazy">
           <span class="featured__tile-corner" aria-hidden="true">★</span>
+          <span class="featured__tile-frame" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span>
+          <span class="featured__tile-overlay" aria-hidden="true">
+            <span class="featured__tile-name">{{ display_name(img.filename) }}</span>
+            <span class="featured__tile-open">OPEN ↗</span>
+          </span>
         </a>
       </li>
     {% endfor %}

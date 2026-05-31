@@ -25,31 +25,12 @@
     </div>
   {% else %}
     {% if showcase_albums %}
-      <section class="featured featured--albums" aria-label="Showcase albums">
-        <header class="featured__head">
-          <span class="featured__label">★ SHOWCASE ALBUMS</span>
-          <span class="featured__count">{{ showcase_albums | length }} · CURATED</span>
+      <section class="showcase" aria-label="Showcase albums">
+        <header class="showcase__head">
+          <span class="showcase__label">★ SHOWCASE ALBUMS</span>
+          <span class="showcase__count">{{ showcase_albums | length }} · CURATED</span>
         </header>
-        <ul class="showcase-albums">
-          {% for a in showcase_albums %}
-            <li class="showcase-album">
-              <a href="/album/{{ a.album }}">
-                <div class="showcase-album__img">
-                  {% if a.cover %}
-                    <img src="/thumb/{{ a.cover }}" alt="{{ display_name(a.album) }}" loading="lazy">
-                  {% else %}
-                    <div class="album-card__cover-empty">NO COVER</div>
-                  {% endif %}
-                  <span class="album-card__badge">★ FEATURED</span>
-                </div>
-                <div class="showcase-album__cap">
-                  <span class="showcase-album__name">{{ display_name(a.album) }}</span>
-                  <span class="showcase-album__count">{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
-                </div>
-              </a>
-            </li>
-          {% endfor %}
-        </ul>
+        {% include "_showcase_albums.html" %}
       </section>
     {% endif %}
     <div class="toolbar">
@@ -83,10 +64,12 @@
               {% else %}
                 <div class="album-card__cover-empty">NO COVER</div>
               {% endif %}
+              <span class="album-card__idx" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span>
               {% if is_show %}<span class="album-card__badge">★ FEATURED</span>{% endif %}
+              <div class="album-card__hover" aria-hidden="true"><span>ENTER →</span></div>
             </div>
             <div class="album-card__cap">
-              <span class="album-card__tag">ALBUM / {{ '%02d' | format(loop.index) }}</span>
+              <span class="album-card__kicker">{% if is_show %}★ FEATURED ALBUM{% else %}DIRECTORY{% endif %}</span>
               <span class="album-card__name">{{ display_name(a.album) }}</span>
               <span class="album-card__count">{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
             </div>

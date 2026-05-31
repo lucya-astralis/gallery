@@ -52,7 +52,7 @@ Mark individual photos and/or whole albums as **showcased** with a single charac
 | Where the marker sits         | Effect                                                                                |
 |-------------------------------|---------------------------------------------------------------------------------------|
 | **Filename** (`_hero.jpg`)    | Photo is featured: appears in the welcome CRT, in its album's "featured" strip, and in the `/api/showcase` feed. Gets a ★ in the album grid. |
-| **Album folder** (`_best-of/`)| Album is featured: shown in a dedicated "Showcase Albums" section on `/albums` with a `★ FEATURED` badge. Photos inside still need their own `_` to be individually featured. |
+| **Album folder** (`_best-of/`)| Album is featured: shown in a dedicated "Showcase Albums" section on the welcome screen and on `/albums`, with a `★ FEATURED` badge. Photos inside still need their own `_` to be individually featured. |
 
 The two flags are **independent** — putting a photo into a `_showcase` album does NOT auto-feature it. Each photo opts in with its own filename prefix. Display strips the leading marker, so `_best-of/` shows up as "best-of" and `_hero.jpg` as "hero.jpg"; URLs keep the raw name on disk.
 
@@ -209,7 +209,7 @@ The app is fully **read-only** by design:
 
 All GET, all public:
 
-- `GET /` — welcome screen (CRT cycling through showcase, or random fallback)
+- `GET /` — welcome screen (CRT cycling through showcase, or random fallback; plus a Showcase Albums section)
 - `GET /albums` — album overview (showcase albums section + main grid; `?sort=`)
 - `GET /album/{album}` — images in an album (`?tag=`, `?sort=`)
 - `GET /image/{album}/{file}` — detail view (stage shows preview by default; `?sort=` preserved for prev/next ordering)

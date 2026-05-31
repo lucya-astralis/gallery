@@ -110,6 +110,30 @@ def _showcase_rows(album: str | None = None, limit: int = 50, random_order: bool
     return [dict(r) for r in rows]
 
 
+def _showcase_album_rows(limit: int | None = None):
+    """Albums whose folder name carries the showcase marker, newest-active
+    first. Same shape as the rows produced in `albums_index` (album, count,
+    latest, cover) so the showcase-album card partial can be reused on both
+    the /albums overview and the welcome screen."""
+    if not SHOWCASE_MARKER:
+        return []
+    c = db.conn()
+    ml = len(SHOWCASE_MARKER)
+    sql = (
+        "SELECT album, COUNT(*) AS count, MAX(taken_at) AS latest, "
+        "(SELECT rel_path FROM images i2 WHERE i2.album = images.album "
+        " ORDER BY taken_at IS NULL, taken_at DESC, mtime DESC LIMIT 1) AS cover "
+        "FROM images WHERE substr(album, 1, ?) = ? "
+        "GROUP BY album "
+        "ORDER BY MAX(taken_at) IS NULL, MAX(taken_at) DESC, album COLLATE NOCASE ASC"
+    )
+    params: list = [ml, SHOWCASE_MARKER]
+    if limit is not None:
+        sql += " LIMIT ?"
+        params.append(limit)
+    return [dict(r) for r in c.execute(sql, params).fetchall()]
+
+
 def _serialize_showcase_item(row: dict, base: str) -> dict:
     rel = row["rel_path"]
     return {
@@ -359,6 +383,7 @@ def welcome(request: Request):
     showcase_count = c.execute(
         "SELECT COUNT(*) AS n FROM images WHERE is_showcase = 1"
     ).fetchone()
+    showcase_albums = _showcase_album_rows(limit=6)
     return templates.TemplateResponse(
         "welcome.html",
         {
@@ -369,6 +394,7 @@ def welcome(request: Request):
             "image_count": counts["images"] if counts else 0,
             "album_count": counts["albums"] if counts else 0,
             "showcase_count": showcase_count["n"] if showcase_count else 0,
+            "showcase_albums": showcase_albums,
         },
     )
 

@@ -1,0 +1,26 @@
+{# Re-usable poster grid of showcase albums (folder marked with the showcase
+   marker). Shared by /albums and the welcome screen — the section wrapper +
+   header live in the including page so each can add its own context/links.
+   Expects `showcase_albums`: rows of {album, cover, count}. #}
+<ul class="showcase-albums">
+  {% for a in showcase_albums %}
+    <li class="showcase-album">
+      <a href="/album/{{ a.album }}" aria-label="{{ display_name(a.album) }} — {{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}">
+        <div class="showcase-album__img">
+          {% if a.cover %}
+            <img src="/thumb/{{ a.cover }}" alt="{{ display_name(a.album) }}" loading="lazy">
+          {% else %}
+            <div class="album-card__cover-empty">NO COVER</div>
+          {% endif %}
+          <span class="showcase-album__idx" aria-hidden="true">S/{{ '%02d' | format(loop.index) }}</span>
+          <span class="album-card__badge">★ FEATURED</span>
+          <div class="showcase-album__cap">
+            <span class="showcase-album__name">{{ display_name(a.album) }}</span>
+            <span class="showcase-album__count">{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
+            <span class="showcase-album__cta" aria-hidden="true">VIEW ALBUM →</span>
+          </div>
+        </div>
+      </a>
+    </li>
+  {% endfor %}
+</ul>

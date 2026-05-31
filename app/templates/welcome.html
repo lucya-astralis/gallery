@@ -109,6 +109,16 @@
           </div>
         {% endif %}
       </div>
+
+      {% if showcase_albums %}
+        <section class="showcase welcome__showcase" aria-label="Showcase albums">
+          <header class="showcase__head">
+            <span class="showcase__label">★ SHOWCASE ALBUMS</span>
+            <a class="showcase__more" href="/albums">ALL →</a>
+          </header>
+          {% include "_showcase_albums.html" %}
+        </section>
+      {% endif %}
     </aside>
   </div>
 </section>
