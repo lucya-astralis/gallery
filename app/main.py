@@ -23,7 +23,10 @@ FULLS_DIR = Path(os.environ.get("FULLS_DIR", str(PREVIEWS_DIR / "_full"))).resol
 DATA_DIR = Path(os.environ.get("DATA_DIR", "./data")).resolve()
 THUMB_SIZE = int(os.environ.get("THUMB_SIZE", "480"))
 PREVIEW_SIZE = int(os.environ.get("PREVIEW_SIZE", "1600"))
-SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL", "0"))
+# Default 300s (5 min): the file watcher does not get events over SMB/CIFS/NFS
+# shares, so a periodic full scan is what actually picks up newly added albums
+# and sub-folders there. Set SCAN_INTERVAL=0 to disable.
+SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL", "300"))
 ENABLE_WATCHER = os.environ.get("ENABLE_WATCHER", "1") not in ("0", "false", "False", "")
 HIDE_GPS = os.environ.get("HIDE_GPS", "1") not in ("0", "false", "False", "")
 STRIP_GPS = os.environ.get("STRIP_GPS", "1") not in ("0", "false", "False", "")
@@ -111,27 +114,21 @@ def _showcase_rows(album: str | None = None, limit: int = 50, random_order: bool
 
 
 def _showcase_album_rows(limit: int | None = None):
-    """Albums whose folder name carries the showcase marker, newest-active
-    first. Same shape as the rows produced in `albums_index` (album, count,
-    latest, cover) so the showcase-album card partial can be reused on both
-    the /albums overview and the welcome screen."""
+    """Top-level albums whose folder name carries the showcase marker,
+    newest-active first. Derived from the album tree (not a flat
+    `substr(album,…)` match) so a showcase collection that only holds
+    sub-folders still shows up, and its sub-folders are NOT mistaken for
+    top-level showcase albums. Same shape as the cards in `albums_index`
+    (album, name, count, latest, cover, sub_count) so the showcase-album
+    partial can be reused on both /albums and the welcome screen."""
     if not SHOWCASE_MARKER:
         return []
-    c = db.conn()
-    ml = len(SHOWCASE_MARKER)
-    sql = (
-        "SELECT album, COUNT(*) AS count, MAX(taken_at) AS latest, "
-        "(SELECT rel_path FROM images i2 WHERE i2.album = images.album "
-        " ORDER BY taken_at IS NULL, taken_at DESC, mtime DESC LIMIT 1) AS cover "
-        "FROM images WHERE substr(album, 1, ?) = ? "
-        "GROUP BY album "
-        "ORDER BY MAX(taken_at) IS NULL, MAX(taken_at) DESC, album COLLATE NOCASE ASC"
-    )
-    params: list = [ml, SHOWCASE_MARKER]
-    if limit is not None:
-        sql += " LIMIT ?"
-        params.append(limit)
-    return [dict(r) for r in c.execute(sql, params).fetchall()]
+    cards = [
+        c for c in _top_level_album_cards()
+        if c["album"].startswith(SHOWCASE_MARKER)
+    ]
+    cards = _sorted_album_cards(cards, "latest_desc")
+    return cards[:limit] if limit is not None else cards
 
 
 def _serialize_showcase_item(row: dict, base: str) -> dict:
@@ -166,6 +163,105 @@ def _json_cors(payload, max_age: int = 300) -> JSONResponse:
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
     resp.headers["Cache-Control"] = f"public, max-age={max_age}"
     return resp
+
+
+# ----- album tree -------------------------------------------------------
+# Albums are directories and nest arbitrarily (e.g. "japan/tokyo"). The
+# `images.album` column stores each photo's full parent-directory path, so
+# the album *tree* is derived from those strings — intermediate folders that
+# hold only sub-folders (no direct photos of their own) are still found.
+def _distinct_albums() -> list[str]:
+    c = db.conn()
+    return [r["album"] for r in c.execute("SELECT DISTINCT album FROM images").fetchall()]
+
+
+def _child_album_names(parent: str | None, all_albums: list[str] | None = None) -> list[str]:
+    """Immediate sub-folder album-paths directly under `parent`
+    (top-level albums when `parent` is None)."""
+    albums = all_albums if all_albums is not None else _distinct_albums()
+    prefix = (parent + "/") if parent else ""
+    plen = len(prefix)
+    out: list[str] = []
+    seen: set[str] = set()
+    for a in albums:
+        if prefix:
+            if not a.startswith(prefix):
+                continue
+            rest = a[plen:]
+        else:
+            rest = a
+        if not rest:
+            continue
+        full = prefix + rest.split("/", 1)[0]
+        if full not in seen:
+            seen.add(full)
+            out.append(full)
+    return out
+
+
+def _album_card(album: str, all_albums: list[str] | None = None) -> dict:
+    """Display info for one album node: recursive photo count, latest
+    activity, a cover image from anywhere in its subtree, and how many
+    immediate sub-albums it has. `substr(...)` (not LIKE) is used for the
+    subtree prefix so album names containing `_`/`%` don't act as wildcards."""
+    c = db.conn()
+    prefix = album + "/"
+    cond = "(album = ? OR substr(album, 1, ?) = ?)"
+    params = (album, len(prefix), prefix)
+    agg = c.execute(
+        f"SELECT COUNT(*) AS count, MAX(taken_at) AS latest FROM images WHERE {cond}",
+        params,
+    ).fetchone()
+    cover = c.execute(
+        f"SELECT rel_path FROM images WHERE {cond} "
+        "ORDER BY taken_at IS NULL, taken_at DESC, mtime DESC LIMIT 1",
+        params,
+    ).fetchone()
+    return {
+        "album": album,
+        "name": _display_name(album.rsplit("/", 1)[-1]),
+        "count": agg["count"] if agg else 0,
+        "latest": agg["latest"] if agg else None,
+        "cover": cover["rel_path"] if cover else None,
+        "sub_count": len(_child_album_names(album, all_albums)),
+    }
+
+
+def _top_level_album_cards(all_albums: list[str] | None = None) -> list[dict]:
+    """One card per top-level album (unsorted)."""
+    all_albums = all_albums if all_albums is not None else _distinct_albums()
+    return [_album_card(n, all_albums) for n in _child_album_names(None, all_albums)]
+
+
+def _sorted_album_cards(cards: list[dict], sort_key: str) -> list[dict]:
+    """Order album cards by one of the SORT_ALBUM keys. A leading stable
+    name-ascending pass provides the tie-break for every other key."""
+    cards = sorted(cards, key=lambda a: a["album"].lower())
+    if sort_key == "name_desc":
+        cards.sort(key=lambda a: a["album"].lower(), reverse=True)
+    elif sort_key == "count_desc":
+        cards.sort(key=lambda a: a["count"], reverse=True)
+    elif sort_key == "count_asc":
+        cards.sort(key=lambda a: a["count"])
+    elif sort_key == "latest_asc":
+        cards.sort(key=lambda a: (a["latest"] is None, a["latest"] or ""))
+    elif sort_key == "latest_desc":
+        cards.sort(key=lambda a: a["latest"] or "", reverse=True)
+    # name_asc: already sorted
+    return cards
+
+
+def _album_breadcrumbs(album: str) -> list[dict]:
+    """[{name, path}, ...] for each ancestor segment of an album path, so
+    templates can render HOME / ALBUMS / japan / tokyo with linkable parts."""
+    acc: list[str] = []
+    out: list[dict] = []
+    for seg in album.split("/"):
+        if not seg:
+            continue
+        acc.append(seg)
+        out.append({"name": _display_name(seg), "path": "/".join(acc)})
+    return out
 
 
 # ----- sort options -----------------------------------------------------
@@ -377,9 +473,9 @@ def welcome(request: Request):
         ]
         feed_label = "RANDOM"
         feed_mode = "random"
-    counts = c.execute(
-        "SELECT COUNT(*) AS images, COUNT(DISTINCT album) AS albums FROM images"
-    ).fetchone()
+    counts = c.execute("SELECT COUNT(*) AS images FROM images").fetchone()
+    # "Albums" = top-level folders (parents of nested albums count once).
+    top_level_albums = len(_child_album_names(None))
     showcase_count = c.execute(
         "SELECT COUNT(*) AS n FROM images WHERE is_showcase = 1"
     ).fetchone()
@@ -392,7 +488,7 @@ def welcome(request: Request):
             "feed_label": feed_label,
             "feed_mode": feed_mode,
             "image_count": counts["images"] if counts else 0,
-            "album_count": counts["albums"] if counts else 0,
+            "album_count": top_level_albums,
             "showcase_count": showcase_count["n"] if showcase_count else 0,
             "showcase_albums": showcase_albums,
         },
@@ -402,15 +498,7 @@ def welcome(request: Request):
 @app.get("/albums", response_class=HTMLResponse)
 def albums_index(request: Request, sort: str | None = None):
     current_sort = _pick_sort(sort, SORT_ALBUM_SQL, SORT_ALBUM_DEFAULT)
-    order_sql = SORT_ALBUM_SQL[current_sort]
-    c = db.conn()
-    rows = c.execute(
-        f"""SELECT album, COUNT(*) AS count, MAX(taken_at) AS latest,
-                  (SELECT rel_path FROM images i2 WHERE i2.album = images.album
-                   ORDER BY taken_at IS NULL, taken_at DESC, mtime DESC LIMIT 1) AS cover
-           FROM images GROUP BY album ORDER BY {order_sql}"""
-    ).fetchall()
-    albums = [dict(r) for r in rows]
+    albums = _sorted_album_cards(_top_level_album_cards(), current_sort)
     is_show = lambda name: bool(SHOWCASE_MARKER) and name.startswith(SHOWCASE_MARKER)
     showcase_albums = [a for a in albums if is_show(a["album"])]
     return templates.TemplateResponse(
@@ -470,8 +558,11 @@ def api_shuffle(limit: int = 8):
     return [dict(r) for r in rows]
 
 
-@app.get("/album/{album}", response_class=HTMLResponse)
+@app.get("/album/{album:path}", response_class=HTMLResponse)
 def album_view(request: Request, album: str, tag: str | None = None, sort: str | None = None):
+    album = album.strip("/")
+    if not album:
+        raise HTTPException(404, "album not found")
     current_sort = _pick_sort(sort, SORT_IMAGE_SQL, SORT_IMAGE_DEFAULT)
     # qualify column names so the JOIN query below isn't ambiguous
     qualified_sql = SORT_IMAGE_SQL[current_sort].replace("filename", "i.filename")
@@ -494,9 +585,16 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             f"SELECT * FROM images WHERE album = ? ORDER BY {order_sql}",
             (album,),
         ).fetchall()
-    if not rows and tag is None:
-        c2 = c.execute("SELECT 1 FROM images WHERE album = ? LIMIT 1", (album,)).fetchone()
-        if not c2:
+    # Immediate sub-folders of this album, shown as folder cards above the
+    # image grid. Listed alphabetically so the folder view is predictable.
+    sub_albums = _sorted_album_cards(
+        [_album_card(n) for n in _child_album_names(album)], "name_asc"
+    )
+    if not rows and not sub_albums:
+        # nothing directly here and no sub-folders: only a 404 if the album
+        # truly has no photos anywhere (a tag filter may have hidden them).
+        exists = c.execute("SELECT 1 FROM images WHERE album = ? LIMIT 1", (album,)).fetchone()
+        if not exists:
             raise HTTPException(404, "album not found")
     tag_rows = c.execute(
         """SELECT DISTINCT t.name FROM tags t
@@ -505,7 +603,9 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
            WHERE i.album = ? ORDER BY t.name""",
         (album,),
     ).fetchall()
-    album_is_showcase = bool(SHOWCASE_MARKER) and album.startswith(SHOWCASE_MARKER)
+    # A showcase ALBUM is flagged by its own folder name (the last path
+    # segment) starting with the marker — not by an ancestor's.
+    album_is_showcase = bool(SHOWCASE_MARKER) and album.rsplit("/", 1)[-1].startswith(SHOWCASE_MARKER)
     # Featured strip = photos in this album with their own filename marker.
     # A showcase ALBUM doesn't auto-promote its contents — each photo opts
     # in independently with a `_` filename prefix.
@@ -515,6 +615,8 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
         {
             "request": request,
             "album": album,
+            "breadcrumbs": _album_breadcrumbs(album),
+            "sub_albums": sub_albums,
             "album_is_showcase": album_is_showcase,
             "featured": featured,
             "images": [dict(r) for r in rows],
@@ -531,7 +633,7 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     )
 
 
-@app.get("/image/{album}/{filename}", response_class=HTMLResponse)
+@app.get("/image/{album:path}/{filename}", response_class=HTMLResponse)
 def image_view(request: Request, album: str, filename: str, sort: str | None = None):
     album, filename = _resolve_showcase_path(album, filename)
     rel = _safe_rel(album, filename).as_posix()
@@ -567,6 +669,7 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
         {
             "request": request,
             "image": dict(row),
+            "breadcrumbs": _album_breadcrumbs(row["album"]),
             "exif": pretty_exif,
             "exif_raw": exif,
             "tags": tags,

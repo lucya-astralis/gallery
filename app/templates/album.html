@@ -5,7 +5,7 @@
   {% set og_title = album ~ ' — lucya.systems gallery' %}
   {% set img_count = images | length %}
   {% set og_desc = img_count ~ (' image' if img_count == 1 else ' images') ~ ' in “' ~ album ~ '”' %}
-  {% set cover_rel = images[0].rel_path if images else None %}
+  {% set cover_rel = images[0].rel_path if images else (sub_albums[0].cover if sub_albums else None) %}
   <meta property="og:site_name" content="lucya.systems gallery">
   <meta property="og:title" content="{{ og_title }}">
   <meta property="og:description" content="{{ og_desc }}">
@@ -30,13 +30,16 @@
     <a href="/">HOME</a>
     <span class="sep">/</span>
     <a href="/albums">ALBUMS</a>
-    <span class="sep">/</span>
-    <b>{{ display_name(album) }}</b>
+    {% for c in breadcrumbs %}
+      <span class="sep">/</span>
+      {% if loop.last %}<b>{{ c.name }}</b>{% else %}<a href="/album/{{ c.path }}">{{ c.name }}</a>{% endif %}
+    {% endfor %}
   </div>
 
   <div class="section__doc">
     <span>FILE / {{ display_name(album) | upper }}</span>
-    <span>COUNT / <b>{{ images | length }}</b></span>
+    {% if images or not sub_albums %}<span>COUNT / <b>{{ images | length }}</b></span>{% endif %}
+    {% if sub_albums %}<span>ALBUMS / <b>{{ sub_albums | length }}</b></span>{% endif %}
     {% if album_is_showcase %}<span class="stamp stamp--cy">★ SHOWCASE ALBUM</span>{% endif %}
     {% if active_tag %}<span class="stamp stamp--cy">FILTER / #{{ active_tag | upper }}</span>{% endif %}
     <span class="stamp stamp--ok">OK</span>
@@ -50,6 +53,38 @@
     </div>
   </header>
 
+  {% if sub_albums %}
+    <section class="sub-albums" aria-label="Folders">
+      <header class="sub-albums__head">
+        <span class="sub-albums__label">▸ FOLDERS</span>
+        <span class="sub-albums__count">{{ sub_albums | length }} {% if sub_albums | length == 1 %}album{% else %}albums{% endif %}</span>
+      </header>
+      <ul class="album-grid">
+        {% for a in sub_albums %}
+          <li class="album-card album-card--folder">
+            <a href="/album/{{ a.album }}">
+              <div class="album-card__img">
+                {% if a.cover %}
+                  <img src="/thumb/{{ a.cover }}" alt="{{ a.name }}" loading="lazy">
+                {% else %}
+                  <div class="album-card__cover-empty">NO COVER</div>
+                {% endif %}
+                <span class="album-card__idx" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span>
+                <span class="album-card__badge album-card__badge--folder">▸ FOLDER</span>
+                <div class="album-card__hover" aria-hidden="true"><span>ENTER →</span></div>
+              </div>
+              <div class="album-card__cap">
+                <span class="album-card__kicker">FOLDER</span>
+                <span class="album-card__name">{{ a.name }}</span>
+                <span class="album-card__count">{% if a.sub_count %}{{ a.sub_count }} {% if a.sub_count == 1 %}album{% else %}albums{% endif %} · {% endif %}{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
+              </div>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
   {% if featured %}
     {% include "_featured.html" %}
   {% endif %}
@@ -58,6 +93,7 @@
   {% set tag_qs = ('tag=' ~ active_tag) if active_tag else '' %}
   {% set img_qs = ('?' ~ sort_qs) if sort_qs else '' %}
 
+  {% if images or active_tag %}
   <div class="toolbar">
     {% if tags %}
       <div class="tag-bar">
@@ -87,13 +123,15 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
-  {% if not images %}
-    <div class="empty">
-      <span class="stamp">EMPTY</span>
-      <p>No images{% if active_tag %} tagged <code>#{{ active_tag }}</code>{% endif %}.</p>
-    </div>
-  {% else %}
+  {% if images %}
+    {% if sub_albums %}
+      <header class="sub-albums__head sub-albums__head--photos">
+        <span class="sub-albums__label">▤ PHOTOS</span>
+        <span class="sub-albums__count">{{ images | length }} {% if images | length == 1 %}image{% else %}images{% endif %}</span>
+      </header>
+    {% endif %}
     <ul class="image-grid">
       {% for img in images %}
         <li class="image-tile{% if img.is_showcase %} image-tile--showcase{% endif %}">
@@ -105,6 +143,16 @@
         </li>
       {% endfor %}
     </ul>
+  {% elif active_tag %}
+    <div class="empty">
+      <span class="stamp">EMPTY</span>
+      <p>No images tagged <code>#{{ active_tag }}</code>.</p>
+    </div>
+  {% elif not sub_albums %}
+    <div class="empty">
+      <span class="stamp">EMPTY</span>
+      <p>No images.</p>
+    </div>
   {% endif %}
 </section>
 {% endblock %}

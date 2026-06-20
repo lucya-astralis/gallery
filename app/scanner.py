@@ -242,11 +242,16 @@ def _sync_tags(image_id: int, tag_names: list[str]):
 
 
 def index_image(photos_dir: Path, file: Path) -> bool:
-    rel = file.relative_to(photos_dir).as_posix()
-    parts = file.relative_to(photos_dir).parts
+    relp = file.relative_to(photos_dir)
+    rel = relp.as_posix()
+    parts = relp.parts
     if len(parts) < 2:
         return False
-    album = parts[0]
+    # `album` is the full relative directory path of the folder holding the
+    # image (POSIX, e.g. "japan/tokyo"). This keeps the invariant
+    # rel_path == album + "/" + filename and lets albums nest arbitrarily —
+    # the album *tree* is derived from these paths (see main.py helpers).
+    album = "/".join(parts[:-1])
     filename = parts[-1]
     stat = file.stat()
     mtime = stat.st_mtime
@@ -320,24 +325,28 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         except (OSError, PermissionError):
             log.warning("photos dir does not exist and is not writable: %s", photos_dir)
             return {"indexed": 0, "thumbnails": 0, "previews": 0, "removed": 0, "total_seen": 0}
-    for album_dir in sorted(p for p in photos_dir.iterdir() if p.is_dir()):
-        for file in sorted(album_dir.iterdir()):
-            if not file.is_file() or not is_image(file):
-                continue
-            rel = file.relative_to(photos_dir).as_posix()
-            seen.add(rel)
-            if index_image(photos_dir, file):
-                added += 1
-            mtime = file.stat().st_mtime
-            thumb_path = (thumbs_dir / rel).with_suffix(".jpg")
-            if not thumb_path.exists() or thumb_path.stat().st_mtime < mtime:
-                if make_thumbnail(file, thumb_path, thumb_size):
-                    thumbed += 1
-            if previews_dir is not None:
-                preview_path = (previews_dir / rel).with_suffix(".jpg")
-                if not preview_path.exists() or preview_path.stat().st_mtime < mtime:
-                    if make_thumbnail(file, preview_path, preview_size):
-                        previewed += 1
+    # Walk the whole tree so albums can nest (photos/japan/tokyo/img.jpg).
+    # Files sitting directly in photos_dir (no album folder) are skipped.
+    for file in sorted(photos_dir.rglob("*")):
+        if not file.is_file() or not is_image(file):
+            continue
+        relp = file.relative_to(photos_dir)
+        if len(relp.parts) < 2:
+            continue
+        rel = relp.as_posix()
+        seen.add(rel)
+        if index_image(photos_dir, file):
+            added += 1
+        mtime = file.stat().st_mtime
+        thumb_path = (thumbs_dir / rel).with_suffix(".jpg")
+        if not thumb_path.exists() or thumb_path.stat().st_mtime < mtime:
+            if make_thumbnail(file, thumb_path, thumb_size):
+                thumbed += 1
+        if previews_dir is not None:
+            preview_path = (previews_dir / rel).with_suffix(".jpg")
+            if not preview_path.exists() or preview_path.stat().st_mtime < mtime:
+                if make_thumbnail(file, preview_path, preview_size):
+                    previewed += 1
 
     c = db.conn()
     with db.lock():

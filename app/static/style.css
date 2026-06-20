@@ -1142,6 +1142,31 @@ section{
   text-transform:uppercase;
 }
 
+/* ----- nested folders (sub-albums) ----- */
+.album-card__badge--folder{
+  color:var(--text-dim);
+  border-color:var(--line);
+  background:rgba(7,7,11,.78);
+  letter-spacing:.16em;
+}
+.album-card--folder .album-card__kicker{ color:var(--acc-cy); }
+
+.sub-albums{ margin:0 0 30px; }
+.sub-albums__head{
+  display:flex; align-items:baseline; gap:12px;
+  margin-bottom:12px; padding-bottom:8px;
+  border-bottom:1px dashed var(--line);
+  font-family:"JetBrains Mono", monospace;
+  text-transform:uppercase;
+}
+.sub-albums__head--photos{ margin-top:30px; }
+.sub-albums__label{
+  font-size:11px; letter-spacing:.24em; color:var(--acc-cy);
+}
+.sub-albums__count{
+  font-size:10px; letter-spacing:.18em; color:var(--text-dim);
+}
+
 /* ================================================================
    IMAGE GRID  (inside album)
    ================================================================ */

@@ -16,7 +16,9 @@ services:
       - DATA_DIR=/data
       - THUMB_SIZE=${THUMB_SIZE:-480}
       - PREVIEW_SIZE=${PREVIEW_SIZE:-1600}
-      - SCAN_INTERVAL=${SCAN_INTERVAL:-0}
+      # Default 300s: SMB/CIFS/NFS shares don't deliver file-watch events, so a
+      # periodic full scan is what picks up newly added albums/sub-folders there.
+      - SCAN_INTERVAL=${SCAN_INTERVAL:-300}
       - ENABLE_WATCHER=${ENABLE_WATCHER:-1}
       - HIDE_GPS=${HIDE_GPS:-1}
       - STRIP_GPS=${STRIP_GPS:-1}

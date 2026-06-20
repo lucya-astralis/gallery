@@ -28,8 +28,10 @@
     <a href="/">HOME</a>
     <span class="sep">/</span>
     <a href="/albums">ALBUMS</a>
-    <span class="sep">/</span>
-    <a href="/album/{{ image.album }}">{{ image.album | upper }}</a>
+    {% for c in breadcrumbs %}
+      <span class="sep">/</span>
+      <a href="/album/{{ c.path }}">{{ c.name | upper }}</a>
+    {% endfor %}
     <span class="sep">/</span>
     <b>{{ image.filename }}</b>
   </div>
