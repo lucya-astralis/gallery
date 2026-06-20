@@ -795,14 +795,18 @@ section{
 /* the ★ FEATURED badge already exists at .album-card__badge —
    reuse those styles. Position is set there. */
 
+/* folder variant — nested albums (sub-folders) reuse the showcase poster
+   card so they sit flush with no framing box. The cyan count reads as
+   "featured", so dim it: a folder is plain navigation, not a highlight. */
+.showcase-album--folder .showcase-album__count{
+  color:var(--text-dim);
+  text-shadow: 0 1px 6px rgba(0,0,0,.85);
+}
+
 @media (max-width:760px){
   .showcase-album__cap{ padding:10px 12px 12px; }
   .showcase-album__name{ font-size:13px; }
   .showcase-album__count{ font-size:9.5px; }
-}
-@media (max-width:480px){
-  /* match .album-grid's single-column layout at this width */
-  .showcase-albums{ grid-template-columns:1fr; }
 }
 
 /* showcase indicator on individual photo tiles */
@@ -1167,6 +1171,32 @@ section{
   font-size:10px; letter-spacing:.18em; color:var(--text-dim);
 }
 
+/* phones: 2-up grids instead of 1-up giant cards — more of the archive on
+   screen at once (matches the welcome screen, which is already 2-up). Both
+   the poster grid (showcase / nested folders) and the caption-below album
+   grid switch together so the two stay aligned. 560px is where the desktop
+   auto-fill naturally reaches 2 columns, so the handoff is seamless. This
+   block lives AFTER the base grid/card rules on purpose: same specificity,
+   so source order has to win. album-grid keeps gap:1px — its var(--line)
+   background IS the hairline separator; a wider gap would read as thick
+   lines, not spacing. */
+@media (max-width:560px){
+  .album-grid,
+  .showcase-albums{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+
+  .showcase-album__cap{ padding:8px 9px 9px; }
+  .showcase-album__name{ font-size:11.5px; letter-spacing:.02em; }
+  .showcase-album__count{ font-size:8.5px; letter-spacing:.1em; }
+  .showcase-album__idx{ font-size:8px; padding:2px 5px; }
+
+  .album-card__cap{ padding:9px 10px 11px; gap:3px; }
+  .album-card__kicker{ font-size:8px; letter-spacing:.14em; }
+  .album-card__name{ font-size:12px; letter-spacing:.02em; }
+  .album-card__count{ font-size:8.5px; letter-spacing:.1em; }
+  .album-card__badge{ font-size:8px; padding:2px 5px; letter-spacing:.14em; }
+  .album-card__idx{ font-size:8px; padding:2px 5px; }
+}
+
 /* ================================================================
    IMAGE GRID  (inside album)
    ================================================================ */
@@ -1455,6 +1485,14 @@ details[open] > summary::before{ content:"▾ "; }
   .nav__brand .brand-sub{ font-size:9px; }
   .nav__brand img{ height:24px; }
   .nav__status{ display:none; }
+
+  /* tighter vertical rhythm on phones: content first, less dead space */
+  section{ padding-top:22px; padding-bottom:30px; }
+  .sub-albums{ margin-bottom:22px; }
+  .sub-albums__head--photos{ margin-top:22px; }
+  .showcase{ margin-bottom:24px; }
+  .foot{ margin-top:32px; }
+
   .section__doc{
     display:grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1516,8 +1554,7 @@ details[open] > summary::before{ content:"▾ "; }
   .nav__brand .brand-text{ display:none; }
   .nav__search::before{ content:"❯"; margin-right:6px; font-size:10px; }
   .nav__search input{ font-size:11px; padding:8px 0; }
-  .album-grid{ grid-template-columns:1fr; }
-  .image-grid{ grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:6px; }
+  .image-grid{ grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:6px; }
   .nav-arrow{ width:34px; height:48px; font-size:18px; }
   .section__doc > span{ padding:6px 8px; font-size:9px; letter-spacing:.12em; gap:4px; }
   .section__doc > span.stamp{ padding:5px 8px; }

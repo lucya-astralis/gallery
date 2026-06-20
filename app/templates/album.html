@@ -59,24 +59,23 @@
         <span class="sub-albums__label">▸ FOLDERS</span>
         <span class="sub-albums__count">{{ sub_albums | length }} {% if sub_albums | length == 1 %}album{% else %}albums{% endif %}</span>
       </header>
-      <ul class="album-grid">
+      <ul class="showcase-albums">
         {% for a in sub_albums %}
-          <li class="album-card album-card--folder">
-            <a href="/album/{{ a.album }}">
-              <div class="album-card__img">
+          <li class="showcase-album showcase-album--folder">
+            <a href="/album/{{ a.album }}" aria-label="{{ a.name }} — {% if a.sub_count %}{{ a.sub_count }} {% if a.sub_count == 1 %}album{% else %}albums{% endif %}, {% endif %}{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}">
+              <div class="showcase-album__img">
                 {% if a.cover %}
                   <img src="/thumb/{{ a.cover }}" alt="{{ a.name }}" loading="lazy">
                 {% else %}
                   <div class="album-card__cover-empty">NO COVER</div>
                 {% endif %}
-                <span class="album-card__idx" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span>
+                <span class="showcase-album__idx" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span>
                 <span class="album-card__badge album-card__badge--folder">▸ FOLDER</span>
-                <div class="album-card__hover" aria-hidden="true"><span>ENTER →</span></div>
-              </div>
-              <div class="album-card__cap">
-                <span class="album-card__kicker">FOLDER</span>
-                <span class="album-card__name">{{ a.name }}</span>
-                <span class="album-card__count">{% if a.sub_count %}{{ a.sub_count }} {% if a.sub_count == 1 %}album{% else %}albums{% endif %} · {% endif %}{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
+                <div class="showcase-album__cap">
+                  <span class="showcase-album__name">{{ a.name }}</span>
+                  <span class="showcase-album__count">{% if a.sub_count %}{{ a.sub_count }} {% if a.sub_count == 1 %}album{% else %}albums{% endif %} · {% endif %}{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
+                  <span class="showcase-album__cta" aria-hidden="true">OPEN →</span>
+                </div>
               </div>
             </a>
           </li>
