@@ -161,6 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ...document.querySelectorAll('.section__doc b'),
     ...document.querySelectorAll('.notfound__title'),
     ...document.querySelectorAll('.crumb b'),
+    ...document.querySelectorAll('.trip__name'),
   ];
   window.__scrambleOnView(onViewEls);
 
@@ -785,4 +786,128 @@ document.addEventListener('DOMContentLoaded', () => {
     if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
     if (dx < 0) navigate(1); else navigate(-1);
   }, { passive: true });
+});
+
+// ---------- TRIP DASHBOARD (album addon) -----------------------
+// Live flight countdown + itinerary "you are here" marker. Every date is
+// read as the viewer's LOCAL wall-clock, so the widget reads correctly both
+// from home before departure and on the ground once the trip is underway.
+// State is driven purely by class toggles + element.style (CSP-safe — no
+// inline <script>/<style>); all styling lives in style.css.
+document.addEventListener('DOMContentLoaded', () => {
+  const root = document.querySelector('[data-trip]');
+  if (!root) return;
+
+  const DAY = 86400000;
+  const pad2 = (n) => String(n).padStart(2, '0');
+
+  // "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM:SS" -> local Date (NOT UTC).
+  const parseLocal = (s) => {
+    const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (!m) return null;
+    return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+  };
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const fmtDate = (d) => d ? `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}` : '';
+  const ceilDays = (from, to) => Math.max(0, Math.ceil((to - from) / DAY));
+
+  const depart = parseLocal(root.dataset.depart);
+  const stops = Array.from(root.querySelectorAll('[data-stop]')).map((el) => ({
+    el,
+    city: el.dataset.city || '',
+    start: parseLocal(el.dataset.start),
+    end: parseLocal(el.dataset.end),
+    fill: el.querySelector('[data-stop-fill]'),
+    meta: el.querySelector('[data-stop-meta]'),
+  })).filter((s) => s.start && s.end);
+
+  const cd = {
+    d: root.querySelector('[data-cd="d"]'),
+    h: root.querySelector('[data-cd="h"]'),
+    m: root.querySelector('[data-cd="m"]'),
+    s: root.querySelector('[data-cd="s"]'),
+  };
+  const labelEl = root.querySelector('[data-trip-cd-label]');
+  const targetEl = root.querySelector('[data-trip-cd-target]');
+  const statusEl = root.querySelector('[data-trip-status]');
+
+  const firstStart = stops.length ? stops[0].start : null;
+  const lastEnd = stops.length ? stops[stops.length - 1].end : null;
+
+  const setPhase = (p) => ['pre', 'transit', 'active', 'done']
+    .forEach((x) => root.classList.toggle('trip--' + x, x === p));
+
+  const setClock = (ms) => {
+    const t = Math.max(0, ms);
+    if (cd.d) cd.d.textContent = String(Math.floor(t / DAY));
+    if (cd.h) cd.h.textContent = pad2(Math.floor((t % DAY) / 3600000));
+    if (cd.m) cd.m.textContent = pad2(Math.floor((t % 3600000) / 60000));
+    if (cd.s) cd.s.textContent = pad2(Math.floor((t % 60000) / 1000));
+  };
+
+  function tick() {
+    const now = new Date();
+
+    // per-stop state + progress fill. Boundaries are start-inclusive /
+    // end-exclusive (the last stop includes its end) so a shared travel-day
+    // date belongs to the city you're arriving in — only one stop is ever
+    // "active".
+    let activeIdx = -1;
+    stops.forEach((s, i) => {
+      const isLast = i === stops.length - 1;
+      let state;
+      if (now < s.start) state = 'upcoming';
+      else if (isLast ? now > s.end : now >= s.end) state = 'done';
+      else { state = 'active'; activeIdx = i; }
+
+      s.el.classList.toggle('is-upcoming', state === 'upcoming');
+      s.el.classList.toggle('is-active', state === 'active');
+      s.el.classList.toggle('is-done', state === 'done');
+
+      const span = s.end - s.start;
+      let pct = state === 'done' ? 100
+        : state === 'upcoming' ? 0
+        : span > 0 ? ((now - s.start) / span) * 100 : 0;
+      pct = Math.max(0, Math.min(100, pct));
+      if (s.fill) s.fill.style.width = pct + '%';
+
+      if (s.meta) {
+        if (state === 'upcoming') {
+          const dleft = ceilDays(now, s.start);
+          s.meta.textContent = dleft <= 1 ? 'soon' : ('in ' + dleft + ' days');
+        } else if (state === 'active') {
+          const total = Math.max(1, Math.round(span / DAY));
+          const dayNum = Math.min(total, Math.floor((now - s.start) / DAY) + 1);
+          s.meta.textContent = 'Day ' + dayNum + ' / ' + total;
+        } else {
+          s.meta.textContent = '✓';
+        }
+      }
+    });
+
+    // phase + headline countdown
+    let phase, target, label, status;
+    if (depart && now < depart) {
+      phase = 'pre'; target = depart;
+      label = 'Departs in'; status = 'T-' + Math.floor((depart - now) / DAY) + ' DAYS';
+    } else if (firstStart && now < firstStart) {
+      phase = 'transit'; target = firstStart;
+      label = 'Arriving in ' + stops[0].city; status = 'IN TRANSIT';
+    } else if (activeIdx >= 0) {
+      phase = 'active'; target = stops[activeIdx].end;
+      label = 'Leaving ' + stops[activeIdx].city + ' in'; status = 'IN ' + stops[activeIdx].city.toUpperCase();
+    } else {
+      phase = 'done'; target = null;
+      label = 'Trip complete'; status = 'COMPLETE';
+    }
+
+    setPhase(phase);
+    setClock(target ? target - now : 0);
+    if (labelEl) labelEl.textContent = label;
+    if (statusEl) statusEl.textContent = status;
+    if (targetEl) targetEl.textContent = fmtDate(target || lastEnd);
+  }
+
+  tick();
+  setInterval(tick, 1000);
 });

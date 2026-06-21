@@ -60,6 +60,10 @@
     </div>
   </header>
 
+  {% if trip %}
+    {% include "_trip.html" %}
+  {% endif %}
+
   <div class="album-body{% if album_description %} album-body--with-desc{% endif %}">
     {% if album_description %}
     <aside class="album-desc" aria-label="About this album">

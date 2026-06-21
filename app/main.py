@@ -301,6 +301,76 @@ def _album_description(album: str) -> str | None:
     return _render_markdown(raw) or None
 
 
+# ----- trip dashboard ---------------------------------------------------
+# An optional "trip" overlay (a live flight countdown + an itinerary
+# timeline with a "you are here" marker) rendered at the top of one album.
+# Config is keyed by the album's marker-stripped, lower-cased path so it
+# matches whether or not the folder carries the showcase marker (e.g.
+# `_japan_2026` -> `japan_2026`). All dates are wall-clock; the live
+# countdown and current-stop highlight are computed client-side (initTrip
+# in app.js) against the viewer's own clock — so it reads correctly both
+# from home before the flight and on the ground once the trip is underway.
+TRIPS: dict[str, dict] = {
+    "japan_2026": {
+        "title": "Japan 2026",
+        "jp": "日本",
+        # flight out (local wall-clock). 12:00 = noon departure.
+        "depart": "2026-08-09T12:00:00",
+        "stops": [
+            {"city": "Osaka",   "jp": "大阪", "album": "osaka",   "start": "2026-08-10", "end": "2026-08-16"},
+            {"city": "Sapporo", "jp": "札幌", "album": "sapporo", "start": "2026-08-16", "end": "2026-09-16"},
+            {"city": "Tokyo",   "jp": "東京", "album": "tokyo",   "start": "2026-09-16", "end": "2027-01-02"},
+        ],
+    },
+}
+
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def _fmt_date(iso_date: str) -> str:
+    """'2026-08-10' -> '10 Aug 2026'."""
+    try:
+        y, m, d = (int(x) for x in iso_date[:10].split("-"))
+        return f"{d} {_MONTHS[m - 1]} {y}"
+    except (ValueError, IndexError):
+        return iso_date
+
+
+def _trip_for_album(album: str) -> dict | None:
+    """Render-ready trip dashboard for `album`, or None when the album has
+    no configured trip. Matched on the marker-stripped, lower-cased path so
+    `_japan_2026` resolves to the `japan_2026` config. Each stop is wired to
+    its sub-album — cover + photo count + link — so the timeline doubles as
+    navigation into the city galleries (empty city folders stay unlinked)."""
+    key = "/".join(_strip_marker_segment(s) for s in album.split("/")).lower()
+    cfg = TRIPS.get(key)
+    if not cfg:
+        return None
+    stops = []
+    for s in cfg["stops"]:
+        sub = f"{album}/{s['album']}" if s.get("album") else None
+        card = _album_card(sub) if sub else None
+        count = card["count"] if card else 0
+        stops.append({
+            "city": s["city"],
+            "jp": s.get("jp", ""),
+            "start": s["start"],
+            "end": s["end"],
+            "start_h": _fmt_date(s["start"]),
+            "end_h": _fmt_date(s["end"]),
+            "href": f"/album/{sub}" if count else None,
+            "cover": card["cover"] if card else None,
+            "count": count,
+        })
+    return {
+        "title": cfg["title"],
+        "jp": cfg.get("jp", ""),
+        "depart": cfg["depart"],
+        "depart_h": _fmt_date(cfg["depart"]),
+        "stops": stops,
+    }
+
+
 # ----- sort options -----------------------------------------------------
 # image grid (inside an album / search results)
 SORT_IMAGE_OPTIONS = [
@@ -654,6 +724,7 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             "album": album,
             "breadcrumbs": _album_breadcrumbs(album),
             "album_description": _album_description(album),
+            "trip": _trip_for_album(album),
             "sub_albums": sub_albums,
             "album_is_showcase": album_is_showcase,
             "featured": featured,

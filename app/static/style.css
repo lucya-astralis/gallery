@@ -2525,3 +2525,191 @@ body.page-404::after{ --scan-opacity: 0.55; }
   border-color:var(--acc-cy);
   background:rgba(91,138,255,.06);
 }
+
+/* ================================================================
+   TRIP DASHBOARD  (album addon: flight countdown + itinerary)
+   State classes are toggled by initTrip() in app.js:
+     .trip       -> .trip--pre / --transit / --active / --done
+     .trip__stop -> .is-upcoming / .is-active / .is-done
+   Active ("you are here") reads magenta, done reads green — no amber.
+   ================================================================ */
+.trip{
+  margin:0 0 22px;
+  border:1px solid var(--line);
+  border-top:2px solid var(--acc-cy);
+  background:linear-gradient(180deg, rgba(91,138,255,.06), transparent 42%), var(--surface);
+}
+.trip--active{
+  border-top-color:var(--acc-mag);
+  background:linear-gradient(180deg, rgba(165,148,255,.07), transparent 42%), var(--surface);
+}
+.trip--done{ border-top-color:var(--acc-ok); }
+
+/* ---- top bar ---- */
+.trip__bar{
+  display:flex; align-items:center; gap:9px;
+  padding:7px 13px;
+  border-bottom:1px dashed var(--line);
+  font-family:"JetBrains Mono", monospace;
+  font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+}
+.trip__tag{ color:var(--acc-cy); letter-spacing:.24em; }
+.trip--active .trip__tag{ color:var(--acc-mag); }
+.trip--done .trip__tag{ color:var(--acc-ok); }
+.trip__name{ color:var(--text); letter-spacing:.14em; }
+.trip__jp{ font-family:"Noto Sans JP", sans-serif; color:var(--text-ghost); letter-spacing:.08em; }
+.trip__status{
+  margin-left:auto; padding:2px 9px;
+  border:1px dashed rgba(91,138,255,.5); color:var(--acc-cy);
+  font-size:9.5px; letter-spacing:.2em; white-space:nowrap;
+}
+.trip--transit .trip__status,
+.trip--active .trip__status{ color:var(--acc-mag); border-color:rgba(165,148,255,.5); }
+.trip--done .trip__status{ color:var(--acc-ok); border-color:rgba(61,255,165,.45); }
+
+/* ---- body layout ---- */
+.trip__main{
+  display:grid; grid-template-columns:1fr; gap:14px;
+  padding:13px;
+}
+/* Countdown sits beside the timeline as soon as there's room; the timeline
+   is a flexible vertical list, so it stays readable in a narrow column —
+   only phones drop to a single stacked column. */
+@media (min-width:720px){
+  .trip__main{ grid-template-columns:minmax(200px,230px) minmax(0,1fr); gap:22px; align-items:center; }
+}
+
+/* ---- countdown hero ---- */
+.trip__cd{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+.trip__cd-label{
+  font-family:"JetBrains Mono", monospace;
+  font-size:9.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--text-dim);
+}
+.trip__cd-clock{
+  display:flex; align-items:flex-end; gap:5px;
+  font-family:"JetBrains Mono", monospace; font-variant-numeric:tabular-nums;
+}
+.trip__cd-unit{ display:flex; flex-direction:column; align-items:center; gap:1px; }
+.trip__cd-unit b{
+  font-weight:600; font-size:clamp(23px, 4vw, 32px); line-height:1;
+  color:var(--acc-cy); letter-spacing:.01em;
+}
+.trip--active .trip__cd-unit b{ color:var(--acc-mag); }
+.trip--done .trip__cd-unit b{ color:var(--acc-ok); }
+.trip__cd-unit i{
+  font-style:normal; font-size:8px; letter-spacing:.16em; text-transform:uppercase; color:var(--text-ghost);
+}
+.trip__cd-sep{
+  font-size:clamp(18px, 3vw, 24px); line-height:1; color:var(--text-ghost);
+  align-self:flex-start; margin-top:1px;
+}
+.trip__cd-target{
+  font-family:"JetBrains Mono", monospace;
+  font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-dim);
+}
+.trip__cd-target b{ color:var(--text); font-weight:400; }
+
+/* ---- itinerary timeline (compact rows; each links to a city sub-album) ---- */
+.trip__line{
+  list-style:none; margin:0; padding:0;
+  display:flex; flex-direction:column; gap:1px;
+  background:var(--line); border:1px solid var(--line);
+}
+.trip__stop{ position:relative; margin:0; background:var(--surface); min-width:0; }
+.trip__stop.is-active{ background:rgba(165,148,255,.06); }
+
+.trip__stop-link{
+  display:flex; align-items:center; gap:11px;
+  padding:7px 11px 8px; min-width:0;
+  text-decoration:none; color:inherit;
+}
+a.trip__stop-link{ transition:background .15s; }
+a.trip__stop-link:hover{ background:rgba(91,138,255,.07); }
+
+.trip__stop-thumb{
+  position:relative; flex:0 0 auto;
+  width:36px; height:36px;
+  border:1px solid var(--line); background:var(--bg-2);
+  overflow:hidden;
+}
+.trip__stop-thumb img{
+  width:100%; height:100%; object-fit:cover; display:block;
+  filter:saturate(.9) brightness(.92); transition:filter .2s;
+}
+a.trip__stop-link:hover .trip__stop-thumb img{ filter:none; }
+.trip__stop-dot{
+  position:absolute; top:3px; left:3px;
+  width:7px; height:7px;
+  border:1px solid var(--text-ghost); background:var(--bg);
+  transform:rotate(45deg);
+}
+.trip__stop.is-done .trip__stop-dot{ background:var(--acc-ok); border-color:var(--acc-ok); }
+.trip__stop.is-active .trip__stop-dot{
+  background:var(--acc-mag); border-color:var(--acc-mag);
+  animation:trip-pulse 1.8s ease-out infinite;
+}
+
+.trip__stop-info{ display:flex; flex-direction:column; gap:2px; min-width:0; flex:1 1 auto; }
+.trip__stop-head{ display:flex; align-items:baseline; gap:7px; min-width:0; }
+.trip__stop-city{
+  font-family:"JetBrains Mono", monospace;
+  font-size:12.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.trip__stop.is-active .trip__stop-city{ color:var(--acc-mag); }
+.trip__stop-jp{
+  font-family:"Noto Sans JP", sans-serif; font-size:10.5px; color:var(--text-ghost);
+  white-space:nowrap; flex:0 0 auto;
+}
+.trip__stop-dates{
+  font-family:"JetBrains Mono", monospace;
+  font-size:9.5px; letter-spacing:.04em; color:var(--text-dim);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+.trip__stop-side{
+  display:flex; flex-direction:column; align-items:flex-end; gap:3px;
+  flex:0 0 auto; margin-left:auto; text-align:right;
+}
+.trip__stop-meta{
+  font-family:"JetBrains Mono", monospace;
+  font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); white-space:nowrap;
+}
+.trip__stop.is-active .trip__stop-meta{ color:var(--acc-mag); }
+.trip__stop.is-done .trip__stop-meta{ color:var(--acc-ok); }
+.trip__stop-go{
+  display:inline-flex; align-items:center; gap:4px;
+  font-family:"JetBrains Mono", monospace;
+  font-size:9px; letter-spacing:.08em; color:var(--text-ghost); white-space:nowrap;
+}
+.trip__stop-go i{ font-style:normal; transition:transform .15s; }
+a.trip__stop-link:hover .trip__stop-go{ color:var(--acc-cy); }
+a.trip__stop-link:hover .trip__stop-go i{ transform:translateX(3px); }
+
+/* per-leg progress along the bottom edge of each row */
+.trip__stop-track{
+  position:absolute; left:0; right:0; bottom:0; height:2px;
+  background:transparent; overflow:hidden;
+}
+.trip__stop-track i{
+  display:block; height:100%; width:0; background:var(--text-ghost);
+  transition:width .6s ease;
+}
+.trip__stop.is-done .trip__stop-track i{ background:var(--acc-ok); }
+.trip__stop.is-active .trip__stop-track i{ background:var(--acc-mag); }
+
+@keyframes trip-pulse{
+  0%{ box-shadow:0 0 0 0 rgba(165,148,255,.5); }
+  70%{ box-shadow:0 0 0 6px rgba(165,148,255,0); }
+  100%{ box-shadow:0 0 0 0 rgba(165,148,255,0); }
+}
+@media (prefers-reduced-motion: reduce){
+  .trip__stop.is-active .trip__stop-dot{ animation:none; }
+  .trip__stop-track i, .trip__stop-go i{ transition:none; }
+}
+
+@media (max-width:420px){
+  .trip__main{ padding:11px; gap:12px; }
+  .trip__bar{ padding:7px 11px; font-size:9px; gap:7px; }
+  .trip__stop-jp{ display:none; }
+}

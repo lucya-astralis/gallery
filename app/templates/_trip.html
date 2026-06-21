@@ -1,0 +1,60 @@
+{# Live trip dashboard: flight countdown + itinerary timeline with a
+   "you are here" marker. Numbers, labels, status stamp and per-stop state
+   are filled/animated client-side by initTrip() in app.js, read from the
+   data-* attributes against the viewer's own clock. Each stop links into
+   its city sub-album (cover + photo count), so the timeline doubles as
+   navigation. The static markup is a sensible no-JS fallback. #}
+{% macro stop_inner(s) %}
+  <span class="trip__stop-thumb" aria-hidden="true">
+    {% if s.cover %}<img src="/thumb/{{ s.cover }}" alt="" loading="lazy">{% endif %}
+    <span class="trip__stop-dot"></span>
+  </span>
+  <span class="trip__stop-info">
+    <span class="trip__stop-head">
+      <span class="trip__stop-city">{{ s.city }}</span>
+      {% if s.jp %}<span class="trip__stop-jp">{{ s.jp }}</span>{% endif %}
+    </span>
+    <span class="trip__stop-dates">{{ s.start_h }} – {{ s.end_h }}</span>
+  </span>
+  <span class="trip__stop-side">
+    <span class="trip__stop-meta" data-stop-meta></span>
+    {% if s.href %}<span class="trip__stop-go">{{ s.count }}<i aria-hidden="true">→</i></span>{% endif %}
+  </span>
+  <span class="trip__stop-track" aria-hidden="true"><i data-stop-fill></i></span>
+{% endmacro %}
+<section class="trip" data-trip data-depart="{{ trip.depart }}" aria-label="{{ trip.title }} — trip status">
+  <div class="trip__bar">
+    <span class="trip__tag">▸ TRIP</span>
+    <span class="trip__name">{{ trip.title }}</span>
+    {% if trip.jp %}<span class="trip__jp" aria-hidden="true">{{ trip.jp }}</span>{% endif %}
+    <span class="trip__status stamp" data-trip-status>···</span>
+  </div>
+
+  <div class="trip__main">
+    <div class="trip__cd">
+      <span class="trip__cd-label" data-trip-cd-label>Departs in</span>
+      <div class="trip__cd-clock" role="timer">
+        <span class="trip__cd-unit"><b data-cd="d">––</b><i>Days</i></span>
+        <span class="trip__cd-sep" aria-hidden="true">:</span>
+        <span class="trip__cd-unit"><b data-cd="h">––</b><i>Hrs</i></span>
+        <span class="trip__cd-sep" aria-hidden="true">:</span>
+        <span class="trip__cd-unit"><b data-cd="m">––</b><i>Min</i></span>
+        <span class="trip__cd-sep" aria-hidden="true">:</span>
+        <span class="trip__cd-unit"><b data-cd="s">––</b><i>Sec</i></span>
+      </div>
+      <span class="trip__cd-target">Flight · <b data-trip-cd-target>{{ trip.depart_h }}</b></span>
+    </div>
+
+    <ol class="trip__line" data-trip-timeline>
+      {% for s in trip.stops %}
+      <li class="trip__stop" data-stop data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}">
+        {% if s.href %}
+          <a class="trip__stop-link" href="{{ s.href }}">{{ stop_inner(s) }}</a>
+        {% else %}
+          <div class="trip__stop-link trip__stop-link--static">{{ stop_inner(s) }}</div>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
