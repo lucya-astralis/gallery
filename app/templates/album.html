@@ -60,6 +60,18 @@
     </div>
   </header>
 
+  <div class="album-body{% if album_description %} album-body--with-desc{% endif %}">
+    {% if album_description %}
+    <aside class="album-desc" aria-label="About this album">
+      <div class="album-desc__head">
+        <span class="album-desc__label">▸ ABOUT</span>
+        <span class="album-desc__file">{{ (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | upper }}</span>
+      </div>
+      <div class="album-desc__body">{{ album_description | safe }}</div>
+    </aside>
+    {% endif %}
+    <div class="album-body__main">
+
   {% if sub_albums %}
     <section class="sub-albums" aria-label="Folders">
       <header class="sub-albums__head">
@@ -161,5 +173,7 @@
       <p>No images.</p>
     </div>
   {% endif %}
+    </div>
+  </div>
 </section>
 {% endblock %}

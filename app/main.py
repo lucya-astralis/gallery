@@ -264,6 +264,43 @@ def _album_breadcrumbs(album: str) -> list[dict]:
     return out
 
 
+def _render_markdown(text: str) -> str:
+    """Render an album-description markdown string to HTML. python-markdown is
+    a pure-Python dependency (requirements.txt); if it's ever missing we still
+    produce readable paragraphs rather than crashing the album page."""
+    text = (text or "").strip()
+    if not text:
+        return ""
+    try:
+        import markdown as _md
+        return _md.markdown(text, extensions=["extra", "sane_lists"], output_format="html5")
+    except Exception:
+        import html as _html
+        blocks = [b.strip() for b in text.replace("\r\n", "\n").split("\n\n") if b.strip()]
+        return "".join("<p>" + _html.escape(b).replace("\n", "<br>") + "</p>" for b in blocks)
+
+
+def _album_description(album: str) -> str | None:
+    """An album's description is just a markdown file dropped into its photo
+    folder (e.g. photos/japan/album.md). Reads the first *.md sitting directly
+    in the folder, rendered to HTML. Returns None when there's no such file."""
+    folder = (PHOTOS_DIR / album).resolve()
+    try:
+        folder.relative_to(PHOTOS_DIR)  # guard against path traversal
+    except ValueError:
+        return None
+    if not folder.is_dir():
+        return None
+    md_files = sorted(p for p in folder.glob("*.md") if p.is_file())
+    if not md_files:
+        return None
+    try:
+        raw = md_files[0].read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    return _render_markdown(raw) or None
+
+
 # ----- sort options -----------------------------------------------------
 # image grid (inside an album / search results)
 SORT_IMAGE_OPTIONS = [
@@ -616,6 +653,7 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             "request": request,
             "album": album,
             "breadcrumbs": _album_breadcrumbs(album),
+            "album_description": _album_description(album),
             "sub_albums": sub_albums,
             "album_is_showcase": album_is_showcase,
             "featured": featured,

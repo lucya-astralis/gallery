@@ -1215,6 +1215,138 @@ section{
 }
 
 /* ================================================================
+   ALBUM BODY  (content + optional .md description sidebar)
+   ================================================================ */
+/* No description → .album-body is a transparent passthrough (content stays
+   full-width, exactly as before). With a description it becomes a 2-up grid
+   on desktop: content left, description right. DOM order is description-first
+   so it leads on mobile when the grid collapses to a single column; the
+   columns are pinned explicitly on desktop to flip it back to content-left. */
+.album-body--with-desc{
+  display:grid;
+  grid-template-columns:minmax(0, 1fr);
+  gap:22px;
+}
+.album-body__main{ min-width:0; }
+
+@media (min-width:1000px){
+  .album-body--with-desc{
+    grid-template-columns:minmax(0, 1fr) 340px;
+    gap:32px;
+    align-items:start;
+  }
+  .album-body--with-desc > .album-body__main{ grid-column:1; grid-row:1; }
+  .album-body--with-desc > .album-desc{
+    grid-column:2; grid-row:1;
+    position:sticky;
+    top:calc(var(--nav-h) + 18px);
+    max-height:calc(100vh - var(--nav-h) - 36px);
+  }
+  .album-body--with-desc > .album-desc .album-desc__body{
+    overflow:auto;
+    min-height:0;
+    scrollbar-width:thin;
+    scrollbar-color:var(--line-strong) transparent;
+  }
+}
+@media (min-width:1400px){
+  .album-body--with-desc{ grid-template-columns:minmax(0, 1fr) 380px; }
+}
+
+.album-desc{
+  display:flex; flex-direction:column;
+  min-width:0;
+  border:1px solid var(--line);
+  border-top:2px solid var(--acc-cy);
+  background:
+    linear-gradient(180deg, rgba(91,138,255,.05), transparent 38%),
+    var(--surface);
+}
+.album-desc__head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 14px;
+  border-bottom:1px dashed var(--line);
+  font-family:"JetBrains Mono", monospace;
+  font-size:10.5px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+}
+.album-desc__label{ color:var(--acc-cy); letter-spacing:.24em; }
+.album-desc__file{
+  color:var(--text-ghost);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  min-width:0;
+}
+.album-desc__body{
+  padding:14px 16px 18px;
+  font-size:14px;
+  line-height:1.62;
+  color:var(--text-dim);
+  overflow-wrap:anywhere;
+}
+
+/* rendered markdown */
+.album-desc__body > :first-child{ margin-top:0; }
+.album-desc__body > :last-child{ margin-bottom:0; }
+.album-desc__body h1,
+.album-desc__body h2,
+.album-desc__body h4{
+  font-family:"Space Grotesk", sans-serif;
+  color:var(--text);
+  line-height:1.25;
+  letter-spacing:.01em;
+  margin:1.15em 0 .5em;
+}
+.album-desc__body h1{ font-size:19px; }
+.album-desc__body h2{ font-size:16px; }
+.album-desc__body h3{
+  font-family:"JetBrains Mono", monospace;
+  font-size:11px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--acc-cy);
+  margin:1.2em 0 .5em;
+}
+.album-desc__body p{ margin:.6em 0; }
+.album-desc__body a{
+  color:var(--acc-cy);
+  border-bottom:1px solid rgba(91,138,255,.35);
+}
+.album-desc__body a:hover{ border-bottom-color:var(--acc-cy); }
+.album-desc__body strong{ color:var(--text); font-weight:600; }
+.album-desc__body em{ color:var(--text); }
+.album-desc__body ul,
+.album-desc__body ol{ margin:.6em 0; padding-left:1.35em; }
+.album-desc__body li{ margin:.28em 0; }
+.album-desc__body ul li::marker{ color:var(--acc-cy); }
+.album-desc__body ol li::marker{ color:var(--acc-cy); font-family:"JetBrains Mono", monospace; }
+.album-desc__body code{
+  font-family:"JetBrains Mono", monospace;
+  font-size:.86em;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--line);
+  padding:1px 5px;
+}
+.album-desc__body pre{
+  background:rgba(0,0,0,.4);
+  border:1px solid var(--line);
+  padding:10px 12px;
+  overflow:auto;
+  font-size:12px;
+  line-height:1.5;
+}
+.album-desc__body pre code{ background:none; border:0; padding:0; }
+.album-desc__body blockquote{
+  margin:.7em 0;
+  padding:3px 0 3px 12px;
+  border-left:2px solid var(--acc-cy);
+  color:var(--text);
+  background:linear-gradient(90deg, rgba(91,138,255,.05), transparent 60%);
+}
+.album-desc__body hr{ border:0; border-top:1px dashed var(--line); margin:1.1em 0; }
+.album-desc__body img{ max-width:100%; height:auto; border:1px solid var(--line); }
+
+/* ================================================================
    IMAGE GRID  (inside album)
    ================================================================ */
 .image-grid{
