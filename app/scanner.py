@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from fractions import Fraction
 from pathlib import Path
@@ -84,27 +85,101 @@ def _coerce(v):
         return str(v)
 
 
+# XMP namespaces. dc:description (Dublin Core) is the standard "description"
+# field written by Lightroom, digiKam, exiftool (-XMP-dc:Description), etc.
+_XMP_DC_NS = "http://purl.org/dc/elements/1.1/"
+_XMP_RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+_XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
+# key under which the extracted value is stored in exif_json (read back by
+# main._extract_description).
+XMP_DESCRIPTION_KEY = "XMP:dc:Description"
+
+
+def _xmp_description(img: Image.Image) -> str | None:
+    """Read dc:description out of an image's XMP packet (XMP-dc:Description).
+
+    XMP lives in its own metadata packet, separate from EXIF, so PIL exposes it
+    via img.info (key "xmp" for JPEG/HEIF, "XML:com.adobe.xmp" for PNG) rather
+    than getexif(). Handles the three forms dc:description appears in:
+      - rdf:Alt / rdf:li language alternatives (prefers xml:lang="x-default")
+      - a plain element text value
+      - the compact form where it's an attribute on rdf:Description
+    Returns None when there's no XMP or no dc:description.
+    """
+    raw = img.info.get("xmp") or img.info.get("XML:com.adobe.xmp")
+    if not raw:
+        return None
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace")
+    # Trim the xpacket/BOM preamble and any trailing NUL padding so the parser
+    # sees a clean XML document.
+    lt = raw.find("<")
+    if lt > 0:
+        raw = raw[lt:]
+    raw = raw.split("\x00", 1)[0].strip()
+    if not raw:
+        return None
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError:
+        return None
+
+    desc_tag = f"{{{_XMP_DC_NS}}}description"
+    li_tag = f"{{{_XMP_RDF_NS}}}li"
+
+    def _clean(s):
+        return s.strip() if s and s.strip() else None
+
+    # element form: <dc:description>(<rdf:Alt><rdf:li>…</rdf:li>) | plain text
+    for el in root.iter(desc_tag):
+        lis = list(el.iter(li_tag))
+        if lis:
+            xdef = next(
+                (li.text for li in lis if li.get(_XML_LANG) == "x-default" and _clean(li.text)),
+                None,
+            )
+            if _clean(xdef):
+                return xdef.strip()
+            for li in lis:
+                if _clean(li.text):
+                    return li.text.strip()
+        if _clean(el.text):
+            return el.text.strip()
+
+    # compact form: dc:description carried as an attribute on rdf:Description
+    for el in root.iter():
+        v = el.get(desc_tag)
+        if _clean(v):
+            return v.strip()
+    return None
+
+
 def extract_exif(img: Image.Image) -> tuple[dict, str | None]:
-    exif_raw = img.getexif()
     out: dict = {}
-    if not exif_raw:
-        return out, None
-    for tag_id, value in exif_raw.items():
-        name = ExifTags.TAGS.get(tag_id, str(tag_id))
-        out[name] = _coerce(value)
+    exif_raw = img.getexif()
+    if exif_raw:
+        for tag_id, value in exif_raw.items():
+            name = ExifTags.TAGS.get(tag_id, str(tag_id))
+            out[name] = _coerce(value)
 
-    ifd = exif_raw.get_ifd(ExifTags.IFD.Exif) if hasattr(ExifTags, "IFD") else {}
-    for tag_id, value in (ifd or {}).items():
-        name = ExifTags.TAGS.get(tag_id, str(tag_id))
-        out[name] = _coerce(value)
+        ifd = exif_raw.get_ifd(ExifTags.IFD.Exif) if hasattr(ExifTags, "IFD") else {}
+        for tag_id, value in (ifd or {}).items():
+            name = ExifTags.TAGS.get(tag_id, str(tag_id))
+            out[name] = _coerce(value)
 
-    gps_ifd = exif_raw.get_ifd(ExifTags.IFD.GPSInfo) if hasattr(ExifTags, "IFD") else {}
-    if gps_ifd:
-        gps_out = {}
-        for tag_id, value in gps_ifd.items():
-            name = ExifTags.GPSTAGS.get(tag_id, str(tag_id))
-            gps_out[name] = _coerce(value)
-        out["GPSInfo"] = gps_out
+        gps_ifd = exif_raw.get_ifd(ExifTags.IFD.GPSInfo) if hasattr(ExifTags, "IFD") else {}
+        if gps_ifd:
+            gps_out = {}
+            for tag_id, value in gps_ifd.items():
+                name = ExifTags.GPSTAGS.get(tag_id, str(tag_id))
+                gps_out[name] = _coerce(value)
+            out["GPSInfo"] = gps_out
+
+    # dc:description from the XMP packet — read independently of EXIF, since a
+    # file can carry XMP without any EXIF block at all.
+    xmp_desc = _xmp_description(img)
+    if xmp_desc:
+        out[XMP_DESCRIPTION_KEY] = xmp_desc
 
     taken = None
     for key in ("DateTimeOriginal", "DateTime", "DateTimeDigitized"):

@@ -397,6 +397,26 @@ section{
   font-size:12px;
   letter-spacing:.2em;
 }
+/* parent-album link before the title: makes it obvious at a glance that this
+   is a sub-album sitting inside another (e.g. "↑ japan / tokyo"). */
+.section__slug .section__parent{
+  display:inline-flex; align-items:center; gap:6px;
+  align-self:center;
+  font-family:"JetBrains Mono", monospace;
+  font-size:13px;
+  letter-spacing:.04em;
+  color:var(--text-dim);
+  transition: color .15s;
+}
+.section__slug .section__parent:hover{ color:var(--acc-cy); }
+.section__parent-ico{
+  color:var(--acc-cy);
+  font-size:14px;
+  line-height:1;
+}
+.section__parent-name{ border-bottom:1px solid transparent; padding-bottom:1px; }
+.section__parent:hover .section__parent-name{ border-bottom-color:currentColor; }
+.section__parent-slash{ color:var(--text-ghost); }
 
 .crumb{
   font-family:"JetBrains Mono", monospace;
@@ -795,14 +815,6 @@ section{
 /* the ★ FEATURED badge already exists at .album-card__badge —
    reuse those styles. Position is set there. */
 
-/* folder variant — nested albums (sub-folders) reuse the showcase poster
-   card so they sit flush with no framing box. The cyan count reads as
-   "featured", so dim it: a folder is plain navigation, not a highlight. */
-.showcase-album--folder .showcase-album__count{
-  color:var(--text-dim);
-  text-shadow: 0 1px 6px rgba(0,0,0,.85);
-}
-
 @media (max-width:760px){
   .showcase-album__cap{ padding:10px 12px 12px; }
   .showcase-album__name{ font-size:13px; }
@@ -1155,7 +1167,12 @@ section{
 }
 .album-card--folder .album-card__kicker{ color:var(--acc-cy); }
 
-.sub-albums{ margin:0 0 30px; }
+/* nested <section>: cancel the global section page-padding + max-width/auto-
+   centring (same as .showcase / .featured) so the folder grid sits flush-left
+   and full-width, pixel-identical to the /albums album grid. Without this the
+   doubled page-padding indents the grid ~1 page-pad from the left and shrinks
+   it, so the cards mis-align and resize vs the main albums view. */
+.sub-albums{ margin:0 0 30px; padding:0; }
 .sub-albums__head{
   display:flex; align-items:baseline; gap:12px;
   margin-bottom:12px; padding-bottom:8px;

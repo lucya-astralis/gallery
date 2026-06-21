@@ -687,7 +687,9 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
 def _extract_description(exif: dict) -> str | None:
     if not exif:
         return None
-    for key in ("ImageDescription", "XPComment", "XPSubject", "XPTitle", "UserComment"):
+    # XMP-dc:Description (the standard "description" field) takes priority;
+    # the EXIF/XP keys remain as fallbacks for files that only carry those.
+    for key in (scanner.XMP_DESCRIPTION_KEY, "ImageDescription", "XPComment", "XPSubject", "XPTitle", "UserComment"):
         v = exif.get(key)
         if v in (None, "", [], {}):
             continue
