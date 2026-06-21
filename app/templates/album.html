@@ -43,6 +43,7 @@
     {% if sub_albums %}<span>ALBUMS / <b>{{ sub_albums | length }}</b></span>{% endif %}
     {% if breadcrumbs | length > 1 %}<span class="stamp stamp--cy">▸ SUB-ALBUM</span>{% endif %}
     {% if album_is_showcase %}<span class="stamp stamp--cy">★ SHOWCASE ALBUM</span>{% endif %}
+    {% if collection %}<span class="stamp stamp--cy">⧉ COLLECTION</span>{% endif %}
     {% if active_tag %}<span class="stamp stamp--cy">FILTER / #{{ active_tag | upper }}</span>{% endif %}
     <span class="stamp stamp--ok">OK</span>
   </div>

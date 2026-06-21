@@ -212,17 +212,22 @@ def _album_card(album: str, all_albums: list[str] | None = None) -> dict:
         f"SELECT COUNT(*) AS count, MAX(taken_at) AS latest FROM images WHERE {cond}",
         params,
     ).fetchone()
-    cover = c.execute(
-        f"SELECT rel_path FROM images WHERE {cond} "
-        "ORDER BY taken_at IS NULL, taken_at DESC, mtime DESC LIMIT 1",
-        params,
-    ).fetchone()
+    # A pinned cover (album.cfg `cover = ...`) wins; otherwise the newest
+    # photo from anywhere in the subtree.
+    cover_rel = _config_cover_rel(album, _album_config(album).get("cover"))
+    if not cover_rel:
+        cover = c.execute(
+            f"SELECT rel_path FROM images WHERE {cond} "
+            "ORDER BY taken_at IS NULL, taken_at DESC, mtime DESC LIMIT 1",
+            params,
+        ).fetchone()
+        cover_rel = cover["rel_path"] if cover else None
     return {
         "album": album,
         "name": _display_name(album.rsplit("/", 1)[-1]),
         "count": agg["count"] if agg else 0,
         "latest": agg["latest"] if agg else None,
-        "cover": cover["rel_path"] if cover else None,
+        "cover": cover_rel,
         "sub_count": len(_child_album_names(album, all_albums)),
     }
 
@@ -299,6 +304,62 @@ def _album_description(album: str) -> str | None:
     except OSError:
         return None
     return _render_markdown(raw) or None
+
+
+# ----- per-album config (album.cfg) -------------------------------------
+# Optional `album.cfg` dropped into an album's photo folder, alongside the
+# `album.md` description. Plain `key = value` lines (`#`/`;` comments). Known
+# keys:
+#   collection = true   -> the album shows every photo in its subtree (its
+#                          own + all sub-folders) as one flat collection.
+#   cover = sub/pic.jpg  -> pin the album cover (path relative to the album)
+#                          instead of auto-picking the newest photo.
+_TRUE = {"1", "true", "yes", "on"}
+
+
+def _cfg_bool(v: str | None) -> bool:
+    return str(v or "").strip().lower() in _TRUE
+
+
+def _album_config(album: str) -> dict:
+    """Parse the album's `album.cfg` into a lower-cased key->value dict, or
+    {} when there's no such file. Cheap enough to call per album card."""
+    folder = (PHOTOS_DIR / album).resolve()
+    try:
+        folder.relative_to(PHOTOS_DIR)  # guard against path traversal
+    except ValueError:
+        return {}
+    cfg_path = folder / "album.cfg"
+    if not cfg_path.is_file():
+        return {}
+    out: dict[str, str] = {}
+    try:
+        text = cfg_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line[0] in "#;" or "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        out[key.strip().lower()] = val.strip()
+    return out
+
+
+def _config_cover_rel(album: str, manual: str | None) -> str | None:
+    """Resolve an album.cfg `cover` value (path relative to the album, with
+    or without the album prefix) to a real indexed rel_path, or None."""
+    if not manual:
+        return None
+    rel = manual.strip().strip("/")
+    if not rel:
+        return None
+    if not (rel == album or rel.startswith(album + "/")):
+        rel = f"{album}/{rel}"
+    row = db.conn().execute(
+        "SELECT rel_path FROM images WHERE rel_path = ?", (rel,)
+    ).fetchone()
+    return row["rel_path"] if row else None
 
 
 # ----- trip dashboard ---------------------------------------------------
@@ -677,20 +738,33 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     qualified_sql = qualified_sql.replace("mtime", "i.mtime")
     qualified_sql = qualified_sql.replace("size", "i.size")
     c = db.conn()
+    # Collection mode (album.cfg `collection = true`): the grid shows every
+    # photo in this album's whole subtree (its own + all sub-folders) as one
+    # flat set, instead of only the photos sitting directly in this folder.
+    collection = _cfg_bool(_album_config(album).get("collection"))
+    if collection:
+        prefix = album + "/"
+        where_simple = "(album = ? OR substr(album, 1, ?) = ?)"
+        where_join = "(i.album = ? OR substr(i.album, 1, ?) = ?)"
+        scope_params: tuple = (album, len(prefix), prefix)
+    else:
+        where_simple = "album = ?"
+        where_join = "i.album = ?"
+        scope_params = (album,)
     if tag:
         rows = c.execute(
             f"""SELECT i.* FROM images i
                JOIN image_tags it ON it.image_id = i.id
                JOIN tags t ON t.id = it.tag_id
-               WHERE i.album = ? AND t.name = ?
+               WHERE {where_join} AND t.name = ?
                ORDER BY {qualified_sql}""",
-            (album, tag),
+            (*scope_params, tag),
         ).fetchall()
     else:
         order_sql = SORT_IMAGE_SQL[current_sort]
         rows = c.execute(
-            f"SELECT * FROM images WHERE album = ? ORDER BY {order_sql}",
-            (album,),
+            f"SELECT * FROM images WHERE {where_simple} ORDER BY {order_sql}",
+            scope_params,
         ).fetchall()
     # Immediate sub-folders of this album, shown as folder cards above the
     # image grid. Listed alphabetically so the folder view is predictable.
@@ -700,15 +774,17 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     if not rows and not sub_albums:
         # nothing directly here and no sub-folders: only a 404 if the album
         # truly has no photos anywhere (a tag filter may have hidden them).
-        exists = c.execute("SELECT 1 FROM images WHERE album = ? LIMIT 1", (album,)).fetchone()
+        exists = c.execute(
+            f"SELECT 1 FROM images WHERE {where_simple} LIMIT 1", scope_params
+        ).fetchone()
         if not exists:
             raise HTTPException(404, "album not found")
     tag_rows = c.execute(
-        """SELECT DISTINCT t.name FROM tags t
+        f"""SELECT DISTINCT t.name FROM tags t
            JOIN image_tags it ON it.tag_id = t.id
            JOIN images i ON i.id = it.image_id
-           WHERE i.album = ? ORDER BY t.name""",
-        (album,),
+           WHERE {where_join} ORDER BY t.name""",
+        scope_params,
     ).fetchall()
     # A showcase ALBUM is flagged by its own folder name (the last path
     # segment) starting with the marker — not by an ancestor's.
@@ -725,6 +801,7 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             "breadcrumbs": _album_breadcrumbs(album),
             "album_description": _album_description(album),
             "trip": _trip_for_album(album),
+            "collection": collection,
             "sub_albums": sub_albums,
             "album_is_showcase": album_is_showcase,
             "featured": featured,
