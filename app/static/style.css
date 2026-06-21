@@ -2572,6 +2572,14 @@ body.page-404::after{ --scan-opacity: 0.55; }
   display:flex; flex-direction:column; gap:16px;
   padding:18px 16px 20px;
 }
+/* desktop/tablet: countdown on the left, the step list to its right.
+   Phones stack (countdown on top, steps below). */
+@media (min-width:760px){
+  .trip__main{
+    display:grid; grid-template-columns:auto minmax(0, 1fr);
+    gap:30px; align-items:center;
+  }
+}
 
 /* ---- countdown hero ---- */
 .trip__cd{ display:flex; flex-direction:column; gap:9px; min-width:0; }
@@ -2690,28 +2698,6 @@ a.trip__stop-link:hover .trip__stop-go i{ transform:translateX(3px); }
 }
 .trip__stop.is-done .trip__stop-track i{ background:var(--acc-ok); }
 .trip__stop.is-active .trip__stop-track i{ background:var(--acc-mag); }
-
-/* desktop/tablet: poster cards (cover on top) instead of compact rows */
-@media (min-width:560px){
-  .trip__line{ display:grid; grid-template-columns:repeat(3, 1fr); }
-  .trip__stop-link{
-    flex-direction:column; align-items:stretch; gap:0;
-    padding:0 0 10px; height:100%;
-  }
-  .trip__stop-thumb{
-    width:100%; height:108px;
-    border:0; border-bottom:1px solid var(--line);
-  }
-  .trip__stop-dot{ top:7px; left:7px; width:8px; height:8px; }
-  .trip__stop-info{ flex:1 1 auto; padding:10px 12px 0; gap:3px; }
-  .trip__stop-city{ font-size:13.5px; }
-  .trip__stop-jp{ font-size:11px; }
-  .trip__stop-dates{ font-size:10px; white-space:normal; }
-  .trip__stop-side{
-    flex-direction:row; align-items:center; justify-content:space-between;
-    width:100%; margin:8px 0 0; padding:0 12px; gap:8px; text-align:left;
-  }
-}
 
 @keyframes trip-pulse{
   0%{ box-shadow:0 0 0 0 rgba(165,148,255,.5); }
