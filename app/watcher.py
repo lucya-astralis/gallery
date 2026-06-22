@@ -14,13 +14,16 @@ log = logging.getLogger("watcher")
 class _Handler(FileSystemEventHandler):
     def __init__(self, photos_dir: Path, thumbs_dir: Path, thumb_size: int,
                  previews_dir: Path | None = None, preview_size: int = 1600,
-                 fulls_dir: Path | None = None):
+                 fulls_dir: Path | None = None, on_config=None):
         self.photos_dir = photos_dir
         self.thumbs_dir = thumbs_dir
         self.thumb_size = thumb_size
         self.previews_dir = previews_dir
         self.preview_size = preview_size
         self.fulls_dir = fulls_dir
+        # called (no args) whenever an album.cfg changes, so featured/showcase
+        # edits take effect without waiting for the next periodic scan.
+        self.on_config = on_config
         self._pending: dict[str, float] = {}
         self._lock = threading.Lock()
         self._worker = threading.Thread(target=self._drain, daemon=True)
@@ -29,6 +32,15 @@ class _Handler(FileSystemEventHandler):
     def _enqueue(self, path: str):
         with self._lock:
             self._pending[path] = time.time()
+
+    def _fire_config(self):
+        if not self.on_config:
+            return
+        try:
+            self.on_config()
+            log.info("album.cfg changed -> recomputed featured")
+        except Exception as e:
+            log.warning("on_config callback failed: %s", e)
 
     def _drain(self):
         while True:
@@ -42,6 +54,9 @@ class _Handler(FileSystemEventHandler):
                         del self._pending[p]
             for p in ready:
                 fp = Path(p)
+                if fp.name == "album.cfg":
+                    self._fire_config()
+                    continue
                 if fp.suffix == ".tags":
                     image = fp.with_suffix("")
                     if image.exists() and scanner.is_image(image):
@@ -87,6 +102,9 @@ class _Handler(FileSystemEventHandler):
         if event.is_directory:
             return
         fp = Path(event.src_path)
+        if fp.name == "album.cfg":
+            self._fire_config()
+            return
         if fp.suffix == ".tags":
             image = fp.with_suffix("")
             if image.exists() and scanner.is_image(image):
@@ -110,12 +128,12 @@ class _Handler(FileSystemEventHandler):
 
 def start(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
           previews_dir: Path | None = None, preview_size: int = 1600,
-          fulls_dir: Path | None = None) -> Observer:
+          fulls_dir: Path | None = None, on_config=None) -> Observer:
     try:
         photos_dir.mkdir(parents=True, exist_ok=True)
     except (OSError, PermissionError):
         pass
-    handler = _Handler(photos_dir, thumbs_dir, thumb_size, previews_dir, preview_size, fulls_dir)
+    handler = _Handler(photos_dir, thumbs_dir, thumb_size, previews_dir, preview_size, fulls_dir, on_config)
     obs = Observer()
     obs.schedule(handler, str(photos_dir), recursive=True)
     obs.daemon = True

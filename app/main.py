@@ -114,19 +114,12 @@ def _showcase_rows(album: str | None = None, limit: int = 50, random_order: bool
 
 
 def _showcase_album_rows(limit: int | None = None):
-    """Top-level albums whose folder name carries the showcase marker,
-    newest-active first. Derived from the album tree (not a flat
-    `substr(album,…)` match) so a showcase collection that only holds
-    sub-folders still shows up, and its sub-folders are NOT mistaken for
-    top-level showcase albums. Same shape as the cards in `albums_index`
+    """Top-level showcase albums, newest-active first. Whether an album is a
+    showcase is decided by `_album_is_showcase` (album.cfg `showcase = …`,
+    legacy `_` folder marker as fallback). Same card shape as `albums_index`
     (album, name, count, latest, cover, sub_count) so the showcase-album
     partial can be reused on both /albums and the welcome screen."""
-    if not SHOWCASE_MARKER:
-        return []
-    cards = [
-        c for c in _top_level_album_cards()
-        if c["album"].startswith(SHOWCASE_MARKER)
-    ]
+    cards = [c for c in _top_level_album_cards() if _album_is_showcase(c["album"])]
     cards = _sorted_album_cards(cards, "latest_desc")
     return cards[:limit] if limit is not None else cards
 
@@ -362,6 +355,67 @@ def _config_cover_rel(album: str, manual: str | None) -> str | None:
     return row["rel_path"] if row else None
 
 
+# ----- showcase / featured (album.cfg owns it; `_` marker is fallback) --
+# album.cfg is the source of truth for two things that used to be driven by
+# the `_` prefix:
+#   showcase = true|false   -> is this a showcase album? (★ on /albums)
+#   featured = a.jpg, b.jpg -> which photos are featured (welcome CRT,
+#                              /api/showcase, the album's "featured" strip);
+#                              `*`/`all` features every photo in the album.
+# When a key is ABSENT the legacy marker still applies, so existing albums
+# keep working until migrated; when present, album.cfg wins (and can switch
+# a marked album/photo back off).
+def _album_is_showcase(album: str) -> bool:
+    cfg = _album_config(album)
+    if "showcase" in cfg:
+        return _cfg_bool(cfg["showcase"])
+    return bool(SHOWCASE_MARKER) and album.rsplit("/", 1)[-1].startswith(SHOWCASE_MARKER)
+
+
+def _resolve_featured(album: str, spec: str) -> set[str]:
+    """Resolve an album.cfg `featured` value to a set of indexed rel_paths.
+    `*`/`all` = every photo directly in the album; otherwise a comma list of
+    paths relative to the album (sub-folders allowed)."""
+    spec = (spec or "").strip()
+    if not spec:
+        return set()
+    c = db.conn()
+    if spec.lower() in ("*", "all"):
+        return {r["rel_path"] for r in c.execute("SELECT rel_path FROM images WHERE album = ?", (album,))}
+    out: set[str] = set()
+    for item in spec.split(","):
+        item = item.strip().strip("/")
+        if not item:
+            continue
+        rel = item if (item == album or item.startswith(album + "/")) else f"{album}/{item}"
+        row = c.execute("SELECT rel_path FROM images WHERE rel_path = ?", (rel,)).fetchone()
+        if row:
+            out.add(row["rel_path"])
+    return out
+
+
+def _recompute_featured() -> None:
+    """Recompute the `is_showcase` flag for every photo from album.cfg
+    `featured` lists, falling back to the legacy filename marker for albums
+    that don't configure it. The single owner of the column — runs at startup
+    and after every scan / album.cfg change."""
+    c = db.conn()
+    featured: set[str] = set()
+    for album in _distinct_albums():
+        cfg = _album_config(album)
+        if "featured" in cfg:
+            featured |= _resolve_featured(album, cfg["featured"])
+        elif SHOWCASE_MARKER:
+            for r in c.execute("SELECT rel_path, filename FROM images WHERE album = ?", (album,)):
+                if scanner.is_showcase_photo(r["filename"]):
+                    featured.add(r["rel_path"])
+    with db.lock():
+        c.execute("UPDATE images SET is_showcase = 0 WHERE is_showcase != 0")
+        for rel in featured:
+            c.execute("UPDATE images SET is_showcase = 1 WHERE rel_path = ?", (rel,))
+        c.commit()
+
+
 # ----- trip dashboard ---------------------------------------------------
 # An optional "trip" overlay (a live flight countdown + an itinerary
 # timeline with a "you are here" marker) rendered at the top of one album.
@@ -524,6 +578,9 @@ def _run_scan():
             PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE,
             previews_dir=PREVIEWS_DIR, preview_size=PREVIEW_SIZE,
         )
+        # re-derive featured flags from album.cfg (+ legacy marker fallback)
+        # now that the index reflects the current files.
+        _recompute_featured()
         if result["indexed"] or result["thumbnails"] or result["previews"] or result["removed"]:
             log.info("scan: %s", result)
     except Exception as e:
@@ -538,35 +595,10 @@ def _periodic_scan_loop():
         _run_scan()
 
 
-def _backfill_showcase():
-    """
-    Recompute `is_showcase` for every indexed photo based on the current
-    SHOWCASE_MARKER (which is checked against the filename only — being
-    inside a showcase album does NOT auto-feature a photo). Runs on every
-    startup so marker changes propagate without forcing a re-scan.
-    """
-    c = db.conn()
-    marker = scanner.SHOWCASE_MARKER
-    with db.lock():
-        if not marker:
-            c.execute("UPDATE images SET is_showcase = 0 WHERE is_showcase != 0")
-        else:
-            ml = len(marker)
-            c.execute(
-                """UPDATE images
-                   SET is_showcase = CASE
-                     WHEN substr(filename, 1, ?) = ? THEN 1
-                     ELSE 0
-                   END""",
-                (ml, marker),
-            )
-        c.commit()
-
-
 @app.on_event("startup")
 def _startup():
     db.init(DATA_DIR)
-    _backfill_showcase()
+    _recompute_featured()
     log.info(
         "photos=%s thumbs=%s data=%s thumb_size=%d watcher=%s scan_interval=%ds hide_gps=%s strip_gps=%s showcase_marker=%r",
         PHOTOS_DIR, THUMBS_DIR, DATA_DIR, THUMB_SIZE, ENABLE_WATCHER, SCAN_INTERVAL, HIDE_GPS, STRIP_GPS, scanner.SHOWCASE_MARKER,
@@ -576,7 +608,7 @@ def _startup():
         try:
             watcher.start(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE,
                           previews_dir=PREVIEWS_DIR, preview_size=PREVIEW_SIZE,
-                          fulls_dir=FULLS_DIR)
+                          fulls_dir=FULLS_DIR, on_config=_recompute_featured)
         except Exception as e:
             log.warning("watcher failed to start: %s", e)
     if SCAN_INTERVAL > 0:
@@ -667,8 +699,7 @@ def welcome(request: Request):
 def albums_index(request: Request, sort: str | None = None):
     current_sort = _pick_sort(sort, SORT_ALBUM_SQL, SORT_ALBUM_DEFAULT)
     albums = _sorted_album_cards(_top_level_album_cards(), current_sort)
-    is_show = lambda name: bool(SHOWCASE_MARKER) and name.startswith(SHOWCASE_MARKER)
-    showcase_albums = [a for a in albums if is_show(a["album"])]
+    showcase_albums = [a for a in albums if _album_is_showcase(a["album"])]
     return templates.TemplateResponse(
         "index.html",
         {
@@ -786,9 +817,9 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
            WHERE {where_join} ORDER BY t.name""",
         scope_params,
     ).fetchall()
-    # A showcase ALBUM is flagged by its own folder name (the last path
-    # segment) starting with the marker — not by an ancestor's.
-    album_is_showcase = bool(SHOWCASE_MARKER) and album.rsplit("/", 1)[-1].startswith(SHOWCASE_MARKER)
+    # Showcase status now comes from album.cfg (`showcase = …`), with the
+    # legacy `_` folder-name marker as a fallback.
+    album_is_showcase = _album_is_showcase(album)
     # Featured strip = photos in this album with their own filename marker.
     # A showcase ALBUM doesn't auto-promote its contents — each photo opts
     # in independently with a `_` filename prefix.

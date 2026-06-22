@@ -359,17 +359,20 @@ def index_image(photos_dir: Path, file: Path) -> bool:
         log.warning("open failed for %s: %s", file, e)
         return False
 
-    showcase_flag = 1 if is_showcase_photo(filename) else 0
+    # `is_showcase` (featured flag) is owned by main._recompute_featured(),
+    # which derives it from each album's album.cfg (`featured = …`) with the
+    # legacy filename-marker as a fallback. We deliberately leave the column
+    # untouched here so a re-index never clobbers a computed flag: new rows
+    # default to 0, existing rows keep their value.
     with db.lock():
         c.execute(
-            """INSERT INTO images (album, filename, rel_path, mtime, size, width, height, exif_json, taken_at, is_showcase)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """INSERT INTO images (album, filename, rel_path, mtime, size, width, height, exif_json, taken_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(rel_path) DO UPDATE SET
                  album=excluded.album, filename=excluded.filename, mtime=excluded.mtime,
                  size=excluded.size, width=excluded.width, height=excluded.height,
-                 exif_json=excluded.exif_json, taken_at=excluded.taken_at,
-                 is_showcase=excluded.is_showcase""",
-            (album, filename, rel, effective_mtime, stat.st_size, width, height, json.dumps(exif), taken, showcase_flag),
+                 exif_json=excluded.exif_json, taken_at=excluded.taken_at""",
+            (album, filename, rel, effective_mtime, stat.st_size, width, height, json.dumps(exif), taken),
         )
         image_id = c.execute("SELECT id FROM images WHERE rel_path = ?", (rel,)).fetchone()["id"]
         c.commit()
