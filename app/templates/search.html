@@ -11,7 +11,7 @@
   </div>
 
   <div class="section__doc">
-    <span>QUERY / <b>{{ query }}</b></span>
+    <span class="doc-min-hide">QUERY / <b>{{ query }}</b></span>
     <span>HITS / <b>{{ images | length }}</b></span>
     {% if images %}
       <span class="stamp stamp--ok">{{ images | length }} MATCH{% if images | length != 1 %}ES{% endif %}</span>

@@ -1,3 +1,44 @@
+// ---------- DEVICE CAPABILITY ----------------------------------
+// Single gate for the heavy, decorative effects (background video, animated
+// scanlines, text scramble, CRT auto-cycle). Small screens, data-saver,
+// reduced-motion and low-end hardware all opt out and get the lightweight
+// static experience instead.
+const __mqReduceData = window.matchMedia('(prefers-reduced-data: reduce)');
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+function isLowEndDevice() {
+  try {
+    const c = navigator.connection || {};
+    if (c.saveData) return true;
+    if (c.effectiveType && /(slow-)?2g/.test(c.effectiveType)) return true;
+    if (typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 4) return true;
+    if (typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 2) return true;
+  } catch (e) {}
+  return false;
+}
+function allowHeavyFx() {
+  return !prefersReducedMotion() && !__mqReduceData.matches && !isLowEndDevice();
+}
+window.__allowHeavyFx = allowHeavyFx;
+// Bridge capability detection to CSS: html.fx-lite kills the continuous
+// full-screen scanline animation and other ambient motion on weak devices.
+if (!allowHeavyFx()) document.documentElement.classList.add('fx-lite');
+
+// ---------- BACKGROUND VIDEO (opt-in) --------------------------
+// The <video> ships with no src and preload="none", so by default nothing is
+// fetched. We only wire up the 6 MB clip on capable, desktop-sized screens.
+(function bgVideo() {
+  const v = document.querySelector('[data-bg-video]');
+  if (!v || !v.dataset.src) return;
+  const bigScreen = window.matchMedia('(min-width: 761px)').matches;
+  if (!bigScreen || !allowHeavyFx()) return; // keep the static gradient backdrop
+  v.src = v.dataset.src;
+  v.load();
+  const p = v.play();
+  if (p && typeof p.catch === 'function') p.catch(() => {}); // autoplay blocked → ignore
+})();
+
 // ---------- SHARED HELPERS -------------------------------------
 function readAlbumData() {
   const el = document.getElementById('album-data');
@@ -93,6 +134,8 @@ class TextScrambler {
 const __scramblers = new WeakMap();
 window.__scrambleTo = (el, text) => {
   if (!el) return;
+  // low-end / reduced-motion: skip the rAF decoder loop, set text instantly
+  if (!allowHeavyFx()) { el.textContent = String(text); return Promise.resolve(); }
   let s = __scramblers.get(el);
   if (!s){ s = new TextScrambler(el); __scramblers.set(el, s); }
   return s.setText(String(text));
@@ -226,8 +269,14 @@ document.addEventListener('DOMContentLoaded', () => {
   setChannel(current);
   if (screen) screen.dataset.href = frames[current].href;
 
-  let timer = setInterval(advance, AUTO_MS);
-  const reset = () => { clearInterval(timer); timer = setInterval(advance, AUTO_MS); };
+  // auto-cycle only on capable devices; elsewhere the deck is manual (prev/next)
+  const autoOk = allowHeavyFx();
+  let timer = autoOk ? setInterval(advance, AUTO_MS) : null;
+  const reset = () => { if (!autoOk) return; clearInterval(timer); timer = setInterval(advance, AUTO_MS); };
+  if (!autoOk) {
+    const statusEl = document.getElementById('shuffle-status');
+    if (statusEl) statusEl.textContent = 'MANUAL';
+  }
 
   const nextBtn = document.getElementById('shuffle-next');
   const prevBtn = document.getElementById('shuffle-prev');

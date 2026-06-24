@@ -37,8 +37,8 @@
   </div>
 
   <div class="section__doc">
-    <span>FILE / {{ image.filename | upper }}</span>
-    <span>ALBUM / <b>{{ image.album }}</b></span>
+    <span class="doc-min-hide">FILE / {{ image.filename | upper }}</span>
+    <span class="doc-min-hide">ALBUM / <b>{{ image.album }}</b></span>
     {% if image.width and image.height %}<span>DIM / <b>{{ image.width }}×{{ image.height }}</b></span>{% endif %}
     {% if image.size %}<span>SIZE / <b>{{ (image.size / 1024 / 1024) | round(2) }} MB</b></span>{% endif %}
     <span class="stamp stamp--cy" id="quality-stamp">PREVIEW</span>

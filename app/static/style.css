@@ -11,12 +11,15 @@
   font-display: swap;
 }
 @font-face {
+  /* Subset to only the ~34 decorative JP glyphs actually used on the site
+     (was an 8.8 MB variable TTF — now ~9 KB woff2). */
   font-family: 'Noto Sans JP';
   src: local('Noto Sans JP'),
-       url('/static/fonts/NotoSansJP-VariableFont_wght.ttf') format('truetype-variations');
+       url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
 }
 @font-face {
   font-family: 'JetBrains Mono';
@@ -32,14 +35,6 @@
        url('/static/fonts/JetBrainsMono-Italic-VariableFont_wght.ttf') format('truetype-variations');
   font-weight: 100 800;
   font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Proto Nerd Font';
-  src: local('0xProto Nerd Font'),
-       url('/static/fonts/0xProtoNerdFont-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
   font-display: swap;
 }
 @font-face {
@@ -169,18 +164,28 @@ body.page-album::after{ --scan-opacity: 0.4; }
   to  { background-position: 0 120px, 0 0; }
 }
 
+/* Lite mode (JS-detected low-end / data-saver, set via html.fx-lite) and any
+   reduced-motion preference: stop the continuous full-screen scanline repaint
+   and drop the expensive overlay blend so weak GPUs aren't pinned. */
+.fx-lite body::after{ animation:none; mix-blend-mode:normal; opacity:.5; }
+.fx-lite .bg-video{ display:none; }
+@media (prefers-reduced-motion: reduce){
+  body::after{ animation:none; }
+  .bg-video{ display:none; }
+}
+
 a{ color:inherit; text-decoration:none; }
 a:hover{ color:var(--acc-cy); }
 
 img{ user-select:none; -webkit-user-drag:none; }
 
-.mono{ font-family:"Proto Nerd Font", "JetBrains Mono", ui-monospace, monospace; letter-spacing:0; }
+.mono{ font-family:"JetBrains Mono", ui-monospace, monospace; letter-spacing:0; }
 .jp  { font-family:"Noto Sans JP", "Space Grotesk", sans-serif; }
 .dim { color:var(--text-dim); }
 .small{ font-size:12px; }
 
 code{
-  font-family:"Proto Nerd Font", "JetBrains Mono", ui-monospace, monospace;
+  font-family:"JetBrains Mono", ui-monospace, monospace;
   font-size:.88em;
   background:rgba(255,255,255,.05);
   border:1px solid var(--line);
@@ -239,7 +244,7 @@ code{
   color:var(--text);
 }
 .nav__brand .brand-sub{
-  font-family:"Proto Nerd Font", "JetBrains Mono", monospace;
+  font-family:"JetBrains Mono", monospace;
   font-size:10px;
   letter-spacing:.22em;
   text-transform:uppercase;
@@ -1635,6 +1640,16 @@ details[open] > summary::before{ content:"▾ "; }
   .nav__brand img{ height:24px; }
   .nav__status{ display:none; }
 
+  /* low-end friendliness on phones: no full-screen scanline repaint loop and
+     no costly backdrop blurs — use slightly more opaque solids instead so
+     text over them stays legible. */
+  body::after{ animation:none; mix-blend-mode:normal; opacity:.4; }
+  .bg-video{ display:none; }
+  .nav{ background:rgba(7,7,11,0.92); backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .stage__loader{ backdrop-filter:none; -webkit-backdrop-filter:none; background:rgba(7,7,11,.94); }
+  .lightbox__bar{ backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .sort__menu{ backdrop-filter:none; -webkit-backdrop-filter:none; }
+
   /* tighter vertical rhythm on phones: content first, less dead space */
   section{ padding-top:22px; padding-bottom:30px; }
   .sub-albums{ margin-bottom:22px; }
@@ -1642,46 +1657,41 @@ details[open] > summary::before{ content:"▾ "; }
   .showcase{ margin-bottom:24px; }
   .foot{ margin-top:32px; }
 
+  /* Doc bar: a clean, legible strip of chips instead of a cramped 2-col grid
+     with tiny truncated text. Tokens wrap naturally and never get cut off;
+     decorative / redundant ones are hidden (.doc-min-hide) so phones show
+     only the metadata that actually helps. */
   .section__doc{
-    display:grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    font-size:9.5px;
-    letter-spacing:.16em;
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:6px;
+    padding:8px;
+    font-size:10px;
+    letter-spacing:.14em;
     border-left-width:2px;
   }
   .section__doc > span{
-    padding:7px 10px;
-    border:0;
-    border-bottom:1px solid var(--line);
-    border-right:1px solid var(--line);
-    min-width:0;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    display:flex; align-items:center;
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    background:rgba(255,255,255,.025);
+    padding:5px 9px;
     gap:5px;
-    flex:initial;
+    white-space:nowrap;
+    min-width:0;
+    flex:0 1 auto;
   }
-  /* right-column cells: no right border */
-  .section__doc > span:nth-child(2n){ border-right:0; }
-  /* stamps always claim a full-width row */
-  .section__doc > span.stamp{
-    grid-column:1 / -1;
-    margin:0;
-    border-right:0;
-    justify-content:center;
-    padding:6px 10px;
-  }
-  /* last item: drop bottom border */
-  .section__doc > span:last-child{
-    border-bottom:0;
-    margin:0;
-  }
+  .section__doc > span:last-child{ margin-left:0; } /* cancel desktop push-right */
+  .section__doc > span.stamp{ padding:5px 9px; }
+  /* only genuinely long values shrink with an ellipsis; labels stay readable */
   .section__doc b{
     overflow:hidden;
     text-overflow:ellipsis;
     min-width:0;
+    max-width:52vw;
   }
+  /* hide decorative / redundant tokens on small screens */
+  .section__doc .doc-min-hide{ display:none; }
   .section__head{ margin-bottom:16px; }
   .detail{ gap:14px; }
   .stage{ min-height:240px; }
@@ -1732,7 +1742,7 @@ details[open] > summary::before{ content:"▾ "; }
   /* must beat .stage (z:1500) which lifts itself above the scanline overlay,
      otherwise this sibling loader gets hidden behind the stage. */
   z-index:1600;
-  font-family:"Proto Nerd Font", "JetBrains Mono", monospace;
+  font-family:"JetBrains Mono", monospace;
   font-size:11px;
   letter-spacing:.18em;
   text-transform:uppercase;
@@ -2031,7 +2041,7 @@ body.lightbox-open{ overflow:hidden; }
   display:flex; align-items:center; justify-content:space-between;
   gap:24px;
   flex-wrap:wrap;
-  font-family:"Proto Nerd Font", "JetBrains Mono", monospace;
+  font-family:"JetBrains Mono", monospace;
   font-size:10.5px;
   letter-spacing:.18em;
   text-transform:uppercase;
@@ -2510,7 +2520,7 @@ body.page-404::after{ --scan-opacity: 0.55; }
 .notfound__actions{ margin-top:22px; }
 .btn-link{
   display:inline-block;
-  font-family:"Proto Nerd Font", "JetBrains Mono", monospace;
+  font-family:"JetBrains Mono", monospace;
   font-size:11px;
   letter-spacing:.22em;
   text-transform:uppercase;

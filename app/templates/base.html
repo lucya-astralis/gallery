@@ -21,9 +21,11 @@
   {% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-  <video class="bg-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
-    <source src="/static/bg.mp4" type="video/mp4">
-  </video>
+  <!-- Background video is opt-in: JS only loads/plays it on capable, large
+       screens (see app.js). Low-end / mobile / reduced-motion / data-saver
+       users get the static gradient backdrop and never fetch the 6 MB clip. -->
+  <video class="bg-video" autoplay muted loop playsinline preload="none" aria-hidden="true"
+         data-bg-video data-src="/static/bg.mp4"></video>
   <nav class="nav">
     <div class="nav__inner">
       <a href="/" class="nav__brand" aria-label="lucya.systems gallery">

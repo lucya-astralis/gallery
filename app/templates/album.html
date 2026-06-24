@@ -37,7 +37,7 @@
   </div>
 
   <div class="section__doc">
-    <span>FILE / {{ (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | upper }}</span>
+    <span class="doc-min-hide">FILE / {{ (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | upper }}</span>
     {% if breadcrumbs | length > 1 %}<span>IN / <b>{{ breadcrumbs[-2].name }}</b></span>{% endif %}
     {% if images or not sub_albums %}<span>COUNT / <b>{{ images | length }}</b></span>{% endif %}
     {% if sub_albums %}<span>ALBUMS / <b>{{ sub_albums | length }}</b></span>{% endif %}
@@ -45,7 +45,7 @@
     {% if album_is_showcase %}<span class="stamp stamp--cy">★ SHOWCASE ALBUM</span>{% endif %}
     {% if collection %}<span class="stamp stamp--cy">⧉ COLLECTION</span>{% endif %}
     {% if active_tag %}<span class="stamp stamp--cy">FILTER / #{{ active_tag | upper }}</span>{% endif %}
-    <span class="stamp stamp--ok">OK</span>
+    <span class="stamp stamp--ok doc-min-hide">OK</span>
   </div>
 
   <header class="section__head">

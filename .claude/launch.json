@@ -3,9 +3,9 @@
   "configurations": [
     {
       "name": "gallery",
-      "runtimeExecutable": "C:/Users/deimi/AppData/Local/Microsoft/WindowsApps/PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0/python.exe",
-      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8050", "--reload"],
-      "port": 8050
+      "runtimeExecutable": "C:\\Users\\deimi\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000", "--log-level", "warning"],
+      "port": 8000
     }
   ]
 }
