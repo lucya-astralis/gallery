@@ -319,9 +319,18 @@ section{
   padding:7px 12px;
   border-right:1px solid var(--line);
   display:inline-flex; align-items:center; gap:6px;
-  white-space:nowrap;
+  /* let an overlong value (long file/album name) wrap inside its own chip
+     instead of forcing the whole bar to overflow and clip — the bar wraps
+     whole chips first, so short chips still stay on one line. Mobile re-asserts
+     nowrap below and ellipsizes long <b> values instead. */
+  min-width:0;
+  overflow-wrap:anywhere;
 }
-.section__doc > span:last-child{ border-right:0; margin-left:auto; }
+/* the last chip is always a status stamp (its own full border). push it to
+   the right as a status badge, but keep a gap from the bar's right wall so it
+   isn't jammed into the corner — and keep its full border (no longer dropped,
+   so it isn't cut off on the right). */
+.section__doc > span:last-child{ margin-left:auto; margin-right:12px; }
 .section__doc b{
   color:var(--text);
   font-weight:400;
@@ -400,12 +409,18 @@ section{
   text-transform:uppercase;
   color:var(--text-ghost);
   display:flex; align-items:center; gap:8px;
+  /* wrap to a new line instead of overflowing when the trail is long */
+  flex-wrap:wrap;
   margin-bottom:18px;
 }
 .crumb a{ color:var(--text-dim); transition:color .15s; }
 .crumb a:hover{ color:var(--acc-cy); }
 .crumb b{ color:var(--text); font-weight:400; letter-spacing:.14em; }
 .crumb .sep{ color:var(--text-ghost); }
+/* album names and filenames are often single unbreakable tokens (underscores
+   aren't break points) — let them break so a long name can't overflow the
+   viewport and clip / force horizontal scroll, esp. on mobile. */
+.crumb a, .crumb b{ min-width:0; overflow-wrap:anywhere; }
 
 /* ================================================================
    TAGS
@@ -1652,7 +1667,9 @@ details[open] > summary::before{ content:"▾ "; }
     min-width:0;
     flex:0 1 auto;
   }
-  .section__doc > span:last-child{ margin-left:0; } /* cancel desktop push-right */
+  /* cancel desktop's push-right and trailing gap — on mobile chips wrap as
+     individual boxes and keep their own full border. */
+  .section__doc > span:last-child{ margin-left:0; margin-right:0; }
   .section__doc > span.stamp{ padding:5px 9px; }
   /* only genuinely long values shrink with an ellipsis; labels stay readable */
   .section__doc b{
