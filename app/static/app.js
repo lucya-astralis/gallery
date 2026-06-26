@@ -606,9 +606,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const lb = document.getElementById('lightbox');
   if (!lb) return;
 
-  // Reparent to body so the lightbox escapes <main>'s stacking context
-  // (main has z-index:10, which would cap our z:1000 under body::after's
-  // scanline layer at z:200). Living directly under body, z:1000 wins.
+  // Reparent to body so the lightbox escapes <main>'s stacking context,
+  // which would otherwise confine our z:1000 to main's local layer. Living
+  // directly under body, z:1000 stacks at the top level as intended.
   if (lb.parentNode !== document.body) document.body.appendChild(lb);
 
   const stage = document.getElementById('lb-stage');
