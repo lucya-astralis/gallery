@@ -3,6 +3,19 @@
 {% block body_class %}page-albums{% endblock %}
 {% block content %}
 <section>
+  <nav class="pathbar" aria-label="Breadcrumb">
+    <a class="pathbar__back" href="/">
+      <span class="pathbar__back-ico" aria-hidden="true">‹</span>
+      <span class="pathbar__back-lbl">Back to</span>
+      <span class="pathbar__back-txt">Home</span>
+    </a>
+    <div class="crumb">
+      <a href="/">HOME</a>
+      <span class="sep">/</span>
+      <b aria-current="page">ALBUMS</b>
+    </div>
+  </nav>
+
   <div class="section__doc">
     <span class="doc-min-hide">FILE / LUCYA.GALLERY</span>
     <span class="doc-min-hide">CLASS / <b>PUBLIC</b></span>

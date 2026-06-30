@@ -2,13 +2,20 @@
 {% block title %}SEARCH: {{ query | upper }} // LUCYA.SYSTEMS GALLERY{% endblock %}
 {% block content %}
 <section>
-  <div class="crumb">
-    <a href="/">HOME</a>
-    <span class="sep">/</span>
-    <a href="/albums">ALBUMS</a>
-    <span class="sep">/</span>
-    <b>SEARCH / {{ query | upper }}</b>
-  </div>
+  <nav class="pathbar" aria-label="Breadcrumb">
+    <a class="pathbar__back" href="/albums">
+      <span class="pathbar__back-ico" aria-hidden="true">‹</span>
+      <span class="pathbar__back-lbl">Back to</span>
+      <span class="pathbar__back-txt">Albums</span>
+    </a>
+    <div class="crumb">
+      <a href="/">HOME</a>
+      <span class="sep">/</span>
+      <a href="/albums">ALBUMS</a>
+      <span class="sep">/</span>
+      <b aria-current="page">SEARCH / {{ query | upper }}</b>
+    </div>
+  </nav>
 
   <div class="section__doc">
     <span class="doc-min-hide">QUERY / <b>{{ query }}</b></span>

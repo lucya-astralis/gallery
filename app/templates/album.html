@@ -26,15 +26,26 @@
 {% endblock %}
 {% block content %}
 <section>
-  <div class="crumb">
-    <a href="/">HOME</a>
-    <span class="sep">/</span>
-    <a href="/albums">ALBUMS</a>
-    {% for c in breadcrumbs %}
+  {# "up one level" target: parent album for a sub-album, otherwise the album index.
+     Surfaced as a big, obvious back button on mobile (see .pathbar__back). #}
+  {% set up_url = ('/album/' ~ breadcrumbs[-2].path) if breadcrumbs | length > 1 else '/albums' %}
+  {% set up_name = breadcrumbs[-2].name if breadcrumbs | length > 1 else 'Albums' %}
+  <nav class="pathbar" aria-label="Breadcrumb">
+    <a class="pathbar__back" href="{{ up_url }}">
+      <span class="pathbar__back-ico" aria-hidden="true">‹</span>
+      <span class="pathbar__back-lbl">Back to</span>
+      <span class="pathbar__back-txt">{{ up_name }}</span>
+    </a>
+    <div class="crumb">
+      <a href="/">HOME</a>
       <span class="sep">/</span>
-      {% if loop.last %}<b>{{ c.name }}</b>{% else %}<a href="/album/{{ c.path }}">{{ c.name }}</a>{% endif %}
-    {% endfor %}
-  </div>
+      <a href="/albums">ALBUMS</a>
+      {% for c in breadcrumbs %}
+        <span class="sep">/</span>
+        {% if loop.last %}<b aria-current="page">{{ c.name }}</b>{% else %}<a href="/album/{{ c.path }}">{{ c.name }}</a>{% endif %}
+      {% endfor %}
+    </div>
+  </nav>
 
   <div class="section__doc">
     <span class="doc-min-hide">FILE / {{ (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | upper }}</span>
