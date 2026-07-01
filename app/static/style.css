@@ -2607,6 +2607,10 @@ body.lightbox-open{ overflow:hidden; }
    ================================================================ */
 .trip{
   margin:0 0 22px;
+  /* override the generous page-section padding (36/44) — this is a compact
+     widget whose bar/body bring their own padding; the page rule would just
+     add dead height inside the box */
+  padding:0;
   border:1px solid var(--line);
   border-top:2px solid var(--acc-cy);
   background:linear-gradient(180deg, rgba(91,138,255,.06), transparent 42%), var(--surface);
@@ -2644,14 +2648,9 @@ body.lightbox-open{ overflow:hidden; }
   display:flex; flex-direction:column; gap:16px;
   padding:18px 16px 20px;
 }
-/* desktop/tablet: countdown on the left, the step list to its right.
-   Phones stack (countdown on top, steps below). */
-@media (min-width:760px){
-  .trip__main{
-    display:grid; grid-template-columns:auto minmax(0, 1fr);
-    gap:30px; align-items:center;
-  }
-}
+/* Desktop layout (countdown on the left + legs as a left→right row of compact
+   cards to its right) lives at the end of this section — it overrides the base
+   rules below, so it must come after them in source order. */
 
 /* ---- countdown hero ---- */
 .trip__cd{ display:flex; flex-direction:column; gap:9px; min-width:0; }
@@ -2779,6 +2778,45 @@ a.trip__stop-link:hover .trip__stop-go i{ transform:translateX(3px); }
 @media (prefers-reduced-motion: reduce){
   .trip__stop.is-active .trip__stop-dot{ animation:none; }
   .trip__stop-track i, .trip__stop-go i{ transition:none; }
+}
+
+/* desktop: countdown on the left, the legs as a left→right row of compact
+   cards to its right (Osaka → Sapporo → Tokyo) instead of stacked full-width
+   rows — so the whole box stays narrow. Below this width there isn't room for
+   three readable cards in a row, so narrower screens keep the stacked rows
+   (see defaults above). */
+@media (min-width:960px){
+  /* tighter clock + padding keep this full-width strip short */
+  .trip__main{
+    display:grid; grid-template-columns:auto minmax(0,1fr);
+    gap:22px; align-items:center; padding:12px 16px;
+  }
+  .trip__cd{ gap:6px; }
+  .trip__cd-unit b{ font-size:32px; }
+  .trip__cd-sep{ font-size:25px; }
+  /* legs run side by side, sharing the column width equally */
+  .trip__line{ flex-direction:row; }
+  .trip__stop{ flex:1 1 0; }
+  /* each leg is a dense media card: the thumbnail sits to the LEFT of the
+     text, with city / dates / status stacked beside it (display:contents lifts
+     head + dates out of .trip__stop-info so they join this grid). Filling the
+     row this way wastes less space and lets the whole box stay short. */
+  .trip__stop-link{
+    display:grid; grid-template-columns:auto minmax(0,1fr);
+    grid-template-areas:"thumb head" "thumb dates" "thumb side";
+    align-items:center; column-gap:11px; row-gap:1px;
+    padding:8px 12px;
+  }
+  .trip__stop-thumb{ grid-area:thumb; align-self:center; width:44px; height:44px; }
+  .trip__stop-info{ display:contents; }
+  .trip__stop-head{ grid-area:head; }
+  .trip__stop-city{ font-size:13px; letter-spacing:.04em; }
+  .trip__stop-jp{ font-size:11px; }
+  .trip__stop-dates{ grid-area:dates; font-size:9.5px; letter-spacing:0; }
+  .trip__stop-side{
+    grid-area:side; flex-direction:row; align-items:center;
+    justify-content:flex-start; gap:9px; margin-left:0;
+  }
 }
 
 @media (max-width:420px){
