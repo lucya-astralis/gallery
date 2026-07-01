@@ -120,20 +120,31 @@ body{
 body > main{ flex:1 0 auto; }
 body > .foot{ flex-shrink:0; }
 
-/* background video */
-.bg-video{
+/* Fixed site backdrop — ONE real element, not body::before/::after. iOS Safari
+   mispositions fixed *pseudo-elements* of the flex <body> during scroll (they
+   drift downward instead of staying pinned); a regular fixed <div> doesn't hit
+   that bug. Pinned to the top and sized to the LARGEST viewport (100lvh) so the
+   show/hide toolbar can't resize it and slide the wallpaper. */
+.site-bg{
   position:fixed;
-  inset:0;
+  top:0; left:0;
+  width:100%;
+  height:100vh;   /* fallback for engines without large-viewport units */
+  height:100lvh;
+  z-index:-1;
+  pointer-events:none;
+  background:var(--bg);
+}
+/* ambient video fills the backdrop on capable large screens (opt-in via app.js) */
+.bg-video{
+  position:absolute; inset:0;
   width:100%; height:100%;
   object-fit:cover;
-  z-index:-2;
-  pointer-events:none;
 }
-
-/* grid overlay + radial wash + darkening on top of the video */
-body::before{
+/* grid overlay + radial wash + darkening, painted over the video / poster */
+.site-bg::after{
   content:"";
-  position:fixed; inset:0; z-index:-1;
+  position:absolute; inset:0;
   background-image:
     linear-gradient(to right, rgba(255,255,255,.03) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255,255,255,.03) 1px, transparent 1px),
@@ -142,7 +153,6 @@ body::before{
     linear-gradient(rgba(6,8,14,0.72), rgba(4,5,10,0.86));
   background-size: 32px 32px, 32px 32px, auto, auto, auto;
   background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
-  pointer-events:none;
 }
 
 /* Lite mode (JS-detected low-end / data-saver, set via html.fx-lite) and any
@@ -154,28 +164,11 @@ body::before{
 }
 
 /* Phones never load the ambient clip (app.js only wires it up at ≥761px), and
-   most are flagged fx-lite anyway — so instead of the bare gradient, paint a
-   single still frame of the video as the backdrop. Fixed + cover + sat behind
-   the grid/darkening overlay: the same treatment the <video> gets on desktop. */
+   most are flagged fx-lite anyway — so paint a single still frame of the video
+   as the backdrop instead of the bare gradient. */
 @media (max-width:760px){
-  /* iOS Safari grows/shrinks the visual viewport as its toolbar hides/shows on
-     scroll. A fixed backdrop sized with `inset:0` is bottom-anchored, so it gets
-     resized on every toolbar transition and a `cover` image re-centers — making
-     the wallpaper visibly slide up/down while scrolling. Pin both fixed layers
-     to the TOP and give them the LARGEST viewport height (100lvh, which the
-     toolbar can't change), so nothing resizes mid-scroll. */
-  body::before,
-  body::after{
-    top:0; left:0; right:auto; bottom:auto;
-    width:100%;
-    height:100vh;   /* fallback for engines without large-viewport units */
-    height:100lvh;
-  }
-  body::after{
-    content:"";
-    position:fixed; z-index:-2;
+  .site-bg{
     background:var(--bg) url("/static/bg-poster.jpg") center center / cover no-repeat;
-    pointer-events:none;
   }
 }
 
