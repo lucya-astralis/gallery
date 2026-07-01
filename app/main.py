@@ -50,6 +50,22 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
+def _static_url(path: str) -> str:
+    """Cache-busting URL for a file under /static: appends the file's mtime as
+    `?v=` so a browser re-fetches the asset the moment it actually changes, but
+    keeps serving from cache otherwise. Without this, edits to style.css / app.js
+    can sit behind a stale browser cache. Falls back to the bare path if the file
+    is missing."""
+    try:
+        version = int((BASE_DIR / "static" / path).stat().st_mtime)
+    except OSError:
+        return f"/static/{path}"
+    return f"/static/{path}?v={version}"
+
+
+templates.env.globals["static_url"] = _static_url
+
+
 def _public_base_url(request: Request) -> str:
     if PUBLIC_BASE_URL:
         return PUBLIC_BASE_URL

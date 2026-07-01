@@ -349,16 +349,21 @@ section{
   font-weight:400;
   letter-spacing:.14em;
 }
+/* status/context stamps read as clean rounded chips (same look as mobile):
+   dashed outline, roomy padding and their own margin so they sit apart from
+   the flush segmented cells rather than butting against the dividers. */
 .section__doc .stamp{
   color:var(--acc-amb);
   border:1px dashed rgba(255,181,71,.45);
-  padding:1px 7px;
+  border-radius:var(--radius);
+  padding:4px 9px;
+  margin:0 8px;
   font-size:9.5px;
   letter-spacing:.22em;
 }
 .section__doc .stamp--ok{ color:var(--acc-ok); border-color:rgba(61,255,165,.4); }
 .section__doc .stamp--red{ color:var(--acc-red); border-color:rgba(255,103,103,.5); }
-.section__doc .stamp--cy{ color:var(--acc-cy); border-color:rgba(91,138,255,.5); border-style:solid; }
+.section__doc .stamp--cy{ color:var(--acc-cy); border-color:rgba(91,138,255,.45); border-style:dashed; }
 
 .section__head{
   display:flex;
@@ -395,10 +400,11 @@ section{
   font-size:12px;
   letter-spacing:.2em;
 }
-/* parent-album link before the title: makes it obvious at a glance that this
-   is a sub-album sitting inside another (e.g. "↑ japan / tokyo"). */
+/* parent-album link before the title (e.g. "↑ japan / tokyo"). Hidden on every
+   viewport now that the pathbar "‹ Back to <parent>" button is always shown —
+   the inline link would just duplicate it. */
 .section__slug .section__parent{
-  display:inline-flex; align-items:center; gap:6px;
+  display:none; align-items:center; gap:6px;
   align-self:center;
   font-family:"JetBrains Mono", monospace;
   font-size:13px;
@@ -426,8 +432,17 @@ section{
   flex-wrap:wrap;
   margin-bottom:18px;
 }
-.crumb a{ color:var(--text-dim); transition:color .15s; }
-.crumb a:hover{ color:var(--acc-cy); }
+/* trail links read as clearly tappable (cyan + underline) vs. the current page
+   (plain bright "you are here"); same treatment on every viewport. */
+.crumb a{
+  color:var(--acc-cy);
+  text-decoration:underline;
+  text-decoration-color:rgba(91,138,255,.45);
+  text-underline-offset:3px;
+  padding:2px 0;
+  transition:color .15s, text-decoration-color .15s;
+}
+.crumb a:hover{ color:var(--acc-cy); text-decoration-color:var(--acc-cy); }
 .crumb b{ color:var(--text); font-weight:400; letter-spacing:.14em; }
 .crumb .sep{ color:var(--text-ghost); }
 /* album names and filenames are often single unbreakable tokens (underscores
@@ -435,17 +450,44 @@ section{
    viewport and clip / force horizontal scroll, esp. on mobile. */
 .crumb a, .crumb b{ min-width:0; overflow-wrap:anywhere; }
 
-/* ---- path bar: wraps the breadcrumb + a mobile "back" button -------
-   On desktop the breadcrumb + hover states are enough, so the back button
-   is hidden and the bar is just the breadcrumb. On mobile (see media query)
-   the back button becomes a large, unmistakable tap target — the answer to
-   "how do I get back?". */
+/* ---- path bar: a big "‹ Back to <parent>" button stacked over the full
+   breadcrumb trail. Same treatment on every viewport (this used to be
+   mobile-only): the back button is the primary "get me out of here" control,
+   the breadcrumb below is the secondary "jump to Home / Albums" trail. */
 .pathbar{
-  display:flex; align-items:center; gap:16px;
-  margin-bottom:18px; min-width:0;
+  display:flex; flex-direction:column; align-items:stretch;
+  gap:10px; margin-bottom:18px; min-width:0;
 }
 .pathbar .crumb{ margin-bottom:0; }
-.pathbar__back{ display:none; }
+.pathbar__back{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  align-self:flex-start;
+  max-width:100%;
+  padding:10px 16px;
+  min-height:40px;
+  border:1px solid var(--line-strong);
+  border-radius:var(--radius);
+  background:rgba(91,138,255,.10);
+  color:var(--acc-cy);
+  font-family:"JetBrains Mono", monospace;
+  font-size:11px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  line-height:1;
+  transition:background .15s, border-color .15s;
+}
+.pathbar__back:hover{ background:rgba(91,138,255,.16); border-color:var(--acc-cy); }
+.pathbar__back:active{ background:rgba(91,138,255,.2); }
+.pathbar__back-ico{ font-size:18px; line-height:1; margin-top:-1px; }
+.pathbar__back-lbl{ color:var(--text-dim); }
+.pathbar__back-txt{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--text);
+}
 
 /* ================================================================
    TAGS
@@ -1721,44 +1763,9 @@ details[open] > summary::before{ content:"▾ "; }
   .section__doc .doc-min-hide{ display:none; }
   .section__head{ margin-bottom:16px; }
 
-  /* Path bar: stack a big, obvious "back" button over the full breadcrumb.
-     The back button is the primary "get me out of here" control; the
-     breadcrumb below is the secondary "jump to Home / Albums" trail. */
-  .pathbar{
-    flex-direction:column;
-    align-items:stretch;
-    gap:10px;
-    margin-bottom:16px;
-  }
-  .pathbar__back{
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    align-self:flex-start;
-    max-width:100%;
-    padding:10px 16px;
-    min-height:40px;
-    border:1px solid var(--line-strong);
-    border-radius:var(--radius);
-    background:rgba(91,138,255,.10);
-    color:var(--acc-cy);
-    font-family:"JetBrains Mono", monospace;
-    font-size:11px;
-    letter-spacing:.16em;
-    text-transform:uppercase;
-    line-height:1;
-  }
-  .pathbar__back:active{ background:rgba(91,138,255,.2); }
-  .pathbar__back-ico{ font-size:18px; line-height:1; margin-top:-1px; }
-  .pathbar__back-lbl{ color:var(--text-dim); }
-  .pathbar__back-txt{
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-    color:var(--text);
-  }
-  /* the inline "↑ parent" before the title is redundant with the back button */
-  .section__slug .section__parent{ display:none; }
+  /* pathbar + back button now share the base styles on every viewport; only
+     the bottom spacing tightens a touch on small screens. */
+  .pathbar{ margin-bottom:16px; }
   .detail{ gap:14px; }
   .stage{ min-height:240px; }
   .stage img{ max-height:62vh; }
@@ -1773,18 +1780,9 @@ details[open] > summary::before{ content:"▾ "; }
   .kv dt{ font-size:9.5px; letter-spacing:.12em; }
   .kv dd{ font-size:11.5px; }
   .raw-exif{ font-size:10px; max-height:240px; padding:8px 10px; }
-  /* breadcrumb = the "menu": clearly tappable links (cyan + underline) vs. the
-     current page (plain bright "you are here", no underline) so it's obvious
-     what navigates and what doesn't. */
+  /* breadcrumb link styling is shared with the base now; on small screens just
+     shrink the type and tighten the gaps. */
   .crumb{ font-size:10px; gap:6px 8px; flex-wrap:wrap; }
-  .crumb a{
-    color:var(--acc-cy);
-    text-decoration:underline;
-    text-decoration-color:rgba(91,138,255,.45);
-    text-underline-offset:3px;
-    padding:2px 0;
-  }
-  .crumb b{ color:var(--text); }
 }
 @media (max-width:480px){
   .nav__brand .brand-text{ display:none; }
