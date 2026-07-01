@@ -146,6 +146,19 @@ body::before{
   .bg-video{ display:none; }
 }
 
+/* Phones never load the ambient clip (app.js only wires it up at ≥761px), and
+   most are flagged fx-lite anyway — so instead of the bare gradient, paint a
+   single still frame of the video as the backdrop. Fixed + cover + sat behind
+   the grid/darkening overlay: the same treatment the <video> gets on desktop. */
+@media (max-width:760px){
+  body::after{
+    content:"";
+    position:fixed; inset:0; z-index:-2;
+    background:var(--bg) url("/static/bg-poster.jpg") center center / cover no-repeat;
+    pointer-events:none;
+  }
+}
+
 a{ color:inherit; text-decoration:none; }
 a:hover{ color:var(--acc-cy); }
 
@@ -2780,12 +2793,11 @@ a.trip__stop-link:hover .trip__stop-go i{ transform:translateX(3px); }
   .trip__stop-track i, .trip__stop-go i{ transition:none; }
 }
 
-/* desktop: countdown on the left, the legs as a left→right row of compact
-   cards to its right (Osaka → Sapporo → Tokyo) instead of stacked full-width
-   rows — so the whole box stays narrow. Below this width there isn't room for
-   three readable cards in a row, so narrower screens keep the stacked rows
-   (see defaults above). */
-@media (min-width:960px){
+/* desktop: countdown on the left, the legs as a left→right row of media cards
+   to its right (thumbnail beside the text). Needs real width for three cards
+   plus the countdown, so it only kicks in on wide screens ("wenn Platz ist");
+   narrower screens keep the stacked full-width rows (see defaults above). */
+@media (min-width:1100px){
   /* tighter clock + padding keep this full-width strip short */
   .trip__main{
     display:grid; grid-template-columns:auto minmax(0,1fr);
