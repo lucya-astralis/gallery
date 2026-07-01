@@ -104,7 +104,14 @@ body{
   font-family:"Space Grotesk", system-ui, sans-serif;
   font-size:15px;
   line-height:1.55;
-  overflow-x:hidden;
+  /* clip (not hidden) the horizontal overflow: `overflow-x:hidden` forces
+     `overflow-y` to compute to `auto`, turning <body> into a scroll container —
+     and on iOS Safari the fixed background layers (body::before/::after) then
+     scroll *with* the page instead of staying pinned to the viewport. `clip`
+     trims the same overflow but leaves `overflow-y:visible`, so <html> remains
+     the sole scroller and the backdrops stay fixed. */
+  overflow-x:hidden;   /* fallback for engines without overflow:clip */
+  overflow-x:clip;
   letter-spacing:.01em;
   isolation:isolate;
   min-height:100vh;
