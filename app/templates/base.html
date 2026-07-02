@@ -21,11 +21,16 @@
   {% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-  <!-- Background video is opt-in: JS only loads/plays it on capable, large
-       screens (see app.js). Low-end / mobile / reduced-motion / data-saver
-       users get the static gradient backdrop and never fetch the 6 MB clip. -->
-  <video class="bg-video" autoplay muted loop playsinline preload="none" aria-hidden="true"
-         data-bg-video data-src="/static/bg.mp4"></video>
+  <!-- Fixed site backdrop as a single real element (NOT body::before/::after):
+       iOS Safari mispositions fixed *pseudo-elements* of the flex <body> during
+       scroll, so the grid + wallpaper are painted here instead and stay pinned.
+       The ambient video is opt-in: app.js only loads/plays it on capable, large
+       screens; low-end / mobile / reduced-motion / data-saver users keep the
+       static poster + gradient and never fetch the 6 MB clip. -->
+  <div class="site-bg" aria-hidden="true">
+    <video class="bg-video" autoplay muted loop playsinline preload="none"
+           data-bg-video data-src="/static/bg.mp4"></video>
+  </div>
   <nav class="nav">
     <div class="nav__inner">
       <a href="/" class="nav__brand" aria-label="lucya.systems gallery">

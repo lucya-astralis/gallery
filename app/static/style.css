@@ -120,20 +120,31 @@ body{
 body > main{ flex:1 0 auto; }
 body > .foot{ flex-shrink:0; }
 
-/* background video */
-.bg-video{
+/* Fixed site backdrop — ONE real element, not body::before/::after. iOS Safari
+   mispositions fixed *pseudo-elements* of the flex <body> during scroll (they
+   drift downward instead of staying pinned); a regular fixed <div> doesn't hit
+   that bug. Pinned to the top and sized to the LARGEST viewport (100lvh) so the
+   show/hide toolbar can't resize it and slide the wallpaper. */
+.site-bg{
   position:fixed;
-  inset:0;
+  top:0; left:0;
+  width:100%;
+  height:100vh;   /* fallback for engines without large-viewport units */
+  height:100lvh;
+  z-index:-1;
+  pointer-events:none;
+  background:var(--bg);
+}
+/* ambient video fills the backdrop on capable large screens (opt-in via app.js) */
+.bg-video{
+  position:absolute; inset:0;
   width:100%; height:100%;
   object-fit:cover;
-  z-index:-2;
-  pointer-events:none;
 }
-
-/* grid overlay + radial wash + darkening on top of the video */
-body::before{
+/* grid overlay + radial wash + darkening, painted over the video / poster */
+.site-bg::after{
   content:"";
-  position:fixed; inset:0; z-index:-1;
+  position:absolute; inset:0;
   background-image:
     linear-gradient(to right, rgba(255,255,255,.03) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255,255,255,.03) 1px, transparent 1px),
@@ -142,7 +153,6 @@ body::before{
     linear-gradient(rgba(6,8,14,0.72), rgba(4,5,10,0.86));
   background-size: 32px 32px, 32px 32px, auto, auto, auto;
   background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
-  pointer-events:none;
 }
 
 /* Lite mode (JS-detected low-end / data-saver, set via html.fx-lite) and any
@@ -154,28 +164,11 @@ body::before{
 }
 
 /* Phones never load the ambient clip (app.js only wires it up at ≥761px), and
-   most are flagged fx-lite anyway — so instead of the bare gradient, paint a
-   single still frame of the video as the backdrop. Fixed + cover + sat behind
-   the grid/darkening overlay: the same treatment the <video> gets on desktop. */
+   most are flagged fx-lite anyway — so paint a single still frame of the video
+   as the backdrop instead of the bare gradient. */
 @media (max-width:760px){
-  /* iOS Safari grows/shrinks the visual viewport as its toolbar hides/shows on
-     scroll. A fixed backdrop sized with `inset:0` is bottom-anchored, so it gets
-     resized on every toolbar transition and a `cover` image re-centers — making
-     the wallpaper visibly slide up/down while scrolling. Pin both fixed layers
-     to the TOP and give them the LARGEST viewport height (100lvh, which the
-     toolbar can't change), so nothing resizes mid-scroll. */
-  body::before,
-  body::after{
-    top:0; left:0; right:auto; bottom:auto;
-    width:100%;
-    height:100vh;   /* fallback for engines without large-viewport units */
-    height:100lvh;
-  }
-  body::after{
-    content:"";
-    position:fixed; z-index:-2;
+  .site-bg{
     background:var(--bg) url("/static/bg-poster.jpg") center center / cover no-repeat;
-    pointer-events:none;
   }
 }
 
@@ -1295,17 +1288,19 @@ section{
 /* ================================================================
    ALBUM BODY  (content + optional .md description sidebar)
    ================================================================ */
-/* No description → .album-body is a transparent passthrough (content stays
-   full-width, exactly as before). With a description it becomes a 2-up grid
-   on desktop: content left, description right. DOM order is description-first
-   so it leads on mobile when the grid collapses to a single column; the
-   columns are pinned explicitly on desktop to flip it back to content-left. */
+/* No sidebar content → .album-body is a transparent passthrough (content
+   stays full-width, exactly as before). With a description and/or trip map
+   it becomes a 2-up grid on desktop: content left, .album-side (route map
+   stacked above the description) right. DOM order is side-first so it leads
+   on mobile when the grid collapses to a single column; the columns are
+   pinned explicitly on desktop to flip it back to content-left. */
 .album-body--with-desc{
   display:grid;
   grid-template-columns:minmax(0, 1fr);
   gap:22px;
 }
 .album-body__main{ min-width:0; }
+.album-side{ display:flex; flex-direction:column; gap:22px; min-width:0; }
 
 @media (min-width:1000px){
   .album-body--with-desc{
@@ -1314,13 +1309,17 @@ section{
     align-items:start;
   }
   .album-body--with-desc > .album-body__main{ grid-column:1; grid-row:1; }
-  .album-body--with-desc > .album-desc{
+  .album-body--with-desc > .album-side{
     grid-column:2; grid-row:1;
     position:sticky;
     top:calc(var(--nav-h) + 18px);
     max-height:calc(100vh - var(--nav-h) - 36px);
   }
-  .album-body--with-desc > .album-desc .album-desc__body{
+  /* under the sticky height cap the map keeps its size; the description
+     shrinks and scrolls inside its body instead */
+  .album-side > .trip-map{ flex:0 0 auto; width:100%; margin:0; }
+  .album-side > .album-desc{ min-height:0; }
+  .album-side .album-desc__body{
     overflow:auto;
     min-height:0;
     scrollbar-width:thin;
@@ -2673,6 +2672,11 @@ body.lightbox-open{ overflow:hidden; }
 .trip--transit .trip__status,
 .trip--active .trip__status{ color:var(--acc-mag); border-color:rgba(165,148,255,.5); }
 .trip--done .trip__status{ color:var(--acc-ok); border-color:rgba(61,255,165,.45); }
+/* live JST wall clock, right of the status stamp (filled by initTrip) */
+.trip__clock{
+  color:var(--text-dim); letter-spacing:.12em;
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
 
 /* ---- body layout ---- */
 .trip__main{
@@ -2806,9 +2810,83 @@ a.trip__stop-link:hover .trip__stop-go i{ transform:translateX(3px); }
   70%{ box-shadow:0 0 0 6px rgba(165,148,255,0); }
   100%{ box-shadow:0 0 0 0 rgba(165,148,255,0); }
 }
+
+/* ---- route map (generated inline SVG — see _trip_map.html) ----
+   A framed "radar panel": faint blueprint grid behind the archipelago.
+   Dots / visited prefectures mirror stop states (is-upcoming/-active/-done),
+   route segments read is-done / is-next; all toggled by initTrip(). */
+.trip-map{
+  margin:0 auto; width:min(248px, 100%);
+  padding:10px 10px 12px;
+  border:1px solid var(--line);
+  position:relative;
+  background:
+    repeating-linear-gradient(0deg,  rgba(91,138,255,.045) 0 1px, transparent 1px 27px),
+    repeating-linear-gradient(90deg, rgba(91,138,255,.045) 0 1px, transparent 1px 27px),
+    rgba(7,7,11,.42);
+}
+.trip-map::after{
+  content:"日本 / ROUTE";
+  position:absolute; right:9px; bottom:7px;
+  font-family:"Noto Sans JP", "JetBrains Mono", monospace;
+  font-size:8.5px; letter-spacing:.22em; color:var(--text-ghost);
+  pointer-events:none;
+}
+.trip-map svg{ display:block; width:100%; height:auto; }
+
+.trip-map__land{
+  fill:var(--surface-2); stroke:var(--line-strong); stroke-width:.7;
+  stroke-linejoin:round;
+}
+/* prefectures the itinerary visits (Hokkaido carries the Sapporo stop) */
+.trip-map__pref{
+  fill:rgba(91,138,255,.12); stroke:rgba(91,138,255,.6); stroke-width:.8;
+  stroke-linejoin:round;
+}
+.trip-map__pref.is-active{ fill:rgba(165,148,255,.2); stroke:var(--acc-mag); }
+.trip-map__pref.is-done{ fill:rgba(61,255,165,.08); stroke:rgba(61,255,165,.45); }
+
+/* route legs: ghost-dashed until flown; the upcoming leg marches */
+.trip-map__seg{
+  fill:none; stroke:var(--text-ghost); stroke-width:1.1;
+  stroke-dasharray:3 4; stroke-linecap:round; opacity:.55;
+}
+.trip-map__seg.is-next{
+  stroke:var(--acc-cy); stroke-width:1.5; opacity:1;
+  animation:trip-map-dash 1.4s linear infinite;
+}
+.trip-map__seg.is-done{
+  stroke:rgba(61,255,165,.5); stroke-dasharray:none; stroke-width:1; opacity:.9;
+}
+
+.trip-map__dot{ fill:var(--bg); stroke:var(--text-ghost); stroke-width:1.1; }
+.trip-map__city.is-done   .trip-map__dot{ fill:var(--acc-ok);  stroke:var(--acc-ok); }
+.trip-map__city.is-active .trip-map__dot{ fill:var(--acc-mag); stroke:var(--acc-mag); }
+/* "you are here": expanding echo + slowly rotating dashed target ring */
+.trip-map__pulse, .trip-map__ring{ fill:none; stroke:var(--acc-mag); opacity:0; }
+.trip-map__pulse{ stroke-width:1.2; }
+.trip-map__ring{ stroke-width:.8; stroke-dasharray:2.5 3.5; }
+.trip-map__city.is-active .trip-map__pulse{ animation:trip-map-pulse 2.4s ease-out infinite; }
+.trip-map__city.is-active .trip-map__ring{ opacity:.75; animation:trip-map-spin 16s linear infinite; }
+
+.trip-map__lbl{
+  font-family:"JetBrains Mono", monospace; font-size:13px;
+  letter-spacing:.12em; fill:var(--text-dim);
+}
+.trip-map__city.is-active .trip-map__lbl{ fill:var(--acc-mag); }
+.trip-map__city.is-done   .trip-map__lbl{ fill:rgba(61,255,165,.7); }
+
+@keyframes trip-map-pulse{
+  0%{ r:4.5; opacity:.75; }
+  75%, 100%{ r:16; opacity:0; }
+}
+@keyframes trip-map-spin{ to{ stroke-dashoffset:-63; } }
+@keyframes trip-map-dash{ to{ stroke-dashoffset:-14; } }
+
 @media (prefers-reduced-motion: reduce){
   .trip__stop.is-active .trip__stop-dot{ animation:none; }
   .trip__stop-track i, .trip__stop-go i{ transition:none; }
+  .trip-map__pulse, .trip-map__ring, .trip-map__seg.is-next{ animation:none; }
 }
 
 /* desktop: countdown on the left, the legs as a left→right row of media cards
@@ -2851,6 +2929,9 @@ a.trip__stop-link:hover .trip__stop-go i{ transform:translateX(3px); }
 
 @media (max-width:420px){
   .trip__main{ padding:11px; gap:12px; }
-  .trip__bar{ padding:7px 11px; font-size:9px; gap:7px; }
+  /* stamp + JST clock overflow one line on narrow phones: wrap into a tidy
+     second row instead of squeezing the title into mid-word breaks */
+  .trip__bar{ padding:7px 11px; font-size:9px; gap:7px; flex-wrap:wrap; row-gap:4px; }
+  .trip__tag, .trip__name, .trip__jp{ white-space:nowrap; }
   .trip__stop-jp{ display:none; }
 }

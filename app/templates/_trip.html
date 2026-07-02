@@ -1,9 +1,11 @@
-{# Live trip dashboard: flight countdown + itinerary timeline with a
-   "you are here" marker. Numbers, labels, status stamp and per-stop state
-   are filled/animated client-side by initTrip() in app.js, read from the
-   data-* attributes against the viewer's own clock. Each stop links into
-   its city sub-album (cover + photo count), so the timeline doubles as
-   navigation. The static markup is a sensible no-JS fallback. #}
+{# Live trip dashboard: flight countdown, JST clock and an itinerary
+   timeline with a "you are here" marker. Numbers, labels, status stamp and
+   per-stop state are filled/animated client-side by initTrip() in app.js,
+   read from the data-* attributes against the viewer's own clock. Each stop
+   links into its city sub-album (cover + photo count), so the timeline
+   doubles as navigation. The static markup is a sensible no-JS fallback.
+   The matching route map (_trip_map.html) renders in the album sidebar —
+   see album.html — and is state-synced by the same initTrip(). #}
 {% macro stop_inner(s) %}
   <span class="trip__stop-thumb" aria-hidden="true">
     {% if s.cover %}<img src="/thumb/{{ s.cover }}" alt="" loading="lazy">{% endif %}
@@ -28,6 +30,7 @@
     <span class="trip__name">{{ trip.title }}</span>
     {% if trip.jp %}<span class="trip__jp" aria-hidden="true">{{ trip.jp }}</span>{% endif %}
     <span class="trip__status stamp" data-trip-status>···</span>
+    <span class="trip__clock" data-trip-clock title="Local time in Japan">JST --:--:--</span>
   </div>
 
   <div class="trip__main">

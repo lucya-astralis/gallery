@@ -870,6 +870,27 @@ document.addEventListener('DOMContentLoaded', () => {
     meta: el.querySelector('[data-stop-meta]'),
   })).filter((s) => s.start && s.end);
 
+  // route map (_trip_map.html): dots + visited prefectures mirror the stop
+  // states; segments (keyed by the stop they END at) get is-done / is-next.
+  // The map lives in the album sidebar, outside [data-trip], so look it up
+  // document-wide.
+  const mapCity = {};
+  const mapPref = {};
+  document.querySelectorAll('[data-map-city]').forEach((g) => { mapCity[g.dataset.mapCity] = g; });
+  document.querySelectorAll('[data-map-pref]').forEach((p) => { mapPref[p.dataset.mapPref] = p; });
+  const mapSegs = Array.from(document.querySelectorAll('[data-map-seg]'));
+
+  // JST wall clock in the top bar (Japan has a single, DST-free zone).
+  const clockEl = root.querySelector('[data-trip-clock]');
+  let jstFmt = null;
+  try {
+    jstFmt = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    });
+  } catch (e) {
+    if (clockEl) clockEl.hidden = true;
+  }
+
   const cd = {
     d: root.querySelector('[data-cd="d"]'),
     h: root.querySelector('[data-cd="h"]'),
@@ -885,6 +906,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const setPhase = (p) => ['pre', 'transit', 'active', 'done']
     .forEach((x) => root.classList.toggle('trip--' + x, x === p));
+
+  const setState = (el, state) => {
+    if (!el) return;
+    el.classList.toggle('is-upcoming', state === 'upcoming');
+    el.classList.toggle('is-active', state === 'active');
+    el.classList.toggle('is-done', state === 'done');
+  };
 
   const setClock = (ms) => {
     const t = Math.max(0, ms);
@@ -902,16 +930,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // date belongs to the city you're arriving in — only one stop is ever
     // "active".
     let activeIdx = -1;
+    const states = [];
     stops.forEach((s, i) => {
       const isLast = i === stops.length - 1;
       let state;
       if (now < s.start) state = 'upcoming';
       else if (isLast ? now > s.end : now >= s.end) state = 'done';
       else { state = 'active'; activeIdx = i; }
+      states.push(state);
 
-      s.el.classList.toggle('is-upcoming', state === 'upcoming');
-      s.el.classList.toggle('is-active', state === 'active');
-      s.el.classList.toggle('is-done', state === 'done');
+      setState(s.el, state);
+      setState(mapCity[s.city], state);
+      setState(mapPref[s.city], state);
 
       const span = s.end - s.start;
       let pct = state === 'done' ? 100
@@ -933,6 +963,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     });
+
+    // map segments: seg i is the leg INTO stop i (there is no leg into stop
+    // 0). Done once that stop is reached; "next" (animated dashes) while its
+    // origin stop is underway/passed but the destination hasn't started.
+    mapSegs.forEach((seg) => {
+      const i = +seg.dataset.mapSeg;
+      const reached = states[i] && states[i] !== 'upcoming';
+      const next = states[i] === 'upcoming' && !!states[i - 1] && states[i - 1] !== 'upcoming';
+      seg.classList.toggle('is-done', !!reached);
+      seg.classList.toggle('is-next', next);
+    });
+
+    if (jstFmt && clockEl) clockEl.textContent = 'JST ' + jstFmt.format(now);
 
     // phase + headline countdown
     let phase, target, label, status;
