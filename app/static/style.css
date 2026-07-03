@@ -1317,7 +1317,7 @@ section{
   }
   /* under the sticky height cap the map keeps its size; the description
      shrinks and scrolls inside its body instead */
-  .album-side > .trip-map{ flex:0 0 auto; width:100%; margin:0; }
+  .album-side > .trip-map{ flex:0 0 auto; width:100%; max-width:none; margin:0; }
   .album-side > .album-desc{ min-height:0; }
   .album-side .album-desc__body{
     overflow:auto;
@@ -2816,14 +2816,18 @@ a.trip__stop-link:hover .trip__stop-go i{ transform:translateX(3px); }
    Dots / visited prefectures mirror stop states (is-upcoming/-active/-done),
    route segments read is-done / is-next; all toggled by initTrip(). */
 .trip-map{
-  margin:0 auto; width:min(248px, 100%);
+  /* fills its column (full-width panels on mobile, the sidebar on desktop),
+     capped so it never grows unwieldy on tablet widths */
+  margin:0 auto; width:100%; max-width:360px;
   padding:10px 10px 12px;
   border:1px solid var(--line);
   position:relative;
+  /* solid panel (no see-through to the page bg) with a faint blueprint grid
+     over it — grid lines are the only translucent part */
   background:
-    repeating-linear-gradient(0deg,  rgba(91,138,255,.045) 0 1px, transparent 1px 27px),
-    repeating-linear-gradient(90deg, rgba(91,138,255,.045) 0 1px, transparent 1px 27px),
-    rgba(7,7,11,.42);
+    repeating-linear-gradient(0deg,  rgba(91,138,255,.05) 0 1px, transparent 1px 27px),
+    repeating-linear-gradient(90deg, rgba(91,138,255,.05) 0 1px, transparent 1px 27px),
+    var(--bg);
 }
 .trip-map::after{
   content:"日本 / ROUTE";
