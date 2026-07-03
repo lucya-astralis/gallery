@@ -22,104 +22,136 @@
   <meta name="theme-color" content="#5b8aff">
 {% endblock %}
 {% block content %}
-<section class="welcome">
-  <div class="section__doc">
-    <span class="doc-min-hide">SIG / LUCYA.GALLERY</span>
-    <span>FEED / <b>{{ feed_label }}</b></span>
-    {% if showcase_count %}<span>SHOWCASE / <b>{{ showcase_count }}</b></span>{% endif %}
-    <span class="stamp stamp--ok doc-min-hide">ONLINE</span>
-  </div>
+{# ---- LIVE VIEW hero: the feed fills the viewport like a camera's live
+       view; HUD chrome (REC, frame counter, thirds, reticle) is layered on
+       top and the intro text sits in the shaded lower-left quadrant. ---- #}
+<section class="vf{% if not shuffle %} vf--empty{% endif %}" id="vf" data-count="{{ shuffle | length }}">
+  {% if shuffle %}
+    <div class="vf__stage" id="vf-stage">
+      {% for img in shuffle %}
+        <a class="vf__frame{% if loop.first %} is-on{% endif %}" href="/image/{{ img.rel_path }}"
+           data-idx="{{ loop.index0 }}" data-album="{{ img.album }}"
+           data-filename="{{ img.filename }}" data-rel="{{ img.rel_path }}"
+           tabindex="-1" aria-hidden="{% if loop.first %}false{% else %}true{% endif %}">
+          <img src="/preview/{{ img.rel_path }}" alt="{{ img.filename }}"
+               loading="{% if loop.index0 < 2 %}eager{% else %}lazy{% endif %}" decoding="async">
+        </a>
+      {% endfor %}
+      <div class="vf__shade" aria-hidden="true"></div>
+    </div>
 
-  <div class="welcome__grid">
-    <div class="welcome__hero">
-      {% if shuffle %}
-        <div class="crt" id="crt-deck" data-count="{{ shuffle | length }}">
-          <div class="crt__bezel">
-            <div class="crt__topbar">
-              <span class="crt__brand">LCYA-CRT 240</span>
-              <span class="crt__sep">·</span>
-              <span class="crt__feed">FEED / <b>{{ feed_label }}</b></span>
-              <span class="crt__sep">·</span>
-              <span class="crt__ch">CH <b data-shuffle-idx>01</b><span class="crt__ch-of">/{{ '%02d' | format(shuffle | length) }}</span></span>
-              <span class="crt__sep">·</span>
-              <span class="crt__sig"><i class="crt__led"></i> SIG</span>
-            </div>
-            <div class="crt__screen">
-              {% for img in shuffle %}
-                <a class="crt__frame{% if loop.first %} is-on{% endif %}" href="/image/{{ img.rel_path }}" data-idx="{{ loop.index0 }}" data-album="{{ img.album }}" data-filename="{{ img.filename }}" data-rel="{{ img.rel_path }}">
-                  <img src="/preview/{{ img.rel_path }}" alt="{{ img.filename }}" loading="{% if loop.index0 < 2 %}eager{% else %}lazy{% endif %}">
-                </a>
-              {% endfor %}
-              <div class="crt__static" aria-hidden="true"></div>
-              <div class="crt__roll" aria-hidden="true"></div>
-              <div class="crt__scanlines" aria-hidden="true"></div>
-              <div class="crt__vignette" aria-hidden="true"></div>
-              <div class="crt__osd">
-                <span class="crt__osd-name" data-scramble>{{ shuffle[0].album }} / {{ shuffle[0].filename }}</span>
-              </div>
-            </div>
-            <div class="crt__footbar">
-              <button type="button" class="crt__btn" id="shuffle-prev" aria-label="Previous channel">‹ PREV</button>
-              <button type="button" class="crt__btn" id="shuffle-next" aria-label="Next channel">NEXT ›</button>
-              <button type="button" class="crt__btn crt__btn--refresh" id="shuffle-refresh" aria-label="Reshuffle feed">⟳ TUNE</button>
-              <span class="crt__auto" id="shuffle-status">AUTO · 3.0s</span>
-            </div>
-          </div>
+    <div class="vf__hud" aria-hidden="true">
+      <i class="vf__corner vf__corner--tl"></i>
+      <i class="vf__corner vf__corner--tr"></i>
+      <i class="vf__corner vf__corner--bl"></i>
+      <i class="vf__corner vf__corner--br"></i>
+      <div class="vf__thirds"></div>
+      <div class="vf__reticle"></div>
+    </div>
+
+    <div class="vf__hudtop">
+      <span class="vf__rec"><i aria-hidden="true"></i>REC</span>
+      <span class="vf__hudchip">LIVE VIEW / <b>{{ feed_label }}</b></span>
+      <span class="vf__hudchip vf__hudchip--ghost doc-min-hide">SIG / LUCYA.GALLERY</span>
+      <span class="vf__hudright">
+        <span class="vf__frm">FRM <b id="vf-idx">01</b><span class="vf__frm-of">/{{ '%02d' | format(shuffle | length) }}</span></span>
+        <span class="vf__af doc-min-hide"><i aria-hidden="true"></i>AF·LOCK</span>
+      </span>
+    </div>
+
+    <div class="vf__body">
+      <div class="vf__intro">
+        <div class="vf__slug">
+          <span class="ix">00</span>
+          <span class="jp">画像庫</span>
+          <span class="jp vf__slug-sub">ギャラリー</span>
         </div>
-      {% else %}
-        <div class="empty">
-          <span class="stamp">NO INDEX</span>
-          <p>No images indexed yet.</p>
-          <p class="note">Drop subfolders into <code>photos/</code> — each subfolder becomes an album, and albums can nest (e.g. <code>japan/tokyo</code>).</p>
+        {# head/tail are scrambled separately (the scrambler flattens its
+           target's innerHTML — one wrapper would wipe the dot + tail spans) #}
+        <h1 class="vf__title"><span class="vf__title-head">LUCYA</span><span class="vf__title-dot">.</span><wbr><span class="vf__title-tail">GALLERY</span></h1>
+        <p class="vf__lead">A read-only window into a personal photo archive.</p>
+        <div class="vf__actions">
+          <a href="/albums" class="btn-link btn-link--primary">BROWSE ALBUMS →</a>
+          <a href="/image/{{ shuffle[0].rel_path }}" class="btn-link" data-vf-open>OPEN FRAME ↗</a>
+        </div>
+      </div>
+      <a class="vf__meta" id="vf-meta" href="/image/{{ shuffle[0].rel_path }}">
+        <span class="vf__meta-key">FILE</span>
+        <span class="vf__meta-file" id="vf-file" data-scramble>{{ shuffle[0].album }} / {{ shuffle[0].filename }}</span>
+        <span class="vf__meta-sub">SRC / PREVIEW · 1600PX · READONLY</span>
+      </a>
+    </div>
+
+    <div class="vf__deck">
+      <button type="button" class="vf__nav" id="vf-prev" aria-label="Previous frame">‹</button>
+      <button type="button" class="vf__nav" id="vf-next" aria-label="Next frame">›</button>
+      <div class="vf__track" id="vf-track" aria-label="Frame selector">
+        {% for img in shuffle %}
+          <button type="button" class="vf__seg{% if loop.first %} is-on{% endif %}" data-goto="{{ loop.index0 }}" aria-label="Frame {{ loop.index }}: {{ img.album }} / {{ img.filename }}"></button>
+        {% endfor %}
+      </div>
+      {% if feed_mode != 'manual' %}
+        <button type="button" class="vf__tune" id="vf-tune" aria-label="Reshuffle feed">⟳ TUNE</button>
+      {% endif %}
+      <span class="vf__auto" id="vf-auto">AUTO · 6.0S</span>
+    </div>
+  {% else %}
+    <div class="vf__hud" aria-hidden="true">
+      <i class="vf__corner vf__corner--tl"></i>
+      <i class="vf__corner vf__corner--tr"></i>
+      <i class="vf__corner vf__corner--bl"></i>
+      <i class="vf__corner vf__corner--br"></i>
+    </div>
+    <div class="vf__empty">
+      <span class="vf__rec vf__rec--off"><i aria-hidden="true"></i>NO SIGNAL</span>
+      <h1 class="vf__title"><span class="vf__title-head">LUCYA</span><span class="vf__title-dot">.</span><wbr><span class="vf__title-tail">GALLERY</span></h1>
+      <div class="empty">
+        <span class="stamp">NO INDEX</span>
+        <p>No images indexed yet.</p>
+        <p class="note">Drop subfolders into <code>photos/</code> — each subfolder becomes an album, and albums can nest (e.g. <code>japan/tokyo</code>).</p>
+      </div>
+    </div>
+  {% endif %}
+</section>
+
+{# ---- readout band: archive stats + status tokens, full-width strip ---- #}
+<section class="vf-band" aria-label="Archive readout">
+  <div class="vf-band__inner">
+    <div class="vf-band__id doc-min-hide">
+      <span class="vf-band__sig">SIG / LUCYA.GALLERY</span>
+      <span class="vf-band__build">BUILD / READONLY</span>
+    </div>
+    <div class="vf-band__cells">
+      <div class="vf-band__cell">
+        <span class="vf-band__digits" data-count-to="{{ image_count }}">{{ image_count }}</span>
+        <span class="vf-band__caption">Images</span>
+      </div>
+      <span class="vf-band__divider" aria-hidden="true"></span>
+      <div class="vf-band__cell">
+        <span class="vf-band__digits" data-count-to="{{ album_count }}">{{ album_count }}</span>
+        <span class="vf-band__caption">Albums</span>
+      </div>
+      {% if showcase_count %}
+        <span class="vf-band__divider" aria-hidden="true"></span>
+        <div class="vf-band__cell">
+          <span class="vf-band__digits vf-band__digits--accent" data-count-to="{{ showcase_count }}">{{ showcase_count }}</span>
+          <span class="vf-band__caption">Featured</span>
         </div>
       {% endif %}
     </div>
-
-    <aside class="welcome__intro">
-      <div class="welcome__slug">
-        <span class="ix">00</span>
-        <span class="jp">画像庫</span>
-      </div>
-      <h1 class="welcome__title">LUCYA<span>.</span>GALLERY</h1>
-      <p class="welcome__lead">
-        A read-only window into a personal photo archive.
-      </p>
-      <div class="welcome__actions">
-        <a href="/albums" class="btn-link btn-link--primary">BROWSE ALBUMS →</a>
-        {% if shuffle %}
-          <a href="/image/{{ shuffle[0].rel_path }}" class="btn-link" data-shuffle-open>OPEN ON SCREEN ↗</a>
-        {% endif %}
-      </div>
-
-      <div class="readout" aria-label="Archive readout">
-        <div class="readout__cell">
-          <span class="readout__digits" data-count-to="{{ image_count }}">{{ image_count }}</span>
-          <span class="readout__caption">Images</span>
-        </div>
-        <span class="readout__divider" aria-hidden="true"></span>
-        <div class="readout__cell">
-          <span class="readout__digits" data-count-to="{{ album_count }}">{{ album_count }}</span>
-          <span class="readout__caption">Albums</span>
-        </div>
-        {% if showcase_count %}
-          <span class="readout__divider" aria-hidden="true"></span>
-          <div class="readout__cell">
-            <span class="readout__digits readout__digits--accent" data-count-to="{{ showcase_count }}">{{ showcase_count }}</span>
-            <span class="readout__caption">Featured</span>
-          </div>
-        {% endif %}
-      </div>
-
-      {% if showcase_albums %}
-        <section class="showcase welcome__showcase" aria-label="Showcase albums">
-          <header class="showcase__head">
-            <span class="showcase__label">★ SHOWCASE ALBUMS</span>
-            <a class="showcase__more" href="/albums">ALL →</a>
-          </header>
-          {% include "_showcase_albums.html" %}
-        </section>
-      {% endif %}
-    </aside>
+    <span class="stamp stamp--ok vf-band__stamp">ONLINE</span>
   </div>
 </section>
+
+{% if showcase_albums %}
+  <section class="showcase-page" aria-label="Showcase albums">
+    <div class="showcase">
+      <header class="showcase__head">
+        <span class="showcase__label">★ SHOWCASE ALBUMS</span>
+        <a class="showcase__more" href="/albums">ALL ALBUMS →</a>
+      </header>
+      {% include "_showcase_albums.html" %}
+    </div>
+  </section>
+{% endif %}
 {% endblock %}

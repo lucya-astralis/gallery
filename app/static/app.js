@@ -200,7 +200,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // scramble on view: section headers, hero stats, welcome title
   const onViewEls = [
     ...document.querySelectorAll('.section__slug .name'),
-    ...document.querySelectorAll('.welcome__title'),
+    // head + tail separately: scrambling flattens innerHTML, which would
+    // destroy the title's dot/tail spans if the whole <h1> were the target
+    ...document.querySelectorAll('.vf__title-head, .vf__title-tail'),
     ...document.querySelectorAll('.section__doc b'),
     ...document.querySelectorAll('.notfound__title'),
     ...document.querySelectorAll('.crumb b'),
@@ -208,99 +210,137 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
   window.__scrambleOnView(onViewEls);
 
-  const crt = document.getElementById('crt-deck');
-  if (!crt) return;
-  const frames = Array.from(crt.querySelectorAll('.crt__frame'));
+  // ---------- WELCOME VIEWFINDER ---------------------------------
+  // Full-bleed "live view" hero: crossfading frames, HUD readouts and a
+  // segmented track. Auto-advance is driven by the CSS fill animation on
+  // the active segment (animationend), so pause/resume and the visible
+  // progress can never drift apart. fx-lite devices get manual controls.
+  const vf = document.getElementById('vf');
+  if (!vf) return;
+  const frames = Array.from(vf.querySelectorAll('.vf__frame'));
   if (frames.length === 0) return;
 
-  const screen = crt.querySelector('.crt__screen');
-  const osdName = crt.querySelector('.crt__osd-name');
-  const chEl = crt.querySelector('[data-shuffle-idx]');
-  const openLink = document.querySelector('[data-shuffle-open]');
-  const AUTO_MS = 3000;
-  const SWITCH_MS = 280;
+  const segs = Array.from(vf.querySelectorAll('.vf__seg'));
+  const stage = document.getElementById('vf-stage');
+  const track = document.getElementById('vf-track');
+  const fileEl = document.getElementById('vf-file');
+  const idxEl = document.getElementById('vf-idx');
+  const metaLink = document.getElementById('vf-meta');
+  const openLink = document.querySelector('[data-vf-open]');
+  const autoLabel = document.getElementById('vf-auto');
+
+  const AUTO_MS = 6000;
+  const FLASH_MS = 450;
+  vf.style.setProperty('--vf-auto-ms', AUTO_MS + 'ms');
 
   let current = 0;
-  let switching = false;
+  const autoOk = allowHeavyFx() && frames.length > 1;
 
-  function setOsdFor(frame) {
-    if (!osdName) return;
-    const album = frame.dataset.album || '';
-    const filename = frame.dataset.filename || '';
-    const text = album + ' / ' + filename;
-    osdName.dataset.scrambleTarget = text;
-    if (window.__scrambleTo) window.__scrambleTo(osdName, text);
-    else osdName.textContent = text;
+  function syncFrame(idx) {
+    const f = frames[idx];
+    if (fileEl) {
+      const text = (f.dataset.album || '') + ' / ' + (f.dataset.filename || '');
+      fileEl.dataset.scrambleTarget = text;
+      if (window.__scrambleTo) window.__scrambleTo(fileEl, text);
+      else fileEl.textContent = text;
+    }
+    if (idxEl) {
+      const n = String(idx + 1).padStart(2, '0');
+      if (window.__scrambleTo) window.__scrambleTo(idxEl, n);
+      else idxEl.textContent = n;
+    }
+    if (metaLink) metaLink.href = f.href;
+    if (openLink) openLink.href = f.href;
   }
 
-  function setChannel(idx) {
-    if (!chEl) return;
-    const next = String(idx + 1).padStart(2, '0');
-    if (window.__scrambleTo) window.__scrambleTo(chEl, next);
-    else chEl.textContent = next;
-  }
-
-  function switchTo(idx, dir = 1) {
-    if (switching) return;
-    const target = ((idx % frames.length) + frames.length) % frames.length;
-    if (target === current && frames.length > 1) return;
-    switching = true;
-    crt.classList.add('is-switching');
-    setTimeout(() => {
-      frames[current].classList.remove('is-on');
-      current = target;
-      frames[current].classList.add('is-on');
-      if (screen) screen.dataset.href = frames[current].href;
-      if (openLink) openLink.href = frames[current].href;
-      setOsdFor(frames[current]);
-      setChannel(current);
-    }, Math.round(SWITCH_MS * 0.45));
-    setTimeout(() => {
-      crt.classList.remove('is-switching');
-      switching = false;
-    }, SWITCH_MS + 40);
-  }
-
-  function advance() { switchTo(current + 1); }
-  function regress() { switchTo(current - 1, -1); }
-
-  // init: ensure first frame is on and OSD/channel match
-  frames.forEach((f, i) => f.classList.toggle('is-on', i === current));
-  setChannel(current);
-  if (screen) screen.dataset.href = frames[current].href;
-
-  // auto-cycle only on capable devices; elsewhere the deck is manual (prev/next)
-  const autoOk = allowHeavyFx();
-  let timer = autoOk ? setInterval(advance, AUTO_MS) : null;
-  const reset = () => { if (!autoOk) return; clearInterval(timer); timer = setInterval(advance, AUTO_MS); };
-  if (!autoOk) {
-    const statusEl = document.getElementById('shuffle-status');
-    if (statusEl) statusEl.textContent = 'MANUAL';
-  }
-
-  const nextBtn = document.getElementById('shuffle-next');
-  const prevBtn = document.getElementById('shuffle-prev');
-  const refreshBtn = document.getElementById('shuffle-refresh');
-
-  if (nextBtn) nextBtn.addEventListener('click', () => { advance(); reset(); });
-  if (prevBtn) prevBtn.addEventListener('click', () => { regress(); reset(); });
-
-  // clicking the screen opens the currently-on frame
-  if (screen) {
-    screen.addEventListener('click', (e) => {
-      const link = e.target.closest('.crt__frame');
-      if (link) return; // anchor handles it
-      const href = screen.dataset.href;
-      if (href) window.location.href = href;
+  function paintSegs() {
+    segs.forEach((s, i) => {
+      s.classList.toggle('is-done', i < current);
+      s.classList.remove('is-on');
+      if (i === current) {
+        void s.offsetWidth; // restart the fill animation from zero
+        s.classList.add('is-on');
+      }
     });
   }
 
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', async () => {
-      refreshBtn.disabled = true;
-      const prevText = refreshBtn.textContent;
-      refreshBtn.textContent = '… TUNING';
-      crt.classList.add('is-switching');
+  function goTo(idx) {
+    const target = ((idx % frames.length) + frames.length) % frames.length;
+    if (target !== current) {
+      frames[current].classList.remove('is-on');
+      frames[current].setAttribute('aria-hidden', 'true');
+      current = target;
+      frames[current].classList.add('is-on');
+      frames[current].setAttribute('aria-hidden', 'false');
+      vf.classList.add('is-switching'); // AF reticle flash
+      setTimeout(() => vf.classList.remove('is-switching'), FLASH_MS);
+      syncFrame(current);
+    }
+    paintSegs();
+  }
+
+  const advance = () => goTo(current + 1);
+  const regress = () => goTo(current - 1);
+
+  // init: make sure frame 0, counter and links agree
+  frames.forEach((f, i) => {
+    f.classList.toggle('is-on', i === current);
+    f.setAttribute('aria-hidden', i === current ? 'false' : 'true');
+  });
+  syncFrame(current);
+
+  if (autoOk) {
+    vf.classList.add('vf--auto');
+    if (track) track.addEventListener('animationend', (e) => {
+      if (e.animationName === 'vf-seg-fill') advance();
+    });
+    // pause while the user inspects the meta block or the deck controls
+    [metaLink, vf.querySelector('.vf__deck')].forEach(el => {
+      if (!el) return;
+      el.addEventListener('mouseenter', () => vf.classList.add('vf--paused'));
+      el.addEventListener('mouseleave', () => vf.classList.remove('vf--paused'));
+    });
+  } else if (autoLabel) {
+    autoLabel.textContent = frames.length > 1 ? 'MANUAL' : 'SINGLE FRAME';
+  }
+
+  const nextBtn = document.getElementById('vf-next');
+  const prevBtn = document.getElementById('vf-prev');
+  const tuneBtn = document.getElementById('vf-tune');
+  if (nextBtn) nextBtn.addEventListener('click', advance);
+  if (prevBtn) prevBtn.addEventListener('click', regress);
+  segs.forEach(s => s.addEventListener('click', () => goTo(parseInt(s.dataset.goto, 10) || 0)));
+
+  // swipe on the stage switches frames (and suppresses the anchor tap)
+  if (stage) {
+    let sx = 0, sy = 0, st = 0, swiping = false;
+    stage.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) { swiping = false; return; }
+      swiping = true;
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+      st = Date.now();
+    }, { passive: true });
+    stage.addEventListener('touchend', (e) => {
+      if (!swiping) return;
+      swiping = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx;
+      const dy = t.clientY - sy;
+      if (Date.now() - st > 700) return;
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+      e.preventDefault();
+      if (dx < 0) advance(); else regress();
+    }, { passive: false });
+  }
+
+  // TUNE: pull a fresh shuffle from the API into the existing frames
+  if (tuneBtn) {
+    tuneBtn.addEventListener('click', async () => {
+      tuneBtn.disabled = true;
+      const prevText = tuneBtn.textContent;
+      tuneBtn.textContent = '… TUNING';
+      vf.classList.add('is-switching');
       try {
         const resp = await fetch('/api/shuffle?limit=' + frames.length);
         if (!resp.ok) throw new Error('bad status');
@@ -317,33 +357,58 @@ document.addEventListener('DOMContentLoaded', () => {
             img.alt = item.filename;
           }
         });
-        frames.forEach((f, i) => f.classList.toggle('is-on', i === 0));
+        frames.forEach((f, i) => {
+          f.classList.toggle('is-on', i === 0);
+          f.setAttribute('aria-hidden', i === 0 ? 'false' : 'true');
+        });
         current = 0;
-        setChannel(current);
-        setOsdFor(frames[current]);
-        if (screen) screen.dataset.href = frames[current].href;
-        if (openLink) openLink.href = frames[current].href;
+        syncFrame(current);
+        paintSegs();
       } catch (e) {
-        // ignore
+        // ignore — keep the current feed
       } finally {
-        setTimeout(() => crt.classList.remove('is-switching'), SWITCH_MS);
-        refreshBtn.disabled = false;
-        refreshBtn.textContent = prevText;
-        reset();
+        setTimeout(() => vf.classList.remove('is-switching'), FLASH_MS);
+        tuneBtn.disabled = false;
+        tuneBtn.textContent = prevText;
       }
     });
   }
 
-  // pause auto-cycle while user hovers the viewport
-  crt.addEventListener('mouseenter', () => clearInterval(timer));
-  crt.addEventListener('mouseleave', reset);
-
-  // keyboard: ← → cycles channels when CRT is in viewport
+  // keyboard: ← → switches frames on the welcome page
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-    if (e.key === 'ArrowLeft') { regress(); reset(); }
-    else if (e.key === 'ArrowRight') { advance(); reset(); }
+    if (e.key === 'ArrowLeft') regress();
+    else if (e.key === 'ArrowRight') advance();
   });
+});
+
+// ---------- COUNT-UP DIGITS ------------------------------------
+// [data-count-to] elements render their final value server-side; capable
+// devices re-count from 0 when the element scrolls into view. fx-lite
+// keeps the static number (no rAF loop, no zero flash).
+document.addEventListener('DOMContentLoaded', () => {
+  const els = Array.from(document.querySelectorAll('[data-count-to]'));
+  if (!els.length) return;
+  if (!allowHeavyFx() || !('IntersectionObserver' in window)) return;
+  const run = (el) => {
+    const target = parseInt(el.dataset.countTo, 10);
+    if (!isFinite(target)) return;
+    const DUR = 1100;
+    const t0 = performance.now();
+    const tick = (t) => {
+      const p = Math.min(1, (t - t0) / DUR);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = String(Math.round(target * eased));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  const io = new IntersectionObserver((ents, obs) => {
+    ents.forEach(en => {
+      if (en.isIntersecting) { run(en.target); obs.unobserve(en.target); }
+    });
+  }, { threshold: 0.5 });
+  els.forEach(el => { el.textContent = '0'; io.observe(el); });
 });
 
 document.addEventListener('keydown', (e) => {

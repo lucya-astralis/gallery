@@ -51,7 +51,7 @@ Mark individual photos and/or whole albums as **showcased** with a single charac
 
 | Where the marker sits         | Effect                                                                                |
 |-------------------------------|---------------------------------------------------------------------------------------|
-| **Filename** (`_hero.jpg`)    | Photo is featured: appears in the welcome CRT, in its album's "featured" strip, and in the `/api/showcase` feed. Gets a ★ in the album grid. |
+| **Filename** (`_hero.jpg`)    | Photo is featured: appears in the welcome hero feed, in its album's "featured" strip, and in the `/api/showcase` feed. Gets a ★ in the album grid. |
 | **Album folder** (`_best-of/`)| Album is featured: shown in a dedicated "Showcase Albums" section on the welcome screen and on `/albums`, with a `★ FEATURED` badge. Photos inside still need their own `_` to be individually featured. |
 
 The two flags are **independent** — putting a photo into a `_showcase` album does NOT auto-feature it. Each photo opts in with its own filename prefix. Display strips the leading marker, so `_best-of/` shows up as "best-of" and `_hero.jpg` as "hero.jpg"; URLs keep the raw name on disk.
@@ -70,6 +70,27 @@ photos/
 ```
 
 Change the marker globally via `SHOWCASE_MARKER` (set it to an empty string to disable the whole feature). Showcase flags are re-evaluated on every startup, so toggling files / changing the marker takes effect after a restart without needing a full re-scan.
+
+## Welcome feed (`gallery.cfg`)
+
+By default the welcome hero cycles through a random selection of showcased photos (falling back to fully random when nothing is showcased). To pick the images yourself, drop a `gallery.cfg` into the **root of `photos/`** — same `key = value` format as `album.cfg`, `#`/`;` start comments:
+
+```ini
+# photos/gallery.cfg — welcome hero feed
+# one of:
+#   welcome = showcase      ← random featured photos (default, same as no file)
+#   welcome = random        ← random photos, ignore the featured flags
+#   welcome = <paths>       ← hand-picked list, shown in exactly this order
+welcome = berlin_dec_2025/IMG_0646.png
+welcome = paris_march_2026/IMG_2222.png, frankfurt_feb_2026/IMG_1628.png
+```
+
+Rules for the hand-picked list:
+
+- Paths are relative to `photos/` (`album/file.jpg`, nested albums allowed). The showcase marker may be omitted (`best-of/hero.jpg` finds `_best-of/_hero.jpg`), backslashes are tolerated.
+- Repeat the `welcome` key per line and/or comma-separate — entries accumulate in order (max 24, duplicates collapse).
+- Entries that aren't indexed are skipped with a log warning; if nothing resolves, the feed falls back to showcase/random as if the file weren't there.
+- The file is re-read on every page load, so edits apply immediately — no restart needed. With a hand-picked list the hero shows a `CURATED` label and hides the ⟳ TUNE (reshuffle) button.
 
 ## API
 
@@ -209,7 +230,7 @@ The app is fully **read-only** by design:
 
 All GET, all public:
 
-- `GET /` — welcome screen (CRT cycling through showcase, or random fallback; plus a Showcase Albums section)
+- `GET /` — welcome screen (live-view hero cycling through the `gallery.cfg` feed: curated list, showcase or random; plus a Showcase Albums section)
 - `GET /albums` — album overview (showcase albums section + main grid; `?sort=`)
 - `GET /album/{album}` — images in an album (`?tag=`, `?sort=`)
 - `GET /image/{album}/{file}` — detail view (stage shows preview by default; `?sort=` preserved for prev/next ordering)

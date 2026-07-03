@@ -668,27 +668,123 @@ def _resolve_showcase_path(album: str, filename: str) -> tuple[str, str]:
     return album, filename
 
 
+# ----- gallery-wide config (gallery.cfg) ---------------------------------
+# Optional `gallery.cfg` dropped into the photos ROOT (next to the album
+# folders). Same plain `key = value` format as album.cfg (`#`/`;` comments),
+# but repeated keys and comma lists accumulate into a list. Known keys:
+#   welcome = showcase            -> hero feed = random featured photos
+#                                    (default; same as no file / no key)
+#   welcome = random              -> hero feed = random photos, ignore featured
+#   welcome = <album/file.jpg>,…  -> hand-picked hero feed in exactly this
+#                                    order (repeat the key or comma-separate;
+#                                    paths are relative to photos/, marker
+#                                    prefixes may be omitted). Unresolvable
+#                                    entries are skipped with a warning; if
+#                                    nothing resolves, falls back to showcase.
+GALLERY_CFG_NAME = "gallery.cfg"
+WELCOME_FEED_MAX = 24
+
+_WELCOME_KEYWORDS = {
+    "showcase": "showcase", "auto": "showcase", "featured": "showcase",
+    "random": "random", "shuffle": "random",
+}
+_warned_welcome: set[str] = set()
+
+
+def _gallery_config() -> dict[str, list[str]]:
+    """Parse photos/gallery.cfg into a lower-cased key -> [values] dict, or
+    {} when there's no such file. Cheap enough to read per request, so edits
+    show up without a restart (matching album.cfg behaviour)."""
+    cfg_path = PHOTOS_DIR / GALLERY_CFG_NAME
+    if not cfg_path.is_file():
+        return {}
+    try:
+        text = cfg_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+    out: dict[str, list[str]] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line[0] in "#;" or "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        key = key.strip().lower()
+        for item in val.split(","):
+            item = item.strip()
+            if item:
+                out.setdefault(key, []).append(item)
+    return out
+
+
+def _lookup_welcome_image(raw: str):
+    """Resolve one gallery.cfg welcome entry to an indexed image row. Accepts
+    backslashes and marker-stripped paths (the `_` prefix may be omitted)."""
+    rel = raw.replace("\\", "/").strip().strip("/")
+    if not rel or "/" not in rel:
+        return None
+    c = db.conn()
+    row = c.execute(
+        "SELECT album, filename, rel_path FROM images WHERE rel_path = ?", (rel,)
+    ).fetchone()
+    if row:
+        return row
+    # second chance: re-add showcase markers the pretty path dropped
+    album, _, filename = rel.rpartition("/")
+    a, f = _resolve_showcase_path(album, filename)
+    if (a, f) != (album, filename):
+        return c.execute(
+            "SELECT album, filename, rel_path FROM images WHERE rel_path = ?",
+            (f"{a}/{f}",),
+        ).fetchone()
+    return None
+
+
+def _welcome_feed() -> tuple[list[dict], str, str]:
+    """Hero feed for the welcome screen honoring gallery.cfg.
+    Returns (feed, label, mode) with mode one of manual/showcase/random."""
+    spec = _gallery_config().get("welcome", [])
+    mode = "showcase"
+    if len(spec) == 1 and spec[0].lower() in _WELCOME_KEYWORDS:
+        mode = _WELCOME_KEYWORDS[spec[0].lower()]
+    elif spec:
+        feed: list[dict] = []
+        seen: set[str] = set()
+        for raw in spec[:WELCOME_FEED_MAX]:
+            row = _lookup_welcome_image(raw)
+            if row is None:
+                if raw not in _warned_welcome:
+                    _warned_welcome.add(raw)
+                    log.warning("gallery.cfg: welcome image not indexed, skipping: %r", raw)
+                continue
+            if row["rel_path"] in seen:
+                continue
+            seen.add(row["rel_path"])
+            feed.append({"album": row["album"], "filename": row["filename"],
+                         "rel_path": row["rel_path"]})
+        if feed:
+            return feed, "CURATED", "manual"
+        # nothing resolved -> behave as if the key were absent
+    if mode != "random":
+        showcase_feed = _showcase_rows(limit=12, random_order=True)
+        if showcase_feed:
+            feed = [
+                {"album": r["album"], "filename": r["filename"], "rel_path": r["rel_path"]}
+                for r in showcase_feed
+            ]
+            return feed, "FEATURED", "showcase"
+    feed = [
+        dict(r)
+        for r in db.conn().execute(
+            "SELECT album, filename, rel_path FROM images ORDER BY RANDOM() LIMIT 8"
+        ).fetchall()
+    ]
+    return feed, "RANDOM", "random"
+
+
 @app.get("/", response_class=HTMLResponse)
 def welcome(request: Request):
     c = db.conn()
-    # Prefer showcase photos; if none are marked, fall back to random.
-    showcase_feed = _showcase_rows(limit=12, random_order=True)
-    if showcase_feed:
-        feed = [
-            {"album": r["album"], "filename": r["filename"], "rel_path": r["rel_path"]}
-            for r in showcase_feed
-        ]
-        feed_label = "FEATURED"
-        feed_mode = "showcase"
-    else:
-        feed = [
-            dict(r)
-            for r in c.execute(
-                "SELECT album, filename, rel_path FROM images ORDER BY RANDOM() LIMIT 8"
-            ).fetchall()
-        ]
-        feed_label = "RANDOM"
-        feed_mode = "random"
+    feed, feed_label, feed_mode = _welcome_feed()
     counts = c.execute("SELECT COUNT(*) AS images FROM images").fetchone()
     # "Albums" = top-level folders (parents of nested albums count once).
     top_level_albums = len(_child_album_names(None))
