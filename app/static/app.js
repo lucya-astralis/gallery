@@ -358,6 +358,13 @@ document.addEventListener('keydown', (e) => {
     const next = document.querySelector('.nav-arrow.next');
     if (next) next.click();
   } else if (e.key === 'Escape') {
+    // in a collection, Esc returns to the collection root (same target as the
+    // "back" button); otherwise fall back to the last breadcrumb (the folder).
+    const data = readAlbumData();
+    if (data && data.collection_root) {
+      window.location.href = '/album/' + data.collection_root;
+      return;
+    }
     const crumb = document.querySelector('.crumb a:last-of-type');
     if (crumb) window.location.href = crumb.href;
   }
@@ -581,7 +588,10 @@ document.addEventListener('DOMContentLoaded', () => {
     try { data = JSON.parse(dataEl.textContent); }
     catch (e) { return; }
     if (!data || !data.album) return;
-    const albumBase = '/album/' + encodeURIComponent(data.album).replace(/%2F/g, '/');
+    // when browsing a collection, "back" returns to the collection root the
+    // user came from rather than the sub-folder this photo lives in.
+    const backAlbum = data.collection_root || data.album;
+    const albumBase = '/album/' + encodeURIComponent(backAlbum).replace(/%2F/g, '/');
 
     try { history.pushState({ albumGuard: true }, '', location.pathname + location.search); }
     catch (e) { return; }

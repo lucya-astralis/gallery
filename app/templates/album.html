@@ -133,7 +133,10 @@
 
   {% set sort_qs = '' if current_sort == default_sort else ('sort=' ~ current_sort) %}
   {% set tag_qs = ('tag=' ~ active_tag) if active_tag else '' %}
-  {% set img_qs = ('?' ~ sort_qs) if sort_qs else '' %}
+  {# in a collection album, carry the collection root so the single view scrolls
+     through every collected photo instead of just the clicked image's folder #}
+  {% set col_qs = ('col=' ~ (album | urlencode)) if collection else '' %}
+  {% set img_qs = ('?' ~ ([sort_qs, col_qs] | select | join('&'))) if (sort_qs or col_qs) else '' %}
 
   {% if images or active_tag %}
   <div class="toolbar">

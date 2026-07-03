@@ -867,7 +867,7 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
 
 
 @app.get("/image/{album:path}/{filename}", response_class=HTMLResponse)
-def image_view(request: Request, album: str, filename: str, sort: str | None = None):
+def image_view(request: Request, album: str, filename: str, sort: str | None = None, col: str | None = None):
     album, filename = _resolve_showcase_path(album, filename)
     rel = _safe_rel(album, filename).as_posix()
     c = db.conn()
@@ -887,9 +887,27 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
     ]
     current_sort = _pick_sort(sort, SORT_IMAGE_SQL, SORT_IMAGE_DEFAULT)
     order_sql = SORT_IMAGE_SQL[current_sort]
+    # Prev/next neighbours. Normally scoped to the image's own folder, but
+    # when opened from a collection album (`?col=<root>`) the scroll spans
+    # that collection's whole subtree, so you page through every collected
+    # photo instead of getting stuck inside one sub-folder. The query mirrors
+    # the album grid's collection query exactly, so the order lines up.
+    col_root = (col or "").strip("/")
+    if (
+        col_root
+        and (album == col_root or album.startswith(col_root + "/"))
+        and _cfg_bool(_album_config(col_root).get("collection"))
+    ):
+        prefix = col_root + "/"
+        where_scope = "(album = ? OR substr(album, 1, ?) = ?)"
+        scope_params: tuple = (col_root, len(prefix), prefix)
+    else:
+        col_root = ""  # absent / forged / no longer a collection: folder scope
+        where_scope = "album = ?"
+        scope_params = (album,)
     neighbours = c.execute(
-        f"SELECT rel_path FROM images WHERE album = ? ORDER BY {order_sql}",
-        (album,),
+        f"SELECT rel_path FROM images WHERE {where_scope} ORDER BY {order_sql}",
+        scope_params,
     ).fetchall()
     rel_list = [r["rel_path"] for r in neighbours]
     idx = rel_list.index(rel) if rel in rel_list else -1
@@ -910,6 +928,7 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
             "next_rel": next_rel,
             "description": description,
             "album_rels": rel_list,
+            "collection_root": col_root or None,
             "current_index": idx,
             "current_sort": current_sort,
             "default_sort": SORT_IMAGE_DEFAULT,
