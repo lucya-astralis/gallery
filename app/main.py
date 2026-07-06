@@ -3,6 +3,7 @@ import logging
 import os
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -104,9 +105,20 @@ def _pretty_rel(rel_path: str) -> str:
     return "/".join(_strip_marker_segment(p) for p in parts)
 
 
+def _month_label(iso: str | None) -> str | None:
+    """'2026-06-27T18:57:15' -> 'JUN 2026' for the album-card date chips."""
+    if not iso:
+        return None
+    try:
+        return datetime.strptime(iso[:7], "%Y-%m").strftime("%b %Y").upper()
+    except ValueError:
+        return None
+
+
 templates.env.globals["display_name"] = _display_name
 templates.env.globals["pretty_rel"] = _pretty_rel
 templates.env.globals["showcase_marker"] = SHOWCASE_MARKER
+templates.env.globals["month_label"] = _month_label
 
 
 def _showcase_rows(album: str | None = None, limit: int = 50, random_order: bool = False):
@@ -811,7 +823,11 @@ def welcome(request: Request):
 def albums_index(request: Request, sort: str | None = None):
     current_sort = _pick_sort(sort, SORT_ALBUM_SQL, SORT_ALBUM_DEFAULT)
     albums = _sorted_album_cards(_top_level_album_cards(), current_sort)
-    showcase_albums = [a for a in albums if _album_is_showcase(a["album"])]
+    # annotate instead of a legacy `startswith(marker)` check in the template,
+    # so album.cfg-driven showcase albums are recognized too
+    for a in albums:
+        a["is_showcase"] = _album_is_showcase(a["album"])
+    showcase_albums = [a for a in albums if a["is_showcase"]]
     return templates.TemplateResponse(
         "index.html",
         {

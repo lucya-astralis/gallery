@@ -715,11 +715,7 @@ section{
   }
 }
 
-/* showcase indicators on album cards */
-.album-card--showcase{
-  outline: 1px solid rgba(91,138,255,.35);
-  outline-offset: -1px;
-}
+/* showcase / folder badge on album + showcase cards */
 .album-card__badge{
   position:absolute;
   top:8px; right:8px;
@@ -1081,21 +1077,215 @@ section{
 }
 
 /* ================================================================
-   ALBUM GRID  (front page)
+   ALBUMS OVERVIEW  (page header stats + featured rail + archive head)
+   ================================================================ */
+/* totals readout on the right of the page title */
+.section__stat{
+  font-family:"JetBrains Mono", monospace;
+  font-size:10.5px;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  color:var(--text-ghost);
+  white-space:nowrap;
+}
+.section__stat b{ color:var(--acc-cy); font-weight:400; }
+.section__stat-sep{ margin:0 4px; opacity:.6; }
+
+/* ---- featured rail: showcase albums as large poster cards. Nested
+   <section>: cancel the global section padding/centring (same trick
+   as .showcase on the welcome screen). ---- */
+.feat{ margin:0 0 36px; padding:0; }
+.feat__head{
+  display:flex; align-items:center; gap:14px;
+  margin-bottom:14px;
+  padding-bottom:8px;
+  border-bottom:1px dashed var(--line);
+  font-family:"JetBrains Mono", monospace;
+  font-size:10.5px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--text-ghost);
+}
+.feat__label{ color:var(--acc-cy); letter-spacing:.24em; }
+.feat__count{ margin-left:auto; }
+.feat__rail{
+  list-style:none; padding:0; margin:0;
+  display:grid;
+  /* auto-FIT: 1-2 featured albums stretch to fill the row instead of
+     leaving phantom empty tracks */
+  grid-template-columns:repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap:14px;
+}
+.feat-card{
+  position:relative;
+  margin:0;
+  background:var(--surface);
+  border:1px solid var(--line);
+  transition: border-color .2s, transform .2s ease;
+}
+.feat-card:hover{ border-color:var(--line-strong); transform:translateY(-2px); }
+/* corner brackets — same hover signature as .album-card */
+.feat-card::before,
+.feat-card::after{
+  content:"";
+  position:absolute;
+  width:16px; height:16px;
+  border:1px solid var(--acc-cy);
+  opacity:0;
+  pointer-events:none;
+  z-index:5;
+  transition: opacity .2s ease;
+}
+.feat-card::before{ top:-1px; left:-1px; border-right:0; border-bottom:0; }
+.feat-card::after{ bottom:-1px; right:-1px; border-left:0; border-top:0; }
+.feat-card:hover::before,
+.feat-card:hover::after,
+.feat-card:focus-within::before,
+.feat-card:focus-within::after{ opacity:1; }
+.feat-card a{ display:block; color:var(--text); }
+.feat-card a:hover{ color:var(--text); }
+.feat-card a:focus-visible{ outline:1px solid var(--acc-cy); outline-offset:-2px; }
+.feat-card__img{
+  position:relative;
+  aspect-ratio:16/9;
+  /* 1-2 featured albums span the whole page: cap the cover height so a
+     single card can't become a wall of image */
+  max-height:460px;
+  overflow:hidden;
+  background:var(--bg-2);
+}
+.feat-card__img img{
+  width:100%; height:100%;
+  object-fit:cover;
+  display:block;
+  filter:saturate(.94) brightness(.88);
+  transition: transform .5s ease, filter .35s ease;
+}
+.feat-card:hover .feat-card__img img{
+  transform:scale(1.04);
+  filter:saturate(1.02) brightness(1);
+}
+/* legibility scrim behind the overlay caption */
+.feat-card__img::after{
+  content:""; position:absolute; inset:0;
+  background:linear-gradient(to top,
+    rgba(4,5,10,.86) 0%, rgba(4,5,10,.32) 38%, transparent 62%);
+  pointer-events:none;
+}
+.feat-card__idx{
+  position:absolute;
+  top:10px; left:10px;
+  z-index:3;
+  font-family:"JetBrains Mono", monospace;
+  font-size:9px;
+  letter-spacing:.2em;
+  color:var(--text);
+  background:rgba(7,7,11,.7);
+  border:1px solid var(--line-strong);
+  padding:2px 6px;
+  pointer-events:none;
+}
+.feat-card__cap{
+  position:absolute;
+  left:0; right:0; bottom:0;
+  z-index:2;
+  padding:16px 16px 15px;
+  display:flex; flex-direction:column; gap:5px;
+  pointer-events:none;
+}
+.feat-card__name{
+  font-size:clamp(16px, 1.6vw, 19px);
+  font-weight:600;
+  letter-spacing:.03em;
+  line-height:1.2;
+  word-break:break-word;
+  text-shadow:0 1px 10px rgba(0,0,0,.6);
+}
+.feat-card__meta{
+  font-family:"JetBrains Mono", monospace;
+  font-size:10px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--acc-cy);
+  text-shadow:0 1px 6px rgba(0,0,0,.7);
+}
+.feat-card__cta{
+  font-family:"JetBrains Mono", monospace;
+  font-size:9.5px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--text);
+  opacity:0;
+  max-height:0;
+  transform:translateY(4px);
+  transition: opacity .2s ease, transform .2s ease, max-height .2s ease;
+}
+.feat-card:hover .feat-card__cta,
+.feat-card a:focus-visible .feat-card__cta{
+  opacity:1;
+  max-height:1.6em;
+  transform:translateY(0);
+}
+
+/* phones: the rail breaks out of the page padding and becomes an
+   edge-to-edge horizontal snap scroller (next card peeks in) */
+@media (max-width:760px){
+  .feat{ margin-bottom:26px; }
+  .feat .doc-min-hide{ display:none; }
+  .feat__rail{
+    grid-template-columns:none;
+    grid-auto-flow:column;
+    grid-auto-columns:min(78vw, 320px);
+    gap:10px;
+    overflow-x:auto;
+    margin-inline:calc(-1 * var(--page-pad));
+    padding-inline:var(--page-pad);
+    scroll-snap-type:x mandatory;
+    scroll-padding-inline:var(--page-pad);
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .feat__rail::-webkit-scrollbar{ display:none; }
+  .feat-card{ scroll-snap-align:start; }
+  .feat-card:hover{ transform:none; }
+  .feat-card__img{ aspect-ratio:3/2; max-height:none; }
+  .feat-card__cap{ padding:12px; gap:4px; }
+  .feat-card__name{ font-size:15px; }
+  .feat-card__meta{ font-size:9px; letter-spacing:.14em; }
+  .feat-card__cta{ display:none; }
+}
+
+/* ---- archive header: list label + count + sort control ---- */
+.archive-head{
+  display:flex; align-items:center; gap:12px 14px;
+  flex-wrap:wrap;
+  margin-bottom:14px;
+  padding-bottom:8px;
+  border-bottom:1px dashed var(--line);
+  font-family:"JetBrains Mono", monospace;
+  font-size:10.5px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--text-ghost);
+}
+.archive-head__label{ color:var(--acc-cy); letter-spacing:.24em; }
+.archive-head .sort{ margin-left:auto; }
+
+/* ================================================================
+   ALBUM GRID  (albums overview + nested folder grids)
    ================================================================ */
 .album-grid{
   list-style:none; padding:0; margin:0;
   display:grid;
-  grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));
-  gap:1px;
-  background:var(--line);
-  border:1px solid var(--line);
+  grid-template-columns:repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap:14px;
 }
 .album-card{
   background:var(--surface);
+  border:1px solid var(--line);
   margin:0;
   position:relative;
-  transition: background .2s;
+  transition: background .2s, border-color .2s, transform .2s ease;
 }
 .album-card::before,
 .album-card::after{
@@ -1110,7 +1300,11 @@ section{
 }
 .album-card::before{ top:-1px; left:-1px; border-right:0; border-bottom:0; }
 .album-card::after{ bottom:-1px; right:-1px; border-left:0; border-top:0; }
-.album-card:hover{ background:var(--surface-2); }
+.album-card:hover{
+  background:var(--surface-2);
+  border-color:var(--line-strong);
+  transform:translateY(-2px);
+}
 .album-card:hover::before,
 .album-card:hover::after,
 .album-card:focus-within::before,
@@ -1127,7 +1321,7 @@ section{
 }
 .album-card__img{
   position:relative;
-  aspect-ratio:4/3;
+  aspect-ratio:3/2;
   overflow:hidden;
   background:var(--bg-2);
 }
@@ -1202,31 +1396,32 @@ section{
   text-transform:uppercase;
 }
 .album-card__cap{
-  padding:12px 14px 14px;
-  display:flex; flex-direction:column; gap:4px;
+  padding:11px 13px 13px;
+  display:flex; flex-direction:column; gap:6px;
   border-top:1px solid var(--line);
 }
-.album-card__kicker{
-  font-family:"JetBrains Mono", monospace;
-  font-size:9.5px;
-  letter-spacing:.22em;
-  color:var(--text-ghost);
-  text-transform:uppercase;
-}
-.album-card--showcase .album-card__kicker{ color:var(--acc-cy); }
 .album-card__name{
-  font-size:14px;
+  font-size:14.5px;
   font-weight:600;
-  letter-spacing:.04em;
+  letter-spacing:.03em;
+  line-height:1.25;
   color:var(--text);
   word-break:break-word;
 }
-.album-card__count{
+.album-card__meta{
+  display:flex; align-items:baseline; gap:10px;
+  justify-content:space-between;
   font-family:"JetBrains Mono", monospace;
-  font-size:10.5px;
+  font-size:10px;
   letter-spacing:.16em;
   color:var(--text-dim);
   text-transform:uppercase;
+}
+.album-card__meta > span:first-child{ min-width:0; }
+.album-card__date{
+  color:var(--text-ghost);
+  white-space:nowrap;
+  flex-shrink:0;
 }
 
 /* ----- nested folders (sub-albums) ----- */
@@ -1236,7 +1431,6 @@ section{
   background:rgba(7,7,11,.78);
   letter-spacing:.16em;
 }
-.album-card--folder .album-card__kicker{ color:var(--acc-cy); }
 
 /* nested <section>: cancel the global section page-padding + max-width/auto-
    centring (same as .showcase / .featured) so the folder grid sits flush-left
@@ -1262,25 +1456,22 @@ section{
 /* phones: 2-up grids instead of 1-up giant cards — more of the archive on
    screen at once (matches the welcome screen, which is already 2-up). Both
    the poster grid (showcase / nested folders) and the caption-below album
-   grid switch together so the two stay aligned. 560px is where the desktop
-   auto-fill naturally reaches 2 columns, so the handoff is seamless. This
-   block lives AFTER the base grid/card rules on purpose: same specificity,
-   so source order has to win. album-grid keeps gap:1px — its var(--line)
-   background IS the hairline separator; a wider gap would read as thick
-   lines, not spacing. */
+   grid switch together so the two stay aligned. This block lives AFTER the
+   base grid/card rules on purpose: same specificity, so source order has
+   to win. */
 @media (max-width:560px){
   .album-grid,
   .showcase-albums{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .album-grid{ gap:9px; }
 
   .showcase-album__cap{ padding:8px 9px 9px; }
   .showcase-album__name{ font-size:11.5px; letter-spacing:.02em; }
   .showcase-album__count{ font-size:8.5px; letter-spacing:.1em; }
   .showcase-album__idx{ font-size:8px; padding:2px 5px; }
 
-  .album-card__cap{ padding:9px 10px 11px; gap:3px; }
-  .album-card__kicker{ font-size:8px; letter-spacing:.14em; }
+  .album-card__cap{ padding:9px 10px 11px; gap:4px; }
   .album-card__name{ font-size:12px; letter-spacing:.02em; }
-  .album-card__count{ font-size:8.5px; letter-spacing:.1em; }
+  .album-card__meta{ font-size:8.5px; letter-spacing:.1em; gap:6px; flex-wrap:wrap; }
   .album-card__badge{ font-size:8px; padding:2px 5px; letter-spacing:.14em; }
   .album-card__idx{ font-size:8px; padding:2px 5px; }
 }

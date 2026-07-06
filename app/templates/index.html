@@ -28,6 +28,13 @@
       <span class="name">ALBUMS</span>
       <span class="jp">アルバム</span>
     </div>
+    {% if albums %}
+      <div class="section__stat">
+        <b>{{ albums | length }}</b> ALBUMS
+        <span class="section__stat-sep" aria-hidden="true">/</span>
+        <b>{{ albums | sum(attribute='count') }}</b> IMAGES
+      </div>
+    {% endif %}
   </header>
 
   {% if not albums %}
@@ -37,59 +44,93 @@
       <p class="note">Drop subfolders into <code>photos/</code> — each subfolder is an album, and albums can nest.<br>Example: <code>photos/japan/tokyo/dsc_0001.jpg</code></p>
     </div>
   {% else %}
+    {% set archive_albums = albums | rejectattr('is_showcase') | list %}
+
+    {# ---- featured rail: showcase albums as large poster cards; they are
+           pinned here and NOT repeated in the archive grid below ---- #}
     {% if showcase_albums %}
-      <section class="showcase" aria-label="Showcase albums">
-        <header class="showcase__head">
-          <span class="showcase__label">★ SHOWCASE ALBUMS</span>
-          <span class="showcase__count">{{ showcase_albums | length }} · CURATED</span>
+      <section class="feat" aria-label="Featured albums">
+        <header class="feat__head">
+          <span class="feat__label">★ FEATURED</span>
+          <span class="feat__hint doc-min-hide">CURATED SETS</span>
+          <span class="feat__count">{{ showcase_albums | length }} / {{ albums | length }}</span>
         </header>
-        {% include "_showcase_albums.html" %}
+        <ul class="feat__rail">
+          {% for a in showcase_albums %}
+            <li class="feat-card">
+              <a href="/album/{{ a.album }}" aria-label="{{ a.name }} — {{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}">
+                <div class="feat-card__img">
+                  {% if a.cover %}
+                    <img src="/preview/{{ a.cover }}" alt="{{ a.name }}"
+                         loading="{% if loop.index0 < 3 %}eager{% else %}lazy{% endif %}" decoding="async">
+                  {% else %}
+                    <div class="album-card__cover-empty">NO COVER</div>
+                  {% endif %}
+                  <span class="feat-card__idx" aria-hidden="true">S/{{ '%02d' | format(loop.index) }}</span>
+                  <div class="feat-card__cap">
+                    <span class="feat-card__name">{{ a.name }}</span>
+                    <span class="feat-card__meta">
+                      {{ a.count }} {% if a.count == 1 %}IMAGE{% else %}IMAGES{% endif %}{% if a.sub_count %} · {{ a.sub_count }} DIR{% if a.sub_count != 1 %}S{% endif %}{% endif %}{% if month_label(a.latest) %} · {{ month_label(a.latest) }}{% endif %}
+                    </span>
+                    <span class="feat-card__cta" aria-hidden="true">VIEW ALBUM →</span>
+                  </div>
+                </div>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
       </section>
     {% endif %}
-    <div class="toolbar">
-      <span class="toolbar__spacer"></span>
-      <div class="sort" data-sort>
-        <button type="button" class="sort__btn" aria-haspopup="true" aria-expanded="false">
-          <span class="sort__btn-label">SORT</span>
-          <b>{{ sort_label }}</b>
-        </button>
-        <div class="sort__menu" hidden role="menu">
-          <div class="sort__head">SORT BY</div>
-          {% for opt in sort_options %}
-            <a class="sort__option{% if opt.active %} is-active{% endif %}"
-               role="menuitem"
-               href="/albums?sort={{ opt.key }}">
-              {{ opt.label }}
-            </a>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
 
-    <ul class="album-grid">
-      {% for a in albums %}
-        {% set is_show = showcase_marker and a.album.startswith(showcase_marker) %}
-        <li class="album-card{% if is_show %} album-card--showcase{% endif %}">
-          <a href="/album/{{ a.album }}">
-            <div class="album-card__img">
-              {% if a.cover %}
-                <img src="/thumb/{{ a.cover }}" alt="{{ display_name(a.album) }}" loading="lazy">
-              {% else %}
-                <div class="album-card__cover-empty">NO COVER</div>
-              {% endif %}
-              <span class="album-card__idx" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span>
-              {% if is_show %}<span class="album-card__badge">★ FEATURED</span>{% elif a.sub_count %}<span class="album-card__badge album-card__badge--folder">▸ {{ a.sub_count }}</span>{% endif %}
-              <div class="album-card__hover" aria-hidden="true"><span>ENTER →</span></div>
-            </div>
-            <div class="album-card__cap">
-              <span class="album-card__kicker">{% if is_show %}★ FEATURED ALBUM{% elif a.sub_count %}COLLECTION{% else %}DIRECTORY{% endif %}</span>
-              <span class="album-card__name">{{ a.name }}</span>
-              <span class="album-card__count">{% if a.sub_count %}{{ a.sub_count }} {% if a.sub_count == 1 %}album{% else %}albums{% endif %} · {% endif %}{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
-            </div>
-          </a>
-        </li>
-      {% endfor %}
-    </ul>
+    {# ---- archive: every non-featured album, sortable ---- #}
+    {% if archive_albums %}
+      <header class="archive-head">
+        <span class="archive-head__label">▦ ARCHIVE</span>
+        <span class="archive-head__count">{{ archive_albums | length }} {% if archive_albums | length == 1 %}DIRECTORY{% else %}DIRECTORIES{% endif %}</span>
+        <div class="sort" data-sort>
+          <button type="button" class="sort__btn" aria-haspopup="true" aria-expanded="false">
+            <span class="sort__btn-label">SORT</span>
+            <b>{{ sort_label }}</b>
+          </button>
+          <div class="sort__menu" hidden role="menu">
+            <div class="sort__head">SORT BY</div>
+            {% for opt in sort_options %}
+              <a class="sort__option{% if opt.active %} is-active{% endif %}"
+                 role="menuitem"
+                 href="/albums?sort={{ opt.key }}">
+                {{ opt.label }}
+              </a>
+            {% endfor %}
+          </div>
+        </div>
+      </header>
+
+      <ul class="album-grid">
+        {% for a in archive_albums %}
+          <li class="album-card{% if a.sub_count %} album-card--folder{% endif %}">
+            <a href="/album/{{ a.album }}">
+              <div class="album-card__img">
+                {% if a.cover %}
+                  <img src="/thumb/{{ a.cover }}" alt="{{ a.name }}" loading="lazy" decoding="async">
+                {% else %}
+                  <div class="album-card__cover-empty">NO COVER</div>
+                {% endif %}
+                <span class="album-card__idx" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span>
+                {% if a.sub_count %}<span class="album-card__badge album-card__badge--folder">▸ {{ a.sub_count }}</span>{% endif %}
+                <div class="album-card__hover" aria-hidden="true"><span>ENTER →</span></div>
+              </div>
+              <div class="album-card__cap">
+                <span class="album-card__name">{{ a.name }}</span>
+                <span class="album-card__meta">
+                  <span>{{ a.count }} {% if a.count == 1 %}IMAGE{% else %}IMAGES{% endif %}{% if a.sub_count %} · {{ a.sub_count }} DIR{% if a.sub_count != 1 %}S{% endif %}{% endif %}</span>
+                  {% if month_label(a.latest) %}<span class="album-card__date">{{ month_label(a.latest) }}</span>{% endif %}
+                </span>
+              </div>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
   {% endif %}
 </section>
 {% endblock %}

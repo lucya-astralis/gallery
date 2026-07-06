@@ -116,9 +116,11 @@
                 <div class="album-card__hover" aria-hidden="true"><span>ENTER →</span></div>
               </div>
               <div class="album-card__cap">
-                <span class="album-card__kicker">FOLDER</span>
                 <span class="album-card__name">{{ a.name }}</span>
-                <span class="album-card__count">{% if a.sub_count %}{{ a.sub_count }} {% if a.sub_count == 1 %}album{% else %}albums{% endif %} · {% endif %}{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
+                <span class="album-card__meta">
+                  <span>{{ a.count }} {% if a.count == 1 %}IMAGE{% else %}IMAGES{% endif %}{% if a.sub_count %} · {{ a.sub_count }} DIR{% if a.sub_count != 1 %}S{% endif %}{% endif %}</span>
+                  {% if month_label(a.latest) %}<span class="album-card__date">{{ month_label(a.latest) }}</span>{% endif %}
+                </span>
               </div>
             </a>
           </li>
