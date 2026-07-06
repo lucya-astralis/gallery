@@ -1,23 +1,27 @@
-{# Re-usable poster grid of showcase albums (folder marked with the showcase
-   marker). Shared by /albums and the welcome screen — the section wrapper +
-   header live in the including page so each can add its own context/links.
-   Expects `showcase_albums`: rows of {album, cover, count}. #}
-<ul class="showcase-albums">
+{# Re-usable "featured" poster rail of showcase albums — the same cards on
+   /albums and the welcome screen. The section wrapper + header live in the
+   including page so each can add its own context/links.
+   Expects `showcase_albums`: rows of {album, name, count, latest, cover,
+   sub_count}. Set `feat_eager = N` before including to eager-load the first
+   N covers (used on /albums where the rail is above the fold). #}
+<ul class="feat__rail">
   {% for a in showcase_albums %}
-    <li class="showcase-album">
-      <a href="/album/{{ a.album }}" aria-label="{{ display_name(a.album) }} — {{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}">
-        <div class="showcase-album__img">
+    <li class="feat-card">
+      <a href="/album/{{ a.album }}" aria-label="{{ a.name }} — {{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}">
+        <div class="feat-card__img">
           {% if a.cover %}
-            <img src="/thumb/{{ a.cover }}" alt="{{ display_name(a.album) }}" loading="lazy">
+            <img src="/preview/{{ a.cover }}" alt="{{ a.name }}"
+                 loading="{% if loop.index0 < (feat_eager | default(0)) %}eager{% else %}lazy{% endif %}" decoding="async">
           {% else %}
             <div class="album-card__cover-empty">NO COVER</div>
           {% endif %}
-          <span class="showcase-album__idx" aria-hidden="true">S/{{ '%02d' | format(loop.index) }}</span>
-          <span class="album-card__badge">★ FEATURED</span>
-          <div class="showcase-album__cap">
-            <span class="showcase-album__name">{{ display_name(a.album) }}</span>
-            <span class="showcase-album__count">{{ a.count }} {% if a.count == 1 %}image{% else %}images{% endif %}</span>
-            <span class="showcase-album__cta" aria-hidden="true">VIEW ALBUM →</span>
+          <span class="feat-card__idx" aria-hidden="true">S/{{ '%02d' | format(loop.index) }}</span>
+          <div class="feat-card__cap">
+            <span class="feat-card__name">{{ a.name }}</span>
+            <span class="feat-card__meta">
+              {{ a.count }} {% if a.count == 1 %}IMAGE{% else %}IMAGES{% endif %}{% if a.sub_count %} · {{ a.sub_count }} DIR{% if a.sub_count != 1 %}S{% endif %}{% endif %}{% if month_label(a.latest) %} · {{ month_label(a.latest) }}{% endif %}
+            </span>
+            <span class="feat-card__cta" aria-hidden="true">VIEW ALBUM →</span>
           </div>
         </div>
       </a>
