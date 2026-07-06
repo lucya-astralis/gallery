@@ -2156,6 +2156,16 @@ body.lightbox-open{ overflow:hidden; }
 .foot__meta{ color:var(--text-ghost); }
 .foot__meta b{ color:var(--text-dim); font-weight:400; }
 
+/* classic 88x31 web buttons */
+.foot__badges{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.foot__badges img{
+  display:block;
+  width:88px; height:31px;
+  /* content-box: keep the badge art at exactly 88x31, hairline sits outside */
+  box-sizing:content-box;
+  border:1px solid var(--line);
+}
+
 @media (max-width:600px){
   .foot__inner{ flex-direction:column; align-items:flex-start; gap:12px; }
 }
@@ -2168,6 +2178,12 @@ body.lightbox-open{ overflow:hidden; }
    motion (Ken Burns drift, REC blink, auto-advance fill) is gated
    by html.fx-lite / prefers-reduced-motion, mirroring allowHeavyFx().
    ================================================================ */
+/* welcome runs on a wider cap than the rest of the site: the live-view
+   hero wants the room, and since nav, readout band, showcase and footer
+   all derive from the same var, everything below the hero keeps the
+   same edges. (only visible on viewports wider than 2000px) */
+body.page-welcome{ --page-max: 2400px; }
+
 .vf{
   /* full bleed up to the page cap: cancel the section padding but keep the
      site-wide max width, so ultra-wide screens get a centred hero instead
@@ -2187,9 +2203,11 @@ body.lightbox-open{ overflow:hidden; }
   min-height:540px;
   max-height:1100px;
 }
-/* once the cap engages, frame the hero's cut edges */
-@media (min-width: 2001px){
-  .vf{
+/* once the cap engages (welcome cap = 2400px), frame the cut edges of the
+   hero and the readout band below it */
+@media (min-width: 2401px){
+  .vf,
+  .vf-band{
     border-left:1px solid var(--line-strong);
     border-right:1px solid var(--line-strong);
   }
@@ -2576,8 +2594,10 @@ body.lightbox-open{ overflow:hidden; }
 
 /* ---- readout band: stats + status tokens under the hero ---- */
 .vf-band{
-  max-width:none;
-  margin:0;
+  /* capped like the hero above: the strip's background edges line up with
+     the screen instead of running wall-to-wall on ultra-wide viewports */
+  max-width:var(--page-max);
+  margin:0 auto;
   padding:0;
   border-bottom:1px solid var(--line);
   background:
