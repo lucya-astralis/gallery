@@ -382,6 +382,130 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// ---------- ALBUM FEATURED HERO --------------------------------
+// Compact "live view" slideshow of an album's showcased photos.
+// Crossfade + segment track mirror the welcome viewfinder; auto-advance
+// is CSS-animation driven (animationend on the filling segment, so the
+// visible progress and the switch can't drift apart) and gated by
+// allowHeavyFx(). fx-lite devices get manual controls only.
+document.addEventListener('DOMContentLoaded', () => {
+  const hero = document.getElementById('fhero');
+  if (!hero) return;
+  const slides = Array.from(hero.querySelectorAll('.fhero__slide'));
+  if (!slides.length) return;
+
+  const segs = Array.from(hero.querySelectorAll('.fhero__seg'));
+  const stage = document.getElementById('fhero-stage');
+  const track = document.getElementById('fhero-track');
+  const fileLink = document.getElementById('fhero-file');
+  const nameEl = document.getElementById('fhero-name');
+  const idxEl = document.getElementById('fhero-idx');
+  const autoLabel = document.getElementById('fhero-auto');
+
+  const AUTO_MS = 5000;
+  hero.style.setProperty('--fhero-auto-ms', AUTO_MS + 'ms');
+
+  let current = 0;
+  const autoOk = allowHeavyFx() && slides.length > 1;
+
+  function sync(idx) {
+    const s = slides[idx];
+    if (nameEl) {
+      const text = s.dataset.filename || '';
+      nameEl.dataset.scrambleTarget = text;
+      if (window.__scrambleTo) window.__scrambleTo(nameEl, text);
+      else nameEl.textContent = text;
+    }
+    if (idxEl) idxEl.textContent = String(idx + 1).padStart(2, '0');
+    if (fileLink) fileLink.href = s.href;
+  }
+
+  function paintSegs() {
+    segs.forEach((s, i) => {
+      s.classList.toggle('is-done', i < current);
+      s.classList.remove('is-on');
+      if (i === current) {
+        void s.offsetWidth; // restart the fill animation from zero
+        s.classList.add('is-on');
+      }
+    });
+  }
+
+  function goTo(idx) {
+    const target = ((idx % slides.length) + slides.length) % slides.length;
+    if (target !== current) {
+      slides[current].classList.remove('is-on');
+      slides[current].setAttribute('aria-hidden', 'true');
+      current = target;
+      slides[current].classList.add('is-on');
+      slides[current].setAttribute('aria-hidden', 'false');
+      sync(current);
+    }
+    paintSegs();
+  }
+  const advance = () => goTo(current + 1);
+  const regress = () => goTo(current - 1);
+
+  sync(current);
+
+  if (autoOk) {
+    hero.classList.add('fhero--auto');
+    if (track) track.addEventListener('animationend', (e) => {
+      if (e.animationName === 'fhero-seg-fill') advance();
+    });
+    // pause while the pointer is over the hero (the user is aiming/reading)
+    const frame = hero.querySelector('.fhero__frame');
+    if (frame) {
+      frame.addEventListener('mouseenter', () => hero.classList.add('fhero--paused'));
+      frame.addEventListener('mouseleave', () => hero.classList.remove('fhero--paused'));
+    }
+    // and while scrolled out of view — no point cycling off-screen
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(([entry]) => {
+        hero.classList.toggle('fhero--idle', !entry.isIntersecting);
+      }, { threshold: 0.15 }).observe(hero);
+    }
+  } else if (autoLabel) {
+    autoLabel.textContent = slides.length > 1 ? 'MANUAL' : 'SINGLE';
+  }
+
+  const nextBtn = document.getElementById('fhero-next');
+  const prevBtn = document.getElementById('fhero-prev');
+  if (nextBtn) nextBtn.addEventListener('click', advance);
+  if (prevBtn) prevBtn.addEventListener('click', regress);
+  segs.forEach(s => s.addEventListener('click', () => goTo(parseInt(s.dataset.goto, 10) || 0)));
+
+  // ← → only while focus is inside the hero — an in-page slideshow must
+  // not hijack the page-level arrow keys (unlike the welcome viewfinder)
+  hero.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); regress(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); advance(); }
+  });
+
+  // swipe on the stage switches slides (and suppresses the anchor tap)
+  if (stage) {
+    let sx = 0, sy = 0, st = 0, swiping = false;
+    stage.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) { swiping = false; return; }
+      swiping = true;
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+      st = Date.now();
+    }, { passive: true });
+    stage.addEventListener('touchend', (e) => {
+      if (!swiping) return;
+      swiping = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx;
+      const dy = t.clientY - sy;
+      if (Date.now() - st > 700) return;
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+      e.preventDefault();
+      if (dx < 0) advance(); else regress();
+    }, { passive: false });
+  }
+});
+
 // ---------- COUNT-UP DIGITS ------------------------------------
 // [data-count-to] elements render their final value server-side; capable
 // devices re-count from 0 when the element scrolls into view. fx-lite

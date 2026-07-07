@@ -121,11 +121,20 @@ templates.env.globals["showcase_marker"] = SHOWCASE_MARKER
 templates.env.globals["month_label"] = _month_label
 
 
-def _showcase_rows(album: str | None = None, limit: int = 50, random_order: bool = False):
+def _showcase_rows(album: str | None = None, limit: int = 50, random_order: bool = False,
+                   subtree: bool = False):
+    """Featured photos, optionally filtered to one album. `subtree=True`
+    widens the filter to the album's whole folder tree, so photos featured
+    inside sub-albums surface on the parent album's page too. substr()
+    (not LIKE) keeps `_`/`%` in album names from acting as wildcards."""
     c = db.conn()
-    if album is not None:
+    if album is not None and subtree:
+        prefix = album + "/"
+        where = "WHERE is_showcase = 1 AND (album = ? OR substr(album, 1, ?) = ?)"
+        params: tuple = (album, len(prefix), prefix)
+    elif album is not None:
         where = "WHERE is_showcase = 1 AND album = ?"
-        params: tuple = (album,)
+        params = (album,)
     else:
         where = "WHERE is_showcase = 1"
         params = ()
@@ -387,9 +396,12 @@ def _config_cover_rel(album: str, manual: str | None) -> str | None:
 # album.cfg is the source of truth for two things that used to be driven by
 # the `_` prefix:
 #   showcase = true|false   -> is this a showcase album? (★ on /albums)
-#   featured = a.jpg, b.jpg -> which photos are featured (welcome CRT,
-#                              /api/showcase, the album's "featured" strip);
-#                              `*`/`all` features every photo in the album.
+#   featured = a.jpg, b.jpg -> which photos are featured (welcome hero,
+#                              /api/showcase, the featured hero slideshow of
+#                              the album and its parents); paths may point
+#                              into sub-folders, bare filenames also match
+#                              anywhere in the subtree, and `*`/`all`
+#                              features every photo directly in the album.
 # When a key is ABSENT the legacy marker still applies, so existing albums
 # keep working until migrated; when present, album.cfg wins (and can switch
 # a marked album/photo back off).
@@ -403,7 +415,10 @@ def _album_is_showcase(album: str) -> bool:
 def _resolve_featured(album: str, spec: str) -> set[str]:
     """Resolve an album.cfg `featured` value to a set of indexed rel_paths.
     `*`/`all` = every photo directly in the album; otherwise a comma list of
-    paths relative to the album (sub-folders allowed)."""
+    paths relative to the album (sub-folders allowed). A bare filename that
+    isn't found at that exact path falls back to a filename match anywhere
+    in the album's subtree, so a parent cfg can feature sub-folder photos
+    without spelling out the folder (matches every same-named file)."""
     spec = (spec or "").strip()
     if not spec:
         return set()
@@ -411,6 +426,7 @@ def _resolve_featured(album: str, spec: str) -> set[str]:
     if spec.lower() in ("*", "all"):
         return {r["rel_path"] for r in c.execute("SELECT rel_path FROM images WHERE album = ?", (album,))}
     out: set[str] = set()
+    prefix = album + "/"
     for item in spec.split(","):
         item = item.strip().strip("/")
         if not item:
@@ -419,6 +435,12 @@ def _resolve_featured(album: str, spec: str) -> set[str]:
         row = c.execute("SELECT rel_path FROM images WHERE rel_path = ?", (rel,)).fetchone()
         if row:
             out.add(row["rel_path"])
+            continue
+        for r in c.execute(
+            "SELECT rel_path FROM images WHERE (album = ? OR substr(album, 1, ?) = ?) AND filename = ?",
+            (album, len(prefix), prefix, item),
+        ):
+            out.add(r["rel_path"])
     return out
 
 
@@ -948,10 +970,12 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     # Showcase status now comes from album.cfg (`showcase = …`), with the
     # legacy `_` folder-name marker as a fallback.
     album_is_showcase = _album_is_showcase(album)
-    # Featured strip = photos in this album with their own filename marker.
-    # A showcase ALBUM doesn't auto-promote its contents — each photo opts
-    # in independently with a `_` filename prefix.
-    featured = _showcase_rows(album=album, limit=8, random_order=False)
+    # Featured hero = featured photos from this album AND its sub-albums
+    # (subtree), so photos featured inside e.g. japan_2026/osaka surface on
+    # the japan_2026 page too. A showcase ALBUM doesn't auto-promote its
+    # contents — each photo opts in via album.cfg `featured` (the parent's
+    # cfg may list sub-folder paths) or the legacy `_` filename prefix.
+    featured = _showcase_rows(album=album, limit=8, random_order=False, subtree=True)
     return templates.TemplateResponse(
         "album.html",
         {

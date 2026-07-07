@@ -1,30 +1,54 @@
-{# Re-usable horizontal contact-reel of showcased photos.
-   Used inside /album/{name}, so the filename alone is enough context —
-   the album name would just repeat what the page header already says. #}
-<section class="featured featured--reel" aria-label="Featured photos">
-  <header class="featured__head">
-    <span class="featured__label">★ FEATURED</span>
-    <span class="featured__hint" aria-hidden="true">CONTACT REEL</span>
-    <span class="featured__count">{{ featured | length }} {% if featured | length == 1 %}PHOTO{% else %}PHOTOS{% endif %}</span>
+{# Featured photos as a compact "live view" hero slideshow — crossfading
+   slides, HUD corners, segment track with auto-advance (gated by
+   allowHeavyFx() in app.js), prev/next, swipe. Used inside /album/{name},
+   so the filename alone is enough context. Without JS the first slide
+   stays visible as a static hero. Width is fluid (100% of the parent
+   column), so it also fits the narrower main column of albums with a
+   trip/description sidebar.
+   Featured rows may come from sub-albums (subtree query) — those slides
+   carry the child path in their label so "osaka / foo.jpg" reads right
+   on the japan_2026 page. #}
+{%- macro feat_label(img) -%}
+  {%- if img.album != album -%}{{ pretty_rel(img.album[(album | length) + 1:]) }} / {% endif -%}{{ display_name(img.filename) }}
+{%- endmacro -%}
+<section class="fhero{% if featured | length == 1 %} fhero--single{% endif %}" id="fhero" aria-label="Featured photos">
+  <header class="fhero__head">
+    <span class="fhero__label">★ FEATURED</span>
+    <span class="fhero__hint doc-min-hide" aria-hidden="true">SHOWCASE REEL</span>
+    <span class="fhero__count">{{ featured | length }} {% if featured | length == 1 %}PHOTO{% else %}PHOTOS{% endif %}</span>
   </header>
-  <ul class="featured__strip">
-    {% for img in featured %}
-      {% set pretty = pretty_rel(img.rel_path) %}
-      <li class="featured__tile">
-        <a href="/image/{{ pretty }}"
-           title="{{ display_name(img.filename) }}"
-           aria-label="{{ display_name(img.filename) }}">
-          <img src="/thumb/{{ pretty }}"
-               alt="{{ display_name(img.filename) }}"
-               loading="lazy">
-          <span class="featured__tile-corner" aria-hidden="true">★</span>
-          <span class="featured__tile-frame" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span>
-          <span class="featured__tile-overlay" aria-hidden="true">
-            <span class="featured__tile-name">{{ display_name(img.filename) }}</span>
-            <span class="featured__tile-open">OPEN ↗</span>
-          </span>
+  <div class="fhero__frame">
+    <div class="fhero__stage" id="fhero-stage">
+      {% for img in featured %}
+        {% set pretty = pretty_rel(img.rel_path) %}
+        <a class="fhero__slide{% if loop.first %} is-on{% endif %}" href="/image/{{ pretty }}"
+           data-filename="{{ feat_label(img) }}"
+           tabindex="-1" aria-hidden="{% if loop.first %}false{% else %}true{% endif %}">
+          <img src="/preview/{{ pretty }}" alt="{{ feat_label(img) }}"
+               loading="{% if loop.first %}eager{% else %}lazy{% endif %}" decoding="async">
         </a>
-      </li>
-    {% endfor %}
-  </ul>
+      {% endfor %}
+      <div class="fhero__shade" aria-hidden="true"></div>
+    </div>
+    <i class="fhero__corner fhero__corner--tl" aria-hidden="true"></i>
+    <i class="fhero__corner fhero__corner--tr" aria-hidden="true"></i>
+    <i class="fhero__corner fhero__corner--bl" aria-hidden="true"></i>
+    <i class="fhero__corner fhero__corner--br" aria-hidden="true"></i>
+    <span class="fhero__chip fhero__chip--star" aria-hidden="true">★</span>
+    <span class="fhero__chip fhero__chip--frm">FRM <b id="fhero-idx">01</b><span>/{{ '%02d' | format(featured | length) }}</span></span>
+    <a class="fhero__file" id="fhero-file" href="/image/{{ pretty_rel(featured[0].rel_path) }}">
+      <span class="fhero__file-name" id="fhero-name" data-scramble>{{ feat_label(featured[0]) }}</span>
+      <span class="fhero__file-open" aria-hidden="true">OPEN ↗</span>
+    </a>
+    <div class="fhero__bar">
+      <button type="button" class="fhero__nav" id="fhero-prev" aria-label="Previous photo">‹</button>
+      <button type="button" class="fhero__nav" id="fhero-next" aria-label="Next photo">›</button>
+      <div class="fhero__track" id="fhero-track" aria-label="Photo selector">
+        {% for img in featured %}
+          <button type="button" class="fhero__seg{% if loop.first %} is-on{% endif %}" data-goto="{{ loop.index0 }}" aria-label="Photo {{ loop.index }}: {{ feat_label(img) }}"></button>
+        {% endfor %}
+      </div>
+      <span class="fhero__auto" id="fhero-auto">AUTO · 5.0S</span>
+    </div>
+  </div>
 </section>

@@ -539,12 +539,10 @@ section{
    reel doesn't float inside a big empty background. padding:0 cancels the
    global `section` page-padding (this is a nested <section>), so the reel
    lines up with the rest of the page content instead of being inset. */
-.featured{
-  position:relative;
-  margin-bottom:26px;
-  padding:0;
-}
-.featured__head{
+/* Featured photos render as the .fhero slideshow below — nested <section>,
+   so cancel the global section padding/centring like .showcase/.feat do. */
+.fhero{ position:relative; margin:0 0 30px; padding:0; }
+.fhero__head{
   display:flex; align-items:center; gap:10px;
   margin-bottom:12px;
   padding-bottom:8px;
@@ -555,164 +553,218 @@ section{
   text-transform:uppercase;
   color:var(--text-ghost);
 }
-.featured__label{ color:var(--acc-cy); letter-spacing:.24em; }
-.featured__hint{
-  color:var(--text-ghost);
-  padding-left:10px;
-  border-left:1px solid var(--line);
-}
-.featured__count{ margin-left:auto; }
+.fhero__label{ color:var(--acc-cy); letter-spacing:.24em; }
+.fhero__hint{ padding-left:10px; border-left:1px solid var(--line); }
+.fhero__count{ margin-left:auto; }
 
-.featured__strip{
-  list-style:none;
-  margin:0;
-  padding:0;
-  display:flex;
-  gap:10px;
-  /* hug the tiles: a short reel stays as wide as its content (no empty
-     trailing background); a long reel hits 100% and scrolls. */
-  width: fit-content;
-  max-width:100%;
-  overflow-x:auto;
-  overflow-y:hidden;
-  scrollbar-width:thin;
-  scrollbar-color: var(--line-strong) transparent;
-  scroll-snap-type: x proximity;
-  -webkit-overflow-scrolling: touch;
-}
-.featured__strip::-webkit-scrollbar{ height:6px; }
-.featured__strip::-webkit-scrollbar-thumb{ background: var(--line-strong); }
-.featured__strip::-webkit-scrollbar-track{ background: transparent; }
-.featured__tile{
-  flex: 0 0 auto;
-  scroll-snap-align: start;
-  margin:0;
-}
-.featured__tile a{
+/* the hero box is fluid (100% of the parent column) with a capped height,
+   so it also fits the narrower main column of albums that show a trip map
+   or description sidebar (e.g. japan_2026). */
+.fhero__frame{
   position:relative;
-  display:block;
-  width: clamp(150px, 16vw, 200px);
-  aspect-ratio: 4 / 3;
-  background:var(--bg-2);
-  border:1px solid var(--line-strong);
   overflow:hidden;
-  transition: border-color .15s ease, box-shadow .2s ease, transform .2s ease;
+  isolation:isolate;
+  background:#05050a;
+  border:1px solid var(--line-strong);
+  aspect-ratio:21/9;
+  max-height:min(58vh, 540px);
+  min-height:240px;
 }
-.featured__tile a:hover{
-  border-color: var(--acc-cy);
-  box-shadow: 0 0 18px rgba(91,138,255,.18);
-  transform: translateY(-2px);
+.fhero__stage{ position:absolute; inset:0; }
+.fhero__slide{
+  position:absolute; inset:0;
+  display:block;
+  opacity:0;
+  transition:opacity .7s ease;
+  z-index:1;
+  pointer-events:none;
 }
-.featured__tile a:focus-visible{
-  outline:0;
-  border-color: var(--acc-cy);
-  box-shadow: 0 0 0 2px rgba(91,138,255,.5);
-}
-.featured__tile img{
+.fhero__slide.is-on{ opacity:1; z-index:2; pointer-events:auto; }
+.fhero__slide img{
   width:100%; height:100%;
   object-fit:cover;
   display:block;
-  filter: saturate(.9) brightness(.9);
-  transition: transform .35s ease, filter .35s ease;
+  filter:saturate(.96) contrast(1.03) brightness(.92);
 }
-.featured__tile a:hover img{
-  transform: scale(1.05);
-  filter: saturate(1) brightness(1);
+/* slow Ken Burns drift on the active slide (keyframes shared with .vf) */
+.fhero__slide.is-on img{ animation: vf-drift 8s ease-out forwards; }
+.fhero__slide.is-on:nth-child(even) img{ animation-name: vf-drift-b; }
+.fx-lite .fhero__slide img{ animation:none !important; transform:none; }
+@media (prefers-reduced-motion: reduce){
+  .fhero__slide{ transition:opacity .2s linear; }
+  .fhero__slide img{ animation:none !important; transform:none; }
 }
-.featured__tile-corner{
+/* legibility shade: darken the top chips row and the control bar zone */
+.fhero__shade{
+  position:absolute; inset:0; z-index:3;
+  pointer-events:none;
+  background:linear-gradient(180deg,
+    rgba(4,5,10,.42) 0%, transparent 22%, transparent 55%, rgba(4,5,10,.78) 100%);
+}
+.fhero__corner{
   position:absolute;
-  top:6px; left:6px;
+  width:18px; height:18px;
+  border:1px solid rgba(91,138,255,.75);
+  opacity:.9;
   z-index:4;
-  width:20px; height:20px;
-  display:flex; align-items:center; justify-content:center;
-  font-size:11px;
-  line-height:1;
-  color:var(--acc-cy);
-  background: rgba(7,7,11,.78);
-  border:1px solid var(--acc-cy);
-  pointer-events:none;
-  text-shadow: 0 0 4px rgba(91,138,255,.5);
-}
-
-/* frame number (bottom-left) — hides when the hover overlay takes over */
-.featured__tile-frame{
-  position:absolute;
-  left:6px; bottom:6px;
-  z-index:2;
-  font-family:"JetBrains Mono", monospace;
-  font-size:9px;
-  letter-spacing:.16em;
-  color:var(--text-dim);
-  background: rgba(7,7,11,.72);
-  border:1px solid var(--line);
-  padding:1px 5px;
-  pointer-events:none;
-  transition: opacity .2s ease;
-}
-.featured__tile a:hover .featured__tile-frame,
-.featured__tile a:focus-visible .featured__tile-frame{ opacity:0; }
-
-/* filename + open affordance, revealed on hover/focus */
-.featured__tile-overlay{
-  position:absolute; inset:0;
-  z-index:3;
-  display:flex; flex-direction:column; justify-content:flex-end;
-  gap:3px;
-  padding:8px 9px;
-  opacity:0;
-  background:linear-gradient(to top,
-    rgba(7,7,11,.85) 0%, rgba(7,7,11,.15) 55%, transparent 80%);
-  transition: opacity .2s ease;
   pointer-events:none;
 }
-.featured__tile a:hover .featured__tile-overlay,
-.featured__tile a:focus-visible .featured__tile-overlay{ opacity:1; }
-.featured__tile-name{
+.fhero__corner--tl{ top:10px; left:10px; border-right:0; border-bottom:0; }
+.fhero__corner--tr{ top:10px; right:10px; border-left:0; border-bottom:0; }
+.fhero__corner--bl{ bottom:10px; left:10px; border-right:0; border-top:0; }
+.fhero__corner--br{ bottom:10px; right:10px; border-left:0; border-top:0; }
+.fhero__chip{
+  position:absolute; top:12px; z-index:4;
   font-family:"JetBrains Mono", monospace;
   font-size:9.5px;
-  letter-spacing:.03em;
+  letter-spacing:.2em;
+  text-transform:uppercase;
   color:var(--text);
-  line-height:1.3;
-  word-break:break-word;
-  display:-webkit-box;
-  -webkit-line-clamp:2;
-  -webkit-box-orient:vertical;
-  overflow:hidden;
-  text-shadow:0 1px 4px rgba(0,0,0,.7);
+  background:rgba(7,7,11,.72);
+  border:1px solid var(--line-strong);
+  padding:3px 8px;
+  pointer-events:none;
 }
-.featured__tile-open{
+.fhero__chip--star{
+  left:14px;
+  color:var(--acc-cy);
+  border-color:var(--acc-cy);
+  text-shadow:0 0 6px rgba(91,138,255,.5);
+}
+.fhero__chip--frm{ right:14px; }
+.fhero__chip--frm b{ color:var(--acc-cy); font-weight:400; font-variant-numeric:tabular-nums; }
+.fhero__chip--frm span{ color:var(--text-ghost); }
+/* filename link, lower-left above the control bar */
+.fhero__file{
+  position:absolute; left:14px; bottom:52px; z-index:4;
+  display:inline-flex; align-items:baseline; gap:10px;
+  max-width:calc(100% - 28px);
   font-family:"JetBrains Mono", monospace;
+  color:var(--text);
+  background:rgba(7,7,11,.55);
+  border:1px solid var(--line);
+  padding:6px 10px;
+  transition:border-color .15s, background .15s;
+}
+.fhero__file:hover{
+  border-color:var(--acc-cy);
+  background:rgba(7,7,11,.78);
+  color:var(--text);
+}
+.fhero__file-name{
+  font-size:11px;
+  letter-spacing:.06em;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  min-width:0;
+}
+.fhero__file-open{
   font-size:8.5px;
   letter-spacing:.22em;
   text-transform:uppercase;
   color:var(--acc-cy);
+  white-space:nowrap;
 }
-
-/* contact-reel: faint sprocket-hole rows top & bottom of the strip */
-.featured--reel .featured__strip{
-  padding-top:16px;
-  padding-bottom:16px;
-  background-image:
-    repeating-linear-gradient(to right, rgba(255,255,255,.06) 0 7px, transparent 7px 16px),
-    repeating-linear-gradient(to right, rgba(255,255,255,.06) 0 7px, transparent 7px 16px);
-  background-size: 100% 4px, 100% 4px;
-  background-position: left top, left bottom;
-  background-repeat: no-repeat, no-repeat;
+/* bottom control bar: prev/next + segment track + auto label */
+.fhero__bar{
+  position:absolute; left:0; right:0; bottom:0; z-index:5;
+  display:flex; align-items:center; gap:10px;
+  padding:9px 12px 10px;
+  border-top:1px solid rgba(255,255,255,.1);
+  background:linear-gradient(180deg, rgba(5,6,10,.35), rgba(5,6,10,.7));
+  backdrop-filter:blur(8px) saturate(120%);
+  -webkit-backdrop-filter:blur(8px) saturate(120%);
 }
+.fhero__nav{
+  font-family:"JetBrains Mono", monospace;
+  font-size:13px;
+  line-height:1.2;
+  padding:3px 10px;
+  background:transparent;
+  border:1px solid var(--line-strong);
+  color:var(--text-dim);
+  cursor:pointer;
+  transition:color .15s, border-color .15s, background .15s;
+}
+.fhero__nav:hover{
+  color:var(--acc-cy);
+  border-color:var(--acc-cy);
+  background:rgba(91,138,255,.08);
+}
+.fhero__nav:focus-visible,
+.fhero__seg:focus-visible{
+  outline:1px solid var(--acc-cy);
+  outline-offset:2px;
+}
+.fhero__track{ flex:1; display:flex; gap:6px; min-width:0; }
+.fhero__seg{
+  flex:1 1 0;
+  min-width:6px;
+  height:18px;
+  margin:0; padding:0;
+  border:0;
+  background:transparent;
+  position:relative;
+  cursor:pointer;
+}
+.fhero__seg::before{           /* rail */
+  content:"";
+  position:absolute; left:0; right:0; top:50%; height:3px;
+  transform:translateY(-50%);
+  background:rgba(255,255,255,.16);
+  transition:background .2s;
+}
+.fhero__seg:hover::before{ background:rgba(255,255,255,.34); }
+.fhero__seg::after{            /* fill */
+  content:"";
+  position:absolute; left:0; right:0; top:50%; height:3px;
+  transform:translateY(-50%) scaleX(0);
+  transform-origin:left center;
+  background:var(--acc-cy);
+  box-shadow:0 0 8px rgba(91,138,255,.55);
+}
+.fhero__seg.is-done::after{
+  transform:translateY(-50%) scaleX(1);
+  background:rgba(158,160,188,.5);
+  box-shadow:none;
+}
+.fhero__seg.is-on::after{ transform:translateY(-50%) scaleX(1); }
+/* auto mode: the active segment fills over the auto-advance interval;
+   paused on hover (fhero--paused) and while off-screen (fhero--idle) */
+.fhero--auto .fhero__seg.is-on::after{
+  animation: fhero-seg-fill var(--fhero-auto-ms, 5000ms) linear both;
+}
+.fhero--paused .fhero__seg.is-on::after,
+.fhero--idle .fhero__seg.is-on::after{ animation-play-state:paused; }
+@keyframes fhero-seg-fill{
+  from{ transform:translateY(-50%) scaleX(0); }
+  to  { transform:translateY(-50%) scaleX(1); }
+}
+.fhero__auto{
+  font-family:"JetBrains Mono", monospace;
+  font-size:9px;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  color:var(--text-ghost);
+  white-space:nowrap;
+}
+/* single featured photo: static hero, no slideshow chrome */
+.fhero--single .fhero__bar,
+.fhero--single .fhero__chip--frm{ display:none; }
+.fhero--single .fhero__file{ bottom:14px; }
 
 @media (max-width:760px){
-  .featured{ margin-bottom:20px; }
-  .featured__hint{ display:none; }
-  .featured__head{ font-size:9.5px; }
-  .featured__strip{
-    gap:8px;
-    scroll-snap-type: x mandatory;
-  }
-  .featured__tile a{ width: clamp(140px, 42vw, 200px); }
-  .featured__tile-corner{
-    width:18px; height:18px; font-size:10px;
-    top:5px; left:5px;
-  }
+  .fhero{ margin-bottom:22px; }
+  .fhero .doc-min-hide{ display:none; }
+  .fhero__head{ font-size:9.5px; }
+  .fhero__frame{ aspect-ratio:3/2; min-height:220px; max-height:60vh; }
+  .fhero__bar{ padding:8px 10px 9px; gap:8px; }
+  .fhero__file{ left:10px; bottom:46px; padding:5px 8px; gap:8px; }
+  .fhero__file-name{ font-size:10px; }
+  .fhero__chip{ font-size:8.5px; padding:2px 6px; }
+  .fhero__chip--star{ left:10px; }
+  .fhero__chip--frm{ right:10px; }
+  .fhero__corner{ width:14px; height:14px; }
+  .fhero__auto{ display:none; }
 }
 
 /* showcase / folder badge on album + showcase cards */
@@ -1315,7 +1367,7 @@ section{
 }
 
 /* nested <section>: cancel the global section page-padding + max-width/auto-
-   centring (same as .showcase / .featured) so the folder grid sits flush-left
+   centring (same as .showcase / .fhero) so the folder grid sits flush-left
    and full-width, pixel-identical to the /albums album grid. Without this the
    doubled page-padding indents the grid ~1 page-pad from the left and shrinks
    it, so the cards mis-align and resize vs the main albums view. */
