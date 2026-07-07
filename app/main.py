@@ -151,13 +151,16 @@ def _showcase_rows(album: str | None = None, limit: int = 50, random_order: bool
 
 
 def _showcase_album_rows(limit: int | None = None):
-    """Top-level showcase albums, newest-active first. Whether an album is a
-    showcase is decided by `_album_is_showcase` (album.cfg `showcase = …`,
+    """Top-level showcase albums for the ★ FEATURED rails (welcome screen
+    and /albums). Newest-active first — unless gallery.cfg defines a curated
+    `album_order`, which then fixes the rail order too. Whether an album is
+    a showcase is decided by `_album_is_showcase` (album.cfg `showcase = …`,
     legacy `_` folder marker as fallback). Same card shape as `albums_index`
     (album, name, count, latest, cover, sub_count) so the showcase-album
-    partial can be reused on both /albums and the welcome screen."""
+    partial can be reused on both pages."""
     cards = [c for c in _top_level_album_cards() if _album_is_showcase(c["album"])]
-    cards = _sorted_album_cards(cards, "latest_desc")
+    order = "curated" if _curated_album_positions() else "latest_desc"
+    cards = _sorted_album_cards(cards, order)
     return cards[:limit] if limit is not None else cards
 
 
@@ -244,7 +247,7 @@ def _album_card(album: str, all_albums: list[str] | None = None) -> dict:
     ).fetchone()
     # A pinned cover (album.cfg `cover = ...`) wins; otherwise the newest
     # photo from anywhere in the subtree.
-    cover_rel = _config_cover_rel(album, _album_config(album).get("cover"))
+    cover_rel = _config_cover_rel(album, _cfg_first(_album_config(album), "cover"))
     if not cover_rel:
         cover = c.execute(
             f"SELECT rel_path FROM images WHERE {cond} "
@@ -268,11 +271,37 @@ def _top_level_album_cards(all_albums: list[str] | None = None) -> list[dict]:
     return [_album_card(n, all_albums) for n in _child_album_names(None, all_albums)]
 
 
+def _album_order_key(path: str) -> str:
+    """Normalize an album path for matching against gallery.cfg
+    `album_order` entries: marker-stripped segments, lower-cased, so an
+    entry works with or without the showcase marker / exact casing."""
+    segs = path.replace("\\", "/").strip().strip("/").split("/")
+    return "/".join(_strip_marker_segment(s) for s in segs).lower()
+
+
+def _curated_album_positions() -> dict[str, int]:
+    """gallery.cfg `album_order` as {normalized album path: position}.
+    Empty dict when no curated album order is configured."""
+    pos: dict[str, int] = {}
+    for i, item in enumerate(_gallery_config().get("album_order", [])):
+        key = _album_order_key(item)
+        if key and key not in pos:
+            pos[key] = i
+    return pos
+
+
 def _sorted_album_cards(cards: list[dict], sort_key: str) -> list[dict]:
-    """Order album cards by one of the SORT_ALBUM keys. A leading stable
-    name-ascending pass provides the tie-break for every other key."""
+    """Order album cards by one of the SORT_ALBUM keys or "curated"
+    (gallery.cfg `album_order`). A leading stable name-ascending pass
+    provides the tie-break for every other key."""
     cards = sorted(cards, key=lambda a: a["album"].lower())
-    if sort_key == "name_desc":
+    if sort_key == "curated":
+        # listed albums first, in their configured order; everything not
+        # listed follows newest-first (stable sorts keep both groups tidy)
+        pos = _curated_album_positions()
+        cards.sort(key=lambda a: a["latest"] or "", reverse=True)
+        cards.sort(key=lambda a: pos.get(_album_order_key(a["album"]), len(pos)))
+    elif sort_key == "name_desc":
         cards.sort(key=lambda a: a["album"].lower(), reverse=True)
     elif sort_key == "count_desc":
         cards.sort(key=lambda a: a["count"], reverse=True)
@@ -336,24 +365,62 @@ def _album_description(album: str) -> str | None:
     return _render_markdown(raw) or None
 
 
-# ----- per-album config (album.cfg) -------------------------------------
-# Optional `album.cfg` dropped into an album's photo folder, alongside the
-# `album.md` description. Plain `key = value` lines (`#`/`;` comments). Known
-# keys:
-#   collection = true   -> the album shows every photo in its subtree (its
-#                          own + all sub-folders) as one flat collection.
+# ----- config file format (album.cfg / gallery.cfg) ----------------------
+# Both files share one format: plain `key = value` lines, `#`/`;` comments.
+# List values accumulate — comma-separate, repeat the key, or (easiest to
+# read) put one entry per line below the key: any non-comment line without
+# a `=` continues the key above it.
+#
+# album.cfg keys (file sits inside an album's photo folder):
+#   collection = true    -> the album shows every photo in its subtree (its
+#                           own + all sub-folders) as one flat collection.
 #   cover = sub/pic.jpg  -> pin the album cover (path relative to the album)
-#                          instead of auto-picking the newest photo.
+#                           instead of auto-picking the newest photo.
+#   showcase = true      -> showcase album (★ rail on /albums + welcome).
+#   featured = a.jpg, …  -> featured photos (see _recompute_featured).
+#   reel = featured|random|off -> what the album's hero slideshow shows.
+#   order = a.jpg, …     -> curated photo order ("Curated" sort option).
+#   sort = curated|date_desc|… -> preselect the sort option for this album.
 _TRUE = {"1", "true", "yes", "on"}
+_FALSE = {"0", "false", "no", "off", "none", "hide"}
 
 
 def _cfg_bool(v: str | None) -> bool:
     return str(v or "").strip().lower() in _TRUE
 
 
-def _album_config(album: str) -> dict:
-    """Parse the album's `album.cfg` into a lower-cased key->value dict, or
-    {} when there's no such file. Cheap enough to call per album card."""
+def _parse_cfg(text: str) -> dict[str, list[str]]:
+    """Parse cfg text into a lower-cased key -> [values] dict. Repeated keys
+    and comma lists accumulate in order; bare lines append to the key above
+    (one entry per line). A key given with an empty value still registers
+    (empty list), so "present but empty" is distinguishable from "absent"."""
+    out: dict[str, list[str]] = {}
+    key: str | None = None
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line[0] in "#;":
+            continue
+        if "=" in line:
+            key, _, val = line.partition("=")
+            key = key.strip().lower()
+            out.setdefault(key, [])
+        elif key is None:
+            continue  # stray line before any key
+        else:
+            val = line
+        out[key].extend(i.strip() for i in val.split(",") if i.strip())
+    return out
+
+
+def _cfg_first(cfg: dict[str, list[str]], key: str) -> str | None:
+    """First configured value for a scalar key, or None."""
+    vals = cfg.get(key)
+    return vals[0] if vals else None
+
+
+def _album_config(album: str) -> dict[str, list[str]]:
+    """Parse the album's `album.cfg` (see _parse_cfg), or {} when there's no
+    such file. Cheap enough to call per album card."""
     folder = (PHOTOS_DIR / album).resolve()
     try:
         folder.relative_to(PHOTOS_DIR)  # guard against path traversal
@@ -362,18 +429,11 @@ def _album_config(album: str) -> dict:
     cfg_path = folder / "album.cfg"
     if not cfg_path.is_file():
         return {}
-    out: dict[str, str] = {}
     try:
         text = cfg_path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return {}
-    for line in text.splitlines():
-        line = line.strip()
-        if not line or line[0] in "#;" or "=" not in line:
-            continue
-        key, val = line.split("=", 1)
-        out[key.strip().lower()] = val.strip()
-    return out
+    return _parse_cfg(text)
 
 
 def _config_cover_rel(album: str, manual: str | None) -> str | None:
@@ -408,40 +468,48 @@ def _config_cover_rel(album: str, manual: str | None) -> str | None:
 def _album_is_showcase(album: str) -> bool:
     cfg = _album_config(album)
     if "showcase" in cfg:
-        return _cfg_bool(cfg["showcase"])
+        return _cfg_bool(_cfg_first(cfg, "showcase"))
     return bool(SHOWCASE_MARKER) and album.rsplit("/", 1)[-1].startswith(SHOWCASE_MARKER)
 
 
-def _resolve_featured(album: str, spec: str) -> set[str]:
-    """Resolve an album.cfg `featured` value to a set of indexed rel_paths.
-    `*`/`all` = every photo directly in the album; otherwise a comma list of
-    paths relative to the album (sub-folders allowed). A bare filename that
-    isn't found at that exact path falls back to a filename match anywhere
-    in the album's subtree, so a parent cfg can feature sub-folder photos
-    without spelling out the folder (matches every same-named file)."""
-    spec = (spec or "").strip()
-    if not spec:
-        return set()
+def _resolve_photo_refs(album: str, items: list[str]) -> list[str]:
+    """Resolve photo references from an album.cfg list value (`featured`,
+    `order`) to indexed rel_paths, keeping the given order (deduped). Each
+    item is a path relative to the album (sub-folders allowed); a bare
+    filename that isn't found at that exact path falls back to a filename
+    match anywhere in the album's subtree, so a parent cfg can reference
+    sub-folder photos without spelling out the folder (matches every
+    same-named file)."""
     c = db.conn()
-    if spec.lower() in ("*", "all"):
-        return {r["rel_path"] for r in c.execute("SELECT rel_path FROM images WHERE album = ?", (album,))}
-    out: set[str] = set()
     prefix = album + "/"
-    for item in spec.split(","):
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in items:
         item = item.strip().strip("/")
         if not item:
             continue
-        rel = item if (item == album or item.startswith(album + "/")) else f"{album}/{item}"
+        rel = item if (item == album or item.startswith(prefix)) else f"{album}/{item}"
         row = c.execute("SELECT rel_path FROM images WHERE rel_path = ?", (rel,)).fetchone()
-        if row:
-            out.add(row["rel_path"])
-            continue
-        for r in c.execute(
-            "SELECT rel_path FROM images WHERE (album = ? OR substr(album, 1, ?) = ?) AND filename = ?",
+        rows = [row] if row else c.execute(
+            "SELECT rel_path FROM images WHERE (album = ? OR substr(album, 1, ?) = ?) "
+            "AND filename = ? ORDER BY rel_path",
             (album, len(prefix), prefix, item),
-        ):
-            out.add(r["rel_path"])
+        ).fetchall()
+        for r in rows:
+            if r["rel_path"] not in seen:
+                seen.add(r["rel_path"])
+                out.append(r["rel_path"])
     return out
+
+
+def _resolve_featured(album: str, items: list[str]) -> set[str]:
+    """Resolve an album.cfg `featured` list to a set of indexed rel_paths.
+    `*`/`all` features every photo directly in the album; everything else
+    resolves like _resolve_photo_refs."""
+    if any(i.strip().lower() in ("*", "all") for i in items):
+        c = db.conn()
+        return {r["rel_path"] for r in c.execute("SELECT rel_path FROM images WHERE album = ?", (album,))}
+    return set(_resolve_photo_refs(album, items))
 
 
 def _recompute_featured() -> None:
@@ -561,23 +629,57 @@ SORT_ALBUM_OPTIONS = [
 SORT_ALBUM_DEFAULT = "latest_desc"
 SORT_ALBUM_SQL = {k: sql for k, _, sql in SORT_ALBUM_OPTIONS}
 
+# pseudo sort key backed by a cfg list (album.cfg `order` / gallery.cfg
+# `album_order`) instead of SQL; only offered when such a list exists
+SORT_CURATED = "curated"
+SORT_CURATED_LABEL = "Curated"
 
-def _pick_sort(value: str | None, allowed: dict[str, str], default: str) -> str:
+
+def _pick_sort(value: str | None, allowed, default: str) -> str:
     return value if value in allowed else default
 
 
-def _image_sort_options_for_template(current: str) -> list[dict]:
-    return [
-        {"key": k, "label": label, "active": k == current}
-        for k, label, _ in SORT_IMAGE_OPTIONS
-    ]
+def _image_sort_options_for_template(current: str, curated: bool = False) -> list[dict]:
+    keys = ([(SORT_CURATED, SORT_CURATED_LABEL)] if curated else [])
+    keys += [(k, label) for k, label, _ in SORT_IMAGE_OPTIONS]
+    return [{"key": k, "label": label, "active": k == current} for k, label in keys]
 
 
-def _album_sort_options_for_template(current: str) -> list[dict]:
-    return [
-        {"key": k, "label": label, "active": k == current}
-        for k, label, _ in SORT_ALBUM_OPTIONS
-    ]
+def _album_sort_options_for_template(current: str, curated: bool = False) -> list[dict]:
+    keys = ([(SORT_CURATED, SORT_CURATED_LABEL)] if curated else [])
+    keys += [(k, label) for k, label, _ in SORT_ALBUM_OPTIONS]
+    return [{"key": k, "label": label, "active": k == current} for k, label in keys]
+
+
+def _active_sort_label(options: list[dict]) -> str:
+    return next((o["label"] for o in options if o["active"]), "")
+
+
+def _curated_photo_order(album: str, cfg: dict[str, list[str]]) -> list[str]:
+    """Resolved album.cfg `order` list (curated photo order) as rel_paths,
+    [] when the album doesn't configure one."""
+    items = cfg.get("order", [])
+    return _resolve_photo_refs(album, items) if items else []
+
+
+def _apply_curated_order(images: list[dict], curated_order: list[str]) -> list[dict]:
+    """Stable-sort image dicts into the curated order: listed photos first
+    in the given order, unlisted ones keep their previous (date) order."""
+    pos = {rel: i for i, rel in enumerate(curated_order)}
+    images.sort(key=lambda r: pos.get(r["rel_path"], len(pos)))
+    return images
+
+
+def _random_subtree_rows(album: str, limit: int = 8) -> list[dict]:
+    """Random photos from an album's whole subtree, for album.cfg
+    `reel = random`."""
+    prefix = album + "/"
+    rows = db.conn().execute(
+        "SELECT * FROM images WHERE (album = ? OR substr(album, 1, ?) = ?) "
+        "ORDER BY RANDOM() LIMIT ?",
+        (album, len(prefix), prefix, limit),
+    ).fetchall()
+    return [dict(r) for r in rows]
 
 
 CSP = (
@@ -704,17 +806,25 @@ def _resolve_showcase_path(album: str, filename: str) -> tuple[str, str]:
 
 # ----- gallery-wide config (gallery.cfg) ---------------------------------
 # Optional `gallery.cfg` dropped into the photos ROOT (next to the album
-# folders). Same plain `key = value` format as album.cfg (`#`/`;` comments),
-# but repeated keys and comma lists accumulate into a list. Known keys:
+# folders). Same format as album.cfg (see _parse_cfg: `key = value`, list
+# values comma-separated / repeated keys / one entry per line). Known keys:
 #   welcome = showcase            -> hero feed = random featured photos
 #                                    (default; same as no file / no key)
 #   welcome = random              -> hero feed = random photos, ignore featured
 #   welcome = <album/file.jpg>,…  -> hand-picked hero feed in exactly this
-#                                    order (repeat the key or comma-separate;
-#                                    paths are relative to photos/, marker
-#                                    prefixes may be omitted). Unresolvable
-#                                    entries are skipped with a warning; if
-#                                    nothing resolves, falls back to showcase.
+#                                    order (paths are relative to photos/,
+#                                    marker prefixes may be omitted).
+#                                    Unresolvable entries are skipped with a
+#                                    warning; if nothing resolves, falls back
+#                                    to showcase.
+#   welcome_desktop / welcome_mobile -> same syntax as `welcome`, but only
+#                                    for the respective device class (phones
+#                                    are detected via User-Agent). `welcome`
+#                                    stays the shared fallback.
+#   album_order = <album>,…       -> curated album order: adds a "Curated"
+#                                    entry to the /albums sort menu and fixes
+#                                    the order of the ★ featured-album rails.
+#   album_sort = curated|latest_desc|… -> preselect the /albums sort option.
 GALLERY_CFG_NAME = "gallery.cfg"
 WELCOME_FEED_MAX = 24
 
@@ -726,9 +836,9 @@ _warned_welcome: set[str] = set()
 
 
 def _gallery_config() -> dict[str, list[str]]:
-    """Parse photos/gallery.cfg into a lower-cased key -> [values] dict, or
-    {} when there's no such file. Cheap enough to read per request, so edits
-    show up without a restart (matching album.cfg behaviour)."""
+    """Parse photos/gallery.cfg (see _parse_cfg), or {} when there's no such
+    file. Cheap enough to read per request, so edits show up without a
+    restart (matching album.cfg behaviour)."""
     cfg_path = PHOTOS_DIR / GALLERY_CFG_NAME
     if not cfg_path.is_file():
         return {}
@@ -736,18 +846,15 @@ def _gallery_config() -> dict[str, list[str]]:
         text = cfg_path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return {}
-    out: dict[str, list[str]] = {}
-    for line in text.splitlines():
-        line = line.strip()
-        if not line or line[0] in "#;" or "=" not in line:
-            continue
-        key, val = line.split("=", 1)
-        key = key.strip().lower()
-        for item in val.split(","):
-            item = item.strip()
-            if item:
-                out.setdefault(key, []).append(item)
-    return out
+    return _parse_cfg(text)
+
+
+def _is_mobile_request(request: Request) -> bool:
+    """Phone detection for the welcome_mobile/_desktop split. MDN's
+    recommended heuristic: 'Mobi' anywhere in the User-Agent — catches
+    iPhones and Android phones; Android tablets (no 'Mobi') and iPads in
+    desktop mode deliberately get the desktop feed."""
+    return "mobi" in request.headers.get("user-agent", "").lower()
 
 
 def _lookup_welcome_image(raw: str):
@@ -773,10 +880,13 @@ def _lookup_welcome_image(raw: str):
     return None
 
 
-def _welcome_feed() -> tuple[list[dict], str, str]:
-    """Hero feed for the welcome screen honoring gallery.cfg.
+def _welcome_feed(mobile: bool = False) -> tuple[list[dict], str, str]:
+    """Hero feed for the welcome screen honoring gallery.cfg. The device
+    keys (welcome_mobile / welcome_desktop) win over the shared `welcome`
+    key for their device class; each accepts the same syntax.
     Returns (feed, label, mode) with mode one of manual/showcase/random."""
-    spec = _gallery_config().get("welcome", [])
+    cfg = _gallery_config()
+    spec = cfg.get("welcome_mobile" if mobile else "welcome_desktop") or cfg.get("welcome", [])
     mode = "showcase"
     if len(spec) == 1 and spec[0].lower() in _WELCOME_KEYWORDS:
         mode = _WELCOME_KEYWORDS[spec[0].lower()]
@@ -818,7 +928,7 @@ def _welcome_feed() -> tuple[list[dict], str, str]:
 @app.get("/", response_class=HTMLResponse)
 def welcome(request: Request):
     c = db.conn()
-    feed, feed_label, feed_mode = _welcome_feed()
+    feed, feed_label, feed_mode = _welcome_feed(mobile=_is_mobile_request(request))
     counts = c.execute("SELECT COUNT(*) AS images FROM images").fetchone()
     # "Albums" = top-level folders (parents of nested albums count once).
     top_level_albums = len(_child_album_names(None))
@@ -838,18 +948,27 @@ def welcome(request: Request):
             "showcase_count": showcase_count["n"] if showcase_count else 0,
             "showcase_albums": showcase_albums,
         },
+        # the hero feed can differ per device class (welcome_mobile/_desktop),
+        # so shared caches must key on the UA
+        headers={"Vary": "User-Agent"},
     )
 
 
 @app.get("/albums", response_class=HTMLResponse)
 def albums_index(request: Request, sort: str | None = None):
-    current_sort = _pick_sort(sort, SORT_ALBUM_SQL, SORT_ALBUM_DEFAULT)
+    # "Curated" only exists as a sort option while gallery.cfg defines an
+    # album_order; gallery.cfg `album_sort` presets the default sort.
+    has_curated = bool(_curated_album_positions())
+    allowed = set(SORT_ALBUM_SQL) | ({SORT_CURATED} if has_curated else set())
+    default_sort = _pick_sort(_cfg_first(_gallery_config(), "album_sort"), allowed, SORT_ALBUM_DEFAULT)
+    current_sort = _pick_sort(sort, allowed, default_sort)
     albums = _sorted_album_cards(_top_level_album_cards(), current_sort)
     # annotate instead of a legacy `startswith(marker)` check in the template,
     # so album.cfg-driven showcase albums are recognized too
     for a in albums:
         a["is_showcase"] = _album_is_showcase(a["album"])
     showcase_albums = [a for a in albums if a["is_showcase"]]
+    sort_options = _album_sort_options_for_template(current_sort, curated=has_curated)
     return templates.TemplateResponse(
         "index.html",
         {
@@ -857,12 +976,9 @@ def albums_index(request: Request, sort: str | None = None):
             "albums": albums,
             "showcase_albums": showcase_albums,
             "current_sort": current_sort,
-            "default_sort": SORT_ALBUM_DEFAULT,
-            "sort_options": _album_sort_options_for_template(current_sort),
-            "sort_label": next(
-                (label for k, label, _ in SORT_ALBUM_OPTIONS if k == current_sort),
-                "",
-            ),
+            "default_sort": default_sort,
+            "sort_options": sort_options,
+            "sort_label": _active_sort_label(sort_options),
         },
     )
 
@@ -912,9 +1028,17 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     album = album.strip("/")
     if not album:
         raise HTTPException(404, "album not found")
-    current_sort = _pick_sort(sort, SORT_IMAGE_SQL, SORT_IMAGE_DEFAULT)
+    album_cfg = _album_config(album)
+    # album.cfg `order` adds a "Curated" sort option; `sort` presets the
+    # default sort for this album (query param still wins).
+    curated_order = _curated_photo_order(album, album_cfg)
+    allowed = set(SORT_IMAGE_SQL) | ({SORT_CURATED} if curated_order else set())
+    default_sort = _pick_sort(_cfg_first(album_cfg, "sort"), allowed, SORT_IMAGE_DEFAULT)
+    current_sort = _pick_sort(sort, allowed, default_sort)
+    # curated is reordered in Python below; SQL runs with the date default
+    base_sort = SORT_IMAGE_DEFAULT if current_sort == SORT_CURATED else current_sort
     # qualify column names so the JOIN query below isn't ambiguous
-    qualified_sql = SORT_IMAGE_SQL[current_sort].replace("filename", "i.filename")
+    qualified_sql = SORT_IMAGE_SQL[base_sort].replace("filename", "i.filename")
     qualified_sql = qualified_sql.replace("taken_at", "i.taken_at")
     qualified_sql = qualified_sql.replace("mtime", "i.mtime")
     qualified_sql = qualified_sql.replace("size", "i.size")
@@ -922,7 +1046,7 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     # Collection mode (album.cfg `collection = true`): the grid shows every
     # photo in this album's whole subtree (its own + all sub-folders) as one
     # flat set, instead of only the photos sitting directly in this folder.
-    collection = _cfg_bool(_album_config(album).get("collection"))
+    collection = _cfg_bool(_cfg_first(album_cfg, "collection"))
     if collection:
         prefix = album + "/"
         where_simple = "(album = ? OR substr(album, 1, ?) = ?)"
@@ -942,11 +1066,14 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             (*scope_params, tag),
         ).fetchall()
     else:
-        order_sql = SORT_IMAGE_SQL[current_sort]
+        order_sql = SORT_IMAGE_SQL[base_sort]
         rows = c.execute(
             f"SELECT * FROM images WHERE {where_simple} ORDER BY {order_sql}",
             scope_params,
         ).fetchall()
+    images = [dict(r) for r in rows]
+    if current_sort == SORT_CURATED:
+        images = _apply_curated_order(images, curated_order)
     # Immediate sub-folders of this album, shown as folder cards above the
     # image grid. Listed alphabetically so the folder view is predictable.
     sub_albums = _sorted_album_cards(
@@ -970,12 +1097,24 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     # Showcase status now comes from album.cfg (`showcase = …`), with the
     # legacy `_` folder-name marker as a fallback.
     album_is_showcase = _album_is_showcase(album)
-    # Featured hero = featured photos from this album AND its sub-albums
-    # (subtree), so photos featured inside e.g. japan_2026/osaka surface on
-    # the japan_2026 page too. A showcase ALBUM doesn't auto-promote its
-    # contents — each photo opts in via album.cfg `featured` (the parent's
-    # cfg may list sub-folder paths) or the legacy `_` filename prefix.
-    featured = _showcase_rows(album=album, limit=8, random_order=False, subtree=True)
+    # Hero reel (album.cfg `reel`, like the welcome feed): default/featured
+    # shows featured photos from this album AND its sub-albums (subtree), so
+    # photos featured inside e.g. japan_2026/osaka surface on the japan_2026
+    # page too — a showcase ALBUM doesn't auto-promote its contents, each
+    # photo opts in via album.cfg `featured` or the legacy `_` prefix.
+    # `reel = random` fills it with random subtree photos instead, and
+    # `reel = off` hides the slideshow entirely.
+    reel_mode = (_cfg_first(album_cfg, "reel") or "").strip().lower()
+    if reel_mode in _FALSE:
+        featured = []
+        reel_mode = "off"
+    elif reel_mode in ("random", "shuffle"):
+        featured = _random_subtree_rows(album, limit=8)
+        reel_mode = "random"
+    else:
+        featured = _showcase_rows(album=album, limit=8, random_order=False, subtree=True)
+        reel_mode = "featured"
+    sort_options = _image_sort_options_for_template(current_sort, curated=bool(curated_order))
     return templates.TemplateResponse(
         "album.html",
         {
@@ -988,16 +1127,14 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             "sub_albums": sub_albums,
             "album_is_showcase": album_is_showcase,
             "featured": featured,
-            "images": [dict(r) for r in rows],
+            "reel_mode": reel_mode,
+            "images": images,
             "tags": [r["name"] for r in tag_rows],
             "active_tag": tag,
             "current_sort": current_sort,
-            "default_sort": SORT_IMAGE_DEFAULT,
-            "sort_options": _image_sort_options_for_template(current_sort),
-            "sort_label": next(
-                (label for k, label, _ in SORT_IMAGE_OPTIONS if k == current_sort),
-                "",
-            ),
+            "default_sort": default_sort,
+            "sort_options": sort_options,
+            "sort_label": _active_sort_label(sort_options),
         },
     )
 
@@ -1021,8 +1158,6 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
             (row["id"],),
         ).fetchall()
     ]
-    current_sort = _pick_sort(sort, SORT_IMAGE_SQL, SORT_IMAGE_DEFAULT)
-    order_sql = SORT_IMAGE_SQL[current_sort]
     # Prev/next neighbours. Normally scoped to the image's own folder, but
     # when opened from a collection album (`?col=<root>`) the scroll spans
     # that collection's whole subtree, so you page through every collected
@@ -1032,7 +1167,7 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
     if (
         col_root
         and (album == col_root or album.startswith(col_root + "/"))
-        and _cfg_bool(_album_config(col_root).get("collection"))
+        and _cfg_bool(_cfg_first(_album_config(col_root), "collection"))
     ):
         prefix = col_root + "/"
         where_scope = "(album = ? OR substr(album, 1, ?) = ?)"
@@ -1041,11 +1176,25 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
         col_root = ""  # absent / forged / no longer a collection: folder scope
         where_scope = "album = ?"
         scope_params = (album,)
+    # Sort must resolve exactly like on the album grid the visitor came from
+    # (same cfg scope: collection root or the image's own folder), so links
+    # without an explicit ?sort= still walk the grid in the grid's order —
+    # including a cfg-preset default and the curated order.
+    scope_cfg = _album_config(col_root or album)
+    curated_order = _curated_photo_order(col_root or album, scope_cfg)
+    allowed = set(SORT_IMAGE_SQL) | ({SORT_CURATED} if curated_order else set())
+    default_sort = _pick_sort(_cfg_first(scope_cfg, "sort"), allowed, SORT_IMAGE_DEFAULT)
+    current_sort = _pick_sort(sort, allowed, default_sort)
+    base_sort = SORT_IMAGE_DEFAULT if current_sort == SORT_CURATED else current_sort
+    order_sql = SORT_IMAGE_SQL[base_sort]
     neighbours = c.execute(
         f"SELECT rel_path FROM images WHERE {where_scope} ORDER BY {order_sql}",
         scope_params,
     ).fetchall()
     rel_list = [r["rel_path"] for r in neighbours]
+    if current_sort == SORT_CURATED:
+        pos = {r: i for i, r in enumerate(curated_order)}
+        rel_list.sort(key=lambda r: pos.get(r, len(pos)))
     idx = rel_list.index(rel) if rel in rel_list else -1
     prev_rel = rel_list[idx - 1] if idx > 0 else None
     next_rel = rel_list[idx + 1] if 0 <= idx < len(rel_list) - 1 else None
@@ -1067,7 +1216,7 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
             "collection_root": col_root or None,
             "current_index": idx,
             "current_sort": current_sort,
-            "default_sort": SORT_IMAGE_DEFAULT,
+            "default_sort": default_sort,
         },
     )
 
@@ -1215,6 +1364,7 @@ def search(request: Request, q: str = "", sort: str | None = None):
            ORDER BY {qualified_sql}""",
         (like, like, like),
     ).fetchall()
+    sort_options = _image_sort_options_for_template(current_sort)
     return templates.TemplateResponse(
         "search.html",
         {
@@ -1223,10 +1373,7 @@ def search(request: Request, q: str = "", sort: str | None = None):
             "images": [dict(r) for r in rows],
             "current_sort": current_sort,
             "default_sort": SORT_IMAGE_DEFAULT,
-            "sort_options": _image_sort_options_for_template(current_sort),
-            "sort_label": next(
-                (label for k, label, _ in SORT_IMAGE_OPTIONS if k == current_sort),
-                "",
-            ),
+            "sort_options": sort_options,
+            "sort_label": _active_sort_label(sort_options),
         },
     )

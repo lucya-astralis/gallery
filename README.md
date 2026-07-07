@@ -10,7 +10,7 @@ A lean, read-only web image gallery with folder-based albums, EXIF display, side
 - **EXIF:** camera, lens, exposure, ISO, focal length, … on the detail page. GPS coordinates are stripped by default (privacy).
 - **Tags via sidecar files:** drop a `.tags` file next to an image (e.g. `IMG_0001.jpg.tags` containing `holiday, beach, sunset`). Click a tag in the album view to filter.
 - **Showcase:** mark a photo (`_hero.jpg`) or a whole album (`_best-of/`) with an underscore prefix to surface it on the welcome screen, on the album overview, and via `/api/showcase` JSON for embedding on other sites.
-- **Search & sort:** top bar searches album, file, and tag names; sort by date, name or size on every list view.
+- **Search & sort:** top bar searches album, file, and tag names; sort by date, name or size on every list view — plus a "Curated" order defined in `album.cfg` / `gallery.cfg`, which can also preselect the default sort.
 - **Mobile-friendly:** responsive grid, large touch targets, keyboard navigation (← → ESC) on desktop.
 - **Read-only:** no write endpoints, no uploads. The `photos/` mount is `:ro`. No attack surface for upload/tag-injection exploits.
 - **Security headers:** CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy — all set by built-in middleware.
@@ -71,9 +71,36 @@ photos/
 
 Change the marker globally via `SHOWCASE_MARKER` (set it to an empty string to disable the whole feature). Showcase flags are re-evaluated on every startup, so toggling files / changing the marker takes effect after a restart without needing a full re-scan.
 
-## Welcome feed (`gallery.cfg`)
+## Config files (`gallery.cfg` / `album.cfg`)
 
-By default the welcome hero cycles through a random selection of showcased photos (falling back to fully random when nothing is showcased). To pick the images yourself, drop a `gallery.cfg` into the **root of `photos/`** — same `key = value` format as `album.cfg`, `#`/`;` start comments:
+Both files share one format: plain `key = value` lines, `#`/`;` start comments. List values accumulate — comma-separate them, repeat the key, or (easiest to read) put **one entry per line** below the key; any non-comment line without a `=` continues the key above it:
+
+```ini
+featured =
+    osaka/hero.jpg
+    tokyo/shibuya.jpg
+    skyline.jpg
+```
+
+Both files are re-read on every page load, so edits apply immediately — no restart needed.
+
+### Album settings (`album.cfg`)
+
+Optional file inside an album's photo folder:
+
+| Key          | Values                          | Effect                                                                                     |
+|--------------|---------------------------------|--------------------------------------------------------------------------------------------|
+| `collection` | `true`                          | The album page shows every photo of its whole subtree (own + sub-folders) as one flat set. |
+| `showcase`   | `true` / `false`                | Featured album: ★ rail on `/albums` and the welcome screen (replaces the `_` folder prefix). |
+| `featured`   | paths, or `*` / `all`           | Featured photos: welcome hero, `/api/showcase`, the album's reel (replaces the `_` filename prefix). Paths are relative to the album; bare filenames match anywhere in the subtree. |
+| `cover`      | one path                        | Pin the album cover instead of auto-picking the newest photo.                              |
+| `reel`       | `featured` / `random` / `off`   | What the hero slideshow at the top of the album shows: the featured photos (default), random photos from the album's subtree, or nothing (hidden). |
+| `order`      | paths                           | Curated photo order — adds a **Curated** entry to the album's sort menu. Photos not listed follow, newest first. |
+| `sort`       | `curated`, `date_desc`, `date_asc`, `name_asc`, `name_desc`, `size_desc`, `size_asc` | Preselect the sort option for this album's grid (visitors can still switch). |
+
+### Gallery settings (`gallery.cfg`)
+
+Optional file in the **root of `photos/`**. By default the welcome hero cycles through a random selection of showcased photos (falling back to fully random when nothing is showcased). To pick the images yourself:
 
 ```ini
 # photos/gallery.cfg — welcome hero feed
@@ -81,16 +108,34 @@ By default the welcome hero cycles through a random selection of showcased photo
 #   welcome = showcase      ← random featured photos (default, same as no file)
 #   welcome = random        ← random photos, ignore the featured flags
 #   welcome = <paths>       ← hand-picked list, shown in exactly this order
-welcome = berlin_dec_2025/IMG_0646.png
-welcome = paris_march_2026/IMG_2222.png, frankfurt_feb_2026/IMG_1628.png
+welcome =
+    berlin_dec_2025/IMG_0646.png
+    paris_march_2026/IMG_2222.png
+    frankfurt_feb_2026/IMG_1628.png
+
+# separate feeds per device class (welcome = shared fallback):
+welcome_desktop = showcase
+welcome_mobile =
+    paris_march_2026/IMG_2222.png
+
+# curated album order: adds a "Curated" entry to the /albums sort menu and
+# fixes the order of the ★ featured-album rails (welcome + /albums)
+album_order =
+    japan_2026
+    paris_march_2026
+
+# preselect the sort option on /albums (curated, latest_desc, latest_asc,
+# name_asc, name_desc, count_desc, count_asc)
+album_sort = curated
 ```
 
-Rules for the hand-picked list:
+Rules for the hand-picked welcome list:
 
 - Paths are relative to `photos/` (`album/file.jpg`, nested albums allowed). The showcase marker may be omitted (`best-of/hero.jpg` finds `_best-of/_hero.jpg`), backslashes are tolerated.
-- Repeat the `welcome` key per line and/or comma-separate — entries accumulate in order (max 24, duplicates collapse).
+- Entries accumulate in order (max 24, duplicates collapse).
 - Entries that aren't indexed are skipped with a log warning; if nothing resolves, the feed falls back to showcase/random as if the file weren't there.
-- The file is re-read on every page load, so edits apply immediately — no restart needed. With a hand-picked list the hero shows a `CURATED` label and hides the ⟳ TUNE (reshuffle) button.
+- With a hand-picked list the hero shows a `CURATED` label and hides the ⟳ TUNE (reshuffle) button.
+- `welcome_mobile` / `welcome_desktop` accept the same syntax as `welcome` and win over it for their device class. Phones are detected via the User-Agent (`Mobi`); Android tablets and iPads in desktop mode get the desktop feed.
 
 ## API
 

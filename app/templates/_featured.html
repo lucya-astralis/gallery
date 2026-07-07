@@ -7,14 +7,17 @@
    trip/description sidebar.
    Featured rows may come from sub-albums (subtree query) — those slides
    carry the child path in their label so "osaka / foo.jpg" reads right
-   on the japan_2026 page. #}
+   on the japan_2026 page. With album.cfg `reel = random` the slides are
+   random album photos instead (reel_mode tells us which), so the header
+   is relabelled to match. #}
 {%- macro feat_label(img) -%}
   {%- if img.album != album -%}{{ pretty_rel(img.album[(album | length) + 1:]) }} / {% endif -%}{{ display_name(img.filename) }}
 {%- endmacro -%}
-<section class="fhero{% if featured | length == 1 %} fhero--single{% endif %}" id="fhero" aria-label="Featured photos">
+{% set reel_random = reel_mode == 'random' %}
+<section class="fhero{% if featured | length == 1 %} fhero--single{% endif %}" id="fhero" aria-label="{% if reel_random %}Random photos{% else %}Featured photos{% endif %}">
   <header class="fhero__head">
-    <span class="fhero__label">★ FEATURED</span>
-    <span class="fhero__hint doc-min-hide" aria-hidden="true">SHOWCASE REEL</span>
+    <span class="fhero__label">{% if reel_random %}⟳ RANDOM{% else %}★ FEATURED{% endif %}</span>
+    <span class="fhero__hint doc-min-hide" aria-hidden="true">{% if reel_random %}SHUFFLE REEL{% else %}SHOWCASE REEL{% endif %}</span>
     <span class="fhero__count">{{ featured | length }} {% if featured | length == 1 %}PHOTO{% else %}PHOTOS{% endif %}</span>
   </header>
   <div class="fhero__frame">
@@ -34,7 +37,7 @@
     <i class="fhero__corner fhero__corner--tr" aria-hidden="true"></i>
     <i class="fhero__corner fhero__corner--bl" aria-hidden="true"></i>
     <i class="fhero__corner fhero__corner--br" aria-hidden="true"></i>
-    <span class="fhero__chip fhero__chip--star" aria-hidden="true">★</span>
+    <span class="fhero__chip fhero__chip--star" aria-hidden="true">{% if reel_random %}⟳{% else %}★{% endif %}</span>
     <span class="fhero__chip fhero__chip--frm">FRM <b id="fhero-idx">01</b><span>/{{ '%02d' | format(featured | length) }}</span></span>
     <a class="fhero__file" id="fhero-file" href="/image/{{ pretty_rel(featured[0].rel_path) }}">
       <span class="fhero__file-name" id="fhero-name" data-scramble>{{ feat_label(featured[0]) }}</span>
