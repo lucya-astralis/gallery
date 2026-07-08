@@ -534,6 +534,34 @@ def _recompute_featured() -> None:
         c.commit()
 
 
+# The watcher recomputes featured flags when an album.cfg changes, but its
+# debounce means a save + immediate reload can still render stale flags (and
+# a recompute racing a mid-write read may even drop them until the next
+# scan). Album pages therefore stat their own album.cfg per request and run
+# the recompute inline the moment the file's mtime differs from the last
+# look — a cfg edit + reload then always shows the new featured state.
+_cfg_seen_mtimes: dict[str, float] = {}
+_cfg_seen_lock = threading.Lock()
+
+
+def _refresh_featured_on_cfg_change(album: str) -> None:
+    folder = (PHOTOS_DIR / album).resolve()
+    try:
+        folder.relative_to(PHOTOS_DIR)  # guard against path traversal
+    except ValueError:
+        return
+    try:
+        mtime = (folder / "album.cfg").stat().st_mtime
+    except OSError:
+        mtime = 0.0  # missing file is a state too (cfg deleted -> refresh)
+    with _cfg_seen_lock:
+        stale = _cfg_seen_mtimes.get(album) != mtime
+        if stale:
+            _cfg_seen_mtimes[album] = mtime
+    if stale:
+        _recompute_featured()
+
+
 # ----- trip dashboard ---------------------------------------------------
 # An optional "trip" overlay (a live flight countdown + an itinerary
 # timeline with a "you are here" marker) rendered at the top of one album.
@@ -1028,6 +1056,9 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     album = album.strip("/")
     if not album:
         raise HTTPException(404, "album not found")
+    # a just-saved album.cfg must be visible on this very reload (reel mode,
+    # featured set, grid stars) without waiting for the watcher's debounce
+    _refresh_featured_on_cfg_change(album)
     album_cfg = _album_config(album)
     # album.cfg `order` adds a "Curated" sort option; `sort` presets the
     # default sort for this album (query param still wins).
@@ -1112,7 +1143,17 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
         featured = _random_subtree_rows(album, limit=8)
         reel_mode = "random"
     else:
-        featured = _showcase_rows(album=album, limit=8, random_order=False, subtree=True)
+        # The reel follows the album.cfg `featured` list order: photos from
+        # this album's own list come first, exactly as written; anything
+        # featured by sub-album cfgs or the legacy marker follows newest-
+        # first. Fetch wide before trimming so a date-based LIMIT can't cut
+        # off early list entries.
+        featured = _showcase_rows(album=album, limit=100, random_order=False, subtree=True)
+        order_items = [i for i in album_cfg.get("featured", [])
+                       if i.strip().lower() not in ("*", "all")]
+        if order_items:
+            featured = _apply_curated_order(featured, _resolve_photo_refs(album, order_items))
+        featured = featured[:8]
         reel_mode = "featured"
     sort_options = _image_sort_options_for_template(current_sort, curated=bool(curated_order))
     return templates.TemplateResponse(
