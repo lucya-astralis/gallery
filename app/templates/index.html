@@ -6,13 +6,13 @@
   <nav class="pathbar" aria-label="Breadcrumb">
     <a class="pathbar__back" href="/">
       <span class="pathbar__back-ico" aria-hidden="true">‹</span>
-      <span class="pathbar__back-lbl">Back to</span>
-      <span class="pathbar__back-txt">Home</span>
+      <span class="pathbar__back-lbl">{{ t('back.label') }}</span>
+      <span class="pathbar__back-txt">{{ t('back.home') }}</span>
     </a>
     <div class="crumb">
-      <a href="/">HOME</a>
+      <a href="/">{{ t('crumb.home') }}</a>
       <span class="sep">/</span>
-      <b aria-current="page">ALBUMS</b>
+      <b aria-current="page">{{ t('crumb.albums') }}</b>
     </div>
   </nav>
 
@@ -25,14 +25,14 @@
   <header class="section__head">
     <div class="section__slug">
       <span class="ix">01</span>
-      <span class="name">ALBUMS</span>
-      <span class="jp">アルバム</span>
+      <span class="name">{{ t('index.slug') }}</span>
+      <span class="jp">{{ t('index.slug_deco') }}</span>
     </div>
     {% if albums %}
       <div class="section__stat">
-        <b>{{ albums | length }}</b> ALBUMS
+        <b>{{ albums | length }}</b> {{ t('stat.albums') }}
         <span class="section__stat-sep" aria-hidden="true">/</span>
-        <b>{{ albums | sum(attribute='count') }}</b> IMAGES
+        <b>{{ albums | sum(attribute='count') }}</b> {{ t('stat.images') }}
       </div>
     {% endif %}
   </header>
@@ -40,7 +40,7 @@
   {% if not albums %}
     <div class="empty">
       <span class="stamp">NO INDEX</span>
-      <p>No images indexed yet.</p>
+      <p>{{ t('welcome.no_images') }}</p>
       <p class="note">Drop subfolders into <code>photos/</code> — each subfolder is an album, and albums can nest.<br>Example: <code>photos/japan/tokyo/dsc_0001.jpg</code></p>
     </div>
   {% else %}
@@ -51,8 +51,8 @@
     {% if showcase_albums %}
       <section class="feat" aria-label="Featured albums">
         <header class="feat__head">
-          <span class="feat__label">★ FEATURED</span>
-          <span class="feat__hint doc-min-hide">CURATED SETS</span>
+          <span class="feat__label">{{ t('feat.label') }}</span>
+          <span class="feat__hint doc-min-hide">{{ t('feat.hint') }}</span>
           <span class="feat__count">{{ showcase_albums | length }} / {{ albums | length }}</span>
         </header>
         {% set feat_eager = 3 %}
@@ -63,15 +63,15 @@
     {# ---- archive: every non-featured album, sortable ---- #}
     {% if archive_albums %}
       <header class="archive-head">
-        <span class="archive-head__label">▦ ARCHIVE</span>
-        <span class="archive-head__count">{{ archive_albums | length }} {% if archive_albums | length == 1 %}DIRECTORY{% else %}DIRECTORIES{% endif %}</span>
+        <span class="archive-head__label">{{ t('archive.label') }}</span>
+        <span class="archive-head__count">{{ archive_albums | length }} {% if archive_albums | length == 1 %}{{ t('unit.directory') }}{% else %}{{ t('unit.directories') }}{% endif %}</span>
         <div class="sort" data-sort>
           <button type="button" class="sort__btn" aria-haspopup="true" aria-expanded="false">
-            <span class="sort__btn-label">SORT</span>
+            <span class="sort__btn-label">{{ t('sort.btn') }}</span>
             <b>{{ sort_label }}</b>
           </button>
           <div class="sort__menu" hidden role="menu">
-            <div class="sort__head">SORT BY</div>
+            <div class="sort__head">{{ t('sort.by') }}</div>
             {% for opt in sort_options %}
               <a class="sort__option{% if opt.active %} is-active{% endif %}"
                  role="menuitem"
@@ -91,16 +91,16 @@
                 {% if a.cover %}
                   <img src="/thumb/{{ a.cover }}" alt="{{ a.name }}" loading="lazy" decoding="async">
                 {% else %}
-                  <div class="album-card__cover-empty">NO COVER</div>
+                  <div class="album-card__cover-empty">{{ t('card.no_cover') }}</div>
                 {% endif %}
                 <span class="album-card__idx" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span>
                 {% if a.sub_count %}<span class="album-card__badge album-card__badge--folder">▸ {{ a.sub_count }}</span>{% endif %}
-                <div class="album-card__hover" aria-hidden="true"><span>ENTER →</span></div>
+                <div class="album-card__hover" aria-hidden="true"><span>{{ t('card.enter') }}</span></div>
               </div>
               <div class="album-card__cap">
                 <span class="album-card__name">{{ a.name }}</span>
                 <span class="album-card__meta">
-                  <span>{{ a.count }} {% if a.count == 1 %}IMAGE{% else %}IMAGES{% endif %}{% if a.sub_count %} · {{ a.sub_count }} DIR{% if a.sub_count != 1 %}S{% endif %}{% endif %}</span>
+                  <span>{{ a.count }} {% if a.count == 1 %}{{ t('unit.image') }}{% else %}{{ t('unit.images') }}{% endif %}{% if a.sub_count %} · {{ a.sub_count }} {% if a.sub_count != 1 %}{{ t('unit.dirs') }}{% else %}{{ t('unit.dir') }}{% endif %}{% endif %}</span>
                   {% if month_label(a.latest) %}<span class="album-card__date">{{ month_label(a.latest) }}</span>{% endif %}
                 </span>
               </div>

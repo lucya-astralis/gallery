@@ -1,3 +1,57 @@
+// ---------- UI LANGUAGE ----------------------------------------
+// The server renders <html lang="en|de|ja"> from the language cookie
+// (selector in the nav); client-side strings pick their translation here.
+// Keep the wording in sync with app/i18n.py. Decorative HUD stamps
+// (PREVIEW/ORIGINAL, IN TRANSIT, T-x DAYS, …) intentionally stay English.
+// NB: new Japanese text may need a font-subset rebuild — see
+// tools/build_jp_subset.py.
+const UI_LANG = (document.documentElement.lang || 'en').toLowerCase().slice(0, 2);
+const UI_STRINGS = {
+  en: {
+    loadOriginal: 'Load original',
+    loading: 'Loading…',
+    errRetry: 'Error — retry?',
+    departsIn: 'Departs in',
+    arrivingIn: (city) => 'Arriving in ' + city,
+    leavingIn: (city) => 'Leaving ' + city + ' in',
+    tripComplete: 'Trip complete',
+    soon: 'soon',
+    inDays: (d) => 'in ' + d + ' days',
+    dayOf: (n, total) => 'Day ' + n + ' / ' + total,
+    months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    fmtDate: (d, M) => `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`,
+  },
+  de: {
+    loadOriginal: 'Original laden',
+    loading: 'Lädt…',
+    errRetry: 'Fehler — erneut?',
+    departsIn: 'Abflug in',
+    arrivingIn: (city) => 'Ankunft in ' + city,
+    leavingIn: (city) => 'Abreise aus ' + city + ' in',
+    tripComplete: 'Reise beendet',
+    soon: 'bald',
+    inDays: (d) => 'in ' + d + ' Tagen',
+    dayOf: (n, total) => 'Tag ' + n + ' / ' + total,
+    months: ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'],
+    fmtDate: (d, M) => `${d.getDate()}. ${M[d.getMonth()]} ${d.getFullYear()}`,
+  },
+  ja: {
+    loadOriginal: 'オリジナルを読み込む',
+    loading: '読み込み中…',
+    errRetry: 'エラー — 再試行？',
+    departsIn: '出発まで',
+    arrivingIn: (city) => city + 'に到着まで',
+    leavingIn: (city) => city + 'を出発まで',
+    tripComplete: '旅は終了しました',
+    soon: 'まもなく',
+    inDays: (d) => 'あと' + d + '日',
+    dayOf: (n, total) => n + '日目 / ' + total + '日',
+    months: null, // fmtDate below doesn't use month names
+    fmtDate: (d) => `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`,
+  },
+};
+const TXT = UI_STRINGS[UI_LANG] || UI_STRINGS.en;
+
 // ---------- DEVICE CAPABILITY ----------------------------------
 // Single gate for the heavy, decorative effects (background video, animated
 // scanlines, text scramble, CRT auto-cycle). Small screens, data-saver,
@@ -570,7 +624,7 @@ function initImagePage() {
   // reset stage state — DOM was just (re)rendered
   loader.classList.remove('is-loading', 'is-done');
   img.classList.add('is-preview');
-  btn.textContent = 'Load original';
+  btn.textContent = TXT.loadOriginal;
   if (stamp) {
     stamp.textContent = 'PREVIEW';
     stamp.classList.add('stamp--cy');
@@ -582,7 +636,7 @@ function initImagePage() {
     const fullUrl = img.dataset.full;
     if (!fullUrl) return;
     loader.classList.add('is-loading');
-    btn.textContent = 'Loading…';
+    btn.textContent = TXT.loading;
     const full = new Image();
     full.onload = () => {
       img.src = fullUrl;
@@ -596,7 +650,7 @@ function initImagePage() {
     };
     full.onerror = () => {
       loader.classList.remove('is-loading');
-      btn.textContent = 'Error — retry?';
+      btn.textContent = TXT.errRetry;
     };
     full.src = fullUrl;
   });
@@ -888,7 +942,7 @@ document.addEventListener('DOMContentLoaded', () => {
     countEl.textContent = String(index + 1).padStart(2, '0') + ' / ' + String(total).padStart(2, '0');
     dlBtn.href = relToFull(rel);
     dlBtn.setAttribute('download', filename);
-    fullBtn.textContent = 'Load original';
+    fullBtn.textContent = TXT.loadOriginal;
     bar.classList.remove('is-loading-full', 'is-full');
     showingFull = false;
 
@@ -986,7 +1040,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const rel = rels[index];
     const fullUrl = relToFull(rel);
     bar.classList.add('is-loading-full');
-    fullBtn.textContent = 'Loading…';
+    fullBtn.textContent = TXT.loading;
     const full = new Image();
     full.onload = () => {
       imgEl.src = fullUrl;
@@ -996,7 +1050,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     full.onerror = () => {
       bar.classList.remove('is-loading-full');
-      fullBtn.textContent = 'Error — retry?';
+      fullBtn.textContent = TXT.errRetry;
     };
     full.src = fullUrl;
   });
@@ -1055,14 +1109,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!m) return null;
     return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
   };
-  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const fmtDate = (d) => d ? `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}` : '';
+  const fmtDate = (d) => d ? TXT.fmtDate(d, TXT.months) : '';
   const ceilDays = (from, to) => Math.max(0, Math.ceil((to - from) / DAY));
 
   const depart = parseLocal(root.dataset.depart);
+  // `city` stays the English key (matches _trip_map.html's data-map-city and
+  // the HUD status stamp); `cityLabel` is what countdown sentences display —
+  // the Japanese name on the JP page when the template provides one.
   const stops = Array.from(root.querySelectorAll('[data-stop]')).map((el) => ({
     el,
     city: el.dataset.city || '',
+    cityLabel: (UI_LANG === 'ja' && el.dataset.cityJp) ? el.dataset.cityJp : (el.dataset.city || ''),
     start: parseLocal(el.dataset.start),
     end: parseLocal(el.dataset.end),
     fill: el.querySelector('[data-stop-fill]'),
@@ -1152,11 +1209,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (s.meta) {
         if (state === 'upcoming') {
           const dleft = ceilDays(now, s.start);
-          s.meta.textContent = dleft <= 1 ? 'soon' : ('in ' + dleft + ' days');
+          s.meta.textContent = dleft <= 1 ? TXT.soon : TXT.inDays(dleft);
         } else if (state === 'active') {
           const total = Math.max(1, Math.round(span / DAY));
           const dayNum = Math.min(total, Math.floor((now - s.start) / DAY) + 1);
-          s.meta.textContent = 'Day ' + dayNum + ' / ' + total;
+          s.meta.textContent = TXT.dayOf(dayNum, total);
         } else {
           s.meta.textContent = '✓';
         }
@@ -1176,20 +1233,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (jstFmt && clockEl) clockEl.textContent = 'JST ' + jstFmt.format(now);
 
-    // phase + headline countdown
+    // phase + headline countdown (label is localized; the status stamp is
+    // HUD chrome and stays English in every language)
     let phase, target, label, status;
     if (depart && now < depart) {
       phase = 'pre'; target = depart;
-      label = 'Departs in'; status = 'T-' + Math.floor((depart - now) / DAY) + ' DAYS';
+      label = TXT.departsIn; status = 'T-' + Math.floor((depart - now) / DAY) + ' DAYS';
     } else if (firstStart && now < firstStart) {
       phase = 'transit'; target = firstStart;
-      label = 'Arriving in ' + stops[0].city; status = 'IN TRANSIT';
+      label = TXT.arrivingIn(stops[0].cityLabel); status = 'IN TRANSIT';
     } else if (activeIdx >= 0) {
       phase = 'active'; target = stops[activeIdx].end;
-      label = 'Leaving ' + stops[activeIdx].city + ' in'; status = 'IN ' + stops[activeIdx].city.toUpperCase();
+      label = TXT.leavingIn(stops[activeIdx].cityLabel); status = 'IN ' + stops[activeIdx].city.toUpperCase();
     } else {
       phase = 'done'; target = null;
-      label = 'Trip complete'; status = 'COMPLETE';
+      label = TXT.tripComplete; status = 'COMPLETE';
     }
 
     setPhase(phase);

@@ -2,7 +2,7 @@
 {% block title %}WELCOME // LUCYA.SYSTEMS GALLERY{% endblock %}
 {% block body_class %}page-welcome{% endblock %}
 {% block meta %}
-  {% set og_desc = 'Personal photo archive · ' ~ image_count ~ ' images in ' ~ album_count ~ ' albums.' %}
+  {% set og_desc = t('welcome.og_desc', images=image_count, albums=album_count) %}
   <meta property="og:site_name" content="lucya.systems gallery">
   <meta property="og:title" content="lucya.systems / gallery">
   <meta property="og:description" content="{{ og_desc }}">
@@ -69,12 +69,12 @@
         {# head/tail are scrambled separately (the scrambler flattens its
            target's innerHTML — one wrapper would wipe the dot + tail spans) #}
         <h1 class="vf__title"><span class="vf__title-head">LUCYA</span><span class="vf__title-dot">.</span><wbr><span class="vf__title-tail">GALLERY</span></h1>
-        <p class="vf__lead">A read-only window into a personal photo archive.</p>
+        <p class="vf__lead">{{ t('welcome.lead') }}</p>
         <div class="vf__actions">
-          <a href="/albums" class="btn-link btn-link--primary">BROWSE ALBUMS →</a>
-          <a href="/image/{{ shuffle[0].rel_path }}" class="btn-link" data-vf-open>OPEN FRAME ↗</a>
+          <a href="/albums" class="btn-link btn-link--primary">{{ t('welcome.browse') }}</a>
+          <a href="/image/{{ shuffle[0].rel_path }}" class="btn-link" data-vf-open>{{ t('welcome.open_frame') }}</a>
           <a href="https://lucya.sh" class="btn-link btn-link--about" target="_blank" rel="noopener">
-            <img class="btn-link__pfp" src="{{ static_url('pfp.webp') }}" alt="" width="18" height="18" loading="lazy" decoding="async">ABOUT ME ↗
+            <img class="btn-link__pfp" src="{{ static_url('pfp.webp') }}" alt="" width="18" height="18" loading="lazy" decoding="async">{{ t('welcome.about_me') }}
           </a>
         </div>
       </div>
@@ -86,15 +86,15 @@
     </div>
 
     <div class="vf__deck">
-      <button type="button" class="vf__nav" id="vf-prev" aria-label="Previous frame">‹</button>
-      <button type="button" class="vf__nav" id="vf-next" aria-label="Next frame">›</button>
-      <div class="vf__track" id="vf-track" aria-label="Frame selector">
+      <button type="button" class="vf__nav" id="vf-prev" aria-label="{{ t('aria.prev_frame') }}">‹</button>
+      <button type="button" class="vf__nav" id="vf-next" aria-label="{{ t('aria.next_frame') }}">›</button>
+      <div class="vf__track" id="vf-track" aria-label="{{ t('aria.frame_selector') }}">
         {% for img in shuffle %}
           <button type="button" class="vf__seg{% if loop.first %} is-on{% endif %}" data-goto="{{ loop.index0 }}" aria-label="Frame {{ loop.index }}: {{ img.album }} / {{ img.filename }}"></button>
         {% endfor %}
       </div>
       {% if feed_mode != 'manual' %}
-        <button type="button" class="vf__tune" id="vf-tune" aria-label="Reshuffle feed">⟳ TUNE</button>
+        <button type="button" class="vf__tune" id="vf-tune" aria-label="{{ t('aria.reshuffle') }}">⟳ TUNE</button>
       {% endif %}
       <span class="vf__auto" id="vf-auto">AUTO · 6.0S</span>
     </div>
@@ -110,7 +110,7 @@
       <h1 class="vf__title"><span class="vf__title-head">LUCYA</span><span class="vf__title-dot">.</span><wbr><span class="vf__title-tail">GALLERY</span></h1>
       <div class="empty">
         <span class="stamp">NO INDEX</span>
-        <p>No images indexed yet.</p>
+        <p>{{ t('welcome.no_images') }}</p>
         <p class="note">Drop subfolders into <code>photos/</code> — each subfolder becomes an album, and albums can nest (e.g. <code>japan/tokyo</code>).</p>
       </div>
     </div>
@@ -127,18 +127,18 @@
     <div class="vf-band__cells">
       <div class="vf-band__cell">
         <span class="vf-band__digits" data-count-to="{{ image_count }}">{{ image_count }}</span>
-        <span class="vf-band__caption">Images</span>
+        <span class="vf-band__caption">{{ t('band.images') }}</span>
       </div>
       <span class="vf-band__divider" aria-hidden="true"></span>
       <div class="vf-band__cell">
         <span class="vf-band__digits" data-count-to="{{ album_count }}">{{ album_count }}</span>
-        <span class="vf-band__caption">Albums</span>
+        <span class="vf-band__caption">{{ t('band.albums') }}</span>
       </div>
       {% if showcase_count %}
         <span class="vf-band__divider" aria-hidden="true"></span>
         <div class="vf-band__cell">
           <span class="vf-band__digits vf-band__digits--accent" data-count-to="{{ showcase_count }}">{{ showcase_count }}</span>
-          <span class="vf-band__caption">Featured</span>
+          <span class="vf-band__caption">{{ t('band.featured') }}</span>
         </div>
       {% endif %}
     </div>
@@ -150,8 +150,8 @@
   <section class="showcase-page" aria-label="Showcase albums">
     <div class="showcase">
       <header class="showcase__head">
-        <span class="showcase__label">★ SHOWCASE ALBUMS</span>
-        <a class="showcase__more" href="/albums">ALL ALBUMS →</a>
+        <span class="showcase__label">{{ t('showcase.head') }}</span>
+        <a class="showcase__more" href="/albums">{{ t('showcase.all') }}</a>
       </header>
       {% include "_showcase_albums.html" %}
     </div>

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ html_lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,12 +11,12 @@
   {% block meta %}
   <meta property="og:site_name" content="lucya.systems gallery">
   <meta property="og:title" content="lucya.systems / gallery">
-  <meta property="og:description" content="Personal photo archive.">
+  <meta property="og:description" content="{{ t('meta.site_desc') }}">
   <meta property="og:type" content="website">
   <meta property="og:url" content="{{ public_base_url(request) }}{{ request.url.path }}">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="lucya.systems / gallery">
-  <meta name="twitter:description" content="Personal photo archive.">
+  <meta name="twitter:description" content="{{ t('meta.site_desc') }}">
   <meta name="theme-color" content="#5b8aff">
   {% endblock %}
 </head>
@@ -42,11 +42,21 @@
         <span class="jp">画像庫</span>
       </a>
       <form action="/search" method="get" class="nav__search" role="search">
-        <input type="search" name="q" placeholder="Search / album, file, tag" value="{{ query or '' }}" autocomplete="off">
+        <input type="search" name="q" placeholder="{{ t('nav.search_ph') }}" value="{{ query or '' }}" autocomplete="off">
       </form>
       <div class="nav__status">
         <span class="dot"></span>
         <span>ONLINE</span>
+      </div>
+      {# language selector — cookie round-trip via /lang/{code}, bouncing
+         back to the current URL. Plain links: works without JS, CSP-safe. #}
+      {% set _next = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
+      <div class="nav__lang" aria-label="{{ t('nav.lang_label') }}">
+        {% for l in langs %}
+          <a class="nav__lang-opt{% if l.active %} is-active{% endif %}"
+             href="/lang/{{ l.code }}?next={{ _next | urlencode }}"
+             {% if l.active %}aria-current="true"{% endif %}>{{ l.label }}</a>
+        {% endfor %}
       </div>
     </div>
   </nav>
@@ -59,15 +69,15 @@
         <img src="/static/logo/lucya_logo.svg" alt="">
         <span>lucya.systems / gallery</span>
       </div>
-      <a class="foot__op" href="https://lucya.sh" target="_blank" rel="noopener" aria-label="About me — lucya.sh">
+      <a class="foot__op" href="https://lucya.sh" target="_blank" rel="noopener" aria-label="{{ t('foot.about') }} — lucya.sh">
         <img class="foot__op-pfp" src="{{ static_url('pfp.webp') }}" alt="" width="34" height="34" loading="lazy" decoding="async">
         <span class="foot__op-txt">
-          <span class="foot__op-key">Operator</span>
-          <span class="foot__op-val">lucya / about me ↗</span>
+          <span class="foot__op-key">{{ t('foot.operator') }}</span>
+          <span class="foot__op-val">{{ t('foot.about') }}</span>
         </span>
       </a>
       <div class="foot__links">
-        <a href="https://lucya.sh/privacy" target="_blank" rel="noopener">Privacy</a>
+        <a href="https://lucya.sh/privacy" target="_blank" rel="noopener">{{ t('foot.privacy') }}</a>
       </div>
       <div class="foot__badges">
         <img src="/static/badges/eu.gif" width="88" height="31" alt="European Union" title="European Union">

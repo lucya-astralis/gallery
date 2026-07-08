@@ -15,12 +15,12 @@
       <span class="notfound__jp">ファイル不明</span>
     </div>
     <div class="notfound__text">
-      <h1 class="notfound__title">NOT FOUND</h1>
-      <p class="notfound__lead">The resource <code>{{ path }}</code> does not exist in this index.</p>
-      <p class="note">It may have been removed, renamed, or never existed in the first place.</p>
+      <h1 class="notfound__title">{{ t('nf.title') }}</h1>
+      <p class="notfound__lead">{{ t('nf.lead_prefix') }}<code>{{ path }}</code>{{ t('nf.lead_suffix') }}</p>
+      <p class="note">{{ t('nf.note') }}</p>
       <div class="notfound__actions">
-        <a href="/" class="btn-link">← home</a>
-        <a href="/albums" class="btn-link">albums →</a>
+        <a href="/" class="btn-link">{{ t('nf.home') }}</a>
+        <a href="/albums" class="btn-link">{{ t('nf.albums') }}</a>
       </div>
     </div>
   </div>

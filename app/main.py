@@ -3,7 +3,7 @@ import logging
 import os
 import threading
 import time
-from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import db, scanner, watcher
+from . import db, i18n, scanner, watcher
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 log = logging.getLogger("main")
@@ -47,7 +47,50 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 app = FastAPI(title="lucya.systems gallery", docs_url=None, redoc_url=None, openapi_url=None)
 
 BASE_DIR = Path(__file__).parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+# ----- language (EN / DE / JP) -------------------------------------------
+# The site is served in three languages. The `lang` cookie (set via the
+# nav selector -> /lang/{code}) wins; first-time visitors fall back to
+# their Accept-Language header, then English. Album descriptions live in
+# per-language markdown files (album_en.md / album_de.md / album_jp.md,
+# see _album_description); UI strings come from i18n.py.
+def _request_lang(request: Request) -> str:
+    cookie = (request.cookies.get("lang") or "").strip().lower()
+    if cookie in i18n.LANGS:
+        return cookie
+    accept = request.headers.get("accept-language", "").lower()
+    for part in accept.split(","):
+        code = part.split(";", 1)[0].strip()[:2]
+        if code == "de":
+            return "de"
+        if code == "ja":
+            return "jp"
+        if code == "en":
+            return "en"
+    return i18n.DEFAULT_LANG
+
+
+def _i18n_context(request: Request) -> dict:
+    """Per-request template context: `t('key')` translates into the active
+    language, `lang`/`html_lang` drive the selector and <html lang=…>, and
+    the localized month_label overrides the app-wide default for the
+    album-card date chips."""
+    lang = _request_lang(request)
+    return {
+        "lang": lang,
+        "html_lang": i18n.HTML_LANG[lang],
+        "langs": [
+            {"code": code, "label": i18n.LANG_LABELS[code], "active": code == lang}
+            for code in i18n.LANGS
+        ],
+        "t": partial(i18n.t, lang),
+        "month_label": partial(i18n.month_label, lang),
+    }
+
+
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"),
+                            context_processors=[_i18n_context])
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
@@ -105,20 +148,10 @@ def _pretty_rel(rel_path: str) -> str:
     return "/".join(_strip_marker_segment(p) for p in parts)
 
 
-def _month_label(iso: str | None) -> str | None:
-    """'2026-06-27T18:57:15' -> 'JUN 2026' for the album-card date chips."""
-    if not iso:
-        return None
-    try:
-        return datetime.strptime(iso[:7], "%Y-%m").strftime("%b %Y").upper()
-    except ValueError:
-        return None
-
-
 templates.env.globals["display_name"] = _display_name
 templates.env.globals["pretty_rel"] = _pretty_rel
 templates.env.globals["showcase_marker"] = SHOWCASE_MARKER
-templates.env.globals["month_label"] = _month_label
+# month_label is provided per request by _i18n_context (localized)
 
 
 def _showcase_rows(album: str | None = None, limit: int = 50, random_order: bool = False,
@@ -344,10 +377,13 @@ def _render_markdown(text: str) -> str:
         return "".join("<p>" + _html.escape(b).replace("\n", "<br>") + "</p>" for b in blocks)
 
 
-def _album_description(album: str) -> str | None:
-    """An album's description is just a markdown file dropped into its photo
-    folder (e.g. photos/japan/album.md). Reads the first *.md sitting directly
-    in the folder, rendered to HTML. Returns None when there's no such file."""
+def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
+    """An album's description is a per-language markdown file dropped into
+    its photo folder: album_en.md / album_de.md / album_jp.md. The active
+    language wins; a missing translation falls back to English, then to a
+    plain legacy album.md, then to the first *.md in the folder — so a
+    partially translated gallery still shows something everywhere. Rendered
+    to HTML; None when the folder has no markdown at all."""
     folder = (PHOTOS_DIR / album).resolve()
     try:
         folder.relative_to(PHOTOS_DIR)  # guard against path traversal
@@ -355,11 +391,16 @@ def _album_description(album: str) -> str | None:
         return None
     if not folder.is_dir():
         return None
-    md_files = sorted(p for p in folder.glob("*.md") if p.is_file())
-    if not md_files:
+    candidates = [folder / f"album_{lang}.md",
+                  folder / f"album_{i18n.DEFAULT_LANG}.md",
+                  folder / "album.md"]
+    md_file = next((p for p in candidates if p.is_file()), None)
+    if md_file is None:
+        md_file = next(iter(sorted(p for p in folder.glob("*.md") if p.is_file())), None)
+    if md_file is None:
         return None
     try:
-        raw = md_files[0].read_text(encoding="utf-8", errors="replace")
+        raw = md_file.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
     return _render_markdown(raw) or None
@@ -585,24 +626,14 @@ TRIPS: dict[str, dict] = {
     },
 }
 
-_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-
-
-def _fmt_date(iso_date: str) -> str:
-    """'2026-08-10' -> '10 Aug 2026'."""
-    try:
-        y, m, d = (int(x) for x in iso_date[:10].split("-"))
-        return f"{d} {_MONTHS[m - 1]} {y}"
-    except (ValueError, IndexError):
-        return iso_date
-
-
-def _trip_for_album(album: str) -> dict | None:
+def _trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
     """Render-ready trip dashboard for `album`, or None when the album has
     no configured trip. Matched on the marker-stripped, lower-cased path so
     `_japan_2026` resolves to the `japan_2026` config. Each stop is wired to
     its sub-album — cover + photo count + link — so the timeline doubles as
-    navigation into the city galleries (empty city folders stay unlinked)."""
+    navigation into the city galleries (empty city folders stay unlinked).
+    Human-readable dates are localized; app.js re-renders them client-side
+    in the same language (read from <html lang>)."""
     key = "/".join(_strip_marker_segment(s) for s in album.split("/")).lower()
     cfg = TRIPS.get(key)
     if not cfg:
@@ -617,8 +648,8 @@ def _trip_for_album(album: str) -> dict | None:
             "jp": s.get("jp", ""),
             "start": s["start"],
             "end": s["end"],
-            "start_h": _fmt_date(s["start"]),
-            "end_h": _fmt_date(s["end"]),
+            "start_h": i18n.fmt_date(lang, s["start"]),
+            "end_h": i18n.fmt_date(lang, s["end"]),
             "href": f"/album/{sub}" if count else None,
             "cover": card["cover"] if card else None,
             "count": count,
@@ -627,32 +658,34 @@ def _trip_for_album(album: str) -> dict | None:
         "title": cfg["title"],
         "jp": cfg.get("jp", ""),
         "depart": cfg["depart"],
-        "depart_h": _fmt_date(cfg["depart"]),
+        "depart_h": i18n.fmt_date(lang, cfg["depart"]),
         "stops": stops,
     }
 
 
 # ----- sort options -----------------------------------------------------
+# Labels are i18n keys (see i18n.STRINGS), resolved per request language in
+# the *_for_template helpers.
 # image grid (inside an album / search results)
 SORT_IMAGE_OPTIONS = [
-    ("date_desc", "Newest first",      "taken_at IS NULL, taken_at DESC, mtime DESC, filename ASC"),
-    ("date_asc",  "Oldest first",      "taken_at IS NULL, taken_at ASC,  mtime ASC,  filename ASC"),
-    ("name_asc",  "Filename A → Z",    "filename COLLATE NOCASE ASC"),
-    ("name_desc", "Filename Z → A",    "filename COLLATE NOCASE DESC"),
-    ("size_desc", "Largest first",     "size DESC, filename ASC"),
-    ("size_asc",  "Smallest first",    "size ASC, filename ASC"),
+    ("date_desc", "sort.date_desc", "taken_at IS NULL, taken_at DESC, mtime DESC, filename ASC"),
+    ("date_asc",  "sort.date_asc",  "taken_at IS NULL, taken_at ASC,  mtime ASC,  filename ASC"),
+    ("name_asc",  "sort.name_asc",  "filename COLLATE NOCASE ASC"),
+    ("name_desc", "sort.name_desc", "filename COLLATE NOCASE DESC"),
+    ("size_desc", "sort.size_desc", "size DESC, filename ASC"),
+    ("size_asc",  "sort.size_asc",  "size ASC, filename ASC"),
 ]
 SORT_IMAGE_DEFAULT = "date_desc"
 SORT_IMAGE_SQL = {k: sql for k, _, sql in SORT_IMAGE_OPTIONS}
 
 # album list (front page)
 SORT_ALBUM_OPTIONS = [
-    ("latest_desc", "Most recent",      "MAX(taken_at) IS NULL, MAX(taken_at) DESC, album COLLATE NOCASE ASC"),
-    ("latest_asc",  "Oldest activity",  "MAX(taken_at) IS NULL, MAX(taken_at) ASC,  album COLLATE NOCASE ASC"),
-    ("name_asc",    "Name A → Z",       "album COLLATE NOCASE ASC"),
-    ("name_desc",   "Name Z → A",       "album COLLATE NOCASE DESC"),
-    ("count_desc",  "Most photos",      "count DESC, album COLLATE NOCASE ASC"),
-    ("count_asc",   "Fewest photos",    "count ASC, album COLLATE NOCASE ASC"),
+    ("latest_desc", "sort.latest_desc",    "MAX(taken_at) IS NULL, MAX(taken_at) DESC, album COLLATE NOCASE ASC"),
+    ("latest_asc",  "sort.latest_asc",     "MAX(taken_at) IS NULL, MAX(taken_at) ASC,  album COLLATE NOCASE ASC"),
+    ("name_asc",    "sort.album_name_asc", "album COLLATE NOCASE ASC"),
+    ("name_desc",   "sort.album_name_desc","album COLLATE NOCASE DESC"),
+    ("count_desc",  "sort.count_desc",     "count DESC, album COLLATE NOCASE ASC"),
+    ("count_asc",   "sort.count_asc",      "count ASC, album COLLATE NOCASE ASC"),
 ]
 SORT_ALBUM_DEFAULT = "latest_desc"
 SORT_ALBUM_SQL = {k: sql for k, _, sql in SORT_ALBUM_OPTIONS}
@@ -660,23 +693,27 @@ SORT_ALBUM_SQL = {k: sql for k, _, sql in SORT_ALBUM_OPTIONS}
 # pseudo sort key backed by a cfg list (album.cfg `order` / gallery.cfg
 # `album_order`) instead of SQL; only offered when such a list exists
 SORT_CURATED = "curated"
-SORT_CURATED_LABEL = "Curated"
+SORT_CURATED_LABEL_KEY = "sort.curated"
 
 
 def _pick_sort(value: str | None, allowed, default: str) -> str:
     return value if value in allowed else default
 
 
-def _image_sort_options_for_template(current: str, curated: bool = False) -> list[dict]:
-    keys = ([(SORT_CURATED, SORT_CURATED_LABEL)] if curated else [])
-    keys += [(k, label) for k, label, _ in SORT_IMAGE_OPTIONS]
-    return [{"key": k, "label": label, "active": k == current} for k, label in keys]
+def _image_sort_options_for_template(current: str, curated: bool = False,
+                                     lang: str = i18n.DEFAULT_LANG) -> list[dict]:
+    keys = ([(SORT_CURATED, SORT_CURATED_LABEL_KEY)] if curated else [])
+    keys += [(k, label_key) for k, label_key, _ in SORT_IMAGE_OPTIONS]
+    return [{"key": k, "label": i18n.t(lang, label_key), "active": k == current}
+            for k, label_key in keys]
 
 
-def _album_sort_options_for_template(current: str, curated: bool = False) -> list[dict]:
-    keys = ([(SORT_CURATED, SORT_CURATED_LABEL)] if curated else [])
-    keys += [(k, label) for k, label, _ in SORT_ALBUM_OPTIONS]
-    return [{"key": k, "label": label, "active": k == current} for k, label in keys]
+def _album_sort_options_for_template(current: str, curated: bool = False,
+                                     lang: str = i18n.DEFAULT_LANG) -> list[dict]:
+    keys = ([(SORT_CURATED, SORT_CURATED_LABEL_KEY)] if curated else [])
+    keys += [(k, label_key) for k, label_key, _ in SORT_ALBUM_OPTIONS]
+    return [{"key": k, "label": i18n.t(lang, label_key), "active": k == current}
+            for k, label_key in keys]
 
 
 def _active_sort_label(options: list[dict]) -> str:
@@ -729,6 +766,12 @@ CSP = (
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
+    # HTML renders in the language picked via the lang cookie (with an
+    # Accept-Language fallback), so shared caches must key on both.
+    if response.headers.get("content-type", "").startswith("text/html"):
+        extra = "Cookie, Accept-Language"
+        vary = response.headers.get("vary")
+        response.headers["Vary"] = f"{vary}, {extra}" if vary else extra
     response.headers.setdefault("Content-Security-Policy", CSP)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
@@ -953,6 +996,23 @@ def _welcome_feed(mobile: bool = False) -> tuple[list[dict], str, str]:
     return feed, "RANDOM", "random"
 
 
+@app.get("/lang/{code}")
+def set_lang(code: str, next: str = "/"):
+    """Language switcher target (nav selector links here). Sets the `lang`
+    cookie and bounces back to `next`. Only same-site relative paths are
+    accepted as redirect targets — anything else falls back to the welcome
+    page, so this can't be abused as an open redirect."""
+    code = code.strip().lower()
+    if code not in i18n.LANGS:
+        raise HTTPException(404, "unknown language")
+    if not next.startswith("/") or next.startswith("//") or "\\" in next:
+        next = "/"
+    resp = RedirectResponse(next, status_code=303)
+    resp.set_cookie("lang", code, max_age=365 * 24 * 3600, path="/",
+                    samesite="lax", httponly=True)
+    return resp
+
+
 @app.get("/", response_class=HTMLResponse)
 def welcome(request: Request):
     c = db.conn()
@@ -996,7 +1056,8 @@ def albums_index(request: Request, sort: str | None = None):
     for a in albums:
         a["is_showcase"] = _album_is_showcase(a["album"])
     showcase_albums = [a for a in albums if a["is_showcase"]]
-    sort_options = _album_sort_options_for_template(current_sort, curated=has_curated)
+    sort_options = _album_sort_options_for_template(current_sort, curated=has_curated,
+                                                    lang=_request_lang(request))
     return templates.TemplateResponse(
         "index.html",
         {
@@ -1155,15 +1216,17 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             featured = _apply_curated_order(featured, _resolve_photo_refs(album, order_items))
         featured = featured[:8]
         reel_mode = "featured"
-    sort_options = _image_sort_options_for_template(current_sort, curated=bool(curated_order))
+    lang = _request_lang(request)
+    sort_options = _image_sort_options_for_template(current_sort, curated=bool(curated_order),
+                                                    lang=lang)
     return templates.TemplateResponse(
         "album.html",
         {
             "request": request,
             "album": album,
             "breadcrumbs": _album_breadcrumbs(album),
-            "album_description": _album_description(album),
-            "trip": _trip_for_album(album),
+            "album_description": _album_description(album, lang),
+            "trip": _trip_for_album(album, lang),
             "collection": collection,
             "sub_albums": sub_albums,
             "album_is_showcase": album_is_showcase,
@@ -1239,7 +1302,7 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
     idx = rel_list.index(rel) if rel in rel_list else -1
     prev_rel = rel_list[idx - 1] if idx > 0 else None
     next_rel = rel_list[idx + 1] if 0 <= idx < len(rel_list) - 1 else None
-    pretty_exif = _prettify_exif(exif)
+    pretty_exif = _prettify_exif(exif, _request_lang(request))
     description = _extract_description(exif)
     return templates.TemplateResponse(
         "image.html",
@@ -1282,28 +1345,28 @@ def _extract_description(exif: dict) -> str | None:
     return None
 
 
-def _prettify_exif(exif: dict) -> list[tuple[str, str]]:
+def _prettify_exif(exif: dict, lang: str = i18n.DEFAULT_LANG) -> list[tuple[str, str]]:
     if not exif:
         return []
     keys = [
-        ("Make", "Camera make"),
-        ("Model", "Camera model"),
-        ("LensModel", "Lens"),
-        ("DateTimeOriginal", "Date taken"),
-        ("ExposureTime", "Exposure"),
-        ("FNumber", "Aperture"),
-        ("ISOSpeedRatings", "ISO"),
-        ("FocalLength", "Focal length"),
-        ("FocalLengthIn35mmFilm", "Focal length (35mm eq.)"),
-        ("Flash", "Flash"),
-        ("WhiteBalance", "White balance"),
-        ("ExposureProgram", "Exposure program"),
-        ("MeteringMode", "Metering mode"),
-        ("Orientation", "Orientation"),
-        ("Software", "Software"),
+        ("Make", "exif.make"),
+        ("Model", "exif.model"),
+        ("LensModel", "exif.lens"),
+        ("DateTimeOriginal", "exif.date_taken"),
+        ("ExposureTime", "exif.exposure"),
+        ("FNumber", "exif.aperture"),
+        ("ISOSpeedRatings", "exif.iso"),
+        ("FocalLength", "exif.focal"),
+        ("FocalLengthIn35mmFilm", "exif.focal35"),
+        ("Flash", "exif.flash"),
+        ("WhiteBalance", "exif.wb"),
+        ("ExposureProgram", "exif.program"),
+        ("MeteringMode", "exif.metering"),
+        ("Orientation", "exif.orientation"),
+        ("Software", "exif.software"),
     ]
     out: list[tuple[str, str]] = []
-    for k, label in keys:
+    for k, label_key in keys:
         if k in exif and exif[k] not in (None, "", []):
             v = exif[k]
             if k == "ExposureTime" and isinstance(v, (int, float)) and v > 0:
@@ -1315,13 +1378,13 @@ def _prettify_exif(exif: dict) -> list[tuple[str, str]]:
                 v = f"f/{v:.1f}"
             elif k in ("FocalLength", "FocalLengthIn35mmFilm") and isinstance(v, (int, float)):
                 v = f"{v:.0f} mm"
-            out.append((label, str(v)))
+            out.append((i18n.t(lang, label_key), str(v)))
     gps = exif.get("GPSInfo")
     if isinstance(gps, dict):
         lat = _gps_to_deg(gps.get("GPSLatitude"), gps.get("GPSLatitudeRef"))
         lon = _gps_to_deg(gps.get("GPSLongitude"), gps.get("GPSLongitudeRef"))
         if lat is not None and lon is not None:
-            out.append(("GPS", f"{lat:.6f}, {lon:.6f}"))
+            out.append((i18n.t(lang, "exif.gps"), f"{lat:.6f}, {lon:.6f}"))
     return out
 
 
@@ -1405,7 +1468,7 @@ def search(request: Request, q: str = "", sort: str | None = None):
            ORDER BY {qualified_sql}""",
         (like, like, like),
     ).fetchall()
-    sort_options = _image_sort_options_for_template(current_sort)
+    sort_options = _image_sort_options_for_template(current_sort, lang=_request_lang(request))
     return templates.TemplateResponse(
         "search.html",
         {

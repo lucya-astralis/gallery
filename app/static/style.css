@@ -11,9 +11,52 @@
   font-display: swap;
 }
 @font-face {
-  /* Subset to only the ~34 decorative JP glyphs actually used on the site
-     (was an 8.8 MB variable TTF — now ~9 KB woff2). */
+  /* Glyph subset of the 8.8 MB variable TTF: full kana blocks + every kanji
+     the site (UI strings, album_jp.md, trip config) actually uses — ~120 KB
+     woff2. Japanese text ANYWHERE new? Re-run tools/build_jp_subset.py or
+     the new glyphs render as tofu. */
   font-family: 'Noto Sans JP';
+  src: local('Noto Sans JP'),
+       url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+/* Same subset registered again under the site's Latin family names, gated
+   to the JP unicode blocks: the browser then composes e.g. JetBrains Mono
+   (Latin) + Noto Sans JP (kana/kanji) per glyph. This is what makes the
+   Japanese UI translation render in Noto instead of the system gothic —
+   without touching any of the font-family stacks below. */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: local('Noto Sans JP'),
+       url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: local('Noto Sans JP'),
+       url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  src: local('Noto Sans JP'),
+       url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Ethnocentric';
   src: local('Noto Sans JP'),
        url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
   font-weight: 100 900;
@@ -308,6 +351,30 @@ code{
   animation:pulse 2s ease-in-out infinite;
 }
 @keyframes pulse{ 50%{ transform:scale(.6); opacity:.6; } }
+
+/* language selector (top right; stays visible on mobile where the ONLINE
+   status is dropped — it's the only interactive chrome in the nav) */
+.nav__lang{
+  display:flex; align-items:center; gap:4px;
+  font-family:"JetBrains Mono", monospace;
+  font-size:11px;
+  letter-spacing:.12em;
+  border-left:1px solid var(--line);
+  padding-left:18px;
+  white-space:nowrap;
+}
+.nav__lang-opt{
+  color:var(--text-ghost);
+  padding:4px 5px;
+  border:1px solid transparent;
+  transition:color .15s, border-color .15s;
+}
+.nav__lang-opt:hover{ color:var(--text); }
+.nav__lang-opt.is-active{
+  color:var(--acc-cy);
+  border-color:var(--line-strong);
+  background:rgba(91,138,255,.08);
+}
 
 /* ================================================================
    LAYOUT
@@ -1850,6 +1917,8 @@ details[open] > summary::before{ content:"▾ "; }
   .nav__brand .brand-sub{ font-size:9px; }
   .nav__brand img{ height:24px; }
   .nav__status{ display:none; }
+  .nav__lang{ padding-left:10px; gap:2px; font-size:10px; }
+  .nav__lang-opt{ padding:4px 4px; }
   /* iOS Safari auto-zooms when a focused input's font-size is < 16px. Keep the
      typed text at 16px so tapping search never zooms the page; the placeholder
      can stay small (its size doesn't affect the zoom trigger). */

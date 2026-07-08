@@ -24,33 +24,33 @@
   </span>
   <span class="trip__stop-track" aria-hidden="true"><i data-stop-fill></i></span>
 {% endmacro %}
-<section class="trip" data-trip data-depart="{{ trip.depart }}" aria-label="{{ trip.title }} — trip status">
+<section class="trip" data-trip data-depart="{{ trip.depart }}" aria-label="{{ t('trip.status_aria', title=trip.title) }}">
   <div class="trip__bar">
-    <span class="trip__tag">▸ TRIP</span>
+    <span class="trip__tag">{{ t('trip.tag') }}</span>
     <span class="trip__name">{{ trip.title }}</span>
     {% if trip.jp %}<span class="trip__jp" aria-hidden="true">{{ trip.jp }}</span>{% endif %}
     <span class="trip__status stamp" data-trip-status>···</span>
-    <span class="trip__clock" data-trip-clock title="Local time in Japan">JST --:--:--</span>
+    <span class="trip__clock" data-trip-clock title="{{ t('trip.jst_title') }}">JST --:--:--</span>
   </div>
 
   <div class="trip__main">
     <div class="trip__cd">
-      <span class="trip__cd-label" data-trip-cd-label>Departs in</span>
+      <span class="trip__cd-label" data-trip-cd-label>{{ t('trip.departs_in') }}</span>
       <div class="trip__cd-clock" role="timer">
-        <span class="trip__cd-unit"><b data-cd="d">––</b><i>Days</i></span>
+        <span class="trip__cd-unit"><b data-cd="d">––</b><i>{{ t('trip.days') }}</i></span>
         <span class="trip__cd-sep" aria-hidden="true">:</span>
-        <span class="trip__cd-unit"><b data-cd="h">––</b><i>Hrs</i></span>
+        <span class="trip__cd-unit"><b data-cd="h">––</b><i>{{ t('trip.hrs') }}</i></span>
         <span class="trip__cd-sep" aria-hidden="true">:</span>
-        <span class="trip__cd-unit"><b data-cd="m">––</b><i>Min</i></span>
+        <span class="trip__cd-unit"><b data-cd="m">––</b><i>{{ t('trip.min') }}</i></span>
         <span class="trip__cd-sep" aria-hidden="true">:</span>
-        <span class="trip__cd-unit"><b data-cd="s">––</b><i>Sec</i></span>
+        <span class="trip__cd-unit"><b data-cd="s">––</b><i>{{ t('trip.sec') }}</i></span>
       </div>
-      <span class="trip__cd-target">Flight · <b data-trip-cd-target>{{ trip.depart_h }}</b></span>
+      <span class="trip__cd-target">{{ t('trip.flight') }} · <b data-trip-cd-target>{{ trip.depart_h }}</b></span>
     </div>
 
     <ol class="trip__line" data-trip-timeline>
       {% for s in trip.stops %}
-      <li class="trip__stop" data-stop data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}">
+      <li class="trip__stop" data-stop data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}"{% if s.jp %} data-city-jp="{{ s.jp }}"{% endif %}>
         {% if s.href %}
           <a class="trip__stop-link" href="{{ s.href }}">{{ stop_inner(s) }}</a>
         {% else %}

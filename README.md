@@ -11,6 +11,7 @@ A lean, read-only web image gallery with folder-based albums, EXIF display, side
 - **Tags via sidecar files:** drop a `.tags` file next to an image (e.g. `IMG_0001.jpg.tags` containing `holiday, beach, sunset`). Click a tag in the album view to filter.
 - **Showcase:** mark a photo (`_hero.jpg`) or a whole album (`_best-of/`) with an underscore prefix to surface it on the welcome screen, on the album overview, and via `/api/showcase` JSON for embedding on other sites.
 - **Search & sort:** top bar searches album, file, and tag names; sort by date, name or size on every list view — plus a "Curated" order defined in `album.cfg` / `gallery.cfg`, which can also preselect the default sort.
+- **Three languages (EN / DE / JP):** selector in the top-right corner, cookie-backed with an `Accept-Language` fallback. Album descriptions are per-language markdown files (`album_en.md` / `album_de.md` / `album_jp.md`); UI strings live in `app/i18n.py`. See [Languages](#languages--i18n).
 - **Mobile-friendly:** responsive grid, large touch targets, keyboard navigation (← → ESC) on desktop.
 - **Read-only:** no write endpoints, no uploads. The `photos/` mount is `:ro`. No attack surface for upload/tag-injection exploits.
 - **Security headers:** CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy — all set by built-in middleware.
@@ -70,6 +71,48 @@ photos/
 ```
 
 Change the marker globally via `SHOWCASE_MARKER` (set it to an empty string to disable the whole feature). Showcase flags are re-evaluated on every startup, so toggling files / changing the marker takes effect after a restart without needing a full re-scan.
+
+## Languages / i18n
+
+The site renders in **English, German and Japanese**. The nav selector
+(top right) hits `GET /lang/{en|de|jp}?next=…`, which sets a `lang` cookie
+and bounces back; first-time visitors get their `Accept-Language` match,
+falling back to English. HTML responses carry `Vary: Cookie, Accept-Language`
+so shared caches key correctly.
+
+**What is translated:** real content — leads, buttons, counters, the sort
+menu, EXIF labels, trip countdown, empty states, OG descriptions. The
+decorative camera-HUD tokens (REC, FRM, SIG /, ONLINE, T-x DAYS, …)
+intentionally stay English in every language, like the HUD of an actual
+Japanese camera. UI strings live in `app/i18n.py` (server) and in the
+`UI_STRINGS` table at the top of `app/static/app.js` (client) — keep both
+in sync when adding text.
+
+**Album descriptions** are per-language markdown files inside the album's
+photo folder:
+
+```
+photos/japan_2026/album_en.md   ← English (also the fallback)
+photos/japan_2026/album_de.md   ← German
+photos/japan_2026/album_jp.md   ← Japanese
+```
+
+Missing translations fall back to `album_en.md`, then to a legacy plain
+`album.md`, then to the first `*.md` in the folder — a partially translated
+gallery still shows something everywhere.
+
+**Japanese font subset:** the site ships a glyph subset of Noto Sans JP
+(`app/static/fonts/NotoSansJP-subset.woff2`, ~120 KB instead of the 8.8 MB
+variable TTF). Every JP glyph the site can render must be baked in — after
+changing/adding Japanese text anywhere (album_jp.md, i18n.py, app.js,
+templates), rebuild it or new characters show as tofu:
+
+```bash
+python tools/build_jp_subset.py     # needs: pip install fonttools brotli
+```
+
+The subset always contains the full kana blocks plus every kanji currently
+in use (the script scans the repo), so kana-only edits never need a rebuild.
 
 ## Config files (`gallery.cfg` / `album.cfg`)
 
@@ -283,6 +326,7 @@ All GET, all public:
 - `GET /preview/{album}/{file}` — stage preview (lazy generated)
 - `GET /full/{album}/{file}` — original file
 - `GET /search?q=…` — search (`?sort=`)
+- `GET /lang/{en|de|jp}?next=…` — set the language cookie, 303 back to `next` (relative paths only)
 - `GET /api/showcase` — JSON list of showcased photos, CORS-enabled (see [API](#api))
 - `GET /api/shuffle?limit=N` — JSON list of random photos (used internally by the welcome CRT)
 

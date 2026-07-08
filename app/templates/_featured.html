@@ -14,11 +14,11 @@
   {%- if img.album != album -%}{{ pretty_rel(img.album[(album | length) + 1:]) }} / {% endif -%}{{ display_name(img.filename) }}
 {%- endmacro -%}
 {% set reel_random = reel_mode == 'random' %}
-<section class="fhero{% if featured | length == 1 %} fhero--single{% endif %}" id="fhero" aria-label="{% if reel_random %}Random photos{% else %}Featured photos{% endif %}">
+<section class="fhero{% if featured | length == 1 %} fhero--single{% endif %}" id="fhero" aria-label="{% if reel_random %}{{ t('aria.random_photos') }}{% else %}{{ t('aria.featured_photos') }}{% endif %}">
   <header class="fhero__head">
-    <span class="fhero__label">{% if reel_random %}⟳ RANDOM{% else %}★ FEATURED{% endif %}</span>
+    <span class="fhero__label">{% if reel_random %}{{ t('reel.random') }}{% else %}{{ t('reel.featured') }}{% endif %}</span>
     <span class="fhero__hint doc-min-hide" aria-hidden="true">{% if reel_random %}SHUFFLE REEL{% else %}SHOWCASE REEL{% endif %}</span>
-    <span class="fhero__count">{{ featured | length }} {% if featured | length == 1 %}PHOTO{% else %}PHOTOS{% endif %}</span>
+    <span class="fhero__count">{{ featured | length }} {% if featured | length == 1 %}{{ t('unit.photo') }}{% else %}{{ t('unit.photos') }}{% endif %}</span>
   </header>
   <div class="fhero__frame">
     <div class="fhero__stage" id="fhero-stage">
@@ -41,14 +41,14 @@
     <span class="fhero__chip fhero__chip--frm">FRM <b id="fhero-idx">01</b><span>/{{ '%02d' | format(featured | length) }}</span></span>
     <a class="fhero__file" id="fhero-file" href="/image/{{ pretty_rel(featured[0].rel_path) }}">
       <span class="fhero__file-name" id="fhero-name" data-scramble>{{ feat_label(featured[0]) }}</span>
-      <span class="fhero__file-open" aria-hidden="true">OPEN ↗</span>
+      <span class="fhero__file-open" aria-hidden="true">{{ t('reel.open') }}</span>
     </a>
     <div class="fhero__bar">
-      <button type="button" class="fhero__nav" id="fhero-prev" aria-label="Previous photo">‹</button>
-      <button type="button" class="fhero__nav" id="fhero-next" aria-label="Next photo">›</button>
-      <div class="fhero__track" id="fhero-track" aria-label="Photo selector">
+      <button type="button" class="fhero__nav" id="fhero-prev" aria-label="{{ t('aria.prev_photo') }}">‹</button>
+      <button type="button" class="fhero__nav" id="fhero-next" aria-label="{{ t('aria.next_photo') }}">›</button>
+      <div class="fhero__track" id="fhero-track" aria-label="{{ t('aria.photo_selector') }}">
         {% for img in featured %}
-          <button type="button" class="fhero__seg{% if loop.first %} is-on{% endif %}" data-goto="{{ loop.index0 }}" aria-label="Photo {{ loop.index }}: {{ feat_label(img) }}"></button>
+          <button type="button" class="fhero__seg{% if loop.first %} is-on{% endif %}" data-goto="{{ loop.index0 }}" aria-label="{{ loop.index }}: {{ feat_label(img) }}"></button>
         {% endfor %}
       </div>
       <span class="fhero__auto" id="fhero-auto">AUTO · 5.0S</span>

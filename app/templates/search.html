@@ -5,15 +5,15 @@
   <nav class="pathbar" aria-label="Breadcrumb">
     <a class="pathbar__back" href="/albums">
       <span class="pathbar__back-ico" aria-hidden="true">‹</span>
-      <span class="pathbar__back-lbl">Back to</span>
-      <span class="pathbar__back-txt">Albums</span>
+      <span class="pathbar__back-lbl">{{ t('back.label') }}</span>
+      <span class="pathbar__back-txt">{{ t('back.albums') }}</span>
     </a>
     <div class="crumb">
-      <a href="/">HOME</a>
+      <a href="/">{{ t('crumb.home') }}</a>
       <span class="sep">/</span>
-      <a href="/albums">ALBUMS</a>
+      <a href="/albums">{{ t('crumb.albums') }}</a>
       <span class="sep">/</span>
-      <b aria-current="page">SEARCH / {{ query | upper }}</b>
+      <b aria-current="page">{{ t('search.crumb') }} / {{ query | upper }}</b>
     </div>
   </nav>
 
@@ -30,27 +30,27 @@
   <header class="section__head">
     <div class="section__slug">
       <span class="ix">??</span>
-      <span class="name">SEARCH</span>
-      <span class="jp">検索</span>
+      <span class="name">{{ t('search.slug') }}</span>
+      <span class="jp">{{ t('search.slug_deco') }}</span>
     </div>
   </header>
 
   {% if not images %}
     <div class="empty">
       <span class="stamp">NO MATCH</span>
-      <p>No matches for <code>{{ query }}</code>.</p>
-      <p class="note">Searches album names, filenames and tags.</p>
+      <p>{{ t('search.no_match_prefix') }}<code>{{ query }}</code>{{ t('search.no_match_suffix') }}</p>
+      <p class="note">{{ t('search.hint') }}</p>
     </div>
   {% else %}
     <div class="toolbar">
       <span class="toolbar__spacer"></span>
       <div class="sort" data-sort>
         <button type="button" class="sort__btn" aria-haspopup="true" aria-expanded="false">
-          <span class="sort__btn-label">SORT</span>
+          <span class="sort__btn-label">{{ t('sort.btn') }}</span>
           <b>{{ sort_label }}</b>
         </button>
         <div class="sort__menu" hidden role="menu">
-          <div class="sort__head">SORT BY</div>
+          <div class="sort__head">{{ t('sort.by') }}</div>
           {% for opt in sort_options %}
             <a class="sort__option{% if opt.active %} is-active{% endif %}"
                role="menuitem"

@@ -3,7 +3,7 @@
 {% block body_class %}page-image{% endblock %}
 {% block meta %}
   {% set og_title = image.filename ~ ' — ' ~ image.album %}
-  {% set og_desc = description if description else 'Photo from album “' ~ image.album ~ '” · lucya.systems gallery' %}
+  {% set og_desc = description if description else t('image.og_desc', album=image.album) %}
   {% set og_image = public_base_url(request) ~ '/preview/' ~ image.rel_path %}
   <meta property="og:site_name" content="lucya.systems gallery">
   <meta property="og:title" content="{{ og_title }}">
@@ -40,13 +40,13 @@
   <nav class="pathbar" aria-label="Breadcrumb">
     <a class="pathbar__back" href="{{ up_url }}">
       <span class="pathbar__back-ico" aria-hidden="true">‹</span>
-      <span class="pathbar__back-lbl">Back to</span>
+      <span class="pathbar__back-lbl">{{ t('back.label') }}</span>
       <span class="pathbar__back-txt">{{ up_name }}</span>
     </a>
     <div class="crumb">
-      <a href="/">HOME</a>
+      <a href="/">{{ t('crumb.home') }}</a>
       <span class="sep">/</span>
-      <a href="/albums">ALBUMS</a>
+      <a href="/albums">{{ t('crumb.albums') }}</a>
       {% for c in breadcrumbs %}
         <span class="sep">/</span>
         <a href="/album/{{ c.path }}">{{ c.name | upper }}</a>
@@ -73,22 +73,22 @@
       <div class="stage">
         <span class="stage__corner stage__corner--tl">FRAME / 01</span>
         <span class="stage__corner stage__corner--tr">{% if image.width and image.height %}{{ image.width }}×{{ image.height }}{% else %}IMG{% endif %}</span>
-        {% if prev_rel %}<a class="nav-arrow prev" href="/image/{{ prev_rel }}{{ img_qs }}" aria-label="Previous">‹</a>{% endif %}
+        {% if prev_rel %}<a class="nav-arrow prev" href="/image/{{ prev_rel }}{{ img_qs }}" aria-label="{{ t('aria.previous') }}">‹</a>{% endif %}
         <img id="stage-img"
              class="is-preview"
              src="/preview/{{ image.rel_path }}"
              data-full="/full/{{ image.rel_path }}"
              alt="{{ image.filename }}">
-        {% if next_rel %}<a class="nav-arrow next" href="/image/{{ next_rel }}{{ img_qs }}" aria-label="Next">›</a>{% endif %}
+        {% if next_rel %}<a class="nav-arrow next" href="/image/{{ next_rel }}{{ img_qs }}" aria-label="{{ t('aria.next') }}">›</a>{% endif %}
         <span class="stage__corner stage__corner--br">{{ image.filename }}</span>
       </div>
 
       <div class="stage__loader" id="stage-loader">
-        <button type="button" id="load-full-btn" class="loader-btn">Load original</button>
+        <button type="button" id="load-full-btn" class="loader-btn">{{ t('btn.load_original') }}</button>
         <span class="sep"></span>
-        <button type="button" id="open-fullscreen-btn" class="loader-btn">Fullscreen ⛶</button>
+        <button type="button" id="open-fullscreen-btn" class="loader-btn">{{ t('btn.fullscreen') }}</button>
         <span class="sep"></span>
-        <a href="/full/{{ image.rel_path }}" download="{{ image.filename }}" class="loader-link">Download ↓</a>
+        <a href="/full/{{ image.rel_path }}" download="{{ image.filename }}" class="loader-link">{{ t('btn.download') }}</a>
       </div>
     </div>
 
@@ -96,24 +96,24 @@
       <section class="panel">
         <h2>FILE <span class="stamp">META</span></h2>
         <dl class="kv">
-          <dt>Album</dt><dd><a href="/album/{{ image.album }}">{{ image.album }}</a></dd>
-          <dt>Filename</dt><dd>{{ image.filename }}</dd>
-          {% if image.width and image.height %}<dt>Dimensions</dt><dd>{{ image.width }} × {{ image.height }} px</dd>{% endif %}
-          {% if image.size %}<dt>Size</dt><dd>{{ (image.size / 1024 / 1024) | round(2) }} MB</dd>{% endif %}
-          <dt>Original</dt><dd><a href="/full/{{ image.rel_path }}" download="{{ image.filename }}">download ↓</a></dd>
+          <dt>{{ t('kv.album') }}</dt><dd><a href="/album/{{ image.album }}">{{ image.album }}</a></dd>
+          <dt>{{ t('kv.filename') }}</dt><dd>{{ image.filename }}</dd>
+          {% if image.width and image.height %}<dt>{{ t('kv.dimensions') }}</dt><dd>{{ image.width }} × {{ image.height }} px</dd>{% endif %}
+          {% if image.size %}<dt>{{ t('kv.size') }}</dt><dd>{{ (image.size / 1024 / 1024) | round(2) }} MB</dd>{% endif %}
+          <dt>{{ t('kv.original') }}</dt><dd><a href="/full/{{ image.rel_path }}" download="{{ image.filename }}">{{ t('kv.download') }}</a></dd>
         </dl>
       </section>
 
       {% if description %}
       <section class="panel">
-        <h2>DESCRIPTION</h2>
+        <h2>{{ t('panel.description') }}</h2>
         <p class="description">{{ description }}</p>
       </section>
       {% endif %}
 
       {% if tags %}
       <section class="panel">
-        <h2>TAGS</h2>
+        <h2>{{ t('panel.tags') }}</h2>
         <div class="tag-list">
           {% for t in tags %}
             <a href="/album/{{ image.album }}?tag={{ t }}" class="tag">#{{ t }}</a>
@@ -131,11 +131,11 @@
             {% endfor %}
           </dl>
           <details>
-            <summary>raw dump</summary>
+            <summary>{{ t('panel.raw_dump') }}</summary>
             <pre class="raw-exif">{{ exif_raw | tojson(indent=2) }}</pre>
           </details>
         {% else %}
-          <p class="note">No EXIF data.</p>
+          <p class="note">{{ t('panel.no_exif') }}</p>
         {% endif %}
       </section>
     </aside>
@@ -151,10 +151,10 @@
 }
 </script>
 
-<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Fullscreen viewer">
-  <button type="button" class="lightbox__close" id="lb-close" aria-label="Close (Esc)">✕</button>
-  <button type="button" class="lightbox__nav lightbox__nav--prev" id="lb-prev" aria-label="Previous">‹</button>
-  <button type="button" class="lightbox__nav lightbox__nav--next" id="lb-next" aria-label="Next">›</button>
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="{{ t('aria.lightbox') }}">
+  <button type="button" class="lightbox__close" id="lb-close" aria-label="{{ t('aria.close') }}">✕</button>
+  <button type="button" class="lightbox__nav lightbox__nav--prev" id="lb-prev" aria-label="{{ t('aria.previous') }}">‹</button>
+  <button type="button" class="lightbox__nav lightbox__nav--next" id="lb-next" aria-label="{{ t('aria.next') }}">›</button>
   <div class="lightbox__stage" id="lb-stage">
     <img class="lightbox__img" id="lb-img" alt="">
     <div class="lightbox__spinner" id="lb-spinner" aria-hidden="true"></div>
@@ -162,8 +162,8 @@
   <div class="lightbox__bar">
     <span class="lightbox__count" id="lb-count">01 / 01</span>
     <span class="lightbox__title" id="lb-title"></span>
-    <button type="button" class="lightbox__btn" id="lb-full">Load original</button>
-    <a class="lightbox__btn" id="lb-dl" href="" download="">Download ↓</a>
+    <button type="button" class="lightbox__btn" id="lb-full">{{ t('btn.load_original') }}</button>
+    <a class="lightbox__btn" id="lb-dl" href="" download="">{{ t('btn.download') }}</a>
   </div>
 </div>
 {% endblock %}
