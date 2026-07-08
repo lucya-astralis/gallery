@@ -2304,6 +2304,26 @@ body.lightbox-open{ overflow:hidden; }
   border:1px solid var(--line);
 }
 
+/* operator card — who's behind this; pfp + link to lucya.sh */
+.foot__op{
+  display:flex; align-items:center; gap:10px;
+  padding:5px 14px 5px 6px;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.02);
+  transition: border-color .15s, background .15s;
+}
+.foot__op:hover{ border-color:var(--acc-cy); background:rgba(91,138,255,.06); }
+.foot__op-pfp{
+  display:block;
+  width:34px; height:34px;
+  border:1px solid var(--line-strong);
+  border-radius:var(--radius);
+}
+.foot__op-txt{ display:flex; flex-direction:column; gap:3px; }
+.foot__op-key{ color:var(--text-ghost); font-size:9px; }
+.foot__op-val{ color:var(--text-dim); transition: color .15s; }
+.foot__op:hover .foot__op-val{ color:var(--acc-cy); }
+
 @media (max-width:600px){
   .foot__inner{ flex-direction:column; align-items:flex-start; gap:12px; }
 }
@@ -2555,6 +2575,9 @@ body.page-welcome{ --page-max: 2400px; }
   display:flex; flex-wrap:wrap; gap:10px;
   margin-top:8px;
 }
+/* flex items stretch to one row height; inline-flex keeps each label
+   vertically centered even next to the taller about-me button */
+.vf__actions .btn-link{ display:inline-flex; align-items:center; }
 .vf .btn-link{
   background:rgba(7,7,11,.5);
   backdrop-filter: blur(5px);
@@ -2931,6 +2954,14 @@ body.page-welcome{ --page-max: 2400px; }
   color:var(--acc-cy);
   border-color:var(--acc-cy);
   background:rgba(91,138,255,.06);
+}
+/* about-me action: btn-link carrying the tiny operator pfp */
+.btn-link--about{ gap:9px; }
+.btn-link__pfp{
+  display:block;
+  width:18px; height:18px;
+  border:1px solid var(--line-strong);
+  border-radius:var(--radius);
 }
 
 /* ================================================================

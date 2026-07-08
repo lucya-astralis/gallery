@@ -10,8 +10,9 @@
     {
       "name": "gallery-test",
       "runtimeExecutable": "C:\\Users\\deimi\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
-      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8011", "--log-level", "warning"],
-      "port": 8011
+      "runtimeArgs": ["-c", "import os, uvicorn; uvicorn.run('app.main:app', host='127.0.0.1', port=int(os.environ.get('PORT', '8011')), log_level='warning')"],
+      "port": 8011,
+      "autoPort": true
     }
   ]
 }
