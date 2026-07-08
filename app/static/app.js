@@ -52,6 +52,26 @@ const UI_STRINGS = {
 };
 const TXT = UI_STRINGS[UI_LANG] || UI_STRINGS.en;
 
+// ---------- LANGUAGE SELECTOR ----------------------------------
+// The server bakes ?next=<URL at render time> into the selector links, but
+// the image page navigates between photos via pushState (SPA swaps) without
+// re-rendering the nav — the baked next then points at the entry image.
+// Rewrite it at interaction time so the /lang round-trip returns to the
+// page actually on screen. pointerdown also covers middle-click/new-tab.
+(function langSelector() {
+  const sync = (a) => {
+    try {
+      const u = new URL(a.href, location.href);
+      u.searchParams.set('next', location.pathname + location.search);
+      a.href = u.toString();
+    } catch (e) {}
+  };
+  document.querySelectorAll('.nav__lang-opt').forEach((a) => {
+    a.addEventListener('pointerdown', () => sync(a));
+    a.addEventListener('click', () => sync(a));
+  });
+})();
+
 // ---------- DEVICE CAPABILITY ----------------------------------
 // Single gate for the heavy, decorative effects (background video, animated
 // scanlines, text scramble, CRT auto-cycle). Small screens, data-saver,

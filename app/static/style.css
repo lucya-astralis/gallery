@@ -23,11 +23,16 @@
   font-display: swap;
   unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
 }
-/* Same subset registered again under the site's Latin family names, gated
-   to the JP unicode blocks: the browser then composes e.g. JetBrains Mono
-   (Latin) + Noto Sans JP (kana/kanji) per glyph. This is what makes the
-   Japanese UI translation render in Noto instead of the system gothic —
-   without touching any of the font-family stacks below. */
+/* Same subset registered again under the two VARIABLE Latin family names,
+   gated to the JP unicode blocks: the browser then composes e.g. JetBrains
+   Mono (Latin) + Noto Sans JP (kana/kanji) per glyph, so the Japanese UI
+   translation renders in Noto without touching any font-family stack.
+   Deliberately NOT registered for the fixed-weight families (Ethnocentric,
+   Chakra Petch): with a single-weight original, Chrome resolves the weight
+   tie to this JP face and then skips to the NEXT family for Latin — the
+   hero title lost Ethnocentric that way. Their texts are HUD/brand chrome
+   (never Japanese), and any JP glyph in their stacks still resolves via
+   the Space Grotesk / JetBrains Mono fallbacks below. */
 @font-face {
   font-family: 'Space Grotesk';
   src: local('Noto Sans JP'),
@@ -39,24 +44,6 @@
 }
 @font-face {
   font-family: 'JetBrains Mono';
-  src: local('Noto Sans JP'),
-       url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
-}
-@font-face {
-  font-family: 'Chakra Petch';
-  src: local('Noto Sans JP'),
-       url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
-}
-@font-face {
-  font-family: 'Ethnocentric';
   src: local('Noto Sans JP'),
        url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
   font-weight: 100 900;
