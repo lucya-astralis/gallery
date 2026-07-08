@@ -88,6 +88,13 @@ Japanese camera. UI strings live in `app/i18n.py` (server) and in the
 `UI_STRINGS` table at the top of `app/static/app.js` (client) — keep both
 in sync when adding text.
 
+**Caching:** because the same URL serves different languages, all HTML is
+sent with `Cache-Control: no-store` (browsers don't reliably key their
+cache on `Vary: Cookie`, and back/forward-cache restores would resurface
+stale-language pages — a `pageshow` guard in app.js reloads on mismatch
+for Safari). Images, CSS and JS keep long-lived cache headers. If you put
+a CDN cache rule in front, make sure it does NOT cache `text/html`.
+
 **Album descriptions** are per-language markdown files inside the album's
 photo folder:
 

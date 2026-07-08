@@ -767,11 +767,18 @@ CSP = (
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
     # HTML renders in the language picked via the lang cookie (with an
-    # Accept-Language fallback), so shared caches must key on both.
+    # Accept-Language fallback). Vary documents that for well-behaved
+    # caches, but browsers do NOT reliably key their HTTP cache on
+    # Vary: Cookie — after a language switch the redirect target came back
+    # from the disk cache in the previous language. HTML here is tiny and
+    # fully dynamic, so opt it out of caching entirely (no-store also keeps
+    # Chrome/Firefox from bfcache-restoring stale-language pages); images,
+    # CSS and JS keep their own long-lived cache headers.
     if response.headers.get("content-type", "").startswith("text/html"):
         extra = "Cookie, Accept-Language"
         vary = response.headers.get("vary")
         response.headers["Vary"] = f"{vary}, {extra}" if vary else extra
+        response.headers.setdefault("Cache-Control", "no-store")
     response.headers.setdefault("Content-Security-Policy", CSP)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
@@ -1008,8 +1015,11 @@ def set_lang(code: str, next: str = "/"):
     if not next.startswith("/") or next.startswith("//") or "\\" in next:
         next = "/"
     resp = RedirectResponse(next, status_code=303)
+    # deliberately NOT httponly: app.js reads the cookie on bfcache restores
+    # (pageshow) to detect a stale-language page and reload it — Safari keeps
+    # pages in the back/forward cache even with Cache-Control: no-store.
     resp.set_cookie("lang", code, max_age=365 * 24 * 3600, path="/",
-                    samesite="lax", httponly=True)
+                    samesite="lax")
     return resp
 
 

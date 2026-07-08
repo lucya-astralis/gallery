@@ -70,6 +70,18 @@ const TXT = UI_STRINGS[UI_LANG] || UI_STRINGS.en;
     a.addEventListener('pointerdown', () => sync(a));
     a.addEventListener('click', () => sync(a));
   });
+
+  // A page restored from the back/forward cache may predate a language
+  // switch and would show the old language (Safari bfcaches even with
+  // Cache-Control: no-store). Compare the cookie against <html lang> and
+  // reload only on a real mismatch, so bfcache stays fast otherwise.
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted) return;
+    const m = document.cookie.match(/(?:^|;\s*)lang=(en|de|jp)\b/);
+    if (!m) return;
+    const want = m[1] === 'jp' ? 'ja' : m[1];
+    if (document.documentElement.lang !== want) location.reload();
+  });
 })();
 
 // ---------- DEVICE CAPABILITY ----------------------------------
