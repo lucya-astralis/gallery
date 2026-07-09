@@ -114,18 +114,8 @@ if (!allowHeavyFx()) document.documentElement.classList.add('fx-lite');
 // style.css): only capable devices with IntersectionObserver opt in —
 // everyone else keeps the fully static page. Runs synchronously before
 // first paint, so gated content never flashes.
-const FX_SEEN_TTL_MS = 30 * 60 * 1000;
 if (allowHeavyFx() && 'IntersectionObserver' in window) {
   document.documentElement.classList.add('fx-anim');
-  // fx-seen suppresses the one-shot entrance choreography (welcome hero
-  // build-up) on session revisits — same key the scroll-reveal module
-  // writes, so "seen" means the same thing for both.
-  try {
-    const last = parseInt(sessionStorage.getItem('rv-seen:' + location.pathname) || '0', 10);
-    if (Date.now() - last < FX_SEEN_TTL_MS) {
-      document.documentElement.classList.add('fx-seen');
-    }
-  } catch (e) {}
 }
 
 // ---------- BACKGROUND VIDEO (opt-in) --------------------------
@@ -619,18 +609,12 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.documentElement.classList.contains('fx-anim')) return;
 
-  // Entrance reveals play ONCE per page per session (30 min TTL): stepping
-  // back out of a photo — or any quick revisit — renders the page statically
-  // instead of replaying the whole cascade, which read as unnatural.
-  // Keyed by pathname only, so changing ?sort= doesn't re-stagger either.
-  let seen = false;
-  try {
-    const key = 'rv-seen:' + location.pathname;
-    const last = parseInt(sessionStorage.getItem(key) || '0', 10);
-    seen = Date.now() - last < FX_SEEN_TTL_MS;
-    sessionStorage.setItem(key, String(Date.now()));
-  } catch (e) {}
-  if (seen) return;
+  // Stepping back OUT of a photo must not rebuild the album around the
+  // user — photoAlbumContinuity() (runs at parse time, i.e. before this)
+  // sets html.fx-return when this load is such a return, and the entrance
+  // cascade is skipped once. Every real (re)visit — leaving an album
+  // entirely and coming back later included — keeps the full entrance.
+  if (document.documentElement.classList.contains('fx-return')) return;
 
   const targets = document.querySelectorAll([
     '.section__doc',
@@ -780,6 +764,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!link && a.getAttribute('href') === '/image/' + rel) link = a;
   });
   if (!link) return;
+  // this load is a return out of one of this page's own photos: flag it so
+  // the scroll-reveal module skips the entrance cascade this one time
+  // (replaying the page build-up around the user read as unnatural)
+  document.documentElement.classList.add('fx-return');
   // land mid-viewport: the user keeps their place in the grid and the
   // return morph has a visible target
   link.scrollIntoView({ block: 'center', behavior: 'instant' });

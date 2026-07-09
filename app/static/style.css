@@ -3460,16 +3460,14 @@ html.fx-anim img.img-fade.img-in{
    (the .detail node is replaced wholesale, so the animation re-runs) ---- */
 html.fx-anim .detail{ animation: rv-fade .32s ease; }
 
-/* ---- welcome hero build-up (one-shot on load; scramble runs on top).
-   fx-seen (set by app.js on session revisits, mirroring the rv-seen skip)
-   suppresses the replay — the choreography plays once per session. ---- */
-html.fx-anim:not(.fx-seen) .vf__hudtop { animation: rv-fade .7s ease .35s backwards; }
-html.fx-anim:not(.fx-seen) .vf__slug   { animation: rv-rise .5s cubic-bezier(.19,.66,.28,.99) .08s backwards; }
-html.fx-anim:not(.fx-seen) .vf__title  { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .16s backwards; }
-html.fx-anim:not(.fx-seen) .vf__lead   { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .26s backwards; }
-html.fx-anim:not(.fx-seen) .vf__actions{ animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .36s backwards; }
-html.fx-anim:not(.fx-seen) .vf__meta   { animation: rv-right .6s cubic-bezier(.19,.66,.28,.99) .45s backwards; }
-html.fx-anim:not(.fx-seen) .vf__deck   { animation: rv-fade .7s ease .5s backwards; }
+/* ---- welcome hero build-up (one-shot on load; scramble runs on top) ---- */
+html.fx-anim .vf__hudtop { animation: rv-fade .7s ease .35s backwards; }
+html.fx-anim .vf__slug   { animation: rv-rise .5s cubic-bezier(.19,.66,.28,.99) .08s backwards; }
+html.fx-anim .vf__title  { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .16s backwards; }
+html.fx-anim .vf__lead   { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .26s backwards; }
+html.fx-anim .vf__actions{ animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .36s backwards; }
+html.fx-anim .vf__meta   { animation: rv-right .6s cubic-bezier(.19,.66,.28,.99) .45s backwards; }
+html.fx-anim .vf__deck   { animation: rv-fade .7s ease .5s backwards; }
 
 /* ---- lightbox: fade the viewer in, image settles from a hair larger.
    display:none → flex restarts the animation on every open; navigating
