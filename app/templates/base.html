@@ -8,10 +8,10 @@
   <link rel="icon" type="image/svg+xml" href="/static/logo/lucya_logo.svg">
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
   {# Hold back first paint until app.js (end of <body>) has run: the photo↔album
-     continuity code must tag the return tile and restore the scroll position
-     BEFORE the incoming view-transition snapshot is taken, even when the parser
-     would otherwise yield early on long album pages. Chromium-only; harmless
-     elsewhere. #}
+     continuity code restores the album's scroll position (back to the tile of
+     the photo you just left) BEFORE anything is painted, even when the parser
+     would otherwise yield early on long album pages — without this the page
+     top flashes and then jumps. Chromium-only; harmless elsewhere. #}
   <link rel="expect" blocking="render" href="#appjs">
 
   {% block meta %}

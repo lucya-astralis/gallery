@@ -3456,6 +3456,24 @@ html.fx-anim img.img-fade.img-in{
   transition: opacity .45s ease, transform .35s ease, filter .35s ease;
 }
 
+/* ---- stage pixel-in (opening a photo; wired in app.js) ---- */
+/* the OPENED photo decodes in like a feed acquiring signal: a coarse
+   mosaic (tiny canvas, CSS-upscaled with image-rendering:pixelated)
+   refines in a few steps, then snaps to the sharp image. Runs on photo
+   page load and after every SPA swap; the real <img> hides behind
+   .px-wait until its mosaic finishes. Grid thumbnails deliberately do
+   NOT use this — it is the click-to-open animation only. */
+html.fx-anim img.px-wait{ opacity:0; }
+.px-canvas{
+  position:absolute;
+  z-index:2;                 /* above the stage photo, below arrows (z:3) */
+  pointer-events:none;
+  image-rendering:pixelated; /* nearest-neighbour upscale = crisp mosaic */
+  /* geometry (left/top/width/height) is set per image by app.js;
+     filter matches .stage img.is-preview so the final snap is seamless */
+  filter:saturate(.92) brightness(.96);
+}
+
 /* ---- image detail: content fades in on load and after every SPA swap
    (the .detail node is replaced wholesale, so the animation re-runs) ---- */
 html.fx-anim .detail{ animation: rv-fade .32s ease; }
@@ -3520,31 +3538,15 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__img{
   to  { opacity:1; transform:translateY(0); }
 }
 
-/* ---- cross-page transitions (View Transitions; Chromium + Safari 18.2+,
-   silently ignored elsewhere). The root crossfades briefly; the photo
-   itself MORPHS between an album tile and the detail stage: .stage img
-   carries the shared `photo` name statically, and app.js tags the
-   matching tile/frame on click (going in) and on return (coming out).
-   Reduced-motion users keep instant swaps. ---- */
+/* ---- cross-page crossfade (View Transitions; Chromium + Safari 18.2+,
+   silently ignored elsewhere). Kept very short so navigation stays snappy;
+   reduced-motion users keep instant swaps. Deliberately NO shared-element
+   morphs — opening a photo pixel-decodes instead, leaving one returns to
+   its tile via scroll restore + bracket blink. ---- */
 @media (prefers-reduced-motion: no-preference){
   @view-transition{ navigation:auto; }
   ::view-transition-old(root){ animation-duration:.14s; }
   ::view-transition-new(root){ animation-duration:.14s; }
-
-  .stage img{ view-transition-name: photo; }
-  ::view-transition-group(photo){
-    animation-duration:.3s;
-    animation-timing-function:cubic-bezier(.22,.61,.36,1);
-  }
-  /* snapshots fill the morphing box cover-style, so the square tile crop
-     and the full-aspect stage blend instead of squishing mid-flight */
-  ::view-transition-old(photo),
-  ::view-transition-new(photo){
-    height:100%;
-    width:100%;
-    object-fit:cover;
-    overflow:clip;
-  }
 }
 
 /* ---- "you are here" return flash: coming back out of a photo, app.js

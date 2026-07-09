@@ -626,6 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
     '.fhero__head',
     '.fhero__frame',
     '.showcase__head',
+    '.album-desc',
     '.album-grid > li',
     '.feat__rail > li',
     '.image-grid > li',
@@ -649,9 +650,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }, { rootMargin: '0px 0px -6% 0px', threshold: 0.05 });
 
   targets.forEach((el) => {
-    // the tile a photo just returned to is the live morph target — it must
-    // stay put, not sit at opacity 0 waiting for its reveal
-    if (el.classList.contains('is-returned')) return;
     el.classList.add('rv');
     io.observe(el);
   });
@@ -678,6 +676,65 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// ---------- STAGE PIXEL-IN (click-to-open decode) --------------
+// Opening a photo decodes it in like a feed acquiring signal: a coarse
+// mosaic (tiny canvas over the stage image, CSS-upscaled with
+// image-rendering:pixelated) refines through a few steps, then snaps to
+// the sharp image. Called by initImagePage(), i.e. on photo-page load AND
+// after every SPA swap — this is the click-to-open animation, grid thumbs
+// deliberately keep their plain fade. The stage <img> hides behind
+// .px-wait until its mosaic finishes.
+window.__stagePixelIn = () => {
+  if (!document.documentElement.classList.contains('fx-anim')) return;
+  const img = document.getElementById('stage-img');
+  if (!img || img.classList.contains('px-wait')) return;
+
+  const CELLS_PX = [40, 20, 10, 5]; // mosaic cell size on screen, coarse → fine
+  const STEP_MS = 90;
+
+  const reveal = () => img.classList.remove('px-wait');
+  const start = () => {
+    // the stage is the positioned ancestor; the img box IS the photo box
+    // (auto-sized, aspect preserved), so overlay exactly that rectangle
+    const stage = img.closest('.stage');
+    if (!stage || !img.naturalWidth || !img.isConnected) { reveal(); return; }
+    const w = img.offsetWidth;
+    const h = img.offsetHeight;
+    if (w < 48 || h < 48) { reveal(); return; }
+    const canvas = document.createElement('canvas');
+    canvas.className = 'px-canvas';
+    canvas.setAttribute('aria-hidden', 'true');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { reveal(); return; }
+    canvas.style.left = img.offsetLeft + 'px';
+    canvas.style.top = img.offsetTop + 'px';
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    const finish = () => { reveal(); canvas.remove(); };
+    let step = 0;
+    const paint = () => {
+      const cell = CELLS_PX[step];
+      canvas.width = Math.max(1, Math.round(w / cell));
+      canvas.height = Math.max(1, Math.round(h / cell));
+      ctx.imageSmoothingEnabled = true; // average down = clean mosaic cells
+      try {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      } catch (e) { finish(); return; }
+      step++;
+      setTimeout(step < CELLS_PX.length ? paint : finish, STEP_MS);
+    };
+    stage.appendChild(canvas);
+    paint();
+  };
+
+  img.classList.add('px-wait');
+  if (img.complete && img.naturalWidth) start();
+  else {
+    img.addEventListener('load', start, { once: true });
+    img.addEventListener('error', reveal, { once: true });
+  }
+};
+
 // ---------- NAV SCROLL STATE -----------------------------------
 // Deepen the sticky nav once the page scrolls so it reads as a bar floating
 // over content instead of blending into the hero. Pure state toggle (colors,
@@ -697,15 +754,13 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 // ---------- PHOTO ↔ ALBUM CONTINUITY ---------------------------
-// Entering a photo morphs the clicked tile into the detail stage and
-// leaving morphs it back (cross-document View Transitions where supported;
-// the shared `photo` view-transition-name sits on .stage img in CSS, the
-// matching tile/frame is tagged here). Independent of morph support, the
-// album remembers WHICH photo was open: on return it scrolls that tile
-// back into view pre-paint (no dump at page top) and blinks its corner
-// brackets. Runs at parse time — the rel=expect link in <head> holds back
-// first render (and the incoming view-transition snapshot) until this
-// script has executed.
+// Opening a photo pixels in via __stagePixelIn; no shared-element morphs
+// in either direction. What this module does: the album remembers WHICH
+// photo was open — on return it scrolls that tile back into view
+// pre-paint (no dump at page top), blinks its corner brackets and skips
+// the entrance-reveal replay (html.fx-return). Runs at parse time — the
+// rel=expect link in <head> holds back first render until this script has
+// executed, so the restored scroll position never flashes.
 (function photoAlbumContinuity() {
   const KEY = 'vt:last-photo';
   const store = {
@@ -715,32 +770,6 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   // image page + lightbox keep the key pointing at the photo on screen
   window.__vtRememberPhoto = (rel) => store.write(rel);
-
-  const motionOk = () => window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
-  const clearFrameNames = () => {
-    document.querySelectorAll('.image-tile img, .fhero__slide img, .vf__frame img')
-      .forEach((i) => { if (i.style.viewTransitionName) i.style.viewTransitionName = ''; });
-  };
-
-  // outgoing: tag the frame the user is entering as the morph source.
-  // Direct targets (tile / hero slide / viewfinder frame) carry their own
-  // <img>; the meta/open links on the heroes proxy to the active frame.
-  document.addEventListener('click', (e) => {
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    if (!motionOk() || !e.target.closest) return;
-    let img = null;
-    const direct = e.target.closest('.image-tile a, .fhero__slide, .vf__frame');
-    if (direct) {
-      img = direct.querySelector('img');
-    } else if (e.target.closest('[data-vf-open], #vf-meta')) {
-      img = document.querySelector('.vf__frame.is-on img');
-    } else if (e.target.closest('#fhero-file')) {
-      img = document.querySelector('.fhero__slide.is-on img');
-    }
-    if (!img) return;
-    clearFrameNames();
-    img.style.viewTransitionName = 'photo';
-  }, true);
 
   if (document.querySelector('.detail')) {
     // photo page: remember the photo being viewed (SPA swaps and lightbox
@@ -759,29 +788,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const rel = store.read();
   store.clear();
   if (!rel) return;
+  // collection albums append ?col= (and sorted views ?sort=) to tile links —
+  // compare the path part only, the query never changes which photo it is
   let link = null;
   document.querySelectorAll('.image-tile a').forEach((a) => {
-    if (!link && a.getAttribute('href') === '/image/' + rel) link = a;
+    if (link) return;
+    const path = (a.getAttribute('href') || '').split('?')[0];
+    if (path === '/image/' + rel) link = a;
   });
   if (!link) return;
   // this load is a return out of one of this page's own photos: flag it so
   // the scroll-reveal module skips the entrance cascade this one time
   // (replaying the page build-up around the user read as unnatural)
   document.documentElement.classList.add('fx-return');
-  // land mid-viewport: the user keeps their place in the grid and the
-  // return morph has a visible target
+  // land mid-viewport: the user keeps their place in the grid
   link.scrollIntoView({ block: 'center', behavior: 'instant' });
   const tile = link.closest('.image-tile');
   if (tile) tile.classList.add('is-returned');
-  if (motionOk()) {
-    const img = link.querySelector('img');
-    if (img) {
-      img.style.viewTransitionName = 'photo';
-      // drop the name once the transition is over so a later tile click
-      // can't produce duplicate names (which would void the morph)
-      setTimeout(() => { img.style.viewTransitionName = ''; }, 800);
-    }
-  }
 })();
 
 // ---------- PREVIEW PRE-WARM (tile hover) ----------------------
@@ -793,7 +816,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!allowHeavyFx()) return;
   const warmed = new Set();
   const warm = (a) => {
-    const m = (a.getAttribute('href') || '').match(/^\/image\/(.+)$/);
+    // strip ?col=/?sort= so the warmed URL matches the stage's cache key
+    const m = (a.getAttribute('href') || '').split('?')[0].match(/^\/image\/(.+)$/);
     if (!m || warmed.has(m[1])) return;
     warmed.add(m[1]);
     const img = new Image();
@@ -872,6 +896,8 @@ function initImagePage() {
   loader.classList.remove('is-loading', 'is-done');
   img.classList.add('is-preview');
   btn.textContent = TXT.loadOriginal;
+  // click-to-open decode: the photo pixels in on load and after SPA swaps
+  if (window.__stagePixelIn) window.__stagePixelIn();
   if (stamp) {
     stamp.textContent = 'PREVIEW';
     stamp.classList.add('stamp--cy');
