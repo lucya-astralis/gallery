@@ -314,12 +314,15 @@ def _album_order_key(path: str) -> str:
 
 def _curated_album_positions() -> dict[str, int]:
     """gallery.cfg `album_order` as {normalized album path: position}.
+    `#group` frame markers don't take part in the ordering and are skipped.
     Empty dict when no curated album order is configured."""
     pos: dict[str, int] = {}
-    for i, item in enumerate(_gallery_config().get("album_order", [])):
+    for item in _gallery_config().get("album_order", []):
+        if item.startswith("#"):
+            continue
         key = _album_order_key(item)
         if key and key not in pos:
-            pos[key] = i
+            pos[key] = len(pos)
     return pos
 
 
@@ -346,6 +349,41 @@ def _sorted_album_cards(cards: list[dict], sort_key: str) -> list[dict]:
         cards.sort(key=lambda a: a["latest"] or "", reverse=True)
     # name_asc: already sorted
     return cards
+
+
+def _curated_album_sections(cards: list[dict]) -> list[dict]:
+    """Split album cards (already in curated order) into the framed groups
+    of the Curated /albums view: a gallery.cfg `album_order` line like
+    `#trips` opens a named group that frames every album listed below it.
+    Returns [{label, cards}, ...] in cfg order — label None for the
+    frameless chunks (albums listed above the first marker, plus a trailing
+    chunk for albums that aren't listed at all) — or [] when the order
+    defines no groups, so callers keep the flat grid."""
+    entries = _gallery_config().get("album_order", [])
+    if not any(e.startswith("#") for e in entries):
+        return []
+    labels = [""]  # section labels in cfg order; "" = the frameless lead
+    key_label: dict[str, str] = {}
+    label = ""
+    for e in entries:
+        if e.startswith("#"):
+            label = e[1:].strip()
+            if label not in labels:
+                labels.append(label)
+        else:
+            k = _album_order_key(e)
+            if k and k not in key_label:
+                key_label[k] = label
+    buckets: dict[str, list[dict]] = {lab: [] for lab in labels}
+    unlisted: list[dict] = []
+    for card in cards:
+        lab = key_label.get(_album_order_key(card["album"]))
+        (unlisted if lab is None else buckets[lab]).append(card)
+    sections = [{"label": lab or None, "cards": buckets[lab]}
+                for lab in labels if buckets[lab]]
+    if unlisted:
+        sections.append({"label": None, "cards": unlisted})
+    return sections
 
 
 def _album_breadcrumbs(album: str) -> list[dict]:
@@ -430,16 +468,25 @@ def _cfg_bool(v: str | None) -> bool:
     return str(v or "").strip().lower() in _TRUE
 
 
-def _parse_cfg(text: str) -> dict[str, list[str]]:
+def _parse_cfg(text: str, group_keys: frozenset[str] = frozenset()) -> dict[str, list[str]]:
     """Parse cfg text into a lower-cased key -> [values] dict. Repeated keys
     and comma lists accumulate in order; bare lines append to the key above
     (one entry per line). A key given with an empty value still registers
-    (empty list), so "present but empty" is distinguishable from "absent"."""
+    (empty list), so "present but empty" is distinguishable from "absent".
+    Inside a key listed in `group_keys`, a bare `#label` line (# glued to
+    the label) is kept as a "#label" group-marker entry; `# spaced`, `##`
+    and `;` comment styles still vanish everywhere."""
     out: dict[str, list[str]] = {}
     key: str | None = None
     for line in text.splitlines():
         line = line.strip()
-        if not line or line[0] in "#;":
+        if not line:
+            continue
+        if line[0] in "#;":
+            label = line[1:].strip()
+            if (line[0] == "#" and label and key in group_keys
+                    and not line[1].isspace() and line[1] not in "#;"):
+                out[key].append("#" + label)
             continue
         if "=" in line:
             key, _, val = line.partition("=")
@@ -902,8 +949,13 @@ def _resolve_showcase_path(album: str, filename: str) -> tuple[str, str]:
 #   album_order = <album>,…       -> curated album order: adds a "Curated"
 #                                    entry to the /albums sort menu and fixes
 #                                    the order of the ★ featured-album rails.
+#                                    A bare `#label` line inside the list
+#                                    (# glued to the label) opens a framed
+#                                    "label" group in the Curated view; every
+#                                    other sort/page keeps the flat order.
 #   album_sort = curated|latest_desc|… -> preselect the /albums sort option.
 GALLERY_CFG_NAME = "gallery.cfg"
+GALLERY_GROUP_KEYS = frozenset({"album_order"})
 WELCOME_FEED_MAX = 24
 
 _WELCOME_KEYWORDS = {
@@ -924,7 +976,7 @@ def _gallery_config() -> dict[str, list[str]]:
         text = cfg_path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return {}
-    return _parse_cfg(text)
+    return _parse_cfg(text, group_keys=GALLERY_GROUP_KEYS)
 
 
 def _is_mobile_request(request: Request) -> bool:
@@ -1066,6 +1118,11 @@ def albums_index(request: Request, sort: str | None = None):
     for a in albums:
         a["is_showcase"] = _album_is_showcase(a["album"])
     showcase_albums = [a for a in albums if a["is_showcase"]]
+    archive_albums = [a for a in albums if not a["is_showcase"]]
+    # `#group` markers in album_order frame the Curated view into labeled
+    # sections; every other sort keeps the flat archive grid
+    album_sections = (_curated_album_sections(archive_albums)
+                      if current_sort == SORT_CURATED else [])
     sort_options = _album_sort_options_for_template(current_sort, curated=has_curated,
                                                     lang=_request_lang(request))
     return templates.TemplateResponse(
@@ -1074,6 +1131,8 @@ def albums_index(request: Request, sort: str | None = None):
             "request": request,
             "albums": albums,
             "showcase_albums": showcase_albums,
+            "archive_albums": archive_albums,
+            "album_sections": album_sections,
             "current_sort": current_sort,
             "default_sort": default_sort,
             "sort_options": sort_options,

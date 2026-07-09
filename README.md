@@ -169,10 +169,19 @@ welcome_mobile =
     paris_march_2026/IMG_2222.png
 
 # curated album order: adds a "Curated" entry to the /albums sort menu and
-# fixes the order of the ★ featured-album rails (welcome + /albums)
+# fixes the order of the ★ featured-album rails (welcome + /albums).
+# A bare #label line (# glued to the label) frames the albums below it as a
+# labeled group — the frames only show in the Curated view on /albums, every
+# other sort/page uses the flat order. "# spaced" and ";" comments stay
+# comments, so `# japan_2026` still just disables a line.
 album_order =
     japan_2026
     paris_march_2026
+    #trips
+    berlin_dec_2025
+    frankfurt_feb_2026
+    #games
+    elite_dangerous
 
 # preselect the sort option on /albums (curated, latest_desc, latest_asc,
 # name_asc, name_desc, count_desc, count_asc)

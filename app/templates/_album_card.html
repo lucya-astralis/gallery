@@ -1,0 +1,24 @@
+{# one archive album card (albums overview grid). Expects in context:
+   a        — album card dict (album, name, count, latest, cover, sub_count)
+   card_idx — 1-based running number for the corner index badge #}
+<li class="album-card{% if a.sub_count %} album-card--folder{% endif %}">
+  <a href="/album/{{ a.album }}">
+    <div class="album-card__img">
+      {% if a.cover %}
+        <img src="/thumb/{{ a.cover }}" alt="{{ a.name }}" loading="lazy" decoding="async">
+      {% else %}
+        <div class="album-card__cover-empty">{{ t('card.no_cover') }}</div>
+      {% endif %}
+      <span class="album-card__idx" aria-hidden="true">{{ '%02d' | format(card_idx) }}</span>
+      {% if a.sub_count %}<span class="album-card__badge album-card__badge--folder">▸ {{ a.sub_count }}</span>{% endif %}
+      <div class="album-card__hover" aria-hidden="true"><span>{{ t('card.enter') }}</span></div>
+    </div>
+    <div class="album-card__cap">
+      <span class="album-card__name">{{ a.name }}</span>
+      <span class="album-card__meta">
+        <span>{{ a.count }} {% if a.count == 1 %}{{ t('unit.image') }}{% else %}{{ t('unit.images') }}{% endif %}{% if a.sub_count %} · {{ a.sub_count }} {% if a.sub_count != 1 %}{{ t('unit.dirs') }}{% else %}{{ t('unit.dir') }}{% endif %}{% endif %}</span>
+        {% if month_label(a.latest) %}<span class="album-card__date">{{ month_label(a.latest) }}</span>{% endif %}
+      </span>
+    </div>
+  </a>
+</li>
