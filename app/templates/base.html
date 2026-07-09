@@ -7,6 +7,12 @@
   <title>{% block title %}LUCYA.SYSTEMS GALLERY{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="/static/logo/lucya_logo.svg">
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
+  {# Hold back first paint until app.js (end of <body>) has run: the photo↔album
+     continuity code must tag the return tile and restore the scroll position
+     BEFORE the incoming view-transition snapshot is taken, even when the parser
+     would otherwise yield early on long album pages. Chromium-only; harmless
+     elsewhere. #}
+  <link rel="expect" blocking="render" href="#appjs">
 
   {% block meta %}
   <meta property="og:site_name" content="lucya.systems gallery">
@@ -88,6 +94,6 @@
       </div>
     </div>
   </footer>
-  <script src="{{ static_url('app.js') }}"></script>
+  <script src="{{ static_url('app.js') }}" id="appjs"></script>
 </body>
 </html>

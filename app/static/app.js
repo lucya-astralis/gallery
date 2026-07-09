@@ -110,6 +110,23 @@ window.__allowHeavyFx = allowHeavyFx;
 // Bridge capability detection to CSS: html.fx-lite kills the continuous
 // full-screen scanline animation and other ambient motion on weak devices.
 if (!allowHeavyFx()) document.documentElement.classList.add('fx-lite');
+// Motion-layer gate (scroll reveals, thumbnail fades, hero build-up in
+// style.css): only capable devices with IntersectionObserver opt in —
+// everyone else keeps the fully static page. Runs synchronously before
+// first paint, so gated content never flashes.
+const FX_SEEN_TTL_MS = 30 * 60 * 1000;
+if (allowHeavyFx() && 'IntersectionObserver' in window) {
+  document.documentElement.classList.add('fx-anim');
+  // fx-seen suppresses the one-shot entrance choreography (welcome hero
+  // build-up) on session revisits — same key the scroll-reveal module
+  // writes, so "seen" means the same thing for both.
+  try {
+    const last = parseInt(sessionStorage.getItem('rv-seen:' + location.pathname) || '0', 10);
+    if (Date.now() - last < FX_SEEN_TTL_MS) {
+      document.documentElement.classList.add('fx-seen');
+    }
+  } catch (e) {}
+}
 
 // ---------- BACKGROUND VIDEO (opt-in) --------------------------
 // The <video> ships with no src and preload="none", so by default nothing is
@@ -592,6 +609,216 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ---------- SCROLL REVEAL --------------------------------------
+// Content blocks rise in as they enter the viewport. Elements that reveal
+// in the same observer batch stagger by 45 ms (capped), so grids cascade
+// instead of popping in as one wall. Gated on html.fx-anim (set above only
+// when allowHeavyFx() + IntersectionObserver hold) — without it nothing is
+// ever tagged .rv and the page stays fully static, including for crawlers
+// and no-JS visitors.
+document.addEventListener('DOMContentLoaded', () => {
+  if (!document.documentElement.classList.contains('fx-anim')) return;
+
+  // Entrance reveals play ONCE per page per session (30 min TTL): stepping
+  // back out of a photo — or any quick revisit — renders the page statically
+  // instead of replaying the whole cascade, which read as unnatural.
+  // Keyed by pathname only, so changing ?sort= doesn't re-stagger either.
+  let seen = false;
+  try {
+    const key = 'rv-seen:' + location.pathname;
+    const last = parseInt(sessionStorage.getItem(key) || '0', 10);
+    seen = Date.now() - last < FX_SEEN_TTL_MS;
+    sessionStorage.setItem(key, String(Date.now()));
+  } catch (e) {}
+  if (seen) return;
+
+  const targets = document.querySelectorAll([
+    '.section__doc',
+    '.section__head',
+    '.archive-head',
+    '.album-group__head',
+    '.sub-albums__head',
+    '.feat__head',
+    '.fhero__head',
+    '.fhero__frame',
+    '.showcase__head',
+    '.album-grid > li',
+    '.feat__rail > li',
+    '.image-grid > li',
+    '.vf-band__cell',
+  ].join(','));
+  if (!targets.length) return;
+
+  const STEP_MS = 45;
+  const MAX_DELAY_MS = 315;
+  const io = new IntersectionObserver((entries, obs) => {
+    let batch = 0;
+    entries.forEach((en) => {
+      if (!en.isIntersecting) return;
+      const el = en.target;
+      // stagger within this batch; CSSOM assignment is CSP-safe
+      el.style.animationDelay = Math.min(batch * STEP_MS, MAX_DELAY_MS) + 'ms';
+      batch++;
+      el.classList.add('rv-in');
+      obs.unobserve(el);
+    });
+  }, { rootMargin: '0px 0px -6% 0px', threshold: 0.05 });
+
+  targets.forEach((el) => {
+    // the tile a photo just returned to is the live morph target — it must
+    // stay put, not sit at opacity 0 waiting for its reveal
+    if (el.classList.contains('is-returned')) return;
+    el.classList.add('rv');
+    io.observe(el);
+  });
+});
+
+// ---------- THUMBNAIL FADE-IN ----------------------------------
+// Grid covers and tiles fade in when they finish loading instead of popping.
+// Images already complete at wiring time (warm cache, bfcache restore) skip
+// the fade entirely, so revisits stay instant. The helper classes are dropped
+// after the fade so the cards' own hover transitions take back over.
+document.addEventListener('DOMContentLoaded', () => {
+  if (!document.documentElement.classList.contains('fx-anim')) return;
+  document.querySelectorAll(
+    '.album-card__img img, .image-tile img, .feat-card__img img'
+  ).forEach((img) => {
+    if (img.complete) return;
+    img.classList.add('img-fade');
+    const done = () => {
+      img.classList.add('img-in');
+      setTimeout(() => img.classList.remove('img-fade', 'img-in'), 600);
+    };
+    img.addEventListener('load', done, { once: true });
+    img.addEventListener('error', done, { once: true });
+  });
+});
+
+// ---------- NAV SCROLL STATE -----------------------------------
+// Deepen the sticky nav once the page scrolls so it reads as a bar floating
+// over content instead of blending into the hero. Pure state toggle (colors,
+// shadow) — cheap enough to run everywhere, no fx gate needed.
+(function navScrollState() {
+  const nav = document.querySelector('.nav');
+  if (!nav) return;
+  let ticking = false;
+  const apply = () => {
+    nav.classList.toggle('nav--scrolled', (window.scrollY || 0) > 8);
+    ticking = false;
+  };
+  window.addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(apply); }
+  }, { passive: true });
+  document.addEventListener('DOMContentLoaded', apply);
+})();
+
+// ---------- PHOTO ↔ ALBUM CONTINUITY ---------------------------
+// Entering a photo morphs the clicked tile into the detail stage and
+// leaving morphs it back (cross-document View Transitions where supported;
+// the shared `photo` view-transition-name sits on .stage img in CSS, the
+// matching tile/frame is tagged here). Independent of morph support, the
+// album remembers WHICH photo was open: on return it scrolls that tile
+// back into view pre-paint (no dump at page top) and blinks its corner
+// brackets. Runs at parse time — the rel=expect link in <head> holds back
+// first render (and the incoming view-transition snapshot) until this
+// script has executed.
+(function photoAlbumContinuity() {
+  const KEY = 'vt:last-photo';
+  const store = {
+    read() { try { return sessionStorage.getItem(KEY); } catch (e) { return null; } },
+    write(v) { try { sessionStorage.setItem(KEY, v); } catch (e) {} },
+    clear() { try { sessionStorage.removeItem(KEY); } catch (e) {} },
+  };
+  // image page + lightbox keep the key pointing at the photo on screen
+  window.__vtRememberPhoto = (rel) => store.write(rel);
+
+  const motionOk = () => window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
+  const clearFrameNames = () => {
+    document.querySelectorAll('.image-tile img, .fhero__slide img, .vf__frame img')
+      .forEach((i) => { if (i.style.viewTransitionName) i.style.viewTransitionName = ''; });
+  };
+
+  // outgoing: tag the frame the user is entering as the morph source.
+  // Direct targets (tile / hero slide / viewfinder frame) carry their own
+  // <img>; the meta/open links on the heroes proxy to the active frame.
+  document.addEventListener('click', (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!motionOk() || !e.target.closest) return;
+    let img = null;
+    const direct = e.target.closest('.image-tile a, .fhero__slide, .vf__frame');
+    if (direct) {
+      img = direct.querySelector('img');
+    } else if (e.target.closest('[data-vf-open], #vf-meta')) {
+      img = document.querySelector('.vf__frame.is-on img');
+    } else if (e.target.closest('#fhero-file')) {
+      img = document.querySelector('.fhero__slide.is-on img');
+    }
+    if (!img) return;
+    clearFrameNames();
+    img.style.viewTransitionName = 'photo';
+  }, true);
+
+  if (document.querySelector('.detail')) {
+    // photo page: remember the photo being viewed (SPA swaps and lightbox
+    // navigation refresh this via __vtRememberPhoto)
+    const m = location.pathname.match(/^\/image\/(.+)$/);
+    if (m) {
+      let rel = m[1];
+      try { rel = decodeURIComponent(rel); } catch (e) {}
+      store.write(rel);
+    }
+    return;
+  }
+
+  // every other page consumes the key exactly once, so a stale entry can't
+  // scroll some later album visit around unexpectedly
+  const rel = store.read();
+  store.clear();
+  if (!rel) return;
+  let link = null;
+  document.querySelectorAll('.image-tile a').forEach((a) => {
+    if (!link && a.getAttribute('href') === '/image/' + rel) link = a;
+  });
+  if (!link) return;
+  // land mid-viewport: the user keeps their place in the grid and the
+  // return morph has a visible target
+  link.scrollIntoView({ block: 'center', behavior: 'instant' });
+  const tile = link.closest('.image-tile');
+  if (tile) tile.classList.add('is-returned');
+  if (motionOk()) {
+    const img = link.querySelector('img');
+    if (img) {
+      img.style.viewTransitionName = 'photo';
+      // drop the name once the transition is over so a later tile click
+      // can't produce duplicate names (which would void the morph)
+      setTimeout(() => { img.style.viewTransitionName = ''; }, 800);
+    }
+  }
+})();
+
+// ---------- PREVIEW PRE-WARM (tile hover) ----------------------
+// Aiming at a tile warms the /preview/ file its photo page will need, so
+// entering the photo doesn't stall on the hero request. Only fires after
+// 65 ms of hover intent (not while sweeping across the grid); pointerdown
+// warms immediately. allowHeavyFx() keeps data-saver and low-end out.
+document.addEventListener('DOMContentLoaded', () => {
+  if (!allowHeavyFx()) return;
+  const warmed = new Set();
+  const warm = (a) => {
+    const m = (a.getAttribute('href') || '').match(/^\/image\/(.+)$/);
+    if (!m || warmed.has(m[1])) return;
+    warmed.add(m[1]);
+    const img = new Image();
+    img.src = '/preview/' + m[1];
+  };
+  document.querySelectorAll('.image-tile a').forEach((a) => {
+    let t = null;
+    a.addEventListener('mouseenter', () => { t = setTimeout(() => warm(a), 65); }, { passive: true });
+    a.addEventListener('mouseleave', () => { if (t) clearTimeout(t); }, { passive: true });
+    a.addEventListener('pointerdown', () => warm(a), { passive: true });
+  });
+});
+
 // ---------- COUNT-UP DIGITS ------------------------------------
 // [data-count-to] elements render their final value server-side; capable
 // devices re-count from 0 when the element scrolls into view. fx-lite
@@ -746,6 +973,17 @@ function initImagePage() {
       if (m) { const p = new Image(); p.src = '/preview/' + m[1]; }
     } catch (e) {}
   });
+
+  // keep the return-to-album anchor pointing at the photo on screen
+  // (this runs again after every SPA swap)
+  if (window.__vtRememberPhoto) {
+    const relM = location.pathname.match(/^\/image\/(.+)$/);
+    if (relM) {
+      let rel = relM[1];
+      try { rel = decodeURIComponent(rel); } catch (e) {}
+      window.__vtRememberPhoto(rel);
+    }
+  }
 }
 window.__initImagePage = initImagePage;
 document.addEventListener('DOMContentLoaded', initImagePage);
@@ -997,6 +1235,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // update URL bar to reflect the currently-viewed image (keep sort etc.)
     try { history.replaceState(null, '', '/image/' + rel + initialSearch); } catch(e){}
+    // keep the return-to-album anchor in sync while flipping in the viewer
+    if (window.__vtRememberPhoto) window.__vtRememberPhoto(rel);
   }
 
   function navigate(delta){

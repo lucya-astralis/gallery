@@ -3385,6 +3385,184 @@ a.trip__stop-link:hover .trip__stop-go i{ transform:translateX(3px); }
 }
 
 /* ================================================================
+   MOTION LAYER  —  entrance choreography + micro-interactions
+   Scroll reveals, staggered card entrances, thumbnail fade-ins and
+   the welcome-hero build-up. Everything here is progressive polish:
+   app.js sets html.fx-anim only when allowHeavyFx() passes AND
+   IntersectionObserver exists — no-JS, reduced-motion, data-saver
+   and low-end devices keep the fully static page. The CSS-only
+   hover/press micro-moves sit behind prefers-reduced-motion instead
+   (they must not depend on JS).
+   ================================================================ */
+
+/* ---- shared keyframes ---- */
+@keyframes rv-rise{
+  from{ opacity:0; transform:translate3d(0, 14px, 0); }
+  to  { opacity:1; transform:translate3d(0, 0, 0); }
+}
+@keyframes rv-right{
+  from{ opacity:0; transform:translate3d(14px, 0, 0); }
+  to  { opacity:1; transform:translate3d(0, 0, 0); }
+}
+@keyframes rv-fade{
+  from{ opacity:0; }
+  to  { opacity:1; }
+}
+/* one-shot HUD scan: a cyan hairline sweeps along the header rule, then
+   fades out again — the resting design stays exactly as before */
+@keyframes rv-scan{
+  0%  { transform:scaleX(0); opacity:1; }
+  72% { transform:scaleX(1); opacity:1; }
+  100%{ transform:scaleX(1); opacity:0; }
+}
+
+/* ---- scroll reveal (app.js tags targets with .rv, observer adds .rv-in;
+   per-batch stagger arrives as element.style.animationDelay) ---- */
+/* `backwards` fill keeps the from-state during the stagger delay; once the
+   animation ends the element returns to its own natural styles, so card
+   hover transforms and transitions keep working untouched. */
+html.fx-anim .rv{ opacity:0; }
+html.fx-anim .rv.rv-in{
+  opacity:1;
+  animation: rv-rise .55s cubic-bezier(.19,.66,.28,.99) backwards;
+}
+@media print{ html.fx-anim .rv{ opacity:1; } }
+
+/* section title rule: scan sweep once the header reveals */
+html.fx-anim .section__head{ position:relative; }
+html.fx-anim .section__head::after{
+  content:"";
+  position:absolute; left:0; right:0; bottom:-1px;
+  height:1px;
+  background:linear-gradient(90deg,
+    var(--acc-cy) 0%, rgba(91,138,255,.4) 55%, transparent 100%);
+  box-shadow:0 0 8px rgba(91,138,255,.35);
+  transform:scaleX(0);
+  transform-origin:left center;
+  opacity:0;
+  pointer-events:none;
+}
+html.fx-anim .section__head.rv-in::after{
+  animation: rv-scan 1s cubic-bezier(.22,.61,.36,1) .2s both;
+}
+
+/* ---- thumbnail fade-in (grid covers/tiles; wired in app.js) ---- */
+/* the transition list mirrors the cards' own transform/filter timing so a
+   hover zoom that starts while the fade classes are still attached stays
+   smooth; app.js drops both classes shortly after the fade completes */
+html.fx-anim img.img-fade{ opacity:0; }
+html.fx-anim img.img-fade.img-in{
+  opacity:1;
+  transition: opacity .45s ease, transform .35s ease, filter .35s ease;
+}
+
+/* ---- image detail: content fades in on load and after every SPA swap
+   (the .detail node is replaced wholesale, so the animation re-runs) ---- */
+html.fx-anim .detail{ animation: rv-fade .32s ease; }
+
+/* ---- welcome hero build-up (one-shot on load; scramble runs on top).
+   fx-seen (set by app.js on session revisits, mirroring the rv-seen skip)
+   suppresses the replay — the choreography plays once per session. ---- */
+html.fx-anim:not(.fx-seen) .vf__hudtop { animation: rv-fade .7s ease .35s backwards; }
+html.fx-anim:not(.fx-seen) .vf__slug   { animation: rv-rise .5s cubic-bezier(.19,.66,.28,.99) .08s backwards; }
+html.fx-anim:not(.fx-seen) .vf__title  { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .16s backwards; }
+html.fx-anim:not(.fx-seen) .vf__lead   { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .26s backwards; }
+html.fx-anim:not(.fx-seen) .vf__actions{ animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .36s backwards; }
+html.fx-anim:not(.fx-seen) .vf__meta   { animation: rv-right .6s cubic-bezier(.19,.66,.28,.99) .45s backwards; }
+html.fx-anim:not(.fx-seen) .vf__deck   { animation: rv-fade .7s ease .5s backwards; }
+
+/* ---- lightbox: fade the viewer in, image settles from a hair larger.
+   display:none → flex restarts the animation on every open; navigating
+   inside the viewer swaps only src, so it never re-triggers. ---- */
+html.fx-anim .lightbox:not([hidden]){ animation: rv-fade .22s ease; }
+html.fx-anim .lightbox:not([hidden]) .lightbox__img{
+  animation: lb-img-in .32s cubic-bezier(.19,.66,.28,.99);
+}
+@keyframes lb-img-in{
+  from{ opacity:0; transform:scale(.985); }
+  to  { opacity:1; transform:scale(1); }
+}
+
+/* ---- sticky nav: deepen once the page scrolls (class from app.js) ---- */
+.nav{ transition: background .25s ease, box-shadow .25s ease; }
+.nav--scrolled{
+  background:rgba(7,7,11,.88);
+  box-shadow:0 12px 32px -18px rgba(0,0,0,.85);
+}
+
+/* ---- micro-interactions (CSS-only, so gated on the OS preference
+   rather than the JS fx-anim class) ---- */
+@media (prefers-reduced-motion: no-preference){
+  /* back button: chevron leans into "back" */
+  .pathbar__back-ico{ transition:transform .18s ease; }
+  .pathbar__back:hover .pathbar__back-ico{ transform:translateX(-3px); }
+
+  /* stage arrows lean into their direction */
+  .nav-arrow.prev:hover{ transform:translateY(-50%) translateX(-2px); }
+  .nav-arrow.next:hover{ transform:translateY(-50%) translateX(2px); }
+
+  /* tags + button links: 1px lift, gentle press */
+  .tag{ transition:border-color .15s, color .15s, background .15s, transform .15s ease; }
+  .tag:hover{ transform:translateY(-1px); }
+  .btn-link{ transition:border-color .15s, color .15s, background .15s, transform .15s ease; }
+  .btn-link:hover{ transform:translateY(-1px); }
+  .btn-link:active,
+  .pathbar__back:active,
+  .vf__nav:active,
+  .vf__tune:active{ transform:translateY(1px); }
+
+  /* desktop sort dropdown pops instead of snapping (the ≤760px sheet
+     already has its own slide-up animation) */
+  @media (min-width:761px){
+    .sort__menu:not([hidden]){ animation: menu-pop .16s ease; }
+  }
+}
+@keyframes menu-pop{
+  from{ opacity:0; transform:translateY(-4px); }
+  to  { opacity:1; transform:translateY(0); }
+}
+
+/* ---- cross-page transitions (View Transitions; Chromium + Safari 18.2+,
+   silently ignored elsewhere). The root crossfades briefly; the photo
+   itself MORPHS between an album tile and the detail stage: .stage img
+   carries the shared `photo` name statically, and app.js tags the
+   matching tile/frame on click (going in) and on return (coming out).
+   Reduced-motion users keep instant swaps. ---- */
+@media (prefers-reduced-motion: no-preference){
+  @view-transition{ navigation:auto; }
+  ::view-transition-old(root){ animation-duration:.14s; }
+  ::view-transition-new(root){ animation-duration:.14s; }
+
+  .stage img{ view-transition-name: photo; }
+  ::view-transition-group(photo){
+    animation-duration:.3s;
+    animation-timing-function:cubic-bezier(.22,.61,.36,1);
+  }
+  /* snapshots fill the morphing box cover-style, so the square tile crop
+     and the full-aspect stage blend instead of squishing mid-flight */
+  ::view-transition-old(photo),
+  ::view-transition-new(photo){
+    height:100%;
+    width:100%;
+    object-fit:cover;
+    overflow:clip;
+  }
+}
+
+/* ---- "you are here" return flash: coming back out of a photo, app.js
+   scrolls the album to its tile and blinks the corner brackets once ---- */
+@media (prefers-reduced-motion: no-preference){
+  .image-tile.is-returned::before,
+  .image-tile.is-returned::after{
+    animation: tile-return 1.5s ease .25s backwards;
+  }
+}
+@keyframes tile-return{
+  0%, 55%{ opacity:1; }
+  100%   { opacity:0; }
+}
+
+/* ================================================================
    DESKTOP TYPE SCALE  (hierarchy boost, ≥761px ONLY)
    Bigger page titles, section labels and value captions so headings
    clearly outrank the small mono readouts around them. Deliberately
