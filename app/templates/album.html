@@ -76,12 +76,12 @@
     {% include "_trip.html" %}
   {% endif %}
 
-  {# side column: route map (trip albums) stacked above the .md description.
-     DOM order side-first so it leads when the grid collapses on mobile. #}
+  {# side column: the .md description stacked above the route map (trip
+     albums). DOM order side-first so it leads when the grid collapses on
+     mobile. #}
   <div class="album-body{% if album_description or trip %} album-body--with-desc{% endif %}">
     {% if album_description or trip %}
     <aside class="album-side" aria-label="{{ t('aria.album_info') }}">
-      {% if trip %}{% include "_trip_map.html" %}{% endif %}
       {% if album_description %}
       <div class="album-desc">
         <div class="album-desc__head">
@@ -91,9 +91,14 @@
         <div class="album-desc__body">{{ album_description | safe }}</div>
       </div>
       {% endif %}
+      {% if trip %}{% include "_trip_map.html" %}{% endif %}
     </aside>
     {% endif %}
     <div class="album-body__main">
+
+  {% if featured %}
+    {% include "_featured.html" %}
+  {% endif %}
 
   {% if sub_albums %}
     <section class="sub-albums" aria-label="{{ t('aria.folders') }}">
@@ -127,10 +132,6 @@
         {% endfor %}
       </ul>
     </section>
-  {% endif %}
-
-  {% if featured %}
-    {% include "_featured.html" %}
   {% endif %}
 
   {% set sort_qs = '' if current_sort == default_sort else ('sort=' ~ current_sort) %}

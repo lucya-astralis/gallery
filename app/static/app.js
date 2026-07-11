@@ -619,6 +619,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const targets = document.querySelectorAll([
     '.section__doc',
     '.section__head',
+    '.trip',
     '.archive-head',
     '.album-group__head',
     '.sub-albums__head',
@@ -626,6 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
     '.fhero__head',
     '.fhero__frame',
     '.showcase__head',
+    '.trip-map',
     '.album-desc',
     '.album-grid > li',
     '.feat__rail > li',
@@ -1545,4 +1547,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
   tick();
   setInterval(tick, 1000);
+
+  // ---- current weather per stop (same-origin proxy) ----
+  // One fetch per page view against /api/trip-weather (server-cached proxy
+  // to Open-Meteo — the browser never talks to a third party, so no consent
+  // UI is needed and connect-src 'self' holds). Chips stay hidden unless
+  // real data arrives; glyphs use text-presentation symbols so they render
+  // in the mono HUD style instead of as emoji. Condition names are HUD
+  // chrome (English, tooltip only), like the status stamps.
+  const wxByCity = {};
+  stops.forEach((s) => {
+    const el = s.el.querySelector('[data-stop-wx]');
+    if (el) wxByCity[s.city] = el;
+  });
+  const tripKey = root.dataset.tripKey;
+  if (tripKey && window.fetch && Object.keys(wxByCity).length) {
+    // WMO weather_code buckets -> [glyph, label]; ☀/☾ pick by is_day
+    const wmo = (code, isDay) => {
+      if (code <= 1) return [isDay ? '☀︎' : '☾︎', code === 0 ? 'Clear' : 'Mostly clear'];
+      if (code <= 3) return ['☁︎', code === 2 ? 'Partly cloudy' : 'Overcast'];
+      if (code <= 48) return ['≡', 'Fog'];
+      if (code <= 57) return ['☂︎', 'Drizzle'];
+      if (code <= 67) return ['☂︎', 'Rain'];
+      if (code <= 77) return ['❄︎', 'Snow'];
+      if (code <= 82) return ['☂︎', 'Rain showers'];
+      if (code <= 86) return ['❄︎', 'Snow showers'];
+      return ['⚡︎', 'Thunderstorm'];
+    };
+    fetch('/api/trip-weather?trip=' + encodeURIComponent(tripKey), { credentials: 'omit' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data || !Array.isArray(data.stops)) return;
+        data.stops.forEach((w) => {
+          const el = wxByCity[w.city];
+          if (!el || typeof w.temp !== 'number') return;
+          const [glyph, label] = wmo(w.code, w.is_day);
+          el.textContent = glyph + ' ' + Math.round(w.temp) + '°';
+          el.title = label + ' · weather: open-meteo.com';
+          el.hidden = false;
+        });
+      })
+      .catch(() => {}); // no weather is a fine state — chips just stay hidden
+  }
 });

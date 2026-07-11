@@ -15,6 +15,9 @@
     <span class="trip__stop-head">
       <span class="trip__stop-city">{{ s.city }}</span>
       {% if s.jp %}<span class="trip__stop-jp">{{ s.jp }}</span>{% endif %}
+      {# current conditions, filled by initTrip() from /api/trip-weather;
+         stays hidden without JS or when the proxy has nothing #}
+      <span class="trip__stop-wx" data-stop-wx hidden></span>
     </span>
     <span class="trip__stop-dates">{{ s.start_h }} – {{ s.end_h }}</span>
   </span>
@@ -24,7 +27,7 @@
   </span>
   <span class="trip__stop-track" aria-hidden="true"><i data-stop-fill></i></span>
 {% endmacro %}
-<section class="trip" data-trip data-depart="{{ trip.depart }}" aria-label="{{ t('trip.status_aria', title=trip.title) }}">
+<section class="trip" data-trip data-trip-key="{{ trip.key }}" data-depart="{{ trip.depart }}" aria-label="{{ t('trip.status_aria', title=trip.title) }}">
   <div class="trip__bar">
     <span class="trip__tag">{{ t('trip.tag') }}</span>
     <span class="trip__name">{{ trip.title }}</span>

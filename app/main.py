@@ -3,6 +3,7 @@ import logging
 import os
 import threading
 import time
+import urllib.request
 from functools import partial
 from pathlib import Path
 
@@ -665,10 +666,11 @@ TRIPS: dict[str, dict] = {
         "jp": "日本",
         # flight out (local wall-clock). 12:00 = noon departure.
         "depart": "2026-08-09T12:00:00",
+        # lat/lon feed the /api/trip-weather proxy (see below)
         "stops": [
-            {"city": "Osaka",   "jp": "大阪", "album": "osaka",   "start": "2026-08-10", "end": "2026-08-16"},
-            {"city": "Sapporo", "jp": "札幌", "album": "sapporo", "start": "2026-08-16", "end": "2026-09-16"},
-            {"city": "Tokyo",   "jp": "東京", "album": "tokyo",   "start": "2026-09-16", "end": "2027-01-02"},
+            {"city": "Osaka",   "jp": "大阪", "album": "osaka",   "start": "2026-08-10", "end": "2026-08-16", "lat": 34.6937, "lon": 135.5023},
+            {"city": "Sapporo", "jp": "札幌", "album": "sapporo", "start": "2026-08-16", "end": "2026-09-16", "lat": 43.0618, "lon": 141.3545},
+            {"city": "Tokyo",   "jp": "東京", "album": "tokyo",   "start": "2026-09-16", "end": "2027-01-02", "lat": 35.6895, "lon": 139.6917},
         ],
     },
 }
@@ -702,12 +704,87 @@ def _trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
             "count": count,
         })
     return {
+        "key": key,  # TRIPS key, echoed as data-trip-key for /api/trip-weather
         "title": cfg["title"],
         "jp": cfg.get("jp", ""),
         "depart": cfg["depart"],
         "depart_h": i18n.fmt_date(lang, cfg["depart"]),
         "stops": stops,
     }
+
+
+# ----- trip weather (server-side proxy) ----------------------------------
+# Current conditions per trip stop, fetched from the Open-Meteo forecast API
+# and re-served same-origin. Proxying is what keeps this consent-free and
+# CSP-clean: the visitor's browser only ever talks to this origin (no
+# third-party request, no cookies, nothing stored on the device — GDPR/
+# ePrivacy don't require a banner for it), and connect-src 'self' stays.
+# Upstream sees only this server's IP plus fixed city coordinates.
+# Open-Meteo is keyless and cookie-free; data is CC BY 4.0 — attributed in
+# the widget tooltip (see initTrip) and README. One upstream call covers
+# all stops; results are cached for WEATHER_TTL so page-view bursts cost
+# at most one fetch, and the last good payload is served on upstream errors.
+WEATHER_TTL = 900  # seconds; weather for a dashboard doesn't need more
+_weather_lock = threading.Lock()
+_weather_cache: dict[str, tuple[float, dict]] = {}  # trip key -> (fetched_at, payload)
+
+
+def _fetch_trip_weather(cfg: dict) -> dict:
+    """One Open-Meteo request for every stop of `cfg` (multi-location call).
+    Returns the trimmed same-origin payload; raises on network trouble —
+    the endpoint decides between stale-cache and 502."""
+    stops = [s for s in cfg["stops"] if "lat" in s and "lon" in s]
+    if not stops:
+        return {"updated": int(time.time()), "stops": []}
+    url = (
+        "https://api.open-meteo.com/v1/forecast"
+        "?latitude=" + ",".join(str(s["lat"]) for s in stops) +
+        "&longitude=" + ",".join(str(s["lon"]) for s in stops) +
+        "&current=temperature_2m,weather_code,is_day&timezone=Asia%2FTokyo"
+    )
+    req = urllib.request.Request(url, headers={"User-Agent": "lucya.systems-gallery"})
+    with urllib.request.urlopen(req, timeout=8) as resp:
+        payload = json.load(resp)
+    if isinstance(payload, dict):  # single-location responses aren't wrapped
+        payload = [payload]
+    out = []
+    for s, loc in zip(stops, payload):
+        cur = (loc or {}).get("current") or {}
+        temp, code = cur.get("temperature_2m"), cur.get("weather_code")
+        if temp is None or code is None:
+            continue
+        out.append({
+            "city": s["city"],  # English key, matches data-city / data-stop-wx lookup
+            "temp": float(temp),
+            "code": int(code),
+            "is_day": int(cur.get("is_day") or 0),
+        })
+    return {"updated": int(time.time()), "stops": out}
+
+
+@app.get("/api/trip-weather")
+def api_trip_weather(trip: str):
+    cfg = TRIPS.get(trip)
+    if not cfg:
+        raise HTTPException(404, "unknown trip")
+    now = time.time()
+    # the lock doubles as stampede protection: concurrent misses queue up
+    # behind the one request actually talking to Open-Meteo (sync endpoint,
+    # so this blocks a threadpool worker, not the event loop)
+    with _weather_lock:
+        cached = _weather_cache.get(trip)
+        if cached and now - cached[0] < WEATHER_TTL:
+            data = cached[1]
+        else:
+            try:
+                data = _fetch_trip_weather(cfg)
+                _weather_cache[trip] = (now, data)
+            except Exception:
+                log.warning("trip weather fetch failed (%s)", trip, exc_info=True)
+                if not cached:
+                    raise HTTPException(502, "weather upstream unavailable")
+                data = cached[1]  # stale beats nothing; retried next TTL window
+    return JSONResponse(data, headers={"Cache-Control": "public, max-age=600"})
 
 
 # ----- sort options -----------------------------------------------------
