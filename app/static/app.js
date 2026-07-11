@@ -1581,8 +1581,14 @@ document.addEventListener('DOMContentLoaded', () => {
         data.stops.forEach((w) => {
           const el = wxByCity[w.city];
           if (!el || typeof w.temp !== 'number') return;
+          const ico = el.querySelector('[data-wx-ico]');
+          const temp = el.querySelector('[data-wx-temp]');
+          const cond = el.querySelector('[data-wx-cond]');
+          if (!ico || !temp) return;
           const [glyph, label] = wmo(w.code, w.is_day);
-          el.textContent = glyph + ' ' + Math.round(w.temp) + '°';
+          ico.textContent = glyph;
+          temp.textContent = Math.round(w.temp) + '°';
+          if (cond) cond.textContent = label.toUpperCase();
           el.title = label + ' · weather: open-meteo.com';
           el.hidden = false;
         });

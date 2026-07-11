@@ -6,24 +6,34 @@
    doubles as navigation. The static markup is a sensible no-JS fallback.
    The matching route map (_trip_map.html) renders in the album sidebar —
    see album.html — and is state-synced by the same initTrip(). #}
-{% macro stop_inner(s) %}
-  <span class="trip__stop-thumb" aria-hidden="true">
+{# Leg card: the city cover fills the card behind a left-heavy shade; on
+   top a head row (index / city / kanji / state dot), the date span, and a
+   footer with the live weather block (filled by initTrip() from
+   /api/trip-weather — stays hidden without JS or data) opposite the
+   day-counter + photo-count link. #}
+{% macro stop_inner(s, ix) %}
+  <span class="trip__stop-media" aria-hidden="true">
     {% if s.cover %}<img src="/thumb/{{ s.cover }}" alt="" loading="lazy">{% endif %}
-    <span class="trip__stop-dot"></span>
   </span>
-  <span class="trip__stop-info">
+  <span class="trip__stop-shade" aria-hidden="true"></span>
+  <span class="trip__stop-body">
     <span class="trip__stop-head">
+      <span class="trip__stop-ix" aria-hidden="true">{{ '%02d' | format(ix) }}</span>
       <span class="trip__stop-city">{{ s.city }}</span>
       {% if s.jp %}<span class="trip__stop-jp">{{ s.jp }}</span>{% endif %}
-      {# current conditions, filled by initTrip() from /api/trip-weather;
-         stays hidden without JS or when the proxy has nothing #}
-      <span class="trip__stop-wx" data-stop-wx hidden></span>
+      <span class="trip__stop-dot" aria-hidden="true"></span>
     </span>
     <span class="trip__stop-dates">{{ s.start_h }} – {{ s.end_h }}</span>
-  </span>
-  <span class="trip__stop-side">
-    <span class="trip__stop-meta" data-stop-meta></span>
-    {% if s.href %}<span class="trip__stop-go">{{ s.count }}<i aria-hidden="true">→</i></span>{% endif %}
+    <span class="trip__stop-foot">
+      <span class="trip__stop-wx" data-stop-wx hidden>
+        <b class="trip__stop-wx-now"><i data-wx-ico aria-hidden="true"></i><span data-wx-temp></span></b>
+        <span class="trip__stop-wx-cond" data-wx-cond></span>
+      </span>
+      <span class="trip__stop-side">
+        <span class="trip__stop-meta" data-stop-meta></span>
+        {% if s.href %}<span class="trip__stop-go">{{ s.count }}<i aria-hidden="true">→</i></span>{% endif %}
+      </span>
+    </span>
   </span>
   <span class="trip__stop-track" aria-hidden="true"><i data-stop-fill></i></span>
 {% endmacro %}
@@ -55,9 +65,9 @@
       {% for s in trip.stops %}
       <li class="trip__stop" data-stop data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}"{% if s.jp %} data-city-jp="{{ s.jp }}"{% endif %}>
         {% if s.href %}
-          <a class="trip__stop-link" href="{{ s.href }}">{{ stop_inner(s) }}</a>
+          <a class="trip__stop-link" href="{{ s.href }}">{{ stop_inner(s, loop.index) }}</a>
         {% else %}
-          <div class="trip__stop-link trip__stop-link--static">{{ stop_inner(s) }}</div>
+          <div class="trip__stop-link trip__stop-link--static">{{ stop_inner(s, loop.index) }}</div>
         {% endif %}
       </li>
       {% endfor %}
