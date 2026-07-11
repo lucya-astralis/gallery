@@ -25,7 +25,7 @@
   <meta name="theme-color" content="#5b8aff">
 {% endblock %}
 {% block content %}
-<section>
+<section{% if album_cover %} class="has-album-hero"{% endif %}>
   {# "up one level" target: parent album for a sub-album, otherwise the album index.
      Surfaced as a big, obvious back button on mobile (see .pathbar__back). #}
   {% set up_url = ('/album/' ~ breadcrumbs[-2].path) if breadcrumbs | length > 1 else '/albums' %}
@@ -46,6 +46,37 @@
       {% endfor %}
     </div>
   </nav>
+
+  {# Mobile hero: the album cover as a full-width visual header — kicker,
+     title, kanji ornament and the key facts. On phones this replaces the
+     text-heavy header stack (crumb trail, doc bar, slug row — hidden via
+     .has-album-hero in style.css); ≥761px it stays display:none and the
+     classic desktop header takes over. #}
+  {% if album_cover %}
+    {% set hero_title = trip.title if trip else (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | replace('_', ' ') %}
+    <header class="album-hero{% if trip %} album-hero--trip{% endif %}">
+      <img class="album-hero__media" src="/preview/{{ album_cover }}" alt="{{ hero_title }}" fetchpriority="high">
+      <span class="album-hero__shade" aria-hidden="true"></span>
+      <span class="album-hero__corner album-hero__corner--tl" aria-hidden="true"></span>
+      <span class="album-hero__corner album-hero__corner--tr" aria-hidden="true"></span>
+      <span class="album-hero__corner album-hero__corner--bl" aria-hidden="true"></span>
+      <span class="album-hero__corner album-hero__corner--br" aria-hidden="true"></span>
+      <div class="album-hero__body">
+        <span class="album-hero__kicker">
+          {%- if trip %}{{ t('trip.tag') }}
+          {%- elif breadcrumbs | length > 1 %}{{ t('stamp.sub_album') }}
+          {%- elif album_is_showcase %}{{ t('stamp.showcase_album') }}
+          {%- else %}ALBUM{% endif -%}{# HUD token — stays English like FILE / #}
+        </span>
+        <h1 class="album-hero__title">{{ hero_title }}<span class="album-hero__jp" aria-hidden="true">{{ trip.jp if trip and trip.jp else t('album.slug_deco') }}</span></h1>
+        <div class="album-hero__facts">
+          {% if trip %}<span class="album-hero__fact album-hero__fact--dates">{{ month_label(trip.stops[0].start) }} – {{ month_label(trip.stops[-1].end) }}</span>{% endif %}
+          <span class="album-hero__fact">{{ images | length }} {{ t('unit.photos' if images | length != 1 else 'unit.photo') }}</span>
+          {% if sub_albums %}<span class="album-hero__fact">{{ sub_albums | length }} {{ t('unit.album_many' if sub_albums | length != 1 else 'unit.album_one') }}</span>{% endif %}
+        </div>
+      </div>
+    </header>
+  {% endif %}
 
   <div class="section__doc">
     <span class="doc-min-hide">FILE / {{ (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | upper }}</span>

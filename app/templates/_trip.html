@@ -23,7 +23,9 @@
       {% if s.jp %}<span class="trip__stop-jp">{{ s.jp }}</span>{% endif %}
       <span class="trip__stop-dot" aria-hidden="true"></span>
     </span>
-    <span class="trip__stop-dates">{{ s.start_h }} – {{ s.end_h }}</span>
+    {# two no-wrap halves: a narrow tile breaks the range cleanly at the
+       dash ("10 Aug 2026 –" / "16 Aug 2026") instead of mid-date #}
+    <span class="trip__stop-dates"><span>{{ s.start_h }} –</span> <span>{{ s.end_h }}</span></span>
     <span class="trip__stop-foot">
       <span class="trip__stop-wx" data-stop-wx hidden>
         <b class="trip__stop-wx-now"><i data-wx-ico aria-hidden="true"></i><span data-wx-temp></span></b>

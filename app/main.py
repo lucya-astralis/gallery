@@ -266,6 +266,22 @@ def _child_album_names(parent: str | None, all_albums: list[str] | None = None) 
     return out
 
 
+def _album_cover_rel(album: str) -> str | None:
+    """Cover for an album node: the album.cfg-pinned cover wins, otherwise
+    the newest photo from anywhere in the subtree. `substr(...)` (not LIKE)
+    so album names containing `_`/`%` don't act as wildcards."""
+    cover_rel = _config_cover_rel(album, _cfg_first(_album_config(album), "cover"))
+    if cover_rel:
+        return cover_rel
+    prefix = album + "/"
+    row = db.conn().execute(
+        "SELECT rel_path FROM images WHERE (album = ? OR substr(album, 1, ?) = ?) "
+        "ORDER BY taken_at IS NULL, taken_at DESC, mtime DESC LIMIT 1",
+        (album, len(prefix), prefix),
+    ).fetchone()
+    return row["rel_path"] if row else None
+
+
 def _album_card(album: str, all_albums: list[str] | None = None) -> dict:
     """Display info for one album node: recursive photo count, latest
     activity, a cover image from anywhere in its subtree, and how many
@@ -279,16 +295,7 @@ def _album_card(album: str, all_albums: list[str] | None = None) -> dict:
         f"SELECT COUNT(*) AS count, MAX(taken_at) AS latest FROM images WHERE {cond}",
         params,
     ).fetchone()
-    # A pinned cover (album.cfg `cover = ...`) wins; otherwise the newest
-    # photo from anywhere in the subtree.
-    cover_rel = _config_cover_rel(album, _cfg_first(_album_config(album), "cover"))
-    if not cover_rel:
-        cover = c.execute(
-            f"SELECT rel_path FROM images WHERE {cond} "
-            "ORDER BY taken_at IS NULL, taken_at DESC, mtime DESC LIMIT 1",
-            params,
-        ).fetchone()
-        cover_rel = cover["rel_path"] if cover else None
+    cover_rel = _album_cover_rel(album)
     return {
         "album": album,
         "name": _display_name(album.rsplit("/", 1)[-1]),
@@ -1372,6 +1379,8 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             "album": album,
             "breadcrumbs": _album_breadcrumbs(album),
             "album_description": _album_description(album, lang),
+            # cover photo for the mobile hero header (see .album-hero)
+            "album_cover": _album_cover_rel(album),
             "trip": _trip_for_album(album, lang),
             "collection": collection,
             "sub_albums": sub_albums,

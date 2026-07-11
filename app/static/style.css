@@ -557,6 +557,140 @@ section{
 }
 
 /* ================================================================
+   ALBUM HERO (phones only) — the cover as a visual header
+   On small screens an album opens on its cover photo with kicker /
+   title / kanji / key-facts overlaid, and the text-heavy header
+   stack (crumb trail, doc bar, slug row) collapses via the
+   .has-album-hero rules below — one glance says what the album is.
+   ≥761px the hero stays display:none; the desktop header is
+   untouched.
+   ================================================================ */
+.album-hero{ display:none; }
+
+@media (max-width:760px){
+  .album-hero{
+    position:relative;
+    display:flex; flex-direction:column; justify-content:flex-end;
+    aspect-ratio:3/2;
+    max-height:58vh;
+    margin:0 0 16px;
+    border:1px solid var(--line-strong);
+    background:#05050a;
+    overflow:hidden;
+    isolation:isolate;
+  }
+  .album-hero__media{
+    position:absolute; inset:0; z-index:0;
+    width:100%; height:100%;
+    object-fit:cover;
+    filter:saturate(.94) contrast(1.04) brightness(.88);
+  }
+  /* slow Ken Burns settle on capable devices (html.fx-anim — same gate as
+     the other motion layers); static image everywhere else */
+  html.fx-anim .album-hero__media{ animation: vf-drift 9s ease-out forwards; }
+  html.fx-lite .album-hero__media{ animation:none !important; transform:none; }
+  /* readability shade: quiet on top, heavy behind the bottom text block */
+  .album-hero__shade{
+    position:absolute; inset:0; z-index:1; pointer-events:none;
+    background:linear-gradient(180deg,
+      rgba(4,5,10,.34) 0%, transparent 26%, transparent 46%, rgba(4,5,10,.88) 100%);
+  }
+  .album-hero__corner{
+    position:absolute; z-index:2;
+    width:16px; height:16px;
+    border:1px solid rgba(91,138,255,.75);
+    opacity:.9; pointer-events:none;
+  }
+  .album-hero__corner--tl{ top:9px; left:9px; border-right:0; border-bottom:0; }
+  .album-hero__corner--tr{ top:9px; right:9px; border-left:0; border-bottom:0; }
+  .album-hero__corner--bl{ bottom:9px; left:9px; border-right:0; border-top:0; }
+  .album-hero__corner--br{ bottom:9px; right:9px; border-left:0; border-top:0; }
+  .album-hero__body{
+    position:relative; z-index:2;
+    display:flex; flex-direction:column; gap:7px;
+    padding:0 16px 15px;
+    min-width:0;
+    text-shadow:0 1px 8px rgba(0,0,0,.6);
+  }
+  /* dark chip (same recipe as .fhero__chip) so the tag reads on any cover */
+  .album-hero__kicker{
+    align-self:flex-start;
+    padding:3px 8px;
+    border:1px solid var(--line-strong);
+    background:rgba(7,7,11,.72);
+    font-family:"JetBrains Mono", monospace;
+    font-size:9.5px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--acc-cy);
+  }
+  .album-hero__title{
+    margin:0;
+    display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+    font-family:"Space Grotesk", sans-serif;
+    font-size:30px; font-weight:700; line-height:1.02;
+    letter-spacing:.01em; color:var(--text);
+    min-width:0; overflow-wrap:anywhere;
+  }
+  .album-hero__jp{
+    font-family:"Noto Sans JP", sans-serif;
+    font-size:13px; font-weight:400;
+    letter-spacing:.3em;
+    color:var(--text-dim);
+  }
+  .album-hero__facts{
+    display:flex; flex-wrap:wrap; gap:3px 14px;
+    font-family:"JetBrains Mono", monospace;
+    font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+    font-variant-numeric:tabular-nums;
+    color:var(--text-dim);
+  }
+  .album-hero__fact--dates{ color:var(--acc-cy); }
+
+  /* the hero replaces the text header stack on phones: back button stays,
+     crumb trail / doc bar / slug row fold away (all still shown ≥761px) */
+  .has-album-hero .pathbar{ margin-bottom:12px; }
+  .has-album-hero .pathbar .crumb{ display:none; }
+  .has-album-hero .section__doc,
+  .has-album-hero .section__head{ display:none; }
+
+  /* trip albums: hero and countdown dashboard fuse into ONE seamless
+     module. The cover's shade runs out into the exact trip surface color
+     (opaque var(--surface)), so the photo dissolves straight into the
+     countdown — no edge, no divider line, one continuous card. The trip
+     bar sheds the tag / title / kanji the hero already shows, leaving a
+     slim HUD line of live status stamp + JST clock right at the seam. */
+  .album-hero--trip{ margin-bottom:0; border-bottom:0; }
+  .album-hero--trip .album-hero__corner--bl,
+  .album-hero--trip .album-hero__corner--br{ display:none; }
+  .album-hero--trip .album-hero__shade{
+    background:linear-gradient(180deg,
+      rgba(4,5,10,.34) 0%, transparent 26%, transparent 40%,
+      rgba(17,17,26,.62) 72%, var(--surface) 100%);
+  }
+  .album-hero--trip .album-hero__body{ padding-bottom:8px; }
+  /* trip box continues the hero: same frame, flat surface (the default
+     blue top glow + accent border would re-draw a seam), no top edge */
+  .has-album-hero .trip{
+    border-top:0;
+    border-left-color:var(--line-strong);
+    border-right-color:var(--line-strong);
+    border-bottom-color:var(--line-strong);
+    background:var(--surface);
+  }
+  .has-album-hero .trip__tag,
+  .has-album-hero .trip__name,
+  .has-album-hero .trip__jp{ display:none; }
+  .has-album-hero .trip__bar{ border-bottom:0; padding-top:2px; padding-bottom:4px; }
+  .has-album-hero .trip__status{ margin-left:0; }
+  .has-album-hero .trip__clock{ margin-left:auto; }
+}
+@media (max-width:480px){
+  .album-hero__title{ font-size:26px; }
+}
+@media (prefers-reduced-motion: reduce){
+  .album-hero__media{ animation:none !important; transform:none; }
+}
+
+/* ================================================================
    TAGS
    ================================================================ */
 .tag-bar{
@@ -3252,6 +3386,9 @@ a.trip__stop-link:hover .trip__stop-media img{
   font-size:10px; letter-spacing:.04em; color:var(--text-dim);
   font-variant-numeric:tabular-nums;
 }
+/* each range half is an unbreakable block, so a narrow tile wraps exactly
+   at the dash (see the phone tile row below) — one line when it fits */
+.trip__stop-dates > span{ display:inline-block; white-space:nowrap; }
 
 /* footer: weather (live) left, day counter + photo count right */
 .trip__stop-foot{
@@ -3417,6 +3554,34 @@ a.trip__stop-link:hover .trip__stop-go i{ transform:translateX(3px); }
   .trip__line{ flex-direction:row; gap:10px; }
   .trip__stop{ flex:1 1 0; }
   .trip__stop-link{ min-height:122px; padding:12px 14px 14px; }
+}
+
+/* phones: the route keeps its cover imagery but flips the layout logic —
+   the three stops sit SIDE BY SIDE as one row of compact portrait tiles
+   (whole route in a single glance, one row tall) instead of stacking
+   full-width banner cards. Tiles read bottom-up over a foot-heavy shade:
+   city / kanji / state dot, the date span in miniature, live temp +
+   photo count in the foot. */
+@media (max-width:760px){
+  .trip__line{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:7px; }
+  .trip__stop-link{ min-height:148px; padding:9px 10px 10px; }
+  /* narrow portrait tile: swap the left-heavy readability shade for a
+     bottom-heavy one so the text block anchors to the foot of the tile */
+  .trip__stop-shade{
+    background:linear-gradient(0deg,
+      rgba(4,7,16,.94) 0%, rgba(4,7,16,.55) 46%, rgba(4,7,16,.2) 100%);
+  }
+  .trip__stop-body{ gap:4px; justify-content:flex-end; }
+  .trip__stop-head{ flex-wrap:wrap; gap:2px 6px; align-items:center; }
+  .trip__stop-ix{ display:none; }
+  .trip__stop-city{ font-size:13px; }
+  .trip__stop-jp{ font-size:11px; }
+  .trip__stop-dates{ font-size:9.5px; letter-spacing:.02em; line-height:1.45; white-space:normal; }
+  .trip__stop-foot{ padding-top:5px; gap:8px; }
+  .trip__stop-wx-now{ font-size:11.5px; }
+  .trip__stop-go{ font-size:11px; }
+  .trip__stop-wx-cond{ display:none; }
+  .trip__stop-meta{ display:none; }
 }
 
 @media (max-width:420px){
