@@ -25,7 +25,12 @@
   <meta name="theme-color" content="#5b8aff">
 {% endblock %}
 {% block content %}
-<section class="{% if featured or album_cover or trip %}has-album-hero {% endif %}{% if featured %}has-hero-reel{% endif %}">
+{# normal (non-trip) album that has BOTH a reel and a description: the reel
+   and description share a top row (reel left, description right) with the
+   photo grid full-width below — instead of a full-width reel over a
+   photos+sidebar split. Trip albums keep their own module layout. #}
+{% set two_col_top = featured and album_description and not trip %}
+<section class="{% if featured or album_cover or trip %}has-album-hero {% endif %}{% if featured %}has-hero-reel {% endif %}{% if two_col_top %}has-album-top{% endif %}">
   {# "up one level" target: parent album for a sub-album, otherwise the album index.
      Surfaced as a big, obvious back button on mobile (see .pathbar__back). #}
   {% set up_url = ('/album/' ~ breadcrumbs[-2].path) if breadcrumbs | length > 1 else '/albums' %}
@@ -67,6 +72,18 @@
     </div>
   {% endmacro %}
 
+  {# the .md description card — used in the top row next to the reel
+     (two_col_top) or in the body sidebar (trip / reel-less albums). #}
+  {% macro desc_card() %}
+    <div class="album-desc">
+      <div class="album-desc__head">
+        <span class="album-desc__label">{{ t('album.about') }}</span>
+        <span class="album-desc__file">{{ (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | upper }}</span>
+      </div>
+      <div class="album-desc__body">{{ album_description | safe }}</div>
+    </div>
+  {% endmacro %}
+
   {# status bar first — it reads as the module's system line, docked right
      above whichever hero block follows (reel, trip module or static cover) #}
   <div class="section__doc">
@@ -85,6 +102,13 @@
     {# trip albums: the whole trip module is the hero — header bar on top,
        the reel docked between it and the countdown (see _trip.html) #}
     {% include "_trip.html" %}
+  {% elif two_col_top %}
+    {# normal album with a description: reel (left) and description (right)
+       share a top row; the photo grid runs full-width below. #}
+    <div class="album-top">
+      {% include "_featured.html" %}
+      <aside class="album-side album-side--top" aria-label="{{ t('aria.album_info') }}">{{ desc_card() }}</aside>
+    </div>
   {% elif featured %}
     {# the reel IS the hero block — slideshow with the identity overlay #}
     {% include "_featured.html" %}
@@ -115,19 +139,13 @@
 
   {# side column: the .md description stacked above the route map (trip
      albums). DOM order side-first so it leads when the grid collapses on
-     mobile. #}
-  <div class="album-body{% if album_description or trip %} album-body--with-desc{% endif %}">
-    {% if album_description or trip %}
+     mobile. Skipped for two_col_top — the description already sits in the
+     top row next to the reel, so the photo grid runs full-width here. #}
+  {% set body_side = (album_description or trip) and not two_col_top %}
+  <div class="album-body{% if body_side %} album-body--with-desc{% endif %}">
+    {% if body_side %}
     <aside class="album-side" aria-label="{{ t('aria.album_info') }}">
-      {% if album_description %}
-      <div class="album-desc">
-        <div class="album-desc__head">
-          <span class="album-desc__label">{{ t('album.about') }}</span>
-          <span class="album-desc__file">{{ (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | upper }}</span>
-        </div>
-        <div class="album-desc__body">{{ album_description | safe }}</div>
-      </div>
-      {% endif %}
+      {% if album_description %}{{ desc_card() }}{% endif %}
       {% if trip %}{% include "_trip_map.html" %}{% endif %}
     </aside>
     {% endif %}

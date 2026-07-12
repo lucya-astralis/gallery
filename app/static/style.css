@@ -708,9 +708,17 @@ section{
    so it also fits the narrower main column of albums that show a trip map
    or description sidebar (e.g. japan_2026). width must be explicit: with
    width:auto the max-height transfers through the aspect-ratio into a
-   max-WIDTH (600px × 2/1 = 1200px) and the frame stops short of the
-   column edge; an explicit 100% keeps it flush and only caps the height
-   (the ratio may relax — slides are object-fit:cover, so that's fine). */
+   max-WIDTH and the frame stops short of the column edge; an explicit 100%
+   keeps it flush and only caps the height (the ratio may relax — slides are
+   object-fit:cover, so that's fine).
+   Resolution guard: previews are capped at 1600px on their long edge and
+   never upscaled, so a low-res source stays small. The page section runs up
+   to 2000px wide, which would blow the frame past any preview and smear it
+   with object-fit:cover. So cap the frame width (a 1600px preview then never
+   upscales) and center it, and use a slightly taller 16/9 with more height
+   headroom than the old 62vh/2:1 — which squished the frame to ~2.4:1 and
+   made low-res photos look worse. The trip-embedded reel opts back out to
+   full-bleed below (its photos are curated hi-res). */
 .fhero__frame{
   position:relative;
   overflow:hidden;
@@ -718,8 +726,10 @@ section{
   background:#05050a;
   border:1px solid var(--line-strong);
   width:100%;
-  aspect-ratio:2/1;
-  max-height:min(62vh, 600px);
+  max-width:1280px;
+  margin-inline:auto;
+  aspect-ratio:16/9;
+  max-height:min(72vh, 640px);
   min-height:240px;
 }
 .fhero__stage{ position:absolute; inset:0; }
@@ -949,7 +959,9 @@ section{
    dissolves straight into the countdown; the trip bar above the reel is
    the module's title row. */
 .trip .fhero{ margin:0; }
-.trip .fhero__frame{ border:0; }
+/* full-bleed inside the trip module (no width cap / centering): the module
+   is meant to span its width, and trip covers are curated hi-res */
+.trip .fhero__frame{ border:0; max-width:none; margin-inline:0; }
 .trip .fhero__shade{
   background:linear-gradient(180deg,
     rgba(4,5,10,.42) 0%, transparent 24%, transparent 42%,
@@ -1696,6 +1708,31 @@ section{
 }
 @media (min-width:1400px){
   .album-body--with-desc{ grid-template-columns:minmax(0, 1fr) 380px; }
+}
+
+/* Two-column top row (normal albums with a reel AND a description): reel
+   left, description right, both sharing the row as a PROPORTIONAL split so
+   the description scales with the viewport instead of staying a thin fixed
+   strip on wide screens. The photo grid runs full-width below. Mobile
+   collapses to one column: reel, then description, then photos. */
+.album-top{
+  display:grid;
+  grid-template-columns:minmax(0, 1fr);
+  gap:22px;
+  margin:0 0 22px;
+}
+.album-top > .fhero{ margin:0; }          /* the grid gap owns the spacing */
+.album-top > .album-side--top{ min-width:0; }
+/* the reel fills its grid column here — the column already bounds its width,
+   so the standalone hero's max-width cap / centering (which left a side gap
+   next to the description) is dropped */
+.album-top .fhero__frame{ max-width:none; margin-inline:0; }
+@media (min-width:1000px){
+  .album-top{
+    grid-template-columns:minmax(0, 2fr) minmax(0, 1fr);
+    gap:32px;
+    align-items:start;   /* description keeps its natural (content) height */
+  }
 }
 
 .album-desc{
