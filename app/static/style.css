@@ -557,15 +557,50 @@ section{
 }
 
 /* ================================================================
-   ALBUM HERO (phones only) — the cover as a visual header
-   On small screens an album opens on its cover photo with kicker /
-   title / kanji / key-facts overlaid, and the text-heavy header
-   stack (crumb trail, doc bar, slug row) collapses via the
-   .has-album-hero rules below — one glance says what the album is.
-   ≥761px the hero stays display:none; the desktop header is
-   untouched.
+   ALBUM HERO — the album's visual header
+   Two carriers share one identity overlay (kicker / title / kanji /
+   key facts, the hero_info() macro in album.html):
+     · the reel slideshow (.fhero--hero + .fhero__ov, every viewport)
+     · the static cover hero below (phones only, reel-less albums)
+   On small screens either hero replaces the text-heavy header stack
+   (crumb trail, doc bar, slug row) via the .has-album-hero rules.
    ================================================================ */
 .album-hero{ display:none; }
+
+/* ---- identity overlay pieces (shared, all viewports; desktop size
+   boosts live in the DESKTOP TYPE SCALE block at the end) ---- */
+/* dark chip (same recipe as .fhero__chip) so the tag reads on any cover */
+.album-hero__kicker{
+  align-self:flex-start;
+  padding:3px 8px;
+  border:1px solid var(--line-strong);
+  background:rgba(7,7,11,.72);
+  font-family:"JetBrains Mono", monospace;
+  font-size:9.5px; letter-spacing:.24em; text-transform:uppercase;
+  color:var(--acc-cy);
+}
+.album-hero__title{
+  margin:0;
+  display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+  font-family:"Space Grotesk", sans-serif;
+  font-size:30px; font-weight:700; line-height:1.02;
+  letter-spacing:.01em; color:var(--text);
+  min-width:0; overflow-wrap:anywhere;
+}
+.album-hero__jp{
+  font-family:"Noto Sans JP", sans-serif;
+  font-size:13px; font-weight:400;
+  letter-spacing:.3em;
+  color:var(--text-dim);
+}
+.album-hero__facts{
+  display:flex; flex-wrap:wrap; gap:3px 14px;
+  font-family:"JetBrains Mono", monospace;
+  font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+  font-variant-numeric:tabular-nums;
+  color:var(--text-dim);
+}
+.album-hero__fact--dates{ color:var(--acc-cy); }
 
 @media (max-width:760px){
   .album-hero{
@@ -612,38 +647,6 @@ section{
     min-width:0;
     text-shadow:0 1px 8px rgba(0,0,0,.6);
   }
-  /* dark chip (same recipe as .fhero__chip) so the tag reads on any cover */
-  .album-hero__kicker{
-    align-self:flex-start;
-    padding:3px 8px;
-    border:1px solid var(--line-strong);
-    background:rgba(7,7,11,.72);
-    font-family:"JetBrains Mono", monospace;
-    font-size:9.5px; letter-spacing:.24em; text-transform:uppercase;
-    color:var(--acc-cy);
-  }
-  .album-hero__title{
-    margin:0;
-    display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
-    font-family:"Space Grotesk", sans-serif;
-    font-size:30px; font-weight:700; line-height:1.02;
-    letter-spacing:.01em; color:var(--text);
-    min-width:0; overflow-wrap:anywhere;
-  }
-  .album-hero__jp{
-    font-family:"Noto Sans JP", sans-serif;
-    font-size:13px; font-weight:400;
-    letter-spacing:.3em;
-    color:var(--text-dim);
-  }
-  .album-hero__facts{
-    display:flex; flex-wrap:wrap; gap:3px 14px;
-    font-family:"JetBrains Mono", monospace;
-    font-size:10px; letter-spacing:.16em; text-transform:uppercase;
-    font-variant-numeric:tabular-nums;
-    color:var(--text-dim);
-  }
-  .album-hero__fact--dates{ color:var(--acc-cy); }
 
   /* the hero replaces the text header stack on phones: back button stays,
      crumb trail / doc bar / slug row fold away (all still shown ≥761px) */
@@ -730,20 +733,6 @@ section{
 /* Featured photos render as the .fhero slideshow below — nested <section>,
    so cancel the global section padding/centring like .showcase/.feat do. */
 .fhero{ position:relative; margin:0 0 30px; padding:0; }
-.fhero__head{
-  display:flex; align-items:center; gap:10px;
-  margin-bottom:12px;
-  padding-bottom:8px;
-  border-bottom:1px dashed var(--line);
-  font-family:"JetBrains Mono", monospace;
-  font-size:10.5px;
-  letter-spacing:.22em;
-  text-transform:uppercase;
-  color:var(--text-ghost);
-}
-.fhero__label{ color:var(--acc-cy); letter-spacing:.24em; }
-.fhero__hint{ padding-left:10px; border-left:1px solid var(--line); }
-.fhero__count{ margin-left:auto; }
 
 /* the hero box is fluid (100% of the parent column) with a capped height,
    so it also fits the narrower main column of albums that show a trip map
@@ -947,8 +936,6 @@ section{
 
 @media (max-width:760px){
   .fhero{ margin-bottom:22px; }
-  .fhero .doc-min-hide{ display:none; }
-  .fhero__head{ font-size:9.5px; }
   .fhero__frame{ aspect-ratio:3/2; min-height:220px; max-height:60vh; }
   .fhero__bar{ padding:8px 10px 9px; gap:8px; }
   .fhero__file{ left:10px; bottom:46px; padding:5px 8px; gap:8px; }
@@ -958,6 +945,52 @@ section{
   .fhero__chip--frm{ right:10px; }
   .fhero__corner{ width:14px; height:14px; }
   .fhero__auto{ display:none; }
+}
+
+/* ---- hero reel (.fhero--hero) — the reel doubling as the album hero ----
+   The album identity overlay (hero_info() from album.html) sits lower-left
+   on the frame above the control bar; the classic slug row below would just
+   repeat the title, so it folds on every viewport. */
+.fhero--hero{ margin:0 0 22px; }
+.fhero__ov{
+  position:absolute; left:14px; right:14px; bottom:50px;
+  z-index:4;
+  display:flex; flex-direction:column; gap:7px;
+  min-width:0;
+  pointer-events:none;   /* clicks fall through to the slide link */
+  text-shadow:0 1px 8px rgba(0,0,0,.6);
+}
+.fhero--single .fhero__ov{ bottom:14px; }
+.has-hero-reel .section__head{ display:none; }
+/* the filename chip clears the overlay corner: top-center on wide screens
+   (between the mode and FRM chips), off on phones — the slide itself links */
+.fhero--hero .fhero__file{
+  bottom:auto; top:12px;
+  left:50%; transform:translateX(-50%);
+  max-width:44%;
+}
+@media (max-width:760px){
+  .fhero--hero .fhero__file{ display:none; }
+  .fhero__ov{ left:11px; right:11px; bottom:46px; gap:6px; }
+  .fhero--single .fhero__ov{ bottom:12px; }
+  /* trip albums: reel hero and countdown dashboard fuse into ONE module
+     (the trip side of the seam keeps its .has-album-hero rules): the shade
+     runs out into the trip surface color and the control bar sits flat on
+     it, so slides dissolve straight into the countdown. */
+  .fhero--fused{ margin-bottom:0; }
+  .fhero--fused .fhero__frame{ border-bottom:0; }
+  .fhero--fused .fhero__shade{
+    background:linear-gradient(180deg,
+      rgba(4,5,10,.42) 0%, transparent 24%, transparent 42%,
+      rgba(17,17,26,.66) 74%, var(--surface) 100%);
+  }
+  .fhero--fused .fhero__bar{
+    border-top:0;
+    background:linear-gradient(180deg, rgba(17,17,26,.42), var(--surface));
+    backdrop-filter:none; -webkit-backdrop-filter:none;
+  }
+  .fhero--fused .fhero__corner--bl,
+  .fhero--fused .fhero__corner--br{ display:none; }
 }
 
 /* showcase / folder badge on album + showcase cards */
@@ -3833,4 +3866,11 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__img{
   .trip__stop-go{ font-size:11px; }
   .trip__cd-unit i{ font-size:10.5px; }
   .trip__cd-target{ font-size:11px; }
+
+  /* hero-reel identity overlay: poster-sized on wide screens */
+  .album-hero__kicker{ font-size:10px; }
+  .album-hero__title{ font-size:clamp(32px, 3.4vw, 44px); }
+  .album-hero__jp{ font-size:15px; }
+  .album-hero__facts{ font-size:11px; gap:3px 18px; }
+  .fhero__ov{ left:18px; right:18px; bottom:56px; gap:9px; }
 }

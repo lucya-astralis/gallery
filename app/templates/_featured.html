@@ -14,12 +14,10 @@
   {%- if img.album != album -%}{{ pretty_rel(img.album[(album | length) + 1:]) }} / {% endif -%}{{ display_name(img.filename) }}
 {%- endmacro -%}
 {% set reel_random = reel_mode == 'random' %}
-<section class="fhero{% if featured | length == 1 %} fhero--single{% endif %}" id="fhero" aria-label="{% if reel_random %}{{ t('aria.random_photos') }}{% else %}{{ t('aria.featured_photos') }}{% endif %}">
-  <header class="fhero__head">
-    <span class="fhero__label">{% if reel_random %}{{ t('reel.random') }}{% else %}{{ t('reel.featured') }}{% endif %}</span>
-    <span class="fhero__hint doc-min-hide" aria-hidden="true">{% if reel_random %}SHUFFLE REEL{% else %}SHOWCASE REEL{% endif %}</span>
-    <span class="fhero__count">{{ featured | length }} {% if featured | length == 1 %}{{ t('unit.photo') }}{% else %}{{ t('unit.photos') }}{% endif %}</span>
-  </header>
+{# fhero--hero: the reel doubles as the album's hero block on every viewport
+   — the album identity overlay (hero_info(), defined in album.html before
+   the include) sits on the frame, so there is no separate header stack. #}
+<section class="fhero fhero--hero{% if trip %} fhero--fused{% endif %}{% if featured | length == 1 %} fhero--single{% endif %}" id="fhero" aria-label="{% if reel_random %}{{ t('aria.random_photos') }}{% else %}{{ t('aria.featured_photos') }}{% endif %}">
   <div class="fhero__frame">
     <div class="fhero__stage" id="fhero-stage">
       {% for img in featured %}
@@ -43,6 +41,9 @@
       <span class="fhero__file-name" id="fhero-name" data-scramble>{{ feat_label(featured[0]) }}</span>
       <span class="fhero__file-open" aria-hidden="true">{{ t('reel.open') }}</span>
     </a>
+    {# album identity overlay, lower-left above the control bar; non-
+       interactive so clicks fall through to the slide link behind it #}
+    <div class="fhero__ov">{{ hero_info() }}</div>
     <div class="fhero__bar">
       <button type="button" class="fhero__nav" id="fhero-prev" aria-label="{{ t('aria.prev_photo') }}">‹</button>
       <button type="button" class="fhero__nav" id="fhero-next" aria-label="{{ t('aria.next_photo') }}">›</button>
