@@ -679,11 +679,12 @@ TRIPS: dict[str, dict] = {
         "jp": "日本",
         # flight out (local wall-clock). 12:00 = noon departure.
         "depart": "2026-08-09T12:00:00",
-        # lat/lon feed the /api/trip-weather proxy (see below)
+        # lat/lon feed the /api/trip-weather proxy (see below); `icon` names a
+        # civic emblem SVG under /static/emblems (rendered on the timeline stop)
         "stops": [
-            {"city": "Osaka",   "jp": "大阪", "album": "osaka",   "start": "2026-08-10", "end": "2026-08-16", "lat": 34.6937, "lon": 135.5023},
-            {"city": "Sapporo", "jp": "札幌", "album": "sapporo", "start": "2026-08-16", "end": "2026-09-16", "lat": 43.0618, "lon": 141.3545},
-            {"city": "Tokyo",   "jp": "東京", "album": "tokyo",   "start": "2026-09-16", "end": "2027-01-02", "lat": 35.6895, "lon": 139.6917},
+            {"city": "Osaka",   "jp": "大阪", "album": "osaka",   "icon": "osaka",   "start": "2026-08-10", "end": "2026-08-16", "lat": 34.6937, "lon": 135.5023},
+            {"city": "Sapporo", "jp": "札幌", "album": "sapporo", "icon": "sapporo", "start": "2026-08-16", "end": "2026-09-16", "lat": 43.0618, "lon": 141.3545},
+            {"city": "Tokyo",   "jp": "東京", "album": "tokyo",   "icon": "tokyo",   "start": "2026-09-16", "end": "2027-01-02", "lat": 35.6895, "lon": 139.6917},
         ],
     },
 }
@@ -708,6 +709,7 @@ def _trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
         stops.append({
             "city": s["city"],
             "jp": s.get("jp", ""),
+            "icon": s.get("icon", ""),
             "start": s["start"],
             "end": s["end"],
             "start_h": i18n.fmt_date(lang, s["start"]),

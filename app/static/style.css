@@ -76,6 +76,17 @@
   font-display: swap;
 }
 @font-face {
+  /* Sumi-e brush display face — used only for the Japan trip album's hero
+     title (see .trip-japan_2026 .album-hero__title). Single weight; Latin
+     only, so it just needs to cover "Japan 2026". */
+  font-family: 'Musashi Brush';
+  src: local('Musashi Brush'),
+       url('/static/fonts/MusashiBrush.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
   font-family: 'Chakra Petch';
   src: local('Chakra Petch'),
        url('/static/fonts/ChakraPetch-Regular.ttf') format('truetype');
@@ -3407,6 +3418,14 @@ a.trip__stop-link:hover .trip__stop-media img{
   font-family:"JetBrains Mono", monospace;
   font-size:9px; letter-spacing:.16em; color:var(--text-ghost);
 }
+/* civic emblem of the destination (Osaka/Sapporo/Tokyo), leading the city
+   name; the drop-shadow keeps the colored marks legible over the stop's
+   photo cover. Falls back gracefully when a stop has no icon. */
+.trip__stop-emblem{
+  flex:0 0 auto; align-self:center;
+  width:18px; height:18px; object-fit:contain;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));
+}
 .trip__stop-city{
   font-family:"JetBrains Mono", monospace; font-weight:600;
   font-size:14px; letter-spacing:.08em; text-transform:uppercase; color:var(--text);
@@ -3936,4 +3955,18 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__img{
   .album-hero__jp{ font-size:15px; }
   .album-hero__facts{ font-size:11px; gap:3px 18px; }
   .fhero__ov{ left:18px; right:18px; bottom:56px; gap:9px; }
+}
+
+/* ---- Japan trip album: brush-script hero title ------------------------- */
+/* Scoped to body.trip-japan_2026 (set in album.html) so only this album's
+   title renders in Musashi Brush; two-class specificity wins over the base
+   and the desktop type-scale rules regardless of source order. The kanji
+   deco span keeps its own Noto Sans JP rule. Single-weight face, so we pin
+   weight:400 to avoid a synthesized faux-bold. */
+.trip-japan_2026 .album-hero__title{
+  font-family:'Musashi Brush', 'Space Grotesk', sans-serif;
+  font-weight:400;
+  font-size:clamp(40px, 5.4vw, 62px);
+  letter-spacing:.015em;
+  line-height:1;
 }

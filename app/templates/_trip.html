@@ -19,6 +19,7 @@
   <span class="trip__stop-body">
     <span class="trip__stop-head">
       <span class="trip__stop-ix" aria-hidden="true">{{ '%02d' | format(ix) }}</span>
+      {% if s.icon %}<img class="trip__stop-emblem" src="/static/emblems/{{ s.icon }}.svg" alt="" aria-hidden="true" width="18" height="18" loading="lazy">{% endif %}
       <span class="trip__stop-city">{{ s.city }}</span>
       {% if s.jp %}<span class="trip__stop-jp">{{ s.jp }}</span>{% endif %}
       <span class="trip__stop-dot" aria-hidden="true"></span>
