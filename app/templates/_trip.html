@@ -48,6 +48,11 @@
     <span class="trip__clock" data-trip-clock title="{{ t('trip.jst_title') }}">JST --:--:--</span>
   </div>
 
+  {# the album reel docks between the trip header and the countdown — the
+     bar above reads as the module's title row, the slideshow dissolves
+     into the dashboard below (see .trip .fhero rules in style.css) #}
+  {% if featured %}{% include "_featured.html" %}{% endif %}
+
   <div class="trip__main">
     <div class="trip__cd">
       <span class="trip__cd-label" data-trip-cd-label>{{ t('trip.departs_in') }}</span>

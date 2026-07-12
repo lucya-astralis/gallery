@@ -468,8 +468,14 @@ def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
 #   reel = featured|random|off -> what the album's hero slideshow shows.
 #   order = a.jpg, …     -> curated photo order ("Curated" sort option).
 #   sort = curated|date_desc|… -> preselect the sort option for this album.
+#   effect = sakura      -> ambient effect layer on this album's page
+#                           (whitelisted in ALBUM_EFFECTS; see initAlbumFx).
 _TRUE = {"1", "true", "yes", "on"}
 _FALSE = {"0", "false", "no", "off", "none", "hide"}
+
+# Ambient per-album page effects (album.cfg `effect = ...`). Whitelisted so
+# a cfg typo can't inject arbitrary class names / JS hooks into the page.
+ALBUM_EFFECTS = {"sakura"}
 
 
 def _cfg_bool(v: str | None) -> bool:
@@ -1372,6 +1378,7 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     lang = _request_lang(request)
     sort_options = _image_sort_options_for_template(current_sort, curated=bool(curated_order),
                                                     lang=lang)
+    effect = (_cfg_first(album_cfg, "effect") or "").strip().lower()
     return templates.TemplateResponse(
         "album.html",
         {
@@ -1381,6 +1388,8 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             "album_description": _album_description(album, lang),
             # cover photo for the mobile hero header (see .album-hero)
             "album_cover": _album_cover_rel(album),
+            # ambient page effect (album.cfg `effect = ...`, whitelisted)
+            "album_effect": effect if effect in ALBUM_EFFECTS else None,
             "trip": _trip_for_album(album, lang),
             "collection": collection,
             "sub_albums": sub_albums,

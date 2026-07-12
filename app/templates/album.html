@@ -25,7 +25,7 @@
   <meta name="theme-color" content="#5b8aff">
 {% endblock %}
 {% block content %}
-<section class="{% if featured or album_cover %}has-album-hero {% endif %}{% if featured %}has-hero-reel{% endif %}">
+<section class="{% if featured or album_cover or trip %}has-album-hero {% endif %}{% if featured %}has-hero-reel{% endif %}">
   {# "up one level" target: parent album for a sub-album, otherwise the album index.
      Surfaced as a big, obvious back button on mobile (see .pathbar__back). #}
   {% set up_url = ('/album/' ~ breadcrumbs[-2].path) if breadcrumbs | length > 1 else '/albums' %}
@@ -67,21 +67,8 @@
     </div>
   {% endmacro %}
 
-  {% if featured %}
-    {# the reel IS the hero block — slideshow with the identity overlay #}
-    {% include "_featured.html" %}
-  {% elif album_cover %}
-    <header class="album-hero{% if trip %} album-hero--trip{% endif %}">
-      <img class="album-hero__media" src="/preview/{{ album_cover }}" alt="{{ hero_title }}" fetchpriority="high">
-      <span class="album-hero__shade" aria-hidden="true"></span>
-      <span class="album-hero__corner album-hero__corner--tl" aria-hidden="true"></span>
-      <span class="album-hero__corner album-hero__corner--tr" aria-hidden="true"></span>
-      <span class="album-hero__corner album-hero__corner--bl" aria-hidden="true"></span>
-      <span class="album-hero__corner album-hero__corner--br" aria-hidden="true"></span>
-      <div class="album-hero__body">{{ hero_info() }}</div>
-    </header>
-  {% endif %}
-
+  {# status bar first — it reads as the module's system line, docked right
+     above whichever hero block follows (reel, trip module or static cover) #}
   <div class="section__doc">
     <span class="doc-min-hide">FILE / {{ (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | upper }}</span>
     {% if breadcrumbs | length > 1 %}<span>IN / <b>{{ breadcrumbs[-2].name }}</b></span>{% endif %}
@@ -93,6 +80,25 @@
     {% if active_tag %}<span class="stamp stamp--cy">FILTER / #{{ active_tag | upper }}</span>{% endif %}
     <span class="stamp stamp--ok doc-min-hide">OK</span>
   </div>
+
+  {% if trip %}
+    {# trip albums: the whole trip module is the hero — header bar on top,
+       the reel docked between it and the countdown (see _trip.html) #}
+    {% include "_trip.html" %}
+  {% elif featured %}
+    {# the reel IS the hero block — slideshow with the identity overlay #}
+    {% include "_featured.html" %}
+  {% elif album_cover %}
+    <header class="album-hero">
+      <img class="album-hero__media" src="/preview/{{ album_cover }}" alt="{{ hero_title }}" fetchpriority="high">
+      <span class="album-hero__shade" aria-hidden="true"></span>
+      <span class="album-hero__corner album-hero__corner--tl" aria-hidden="true"></span>
+      <span class="album-hero__corner album-hero__corner--tr" aria-hidden="true"></span>
+      <span class="album-hero__corner album-hero__corner--bl" aria-hidden="true"></span>
+      <span class="album-hero__corner album-hero__corner--br" aria-hidden="true"></span>
+      <div class="album-hero__body">{{ hero_info() }}</div>
+    </header>
+  {% endif %}
 
   <header class="section__head">
     <div class="section__slug">
@@ -106,10 +112,6 @@
       <span class="jp">{{ t('album.slug_deco') }}</span>
     </div>
   </header>
-
-  {% if trip %}
-    {% include "_trip.html" %}
-  {% endif %}
 
   {# side column: the .md description stacked above the route map (trip
      albums). DOM order side-first so it leads when the grid collapses on
@@ -236,4 +238,10 @@
     </div>
   </div>
 </section>
+
+{% if album_effect %}
+  {# ambient effect layer (album.cfg `effect = ...`): a fixed, input-
+     transparent overlay; petals are spawned by initAlbumFx() in app.js #}
+  <div class="album-fx" data-album-fx="{{ album_effect }}" aria-hidden="true"></div>
+{% endif %}
 {% endblock %}

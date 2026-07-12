@@ -649,42 +649,12 @@ section{
   }
 
   /* the hero replaces the text header stack on phones: back button stays,
-     crumb trail / doc bar / slug row fold away (all still shown ≥761px) */
+     crumb trail / slug row fold away. The doc status bar STAYS on every
+     viewport — it reads as the module's system line docked on top of the
+     hero (see .has-album-hero .section__doc in the hero-reel section). */
   .has-album-hero .pathbar{ margin-bottom:12px; }
   .has-album-hero .pathbar .crumb{ display:none; }
-  .has-album-hero .section__doc,
   .has-album-hero .section__head{ display:none; }
-
-  /* trip albums: hero and countdown dashboard fuse into ONE seamless
-     module. The cover's shade runs out into the exact trip surface color
-     (opaque var(--surface)), so the photo dissolves straight into the
-     countdown — no edge, no divider line, one continuous card. The trip
-     bar sheds the tag / title / kanji the hero already shows, leaving a
-     slim HUD line of live status stamp + JST clock right at the seam. */
-  .album-hero--trip{ margin-bottom:0; border-bottom:0; }
-  .album-hero--trip .album-hero__corner--bl,
-  .album-hero--trip .album-hero__corner--br{ display:none; }
-  .album-hero--trip .album-hero__shade{
-    background:linear-gradient(180deg,
-      rgba(4,5,10,.34) 0%, transparent 26%, transparent 40%,
-      rgba(17,17,26,.62) 72%, var(--surface) 100%);
-  }
-  .album-hero--trip .album-hero__body{ padding-bottom:8px; }
-  /* trip box continues the hero: same frame, flat surface (the default
-     blue top glow + accent border would re-draw a seam), no top edge */
-  .has-album-hero .trip{
-    border-top:0;
-    border-left-color:var(--line-strong);
-    border-right-color:var(--line-strong);
-    border-bottom-color:var(--line-strong);
-    background:var(--surface);
-  }
-  .has-album-hero .trip__tag,
-  .has-album-hero .trip__name,
-  .has-album-hero .trip__jp{ display:none; }
-  .has-album-hero .trip__bar{ border-bottom:0; padding-top:2px; padding-bottom:4px; }
-  .has-album-hero .trip__status{ margin-left:0; }
-  .has-album-hero .trip__clock{ margin-left:auto; }
 }
 @media (max-width:480px){
   .album-hero__title{ font-size:26px; }
@@ -962,6 +932,10 @@ section{
 }
 .fhero--single .fhero__ov{ bottom:14px; }
 .has-hero-reel .section__head{ display:none; }
+/* the doc status bar docks straight onto the hero module below it as the
+   module's system line (every viewport; the following block's own top
+   edge — frame border or trip accent — is the divider) */
+.has-album-hero .section__doc{ margin-bottom:0; border-bottom:0; }
 /* the filename chip clears the overlay corner: top-center on wide screens
    (between the mode and FRM chips), off on phones — the slide itself links */
 .fhero--hero .fhero__file{
@@ -969,28 +943,29 @@ section{
   left:50%; transform:translateX(-50%);
   max-width:44%;
 }
+/* reel embedded in the trip module (trip albums, every viewport): the trip
+   card carries the chrome — frame borders off, the shade runs out into the
+   trip surface color and the control bar sits flat on it, so the slideshow
+   dissolves straight into the countdown; the trip bar above the reel is
+   the module's title row. */
+.trip .fhero{ margin:0; }
+.trip .fhero__frame{ border:0; }
+.trip .fhero__shade{
+  background:linear-gradient(180deg,
+    rgba(4,5,10,.42) 0%, transparent 24%, transparent 42%,
+    rgba(17,17,26,.66) 74%, var(--surface) 100%);
+}
+.trip .fhero__bar{
+  border-top:0;
+  background:linear-gradient(180deg, rgba(17,17,26,.42), var(--surface));
+  backdrop-filter:none; -webkit-backdrop-filter:none;
+}
+.trip .fhero__corner--bl,
+.trip .fhero__corner--br{ display:none; }
 @media (max-width:760px){
   .fhero--hero .fhero__file{ display:none; }
   .fhero__ov{ left:11px; right:11px; bottom:46px; gap:6px; }
   .fhero--single .fhero__ov{ bottom:12px; }
-  /* trip albums: reel hero and countdown dashboard fuse into ONE module
-     (the trip side of the seam keeps its .has-album-hero rules): the shade
-     runs out into the trip surface color and the control bar sits flat on
-     it, so slides dissolve straight into the countdown. */
-  .fhero--fused{ margin-bottom:0; }
-  .fhero--fused .fhero__frame{ border-bottom:0; }
-  .fhero--fused .fhero__shade{
-    background:linear-gradient(180deg,
-      rgba(4,5,10,.42) 0%, transparent 24%, transparent 42%,
-      rgba(17,17,26,.66) 74%, var(--surface) 100%);
-  }
-  .fhero--fused .fhero__bar{
-    border-top:0;
-    background:linear-gradient(180deg, rgba(17,17,26,.42), var(--surface));
-    backdrop-filter:none; -webkit-backdrop-filter:none;
-  }
-  .fhero--fused .fhero__corner--bl,
-  .fhero--fused .fhero__corner--br{ display:none; }
 }
 
 /* showcase / folder badge on album + showcase cards */
@@ -3626,6 +3601,48 @@ a.trip__stop-link:hover .trip__stop-go i{ transform:translateX(3px); }
 }
 
 /* ================================================================
+   ALBUM AMBIENT FX  (album.cfg `effect = ...`)
+   A fixed, input-transparent viewport layer rendered only for albums
+   that enable a whitelisted effect; initAlbumFx() in app.js spawns
+   the particles and hands each one its randomness as CSSOM custom
+   props. First effect: sakura. The wrapper animates the fall, its
+   ::before does the flutter — transform-only on both, so the layer
+   stays GPU-composited. Sits above the page content, below menus
+   (30+), lightbox and nav (100).
+   ================================================================ */
+.album-fx{
+  position:fixed; inset:0;
+  z-index:20;
+  pointer-events:none;
+  overflow:hidden;
+}
+.sakura-petal{
+  position:absolute; top:-6vh;
+  display:block;
+  will-change:transform;
+  animation:sakura-fall linear both;   /* duration set per petal by JS */
+}
+.sakura-petal::before{
+  content:"";
+  display:block; width:100%; height:100%;
+  background:linear-gradient(135deg, #ffe4ee 10%, #ffbcd4 62%, #ff9fc4);
+  border-radius:78% 22% 74% 26% / 60% 42% 62% 38%;
+  opacity:.8;
+  box-shadow:0 0 6px rgba(255,170,205,.16);
+  animation:sakura-sway var(--sway, 3s) ease-in-out infinite alternate;
+}
+@keyframes sakura-fall{
+  to{ transform:translate3d(var(--drift, 0vw), 112vh, 0) rotate(var(--spin, 360deg)); }
+}
+@keyframes sakura-sway{
+  from{ transform:translate3d(-46%, 0, 0) rotate3d(1, .4, .2, 14deg); }
+  to  { transform:translate3d(46%, 0, 0) rotate3d(1, .4, .2, 152deg); }
+}
+/* defense in depth — the spawner itself is already allowHeavyFx()-gated */
+html.fx-lite .album-fx{ display:none; }
+@media (prefers-reduced-motion: reduce){ .album-fx{ display:none; } }
+
+/* ================================================================
    MOTION LAYER  —  entrance choreography + micro-interactions
    Scroll reveals, staggered card entrances, thumbnail fade-ins and
    the welcome-hero build-up. Everything here is progressive polish:
@@ -3668,6 +3685,13 @@ html.fx-anim .rv.rv-in{
   animation: rv-rise .55s cubic-bezier(.19,.66,.28,.99) backwards;
 }
 @media print{ html.fx-anim .rv{ opacity:1; } }
+
+/* countdown block: its own staged entry right after the trip module's
+   reveal lands — keyed to .rv-in so it also skips on fx-return, exactly
+   like the block reveal it follows */
+html.fx-anim .trip.rv-in .trip__cd{
+  animation: rv-rise .55s cubic-bezier(.19,.66,.28,.99) .22s backwards;
+}
 
 /* section title rule: scan sweep once the header reveals */
 html.fx-anim .section__head{ position:relative; }

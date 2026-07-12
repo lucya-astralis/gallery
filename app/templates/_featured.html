@@ -16,8 +16,10 @@
 {% set reel_random = reel_mode == 'random' %}
 {# fhero--hero: the reel doubles as the album's hero block on every viewport
    — the album identity overlay (hero_info(), defined in album.html before
-   the include) sits on the frame, so there is no separate header stack. #}
-<section class="fhero fhero--hero{% if trip %} fhero--fused{% endif %}{% if featured | length == 1 %} fhero--single{% endif %}" id="fhero" aria-label="{% if reel_random %}{{ t('aria.random_photos') }}{% else %}{{ t('aria.featured_photos') }}{% endif %}">
+   the include) sits on the frame, so there is no separate header stack.
+   On trip albums this renders INSIDE the trip module (see _trip.html);
+   the .trip .fhero rules strip the frame chrome there. #}
+<section class="fhero fhero--hero{% if featured | length == 1 %} fhero--single{% endif %}" id="fhero" aria-label="{% if reel_random %}{{ t('aria.random_photos') }}{% else %}{{ t('aria.featured_photos') }}{% endif %}">
   <div class="fhero__frame">
     <div class="fhero__stage" id="fhero-stage">
       {% for img in featured %}

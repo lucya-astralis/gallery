@@ -1596,3 +1596,40 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(() => {}); // no weather is a fine state — chips just stay hidden
   }
 });
+
+// ---------- ALBUM AMBIENT FX (album.cfg `effect = ...`) ----------------
+// First effect: "sakura" — cherry-blossom petals drifting down the page
+// (look borrowed from github.com/jhammann/sakura, re-built here in this
+// project's style). The template renders a fixed [data-album-fx] layer
+// only for albums whose album.cfg enables a whitelisted effect; petals
+// are plain elements whose per-petal randomness lands via CSSOM (CSP-safe
+// — no inline style attributes, no external script). allowHeavyFx() keeps
+// data-saver / reduced-motion / low-end devices fully static, a hard cap
+// plus removal on animationend keeps the DOM small, and nothing spawns
+// while the tab is hidden.
+(function initAlbumFx() {
+  const host = document.querySelector('[data-album-fx="sakura"]');
+  if (!host || !allowHeavyFx()) return;
+  const MAX_PETALS = 16;
+  let live = 0;
+  const spawn = () => {
+    if (document.hidden || live >= MAX_PETALS) return;
+    const petal = document.createElement('i');
+    petal.className = 'sakura-petal';
+    const s = petal.style;
+    const size = 9 + Math.random() * 13; // px
+    s.left = (Math.random() * 104 - 2) + 'vw';
+    s.width = size + 'px';
+    s.height = (size * 0.82) + 'px';
+    s.animationDuration = (9 + Math.random() * 8) + 's';
+    s.setProperty('--drift', ((Math.random() * 2 - 1) * 22) + 'vw'); // side wind
+    s.setProperty('--spin', (240 + Math.random() * 480) + 'deg');
+    s.setProperty('--sway', (2.2 + Math.random() * 2.4) + 's');
+    petal.addEventListener('animationend', () => { petal.remove(); live--; }, { once: true });
+    host.appendChild(petal);
+    live++;
+  };
+  // small opening flurry, then a relaxed steady drizzle
+  for (let i = 0; i < 6; i++) setTimeout(spawn, i * 350);
+  setInterval(spawn, 900);
+})();
