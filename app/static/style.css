@@ -715,10 +715,12 @@ section{
    never upscaled, so a low-res source stays small. The page section runs up
    to 2000px wide, which would blow the frame past any preview and smear it
    with object-fit:cover. So cap the frame width (a 1600px preview then never
-   upscales) and center it, and use a slightly taller 16/9 with more height
+   upscales) and left-align it (this standalone reel is the hero of albums
+   without a description — flush-left reads better than a centered cap that
+   looked like it floated), and use a slightly taller 16/9 with more height
    headroom than the old 62vh/2:1 — which squished the frame to ~2.4:1 and
-   made low-res photos look worse. The trip-embedded reel opts back out to
-   full-bleed below (its photos are curated hi-res). */
+   made low-res photos look worse. The two-column top row and the trip module
+   opt back out to filling their own width below (their photos are hi-res). */
 .fhero__frame{
   position:relative;
   overflow:hidden;
@@ -727,7 +729,7 @@ section{
   border:1px solid var(--line-strong);
   width:100%;
   max-width:1280px;
-  margin-inline:auto;
+  margin-inline:0;
   aspect-ratio:16/9;
   max-height:min(72vh, 640px);
   min-height:240px;
@@ -942,10 +944,10 @@ section{
 }
 .fhero--single .fhero__ov{ bottom:14px; }
 .has-hero-reel .section__head{ display:none; }
-/* the doc status bar docks straight onto the hero module below it as the
-   module's system line (every viewport; the following block's own top
-   edge — frame border or trip accent — is the divider) */
-.has-album-hero .section__doc{ margin-bottom:0; border-bottom:0; }
+/* a little air between the status bar and the hero on every album — it used
+   to dock flush onto the hero; the small gap (base border kept, so it stays a
+   closed panel) reads cleaner */
+.has-album-hero .section__doc{ margin-bottom:12px; }
 /* the filename chip clears the overlay corner: top-center on wide screens
    (between the mode and FRM chips), off on phones — the slide itself links */
 .fhero--hero .fhero__file{
@@ -1729,7 +1731,7 @@ section{
 .album-top .fhero__frame{ max-width:none; margin-inline:0; }
 @media (min-width:1000px){
   .album-top{
-    grid-template-columns:minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-columns:minmax(0, 2.5fr) minmax(0, 1fr);
     gap:32px;
     align-items:start;   /* description keeps its natural (content) height */
   }
