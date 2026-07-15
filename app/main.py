@@ -477,11 +477,18 @@ def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
 #   reel = featured|random|off -> what the album's hero slideshow shows.
 #   order = a.jpg, …     -> curated photo order ("Curated" sort option).
 #   sort = curated|date_desc|… -> preselect the sort option for this album.
+#   tags = paris, night  -> the album's tags, shown under its hero title.
+#                           Album-level and display-only: unrelated to the
+#                           per-image tags a `.tags` sidecar feeds into the
+#                           tags/image_tags tables (scanner.py), which are
+#                           what the ?tag= grid filter reads.
 #   effect = sakura      -> ambient effect layer on this album's page
 #                           (whitelisted in ALBUM_EFFECTS; see initAlbumFx).
 #   font = Musashi.otf   -> display face for the album's hero title; the file
 #                           sits next to the cfg in `.album/` (see the
 #                           per-album title font section further down).
+#   font_scale = 1.25    -> size multiplier for that face (see the same
+#                           section); only read when `font` is set.
 ALBUM_META_DIR = scanner.ALBUM_META_DIR
 
 _TRUE = {"1", "true", "yes", "on"}
@@ -561,6 +568,28 @@ def _album_config(album: str) -> dict[str, list[str]]:
     return _parse_cfg(text)
 
 
+def _album_tags(album: str) -> list[str]:
+    """The album's `tags = a, b, c`, de-duplicated, order kept. A leading `#`
+    is optional in the cfg — the hero renders one either way, so accept both
+    spellings rather than printing `##night`.
+
+    These describe the ALBUM and are display-only. The per-image tags that a
+    `.tags` sidecar feeds into the tags/image_tags tables are a separate
+    thing (scanner._read_sidecar_tags) and still own the ?tag= grid filter."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in _album_config(album).get("tags") or []:
+        name = raw.strip().lstrip("#").strip()
+        if not name:
+            continue
+        key = name.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(name)
+    return out
+
+
 def _config_cover_rel(album: str, manual: str | None) -> str | None:
     """Resolve an album.cfg `cover` value (path relative to the album, with
     or without the album prefix) to a real indexed rel_path, or None."""
@@ -588,7 +617,19 @@ def _config_cover_rel(album: str, manual: str | None) -> str | None:
 # .album-hero__title` rule reads, and /album-font/{album} serves the file.
 # The family name is a constant — only one album's sheet ever loads on a
 # page, so it cannot collide.
+#
+# The sheet also carries --album-title-scale from
+#   font_scale = 1.25
+# a multiplier on the hero title's size. Display faces differ a lot in how
+# much of the em they actually ink — a brush face lands visibly smaller than
+# a geometric one at the same px — so the album that ships the face is also
+# where its size is tuned, rather than the shared clamp in style.css.
 ALBUM_FONT_FAMILY = "album-title"
+
+# Guard rails for `font_scale`: enough room to fix a face that reads a size
+# off, not enough for a cfg typo (font_scale = 100) to blow the title across
+# the page. Out-of-range and unparseable values fall back to no scaling.
+ALBUM_FONT_SCALE_RANGE = (0.5, 2.5)
 
 # Extension -> (CSS `format()` hint, response media type). Doubles as the
 # whitelist of what may be served: a `font = …` naming anything else (an
@@ -619,19 +660,45 @@ def _album_font_file(album: str) -> Path | None:
     return path if path.is_file() else None
 
 
-def _album_font_css_url(album: str) -> str | None:
-    """Cache-busting URL of the album's generated font stylesheet, or None
-    when the album configures no font. Versioned by the font's mtime (same
-    idea as _static_url) so swapping the file can't be masked by a stale
-    cache — both this sheet and the font it points at are cached hard."""
-    font = _album_font_file(album)
-    if font is None:
+def _album_font_scale(album: str) -> float | None:
+    """The album's `font_scale` as a float, or None when it is unset, not a
+    number, or outside ALBUM_FONT_SCALE_RANGE. None means "don't emit the
+    property" — style.css then falls back to its own default of 1."""
+    raw = (_cfg_first(_album_config(album), "font_scale") or "").strip()
+    if not raw:
         return None
     try:
-        version = int(font.stat().st_mtime)
-    except OSError:
-        version = 0
-    return f"/album-font.css/{quote(album)}?v={version}"
+        scale = float(raw.replace(",", "."))
+    except ValueError:
+        return None
+    lo, hi = ALBUM_FONT_SCALE_RANGE
+    return scale if lo <= scale <= hi else None
+
+
+def _album_font_version(album: str) -> int:
+    """Cache-busting stamp for an album's generated font sheet: the newest
+    mtime of the font file and of the album.cfg naming it (same idea as
+    _static_url). The cfg has to count — the sheet carries `font_scale`
+    too, and retuning that never touches the font file, so versioning on
+    the font alone would leave the edit masked by a year-long cache."""
+    meta = _album_meta_dir(album)
+    sources = [_album_font_file(album), (meta / "album.cfg") if meta else None]
+    stamps = []
+    for path in filter(None, sources):
+        try:
+            stamps.append(int(path.stat().st_mtime))
+        except OSError:
+            pass
+    return max(stamps, default=0)
+
+
+def _album_font_css_url(album: str) -> str | None:
+    """Cache-busting URL of the album's generated font stylesheet, or None
+    when the album configures no font — both this sheet and the font it
+    points at are cached hard, so the version is what makes edits land."""
+    if _album_font_file(album) is None:
+        return None
+    return f"/album-font.css/{quote(album)}?v={_album_font_version(album)}"
 
 
 # ----- showcase / featured (album.cfg owns it; `_` marker is fallback) --
@@ -1493,6 +1560,9 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             "album_cover": _album_cover_rel(album),
             # ambient page effect (album.cfg `effect = ...`, whitelisted)
             "album_effect": effect if effect in ALBUM_EFFECTS else None,
+            # album.cfg `tags = ...`, shown under the hero title. NOT the
+            # per-image `tags` below, which drive the ?tag= grid filter.
+            "album_tags": _album_tags(album),
             # generated stylesheet for the album's own title face
             # (album.cfg `font = ...`); None when it configures none
             "album_font_css": _album_font_css_url(album),
@@ -1674,25 +1744,27 @@ def _gps_to_deg(coord, ref):
 @app.get("/album-font.css/{album:path}")
 def album_font_css(album: str):
     """The @font-face + --album-title-font binding for an album's
-    `font = …`, as a real stylesheet — the CSP drops inline styles, so this
-    is how a per-album face reaches the page (see the section on it above).
-    The album path is percent-encoded into the url() so a folder name can
-    never break out of the CSS string."""
+    `font = …` (plus --album-title-scale for its `font_scale = …`), as a
+    real stylesheet — the CSP drops inline styles, so this is how a
+    per-album face reaches the page (see the section on it above). The
+    album path is percent-encoded into the url() so a folder name can
+    never break out of the CSS string; the scale is re-serialised from a
+    validated float, so it cannot carry anything but a number either."""
     font = _album_font_file(album)
     if font is None:
         raise HTTPException(404, "not found")
     fmt, _mime = ALBUM_FONT_TYPES[font.suffix.lower()]
-    try:
-        version = int(font.stat().st_mtime)
-    except OSError:
-        version = 0
-    src = f"/album-font/{quote(album)}?v={version}"
+    src = f"/album-font/{quote(album)}?v={_album_font_version(album)}"
+    scale = _album_font_scale(album)
+    root = f"--album-title-font:'{ALBUM_FONT_FAMILY}'"
+    if scale is not None:
+        root += f";--album-title-scale:{scale:g}"
     css = (
         "@font-face{"
         f"font-family:'{ALBUM_FONT_FAMILY}';"
         f"src:url('{src}') format('{fmt}');"
         "font-weight:400;font-style:normal;font-display:swap}"
-        f":root{{--album-title-font:'{ALBUM_FONT_FAMILY}'}}"
+        f":root{{{root}}}"
     )
     return Response(css, media_type="text/css",
                     headers={"Cache-Control": "public, max-age=31536000"})

@@ -8,7 +8,7 @@ A lean, read-only web image gallery with folder-based albums, EXIF display, side
 - **Fully automatic indexing:** filesystem watcher (local) and/or periodic rescan (for SMB/NFS). No manual buttons in the web UI.
 - **Two-tier images:** `/thumb/...` (480 px) for grids, `/preview/...` (1600 px) for the detail view stage. The original (`/full/...`) only loads when you click *Load original*.
 - **EXIF:** camera, lens, exposure, ISO, focal length, … on the detail page. GPS coordinates are stripped by default (privacy).
-- **Tags via sidecar files:** drop a `.tags` file next to an image (e.g. `IMG_0001.jpg.tags` containing `holiday, beach, sunset`). Click a tag in the album view to filter.
+- **Tags:** per-album ones come from `album.cfg` and label the album in its hero; per-photo ones are sidecar files (e.g. `IMG_0001.jpg.tags` containing `holiday, beach, sunset`) — click one in the album view to filter.
 - **Showcase:** mark a photo (`_hero.jpg`) or a whole album (`_best-of/`) with an underscore prefix to surface it on the welcome screen, on the album overview, and via `/api/showcase` JSON for embedding on other sites.
 - **Search & sort:** top bar searches album, file, and tag names; sort by date, name or size on every list view — plus a "Curated" order defined in `album.cfg` / `gallery.cfg`, which can also preselect the default sort.
 - **Three languages (EN / DE / JP):** selector in the top-right corner, cookie-backed with an `Accept-Language` fallback. Album descriptions are per-language markdown files (`album_en.md` / `album_de.md` / `album_jp.md`); UI strings live in `app/i18n.py`. See [Languages](#languages--i18n).
@@ -127,12 +127,17 @@ and name it in `album.cfg`:
 
 ```ini
 font = MusashiBrush.otf     # .otf / .ttf / .woff2 / .woff
+font_scale = 1.3            # optional, 0.5–2.5 — size multiplier for it
 ```
 
 The album's hero title then renders in that face (and is set larger, since a
-custom face is a display treatment). Because the CSP forbids inline styles,
-the binding is served as a real stylesheet at `/album-font.css/{album}`,
-which carries the `@font-face` plus the `--album-title-font` property that
+custom face is a display treatment). `font_scale` tunes that size per album:
+display faces disagree about how much of the em they ink, so a brush face
+reads a size smaller than a geometric one set at the same px. Out-of-range
+or unparseable values just mean no scaling. Because the CSP forbids inline
+styles, the binding is served as a real stylesheet at
+`/album-font.css/{album}`, which carries the `@font-face` plus the
+`--album-title-font` / `--album-title-scale` properties that
 `.album-font .album-hero__title` in `style.css` reads; the file itself comes
 from `/album-font/{album}`. Only the file named in the cfg is ever served —
 the filename never travels in the URL.
@@ -176,8 +181,10 @@ Optional file in the album's **`.album/` folder** (see above):
 | `reel`       | `featured` / `random` / `off`   | What the hero slideshow at the top of the album shows: the featured photos (default), random photos from the album's subtree, or nothing (hidden). |
 | `order`      | paths                           | Curated photo order — adds a **Curated** entry to the album's sort menu. Photos not listed follow, newest first. |
 | `sort`       | `curated`, `date_desc`, `date_asc`, `name_asc`, `name_desc`, `size_desc`, `size_asc` | Preselect the sort option for this album's grid (visitors can still switch). |
+| `tags`       | names, e.g. `paris, night`      | The album's tags, shown under its hero title and nowhere else. A leading `#` is optional. Album-level and display-only — see the note below. |
 | `effect`     | `sakura`                        | Ambient effect layer on this album's page (petals drifting down). |
 | `font`       | a filename in `.album/`         | Display face for the album's hero title — `.otf` / `.ttf` / `.woff2` / `.woff` (see above). |
+| `font_scale` | a number, `0.5`–`2.5`           | Size multiplier for that face, so a small-reading display face can be evened up. Only read when `font` is set; ignored when out of range. |
 
 ### Gallery settings (`gallery.cfg`)
 
@@ -300,14 +307,26 @@ fetch('https://gallery.example.com/api/showcase?limit=8&random=1')
 
 ## Tags
 
-Tags live as sidecar files in the filesystem — same workflow as the rest of the gallery:
+Two separate things share the name, so keep them apart:
+
+**Album tags** describe the album and are set in its `album.cfg`:
+
+```ini
+tags = paris, night, street     # a leading # is optional
+```
+
+They render under the album's hero title and nowhere else. Labels only — they
+don't filter and aren't indexed.
+
+**Photo tags** describe one image and live as sidecar files in the filesystem —
+same workflow as the rest of the gallery:
 
 ```bash
 # Drop a .tags file next to the image
 echo "holiday, italy, beach" > photos/holiday-2025/DSC_0001.jpg.tags
 ```
 
-The scanner reads the file on the next indexing pass and links the tags. Empty or delete the file → tags disappear. The watcher reacts to changes live; the periodic scan picks them up at the next interval at the latest.
+The scanner reads the file on the next indexing pass and links the tags. Empty or delete the file → tags disappear. The watcher reacts to changes live; the periodic scan picks them up at the next interval at the latest. These are the ones the album's tag bar filters on (`?tag=`), the image page lists, and search matches.
 
 ## Folder structure
 
@@ -372,7 +391,7 @@ All GET, all public:
 - `GET /thumb/{album}/{file}` — grid thumbnail (lazy generated)
 - `GET /preview/{album}/{file}` — stage preview (lazy generated)
 - `GET /full/{album}/{file}` — original file
-- `GET /album-font.css/{album}` — generated stylesheet for an album's `font =` face (`@font-face` + `--album-title-font`); 404 when the album sets none
+- `GET /album-font.css/{album}` — generated stylesheet for an album's `font =` face (`@font-face` + `--album-title-font`, plus `--album-title-scale` when it sets `font_scale =`); 404 when the album sets none
 - `GET /album-font/{album}` — the font file itself; only ever the one named in that album's `album.cfg`
 - `GET /search?q=…` — search (`?sort=`)
 - `GET /lang/{en|de|jp}?next=…` — set the language cookie, 303 back to `next` (relative paths only)

@@ -1,5 +1,5 @@
 {# Featured photos as a compact "live view" hero slideshow — crossfading
-   slides, HUD corners, segment track with auto-advance (gated by
+   slides, mode/frame chips, segment track with auto-advance (gated by
    allowHeavyFx() in app.js), prev/next, swipe. Used inside /album/{name},
    so the filename alone is enough context. Without JS the first slide
    stays visible as a static hero. Width is fluid (100% of the parent
@@ -33,10 +33,6 @@
       {% endfor %}
       <div class="fhero__shade" aria-hidden="true"></div>
     </div>
-    <i class="fhero__corner fhero__corner--tl" aria-hidden="true"></i>
-    <i class="fhero__corner fhero__corner--tr" aria-hidden="true"></i>
-    <i class="fhero__corner fhero__corner--bl" aria-hidden="true"></i>
-    <i class="fhero__corner fhero__corner--br" aria-hidden="true"></i>
     <span class="fhero__chip fhero__chip--star" aria-hidden="true">{% if reel_random %}⟳{% else %}★{% endif %}</span>
     <span class="fhero__chip fhero__chip--frm">FRM <b id="fhero-idx">01</b><span>/{{ '%02d' | format(featured | length) }}</span></span>
     <a class="fhero__file" id="fhero-file" href="/image/{{ pretty_rel(featured[0].rel_path) }}">

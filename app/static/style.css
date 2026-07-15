@@ -558,8 +558,8 @@ section{
 
 /* ================================================================
    ALBUM HERO — the album's visual header
-   Two carriers share one identity overlay (kicker / title / kanji /
-   key facts, the hero_info() macro in album.html):
+   Two carriers share one identity overlay (kicker / title / kanji, plus
+   key facts on a trip only — the hero_info() macro in album.html):
      · the reel slideshow (.fhero--hero + .fhero__ov, every viewport)
      · the static cover hero below (phones only, reel-less albums)
    On small screens either hero replaces the text-heavy header stack
@@ -593,6 +593,12 @@ section{
   letter-spacing:.3em;
   color:var(--text-dim);
 }
+/* phones: the title fills the width, so the generic ギャラリー deco wraps and
+   costs the short hero a whole line to say what the title already says. Off
+   it goes. Only the fallback carries --deco — a trip's own kanji stays. */
+@media (max-width:760px){
+  .album-hero__jp--deco{ display:none; }
+}
 .album-hero__facts{
   display:flex; flex-wrap:wrap; gap:3px 14px;
   font-family:"JetBrains Mono", monospace;
@@ -601,6 +607,22 @@ section{
   color:var(--text-dim);
 }
 .album-hero__fact--dates{ color:var(--acc-cy); }
+/* album.cfg `tags = ...` — the line under the title. Each tag carries the
+   same dark chip as the kicker rather than riding bare on the photo: mono
+   text this small needs the backdrop under ~.15 luminance to stay readable,
+   and the shade can't guarantee that this far up the frame without blacking
+   out the picture (the same reason the old facts line never worked here). */
+.album-hero__tags{ display:flex; flex-wrap:wrap; gap:5px; }
+.album-hero__tag{
+  padding:2px 7px;
+  border:1px solid var(--line-strong);
+  background:rgba(7,7,11,.72);
+  font-family:"JetBrains Mono", monospace;
+  font-size:9.5px; letter-spacing:.14em;
+  /* --text, not --text-dim: dim only clears ~2.4:1 against the brightest
+     slides even through the chip, where --text lands ~4.7:1 */
+  color:var(--text);
+}
 
 @media (max-width:760px){
   .album-hero{
@@ -630,16 +652,6 @@ section{
     background:linear-gradient(180deg,
       rgba(4,5,10,.34) 0%, transparent 26%, transparent 46%, rgba(4,5,10,.88) 100%);
   }
-  .album-hero__corner{
-    position:absolute; z-index:2;
-    width:16px; height:16px;
-    border:1px solid rgba(91,138,255,.75);
-    opacity:.9; pointer-events:none;
-  }
-  .album-hero__corner--tl{ top:9px; left:9px; border-right:0; border-bottom:0; }
-  .album-hero__corner--tr{ top:9px; right:9px; border-left:0; border-bottom:0; }
-  .album-hero__corner--bl{ bottom:9px; left:9px; border-right:0; border-top:0; }
-  .album-hero__corner--br{ bottom:9px; right:9px; border-left:0; border-top:0; }
   .album-hero__body{
     position:relative; z-index:2;
     display:flex; flex-direction:column; gap:7px;
@@ -765,18 +777,6 @@ section{
   background:linear-gradient(180deg,
     rgba(4,5,10,.42) 0%, transparent 22%, transparent 55%, rgba(4,5,10,.78) 100%);
 }
-.fhero__corner{
-  position:absolute;
-  width:18px; height:18px;
-  border:1px solid rgba(91,138,255,.75);
-  opacity:.9;
-  z-index:4;
-  pointer-events:none;
-}
-.fhero__corner--tl{ top:10px; left:10px; border-right:0; border-bottom:0; }
-.fhero__corner--tr{ top:10px; right:10px; border-left:0; border-bottom:0; }
-.fhero__corner--bl{ bottom:10px; left:10px; border-right:0; border-top:0; }
-.fhero__corner--br{ bottom:10px; right:10px; border-left:0; border-top:0; }
 .fhero__chip{
   position:absolute; top:12px; z-index:4;
   font-family:"JetBrains Mono", monospace;
@@ -925,7 +925,6 @@ section{
   .fhero__chip{ font-size:8.5px; padding:2px 6px; }
   .fhero__chip--star{ left:10px; }
   .fhero__chip--frm{ right:10px; }
-  .fhero__corner{ width:14px; height:14px; }
   .fhero__auto{ display:none; }
 }
 
@@ -955,6 +954,22 @@ section{
   left:50%; transform:translateX(-50%);
   max-width:44%;
 }
+/* phones: pool a shade under the overlay the way the welcome hero does
+   (cf. .vf__shade). The stock ramp only bites in the last quarter, but the
+   control bar holds the overlay ~20% off the bottom, so on a short phone
+   frame the title sat on unshaded photo and disappeared into bright ones.
+   MUST stay above the .trip rules below: same specificity, so source order
+   is what lets a trip album keep its dissolve-into-the-module shade — that
+   one already runs dark behind its text and has the countdown to meet. */
+@media (max-width:760px){
+  .fhero--hero .fhero__shade{
+    background:
+      linear-gradient(180deg,
+        rgba(4,5,10,.42) 0%, transparent 18%,
+        rgba(4,5,10,.32) 40%, rgba(4,5,10,.88) 86%, rgba(4,5,10,.9) 100%),
+      radial-gradient(120% 75% at 22% 100%, rgba(4,5,10,.55) 0%, transparent 65%);
+  }
+}
 /* reel embedded in the trip module (trip albums, every viewport): the trip
    card carries the chrome — frame borders off, the shade runs out into the
    trip surface color and the control bar sits flat on it, so the slideshow
@@ -974,8 +989,6 @@ section{
   background:linear-gradient(180deg, rgba(17,17,26,.42), var(--surface));
   backdrop-filter:none; -webkit-backdrop-filter:none;
 }
-.trip .fhero__corner--bl,
-.trip .fhero__corner--br{ display:none; }
 @media (max-width:760px){
   .fhero--hero .fhero__file{ display:none; }
   .fhero__ov{ left:11px; right:11px; bottom:46px; gap:6px; }
@@ -3954,11 +3967,25 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__img{
    order. The display sizing here is part of the treatment: an album that
    brings its own face wants its title set larger than the stock one. The
    kanji deco span keeps its own Noto Sans JP rule. Album faces are assumed
-   single-weight, so weight is pinned to 400 to avoid a faux-bold. */
+   single-weight, so weight is pinned to 400 to avoid a faux-bold.
+   --album-title-scale rides along on the same generated sheet (album.cfg
+   `font_scale = …`): display faces disagree wildly about how much of the em
+   they fill — a brush face set at the same px as a geometric one reads a
+   size smaller — so the album that brings the face also says how to size
+   it. Absent from the sheet (and on every stock-face album) it defaults
+   to 1 and these are the plain clamps. */
 .album-font .album-hero__title{
   font-family:var(--album-title-font), 'Space Grotesk', sans-serif;
   font-weight:400;
-  font-size:clamp(40px, 5.4vw, 62px);
+  font-size:calc(clamp(40px, 5.4vw, 62px) * var(--album-title-scale, 1));
   letter-spacing:.015em;
   line-height:1;
+}
+/* phones: the 40px floor above is a poster size — on a ~350px hero it wrapped
+   to two lines and drove the overlay over the photo. The album's face still
+   leads over the stock 30px, just at phone scale. */
+@media (max-width:760px){
+  .album-font .album-hero__title{
+    font-size:calc(clamp(27px, 8.6vw, 38px) * var(--album-title-scale, 1));
+  }
 }

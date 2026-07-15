@@ -63,6 +63,11 @@
      one (all viewports, see _featured.html), else the static cover hero
      (phones only). Defined before the include so _featured.html sees it. #}
   {% set hero_title = trip.title if trip else (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | replace('_', ' ') %}
+  {# a trip brings its own kanji (japan_2026 -> 日本), which is part of the
+     album's identity; every other album falls back to the generic ギャラリー
+     deco. They share a slot but not a purpose, so the fallback is marked —
+     the phone hero drops it, see .album-hero__jp--deco. #}
+  {% set hero_jp = trip.jp if trip and trip.jp else None %}
   {% macro hero_info() %}
     <span class="album-hero__kicker">
       {%- if trip %}{{ t('trip.tag') }}
@@ -70,12 +75,28 @@
       {%- elif album_is_showcase %}{{ t('stamp.showcase_album') }}
       {%- else %}ALBUM{% endif -%}{# HUD token — stays English like FILE / #}
     </span>
-    <h1 class="album-hero__title">{{ hero_title }}<span class="album-hero__jp" aria-hidden="true">{{ trip.jp if trip and trip.jp else t('album.slug_deco') }}</span></h1>
+    <h1 class="album-hero__title">{{ hero_title }}<span class="album-hero__jp{% if not hero_jp %} album-hero__jp--deco{% endif %}" aria-hidden="true">{{ hero_jp or t('album.slug_deco') }}</span></h1>
+    {# album.cfg `tags = ...`, the line under the title. Display only — the
+       overlay is pointer-events:none, so these are labels, not filter links
+       (the ?tag= filter runs on per-image sidecar tags, a separate thing).
+       Shown here and nowhere else on the page. #}
+    {% if album_tags %}
+    <div class="album-hero__tags">
+      {% for tag in album_tags %}<span class="album-hero__tag">#{{ tag }}</span>{% endfor %}
+    </div>
+    {% endif %}
+    {# key facts are a trip thing only. On a normal album they just repeated
+       the status bar docked right above the hero, which already reads
+       COUNT / n (and ALBUMS / n), so the hero says the album's name and
+       leaves the readout to the bar. A trip earns them: its dates are the
+       one token that bar has no equivalent for. #}
+    {% if trip %}
     <div class="album-hero__facts">
-      {% if trip %}<span class="album-hero__fact album-hero__fact--dates">{{ month_label(trip.stops[0].start) }} – {{ month_label(trip.stops[-1].end) }}</span>{% endif %}
+      <span class="album-hero__fact album-hero__fact--dates">{{ month_label(trip.stops[0].start) }} – {{ month_label(trip.stops[-1].end) }}</span>
       <span class="album-hero__fact">{{ images | length }} {{ t('unit.photos' if images | length != 1 else 'unit.photo') }}</span>
       {% if sub_albums %}<span class="album-hero__fact">{{ sub_albums | length }} {{ t('unit.album_many' if sub_albums | length != 1 else 'unit.album_one') }}</span>{% endif %}
     </div>
+    {% endif %}
   {% endmacro %}
 
   {# the .md description card — used in the top row next to the reel
@@ -122,10 +143,6 @@
     <header class="album-hero">
       <img class="album-hero__media" src="/preview/{{ album_cover }}" alt="{{ hero_title }}" fetchpriority="high">
       <span class="album-hero__shade" aria-hidden="true"></span>
-      <span class="album-hero__corner album-hero__corner--tl" aria-hidden="true"></span>
-      <span class="album-hero__corner album-hero__corner--tr" aria-hidden="true"></span>
-      <span class="album-hero__corner album-hero__corner--bl" aria-hidden="true"></span>
-      <span class="album-hero__corner album-hero__corner--br" aria-hidden="true"></span>
       <div class="album-hero__body">{{ hero_info() }}</div>
     </header>
   {% endif %}
