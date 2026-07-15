@@ -95,18 +95,47 @@ stale-language pages — a `pageshow` guard in app.js reloads on mismatch
 for Safari). Images, CSS and JS keep long-lived cache headers. If you put
 a CDN cache rule in front, make sure it does NOT cache `text/html`.
 
-**Album descriptions** are per-language markdown files inside the album's
-photo folder:
+**The `.album/` folder.** Everything that *describes* an album rather than
+being one of its photos lives in a `.album/` folder inside it, so the photo
+folder itself stays nothing but photos:
 
 ```
-photos/japan_2026/album_en.md   ← English (also the fallback)
-photos/japan_2026/album_de.md   ← German
-photos/japan_2026/album_jp.md   ← Japanese
+photos/japan_2026/
+├── .album/
+│   ├── album.cfg          ← settings (see Config files below)
+│   ├── album_en.md        ← description, English (also the fallback)
+│   ├── album_de.md        ← description, German
+│   ├── album_jp.md        ← description, Japanese
+│   └── MusashiBrush.otf   ← the album's own title face (`font =`)
+├── tokyo/                 ← sub-album (has its own .album/)
+└── skyline.jpg
 ```
 
-Missing translations fall back to `album_en.md`, then to a legacy plain
-`album.md`, then to the first `*.md` in the folder — a partially translated
-gallery still shows something everywhere.
+This is the **only** place looked at — a cfg or description left loose in
+the photo folder is ignored. Nothing inside `.album/` is ever indexed,
+thumbnailed or served as a photo, so a font specimen or reference image can
+sit in there safely. `gallery.cfg` is not part of this: it configures the
+gallery as a whole and stays at the root of `photos/` (see below).
+
+**Album descriptions** are the per-language markdown files above. Missing
+translations fall back to `album_en.md`, then to a plain `album.md`, then to
+the first `*.md` in the folder — a partially translated gallery still shows
+something everywhere.
+
+**An album's own title font.** Drop a font into the album's `.album/` folder
+and name it in `album.cfg`:
+
+```ini
+font = MusashiBrush.otf     # .otf / .ttf / .woff2 / .woff
+```
+
+The album's hero title then renders in that face (and is set larger, since a
+custom face is a display treatment). Because the CSP forbids inline styles,
+the binding is served as a real stylesheet at `/album-font.css/{album}`,
+which carries the `@font-face` plus the `--album-title-font` property that
+`.album-font .album-hero__title` in `style.css` reads; the file itself comes
+from `/album-font/{album}`. Only the file named in the cfg is ever served —
+the filename never travels in the URL.
 
 **Japanese font subset:** the site ships a glyph subset of Noto Sans JP
 (`app/static/fonts/NotoSansJP-subset.woff2`, ~120 KB instead of the 8.8 MB
@@ -136,7 +165,7 @@ Both files are re-read on every page load, so edits apply immediately — no res
 
 ### Album settings (`album.cfg`)
 
-Optional file inside an album's photo folder:
+Optional file in the album's **`.album/` folder** (see above):
 
 | Key          | Values                          | Effect                                                                                     |
 |--------------|---------------------------------|--------------------------------------------------------------------------------------------|
@@ -147,6 +176,8 @@ Optional file inside an album's photo folder:
 | `reel`       | `featured` / `random` / `off`   | What the hero slideshow at the top of the album shows: the featured photos (default), random photos from the album's subtree, or nothing (hidden). |
 | `order`      | paths                           | Curated photo order — adds a **Curated** entry to the album's sort menu. Photos not listed follow, newest first. |
 | `sort`       | `curated`, `date_desc`, `date_asc`, `name_asc`, `name_desc`, `size_desc`, `size_asc` | Preselect the sort option for this album's grid (visitors can still switch). |
+| `effect`     | `sakura`                        | Ambient effect layer on this album's page (petals drifting down). |
+| `font`       | a filename in `.album/`         | Display face for the album's hero title — `.otf` / `.ttf` / `.woff2` / `.woff` (see above). |
 
 ### Gallery settings (`gallery.cfg`)
 
@@ -341,6 +372,8 @@ All GET, all public:
 - `GET /thumb/{album}/{file}` — grid thumbnail (lazy generated)
 - `GET /preview/{album}/{file}` — stage preview (lazy generated)
 - `GET /full/{album}/{file}` — original file
+- `GET /album-font.css/{album}` — generated stylesheet for an album's `font =` face (`@font-face` + `--album-title-font`); 404 when the album sets none
+- `GET /album-font/{album}` — the font file itself; only ever the one named in that album's `album.cfg`
 - `GET /search?q=…` — search (`?sort=`)
 - `GET /lang/{en|de|jp}?next=…` — set the language cookie, 303 back to `next` (relative paths only)
 - `GET /api/showcase` — JSON list of showcased photos, CORS-enabled (see [API](#api))

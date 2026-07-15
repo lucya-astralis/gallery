@@ -25,6 +25,7 @@
   <meta name="twitter:description" content="{{ t('meta.site_desc') }}">
   <meta name="theme-color" content="#5b8aff">
   {% endblock %}
+  {% block head_extra %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
   <!-- Fixed site backdrop as a single real element (NOT body::before/::after):

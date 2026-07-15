@@ -33,6 +33,16 @@ class _Handler(FileSystemEventHandler):
         with self._lock:
             self._pending[path] = time.time()
 
+    def _is_meta(self, path: Path) -> bool:
+        """True for anything in an album's `.album/` folder — descriptions,
+        fonts, and any image that happens to live there (a font specimen,
+        say). Checked *after* album.cfg, which lives there too but has its
+        own handling."""
+        try:
+            return scanner.is_meta_path(path.relative_to(self.photos_dir))
+        except ValueError:
+            return False
+
     def _fire_config(self):
         if not self.on_config:
             return
@@ -57,6 +67,8 @@ class _Handler(FileSystemEventHandler):
                 if fp.name == "album.cfg":
                     self._fire_config()
                     continue
+                if self._is_meta(fp):
+                    continue  # album metadata — never a photo, never thumbed
                 if fp.suffix == ".tags":
                     image = fp.with_suffix("")
                     if image.exists() and scanner.is_image(image):
@@ -105,6 +117,8 @@ class _Handler(FileSystemEventHandler):
         if fp.name == "album.cfg":
             self._fire_config()
             return
+        if self._is_meta(fp):
+            return  # album metadata — nothing indexed, nothing to clean up
         if fp.suffix == ".tags":
             image = fp.with_suffix("")
             if image.exists() and scanner.is_image(image):

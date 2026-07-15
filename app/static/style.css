@@ -76,17 +76,6 @@
   font-display: swap;
 }
 @font-face {
-  /* Sumi-e brush display face — used only for the Japan trip album's hero
-     title (see .trip-japan_2026 .album-hero__title). Single weight; Latin
-     only, so it just needs to cover "Japan 2026". */
-  font-family: 'Musashi Brush';
-  src: local('Musashi Brush'),
-       url('/static/fonts/MusashiBrush.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
   font-family: 'Chakra Petch';
   src: local('Chakra Petch'),
        url('/static/fonts/ChakraPetch-Regular.ttf') format('truetype');
@@ -3957,14 +3946,17 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__img{
   .fhero__ov{ left:18px; right:18px; bottom:56px; gap:9px; }
 }
 
-/* ---- Japan trip album: brush-script hero title ------------------------- */
-/* Scoped to body.trip-japan_2026 (set in album.html) so only this album's
-   title renders in Musashi Brush; two-class specificity wins over the base
-   and the desktop type-scale rules regardless of source order. The kanji
-   deco span keeps its own Noto Sans JP rule. Single-weight face, so we pin
-   weight:400 to avoid a synthesized faux-bold. */
-.trip-japan_2026 .album-hero__title{
-  font-family:'Musashi Brush', 'Space Grotesk', sans-serif;
+/* ---- Album's own hero title face (album.cfg `font = ...`) -------------- */
+/* body.album-font is set (album.html) only when an album configures a font;
+   its @font-face and --album-title-font arrive with the generated sheet at
+   /album-font.css/{album}, linked after this file. Two-class specificity
+   wins over the base and the desktop type-scale rules regardless of source
+   order. The display sizing here is part of the treatment: an album that
+   brings its own face wants its title set larger than the stock one. The
+   kanji deco span keeps its own Noto Sans JP rule. Album faces are assumed
+   single-weight, so weight is pinned to 400 to avoid a faux-bold. */
+.album-font .album-hero__title{
+  font-family:var(--album-title-font), 'Space Grotesk', sans-serif;
   font-weight:400;
   font-size:clamp(40px, 5.4vw, 62px);
   letter-spacing:.015em;

@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ album | upper }} // LUCYA.SYSTEMS GALLERY{% endblock %}
-{% block body_class %}page-album{% if trip %} trip-{{ trip.key }}{% endif %}{% endblock %}
+{% block body_class %}page-album{% if trip %} trip-{{ trip.key }}{% endif %}{% if album_font_css %} album-font{% endif %}{% endblock %}
+{% block head_extra %}
+  {# The album's own title face (album.cfg `font = ...`): a generated sheet
+     carrying the @font-face + --album-title-font, which style.css reads.
+     Loaded here, after style.css, and only on albums that configure one. #}
+  {% if album_font_css %}<link rel="stylesheet" href="{{ album_font_css }}">{% endif %}
+{% endblock %}
 {% block meta %}
   {% set og_title = album ~ ' — lucya.systems gallery' %}
   {% set img_count = images | length %}

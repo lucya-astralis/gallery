@@ -26,6 +26,19 @@ GPS_IFD_TAG = 0x8825
 # configurable via the SHOWCASE_MARKER env var. Set to empty to disable.
 SHOWCASE_MARKER = os.environ.get("SHOWCASE_MARKER", "_")
 
+# Per-album metadata folder. Everything that describes an album rather than
+# being one of its photos — album.cfg, the album_*.md descriptions, a custom
+# title font — lives in `<album>/.album/`, keeping the photo folder itself
+# nothing but photos. Never indexed: a stray image in here is metadata (a
+# font specimen, a screenshot of the cfg), not a gallery photo.
+ALBUM_META_DIR = ".album"
+
+
+def is_meta_path(relp: Path) -> bool:
+    """True for a path (relative to photos_dir) inside an album's metadata
+    folder — see ALBUM_META_DIR."""
+    return ALBUM_META_DIR in relp.parts
+
 
 def is_showcase_photo(filename: str) -> bool:
     """True if a photo's filename marks it as a showcase item."""
@@ -322,6 +335,8 @@ def index_image(photos_dir: Path, file: Path) -> bool:
     parts = relp.parts
     if len(parts) < 2:
         return False
+    if is_meta_path(relp):
+        return False
     # `album` is the full relative directory path of the folder holding the
     # image (POSIX, e.g. "japan/tokyo"). This keeps the invariant
     # rel_path == album + "/" + filename and lets albums nest arbitrarily —
@@ -411,6 +426,8 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         relp = file.relative_to(photos_dir)
         if len(relp.parts) < 2:
             continue
+        if is_meta_path(relp):
+            continue  # album metadata, not a photo — no index, no thumbs
         rel = relp.as_posix()
         seen.add(rel)
         if index_image(photos_dir, file):

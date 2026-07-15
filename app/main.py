@@ -6,6 +6,7 @@ import time
 import urllib.request
 from functools import partial
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -424,25 +425,21 @@ def _render_markdown(text: str) -> str:
 
 
 def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
-    """An album's description is a per-language markdown file dropped into
-    its photo folder: album_en.md / album_de.md / album_jp.md. The active
-    language wins; a missing translation falls back to English, then to a
-    plain legacy album.md, then to the first *.md in the folder — so a
-    partially translated gallery still shows something everywhere. Rendered
-    to HTML; None when the folder has no markdown at all."""
-    folder = (PHOTOS_DIR / album).resolve()
-    try:
-        folder.relative_to(PHOTOS_DIR)  # guard against path traversal
-    except ValueError:
+    """An album's description is a per-language markdown file in its `.album/`
+    folder: album_en.md / album_de.md / album_jp.md. The active language wins;
+    a missing translation falls back to English, then to a plain album.md,
+    then to the first *.md in the folder — so a partially translated gallery
+    still shows something everywhere. Rendered to HTML; None when the folder
+    has no markdown at all."""
+    meta = _album_meta_dir(album)
+    if meta is None:
         return None
-    if not folder.is_dir():
-        return None
-    candidates = [folder / f"album_{lang}.md",
-                  folder / f"album_{i18n.DEFAULT_LANG}.md",
-                  folder / "album.md"]
+    candidates = [meta / f"album_{lang}.md",
+                  meta / f"album_{i18n.DEFAULT_LANG}.md",
+                  meta / "album.md"]
     md_file = next((p for p in candidates if p.is_file()), None)
     if md_file is None:
-        md_file = next(iter(sorted(p for p in folder.glob("*.md") if p.is_file())), None)
+        md_file = next(iter(sorted(p for p in meta.glob("*.md") if p.is_file())), None)
     if md_file is None:
         return None
     try:
@@ -458,7 +455,19 @@ def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
 # read) put one entry per line below the key: any non-comment line without
 # a `=` continues the key above it.
 #
-# album.cfg keys (file sits inside an album's photo folder):
+# Everything that describes an album rather than being one of its photos
+# lives together in a `.album/` folder inside the album (ALBUM_META_DIR),
+# so the photo folder itself stays nothing but photos:
+#
+#   photos/japan_2026/.album/album.cfg          <- settings (keys below)
+#   photos/japan_2026/.album/album_en.md        <- description, per language
+#   photos/japan_2026/.album/MusashiBrush.otf   <- `font = …` title face
+#
+# This is the only place looked at — a cfg or description left in the photo
+# folder itself is ignored. gallery.cfg is NOT part of this: it configures
+# the gallery as a whole and stays at the root of PHOTOS_DIR.
+#
+# album.cfg keys (file sits in the album's `.album/` folder):
 #   collection = true    -> the album shows every photo in its subtree (its
 #                           own + all sub-folders) as one flat collection.
 #   cover = sub/pic.jpg  -> pin the album cover (path relative to the album)
@@ -470,6 +479,11 @@ def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
 #   sort = curated|date_desc|… -> preselect the sort option for this album.
 #   effect = sakura      -> ambient effect layer on this album's page
 #                           (whitelisted in ALBUM_EFFECTS; see initAlbumFx).
+#   font = Musashi.otf   -> display face for the album's hero title; the file
+#                           sits next to the cfg in `.album/` (see the
+#                           per-album title font section further down).
+ALBUM_META_DIR = scanner.ALBUM_META_DIR
+
 _TRUE = {"1", "true", "yes", "on"}
 _FALSE = {"0", "false", "no", "off", "none", "hide"}
 
@@ -520,15 +534,24 @@ def _cfg_first(cfg: dict[str, list[str]], key: str) -> str | None:
     return vals[0] if vals else None
 
 
-def _album_config(album: str) -> dict[str, list[str]]:
-    """Parse the album's `album.cfg` (see _parse_cfg), or {} when there's no
-    such file. Cheap enough to call per album card."""
-    folder = (PHOTOS_DIR / album).resolve()
+def _album_meta_dir(album: str) -> Path | None:
+    """The album's `.album/` metadata folder (see the format notes above), or
+    None when the album path is bogus or the folder doesn't exist."""
+    folder = (PHOTOS_DIR / album / ALBUM_META_DIR).resolve()
     try:
         folder.relative_to(PHOTOS_DIR)  # guard against path traversal
     except ValueError:
+        return None
+    return folder if folder.is_dir() else None
+
+
+def _album_config(album: str) -> dict[str, list[str]]:
+    """Parse the album's `album.cfg` (see _parse_cfg), or {} when there's no
+    such file. Cheap enough to call per album card."""
+    meta = _album_meta_dir(album)
+    if meta is None:
         return {}
-    cfg_path = folder / "album.cfg"
+    cfg_path = meta / "album.cfg"
     if not cfg_path.is_file():
         return {}
     try:
@@ -552,6 +575,63 @@ def _config_cover_rel(album: str, manual: str | None) -> str | None:
         "SELECT rel_path FROM images WHERE rel_path = ?", (rel,)
     ).fetchone()
     return row["rel_path"] if row else None
+
+
+# ----- per-album title font (album.cfg `font = ...`) --------------------
+# An album can bring its own display face for its hero title: drop the font
+# file into the album's `.album/` folder and name it in album.cfg
+#   font = MusashiBrush.otf
+# The face reaches the page as a generated stylesheet rather than an inline
+# <style>, because the CSP (style-src 'self', see CSP below) drops inline
+# styles: /album-font.css/{album} carries the @font-face plus the
+# --album-title-font custom property that style.css's `.album-font
+# .album-hero__title` rule reads, and /album-font/{album} serves the file.
+# The family name is a constant — only one album's sheet ever loads on a
+# page, so it cannot collide.
+ALBUM_FONT_FAMILY = "album-title"
+
+# Extension -> (CSS `format()` hint, response media type). Doubles as the
+# whitelist of what may be served: a `font = …` naming anything else (an
+# album_en.md, say) resolves to nothing.
+ALBUM_FONT_TYPES = {
+    ".otf": ("opentype", "font/otf"),
+    ".ttf": ("truetype", "font/ttf"),
+    ".woff2": ("woff2", "font/woff2"),
+    ".woff": ("woff", "font/woff"),
+}
+
+
+def _album_font_file(album: str) -> Path | None:
+    """The album's configured title font as a real file, or None. The cfg
+    value is a bare filename resolved inside the album's `.album/` folder:
+    anything carrying a path separator, or an extension outside
+    ALBUM_FONT_TYPES, is rejected — so this only ever resolves to a font
+    sitting next to the album.cfg that named it."""
+    meta = _album_meta_dir(album)
+    if meta is None:
+        return None
+    name = (_cfg_first(_album_config(album), "font") or "").strip()
+    if not name or Path(name).name != name:
+        return None
+    if Path(name).suffix.lower() not in ALBUM_FONT_TYPES:
+        return None
+    path = meta / name
+    return path if path.is_file() else None
+
+
+def _album_font_css_url(album: str) -> str | None:
+    """Cache-busting URL of the album's generated font stylesheet, or None
+    when the album configures no font. Versioned by the font's mtime (same
+    idea as _static_url) so swapping the file can't be masked by a stale
+    cache — both this sheet and the font it points at are cached hard."""
+    font = _album_font_file(album)
+    if font is None:
+        return None
+    try:
+        version = int(font.stat().st_mtime)
+    except OSError:
+        version = 0
+    return f"/album-font.css/{quote(album)}?v={version}"
 
 
 # ----- showcase / featured (album.cfg owns it; `_` marker is fallback) --
@@ -629,10 +709,20 @@ def _recompute_featured() -> None:
             for r in c.execute("SELECT rel_path, filename FROM images WHERE album = ?", (album,)):
                 if scanner.is_showcase_photo(r["filename"]):
                     featured.add(r["rel_path"])
+    # Apply the whole set in ONE statement. Clearing the column and adding the
+    # flags back row by row would be visible to anyone reading mid-flight: the
+    # app shares a single sqlite connection (db.py), so concurrent SELECTs run
+    # inside this very transaction and saw the intermediate state — a reel that
+    # rendered empty or half-filled while a recompute was in progress. A single
+    # UPDATE has no intermediate state to observe. The set is passed as one JSON
+    # array rather than N placeholders so a `featured = *` album can't run into
+    # the host-parameter limit; `WHERE is_showcase <> …` keeps it to the rows
+    # that actually change.
+    want = "(rel_path IN (SELECT value FROM json_each(?)))"
+    payload = json.dumps(sorted(featured))
     with db.lock():
-        c.execute("UPDATE images SET is_showcase = 0 WHERE is_showcase != 0")
-        for rel in featured:
-            c.execute("UPDATE images SET is_showcase = 1 WHERE rel_path = ?", (rel,))
+        c.execute(f"UPDATE images SET is_showcase = {want} WHERE is_showcase <> {want}",
+                  (payload, payload))
         c.commit()
 
 
@@ -647,13 +737,17 @@ _cfg_seen_lock = threading.Lock()
 
 
 def _refresh_featured_on_cfg_change(album: str) -> None:
+    # Called with the raw path straight off the URL, before the album is
+    # known to exist — so the traversal guard stays here rather than leaning
+    # on _album_meta_dir, which cannot tell "bogus path" from "no folder"
+    # and would let junk paths seed the mtime map and trigger a recompute.
     folder = (PHOTOS_DIR / album).resolve()
     try:
         folder.relative_to(PHOTOS_DIR)  # guard against path traversal
     except ValueError:
         return
     try:
-        mtime = (folder / "album.cfg").stat().st_mtime
+        mtime = (folder / ALBUM_META_DIR / "album.cfg").stat().st_mtime
     except OSError:
         mtime = 0.0  # missing file is a state too (cfg deleted -> refresh)
     with _cfg_seen_lock:
@@ -986,9 +1080,16 @@ def _startup():
 
 
 def _safe_rel(album: str, filename: str) -> Path:
+    """Validate an album/filename pair for the photo-serving routes (image,
+    thumb, preview, full). These serve straight off disk without consulting
+    the index, so the `.album/` metadata folder is refused here too — its
+    contents are not photos, and the one file in it that is meant to be
+    public (the `font = …` face) has its own route."""
     rel = (Path(album) / filename)
     if ".." in rel.parts or rel.is_absolute():
         raise HTTPException(400, "invalid path")
+    if scanner.is_meta_path(rel):
+        raise HTTPException(404, "not found")
     full = (PHOTOS_DIR / rel).resolve()
     try:
         full.relative_to(PHOTOS_DIR)
@@ -1392,6 +1493,9 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             "album_cover": _album_cover_rel(album),
             # ambient page effect (album.cfg `effect = ...`, whitelisted)
             "album_effect": effect if effect in ALBUM_EFFECTS else None,
+            # generated stylesheet for the album's own title face
+            # (album.cfg `font = ...`); None when it configures none
+            "album_font_css": _album_font_css_url(album),
             "trip": _trip_for_album(album, lang),
             "collection": collection,
             "sub_albums": sub_albums,
@@ -1565,6 +1669,46 @@ def _gps_to_deg(coord, ref):
         return deg
     except Exception:
         return None
+
+
+@app.get("/album-font.css/{album:path}")
+def album_font_css(album: str):
+    """The @font-face + --album-title-font binding for an album's
+    `font = …`, as a real stylesheet — the CSP drops inline styles, so this
+    is how a per-album face reaches the page (see the section on it above).
+    The album path is percent-encoded into the url() so a folder name can
+    never break out of the CSS string."""
+    font = _album_font_file(album)
+    if font is None:
+        raise HTTPException(404, "not found")
+    fmt, _mime = ALBUM_FONT_TYPES[font.suffix.lower()]
+    try:
+        version = int(font.stat().st_mtime)
+    except OSError:
+        version = 0
+    src = f"/album-font/{quote(album)}?v={version}"
+    css = (
+        "@font-face{"
+        f"font-family:'{ALBUM_FONT_FAMILY}';"
+        f"src:url('{src}') format('{fmt}');"
+        "font-weight:400;font-style:normal;font-display:swap}"
+        f":root{{--album-title-font:'{ALBUM_FONT_FAMILY}'}}"
+    )
+    return Response(css, media_type="text/css",
+                    headers={"Cache-Control": "public, max-age=31536000"})
+
+
+@app.get("/album-font/{album:path}")
+def serve_album_font(album: str):
+    """The font file an album's cfg names in `font = …`. The filename never
+    comes from the URL — it is read back out of the album.cfg — so this
+    route cannot be used to pull anything else out of an album."""
+    font = _album_font_file(album)
+    if font is None:
+        raise HTTPException(404, "not found")
+    _fmt, mime = ALBUM_FONT_TYPES[font.suffix.lower()]
+    return FileResponse(str(font), media_type=mime,
+                        headers={"Cache-Control": "public, max-age=31536000"})
 
 
 @app.get("/thumb/{album}/{filename:path}")
