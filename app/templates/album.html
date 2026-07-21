@@ -4,7 +4,13 @@
 {% block head_extra %}
   {# The album's own title face (album.cfg `font = ...`): a generated sheet
      carrying the @font-face + --album-title-font, which style.css reads.
-     Loaded here, after style.css, and only on albums that configure one. #}
+     Loaded here, after style.css, and only on albums that configure one.
+     The preload goes first so the font file downloads in parallel with the
+     sheet rather than only after it's parsed — otherwise the title shows the
+     fallback for a beat, then swaps. crossorigin is required: fonts fetch in
+     anonymous-CORS mode, so an uncredentialed preload is what the @font-face
+     request matches (without it the file downloads twice). #}
+  {% if album_font_preload %}<link rel="preload" href="{{ album_font_preload.href }}" as="font" type="{{ album_font_preload.type }}" crossorigin>{% endif %}
   {% if album_font_css %}<link rel="stylesheet" href="{{ album_font_css }}">{% endif %}
 {% endblock %}
 {% block meta %}

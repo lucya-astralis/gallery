@@ -701,6 +701,26 @@ def _album_font_css_url(album: str) -> str | None:
     return f"/album-font.css/{quote(album)}?v={_album_font_version(album)}"
 
 
+def _album_font_preload(album: str) -> dict | None:
+    """Preload descriptor (font url + media type) for the album's title face,
+    or None when it configures none. Without it the browser can't even learn
+    the font's URL until it has fetched AND parsed the generated
+    /album-font.css sheet, and only then fetches the file — a serial waterfall
+    that leaves the hero title in the fallback face for a visible beat before
+    it swaps in. Preloading the file in the page head runs that download in
+    parallel with the stylesheet instead, so the face is there by first paint
+    and the swap never shows. Same url/version as the @font-face src, so both
+    requests hit one cache entry."""
+    font = _album_font_file(album)
+    if font is None:
+        return None
+    _fmt, mime = ALBUM_FONT_TYPES[font.suffix.lower()]
+    return {
+        "href": f"/album-font/{quote(album)}?v={_album_font_version(album)}",
+        "type": mime,
+    }
+
+
 # ----- showcase / featured (album.cfg owns it; `_` marker is fallback) --
 # album.cfg is the source of truth for two things that used to be driven by
 # the `_` prefix:
@@ -1566,6 +1586,9 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             # generated stylesheet for the album's own title face
             # (album.cfg `font = ...`); None when it configures none
             "album_font_css": _album_font_css_url(album),
+            # preload for that same face, so it downloads alongside the sheet
+            # instead of after it (no fallback→face swap on load)
+            "album_font_preload": _album_font_preload(album),
             "trip": _trip_for_album(album, lang),
             "collection": collection,
             "sub_albums": sub_albums,
