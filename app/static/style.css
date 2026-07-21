@@ -2203,8 +2203,12 @@ details[open] > summary::before{ content:"▾ "; }
   .nav__brand .brand-sub{ font-size:9px; }
   .nav__brand img{ height:24px; }
   .nav__status{ display:none; }
-  .nav__lang{ padding:2px; gap:1px; font-size:10px; }
-  .nav__lang-opt{ padding:4px 6px; }
+  /* search field and language selector share one height so the two controls
+     read as a matched pair; the option pills stretch to fill the taller box,
+     which also gives them bigger tap targets */
+  .nav__search, .nav__lang{ height:38px; }
+  .nav__lang{ padding:3px; gap:1px; font-size:10px; align-items:stretch; }
+  .nav__lang-opt{ display:flex; align-items:center; padding:0 7px; }
   /* iOS Safari auto-zooms when a focused input's font-size is < 16px. Keep the
      typed text at 16px so tapping search never zooms the page; the placeholder
      can stay small (its size doesn't affect the zoom trigger). */

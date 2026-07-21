@@ -38,6 +38,9 @@ STRINGS: dict[str, tuple[str, str, str]] = {
         "Suche / Album, Datei, Tag",
         "検索 / アルバム・ファイル・タグ",
     ),
+    # short form swapped in on phones (app.js), where the full hint is too long
+    # for the narrow field — see the data-ph-short attribute in base.html
+    "nav.search_ph_short": ("Search", "Suchen", "検索"),
     "nav.lang_label": ("Language", "Sprache", "言語"),
     "foot.operator": ("Operator", "Operator", "オペレーター"),
     "foot.about": ("lucya / about me ↗", "lucya / über mich ↗", "lucya / 私について ↗"),

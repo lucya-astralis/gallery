@@ -118,6 +118,21 @@ if (allowHeavyFx() && 'IntersectionObserver' in window) {
   document.documentElement.classList.add('fx-anim');
 }
 
+// ---------- NAV SEARCH PLACEHOLDER -----------------------------
+// The full "SEARCH / ALBUM, FILE, TAG" hint is too long for the narrow field
+// on phones, so swap in the short form there (kept in the data-ph-short attr,
+// already localized server-side) and restore the full one on wider viewports.
+(function searchPlaceholder() {
+  const input = document.querySelector('.nav__search input');
+  if (!input) return;
+  const full = input.getAttribute('placeholder') || '';
+  const short = input.getAttribute('data-ph-short') || full;
+  const mq = window.matchMedia('(max-width: 760px)');
+  const apply = () => { input.placeholder = mq.matches ? short : full; };
+  mq.addEventListener('change', apply);
+  apply();
+})();
+
 // ---------- BACKGROUND VIDEO (opt-in) --------------------------
 // The <video> ships with no src and preload="none", so by default nothing is
 // fetched. We only wire up the 6 MB clip on capable, desktop-sized screens.

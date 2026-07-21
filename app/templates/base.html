@@ -49,7 +49,8 @@
         <span class="jp">画像庫</span>
       </a>
       <form action="/search" method="get" class="nav__search" role="search">
-        <input type="search" name="q" placeholder="{{ t('nav.search_ph') }}" value="{{ query or '' }}" autocomplete="off">
+        {# full HUD hint by default; app.js swaps to data-ph-short on phones #}
+        <input type="search" name="q" placeholder="{{ t('nav.search_ph') }}" data-ph-short="{{ t('nav.search_ph_short') }}" value="{{ query or '' }}" autocomplete="off">
       </form>
       <div class="nav__status">
         <span class="dot"></span>
