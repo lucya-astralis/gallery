@@ -292,3 +292,46 @@ def month_label(lang: str, iso: str | None) -> str | None:
         return f"{y}年{m}月"
     months = _MONTHS_DE if lang == "de" else _MONTHS_EN
     return f"{months[m - 1]} {y}".upper()
+
+
+def date_span(lang: str, iso_min: str | None, iso_max: str | None) -> str | None:
+    """Day-precise, collapsed date range for the album SPAN stat:
+        same day    -> '20 MAR 2026'      / '20. MÄR 2026'      / '2026年3月20日'
+        same month  -> '20–21 MAR 2026'    / '20.–21. MÄR 2026'  / '2026年3月20–21日'
+        same year   -> '20 MAR – 5 APR 2026'                     / '2026年3月20日 – 4月5日'
+        crosses year-> '28 DEC 2025 – 3 JAN 2026'
+    Uppercased for en/de like month_label (it reads as a HUD chip). Accepts a
+    single side (min or max may be None); None only when neither parses."""
+    def _parse(iso):
+        try:
+            return int(iso[:4]), int(iso[5:7]), int(iso[8:10])
+        except (ValueError, IndexError, TypeError):
+            return None
+    a, b = _parse(iso_min), _parse(iso_max)
+    a, b = a or b, b or a
+    if not a:
+        return None
+    if b < a:
+        a, b = b, a
+    (y1, m1, d1), (y2, m2, d2) = a, b
+    if lang == "jp":
+        lo = f"{y1}年{m1}月{d1}日"
+        if (y1, m1, d1) == (y2, m2, d2):
+            return lo
+        if (y1, m1) == (y2, m2):
+            return f"{y1}年{m1}月{d1}–{d2}日"
+        hi = f"{m2}月{d2}日" if y1 == y2 else f"{y2}年{m2}月{d2}日"
+        return f"{lo} – {hi}"
+    months = _MONTHS_DE if lang == "de" else _MONTHS_EN
+    dot = "." if lang == "de" else ""
+
+    def _mon(m):
+        return months[m - 1].upper()
+
+    if (y1, m1, d1) == (y2, m2, d2):
+        return f"{d1}{dot} {_mon(m1)} {y1}"
+    if (y1, m1) == (y2, m2):
+        return f"{d1}{dot}–{d2}{dot} {_mon(m1)} {y1}"
+    if y1 == y2:
+        return f"{d1}{dot} {_mon(m1)} – {d2}{dot} {_mon(m2)} {y1}"
+    return f"{d1}{dot} {_mon(m1)} {y1} – {d2}{dot} {_mon(m2)} {y2}"

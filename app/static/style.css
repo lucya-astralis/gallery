@@ -1889,6 +1889,40 @@ section{
 .album-desc__body hr{ border:0; border-top:1px dashed var(--line); margin:1.1em 0; }
 .album-desc__body img{ max-width:100%; height:auto; border:1px solid var(--line); }
 
+/* stats block under the description — HUD-style KEY / VALUE readouts.
+   Two groups: editorial (album.cfg loc/stat) then the auto EXIF/size
+   capture readouts, split by a dashed divider. */
+.album-desc__stats{
+  padding:12px 16px 15px;
+  border-top:1px dashed var(--line);
+}
+.album-stats{ margin:0; }
+.album-stats + .album-stats{
+  margin-top:9px; padding-top:9px;
+  border-top:1px dashed var(--line);
+}
+.album-stat{
+  display:flex; align-items:baseline; justify-content:space-between; gap:14px;
+  padding:4px 0;
+  font-family:"JetBrains Mono", monospace;
+}
+.album-stat + .album-stat{ border-top:1px solid var(--line); }
+.album-stat__key{
+  flex:0 0 auto;
+  color:var(--acc-cy);
+  font-size:9.5px; letter-spacing:.2em; text-transform:uppercase;
+  white-space:nowrap;
+}
+.album-stat__key:empty{ display:none; }
+.album-stat__val{
+  color:var(--text);
+  font-size:12px; line-height:1.4;
+  text-align:right;
+  overflow-wrap:anywhere;
+}
+/* a label-less free `stat =` line reads as one left-aligned note */
+.album-stat:has(.album-stat__key:empty) .album-stat__val{ text-align:left; }
+
 /* ================================================================
    IMAGE GRID  (inside album)
    ================================================================ */

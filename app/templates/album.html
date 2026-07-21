@@ -105,15 +105,36 @@
     {% endif %}
   {% endmacro %}
 
+  {# one KEY / VALUE readout group in the stats block. `key` may be empty
+     (a free `stat =` line with no label) — the grid still lines up. #}
+  {% macro stat_group(items) %}
+    <dl class="album-stats">
+      {% for s in items %}
+      <div class="album-stat">
+        <dt class="album-stat__key">{{ s.key }}</dt>
+        <dd class="album-stat__val">{{ s.val }}</dd>
+      </div>
+      {% endfor %}
+    </dl>
+  {% endmacro %}
+
   {# the .md description card — used in the top row next to the reel
-     (two_col_top) or in the body sidebar (trip / reel-less albums). #}
+     (two_col_top) or in the body sidebar (trip / reel-less albums). The
+     stats block (album.cfg `loc`/`stat` + auto EXIF/size readouts) docks
+     under the description; context group first, then the capture group. #}
   {% macro desc_card() %}
     <div class="album-desc">
       <div class="album-desc__head">
         <span class="album-desc__label">{{ t('album.about') }}</span>
         <span class="album-desc__file">{{ (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | upper }}</span>
       </div>
-      <div class="album-desc__body">{{ album_description | safe }}</div>
+      {% if album_description %}<div class="album-desc__body">{{ album_description | safe }}</div>{% endif %}
+      {% if album_stats and album_stats.has %}
+      <div class="album-desc__stats">
+        {% if album_stats.context %}{{ stat_group(album_stats.context) }}{% endif %}
+        {% if album_stats.capture %}{{ stat_group(album_stats.capture) }}{% endif %}
+      </div>
+      {% endif %}
     </div>
   {% endmacro %}
 

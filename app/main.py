@@ -4,6 +4,7 @@ import os
 import threading
 import time
 import urllib.request
+from collections import Counter
 from functools import partial
 from pathlib import Path
 from urllib.parse import quote
@@ -489,6 +490,13 @@ def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
 #                           per-album title font section further down).
 #   font_scale = 1.25    -> size multiplier for that face (see the same
 #                           section); only read when `font` is set.
+#   loc = Paris, France  -> LOC line in the stats block under the description.
+#   stat = Label: Value  -> one freeform KEY / VALUE stat line (repeat the key
+#                           for more). Avoid commas in the value — the parser
+#                           comma-splits list values (see _parse_cfg). These
+#                           sit above the auto SPAN/DEVICE/FOCAL/APERTURE/DATA
+#                           readouts derived from the photos' EXIF (_album_stats).
+#   stats = off          -> hide the whole stats block for this album.
 ALBUM_META_DIR = scanner.ALBUM_META_DIR
 
 _TRUE = {"1", "true", "yes", "on"}
@@ -588,6 +596,132 @@ def _album_tags(album: str) -> list[str]:
         seen.add(key)
         out.append(name)
     return out
+
+
+# ----- album stats (auto EXIF/size readouts + editorial cfg facts) -------
+# The little HUD-style KEY / VALUE block under an album's description. Two
+# groups feed it:
+#   * capture  — derived automatically from the album's own photos (EXIF +
+#                file size), so they cost zero upkeep: SPAN (date range),
+#                DEVICE, FOCAL, APERTURE, DATA. A missing field just drops
+#                that one line.
+#   * context  — editorial, from album.cfg: `loc = City, Country` plus any
+#                number of freeform `stat = Label: Value` lines.
+# The KEY labels are HUD tokens and stay English by design; only the SPAN
+# *value* localises (i18n.date_span). `stats = off` in album.cfg hides the
+# whole block.
+
+def _humanize_bytes(n: int | None) -> str | None:
+    """1311994866 -> '1.2 GB'. None for empty/zero."""
+    if not n or n <= 0:
+        return None
+    units = ("B", "KB", "MB", "GB", "TB")
+    f = float(n)
+    i = 0
+    while f >= 1024 and i < len(units) - 1:
+        f /= 1024.0
+        i += 1
+    if i == 0:
+        return f"{int(f)} {units[i]}"
+    return f"{f:.0f} {units[i]}" if f >= 100 else f"{f:.1f} {units[i]}"
+
+
+def _clean_device(make: str | None, model: str | None) -> str | None:
+    """Human camera name from EXIF Make/Model: 'Apple' + 'iPhone 17' ->
+    'iPhone 17'; 'FUJIFILM' + 'X100V' -> 'FUJIFILM X100V'. Drops a Make the
+    Model already echoes."""
+    make = (make or "").strip()
+    model = (model or "").strip()
+    if not model:
+        return make or None
+    # Apple brands by model alone ("iPhone 17", never "Apple iPhone 17")
+    if make.lower() == "apple":
+        return model
+    if make and make.split()[0].lower() in model.lower():
+        return model
+    return f"{make} {model}" if make else model
+
+
+def _fmt_num(v: float) -> str:
+    """2.0 -> '2', 1.6 -> '1.6' (trims a trailing zero decimal)."""
+    return f"{v:.1f}".rstrip("0").rstrip(".")
+
+
+def _album_stats(images: list[dict], cfg: dict[str, list[str]], lang: str) -> dict:
+    """Stats block for the description card: {'context': [...], 'capture': [...],
+    'has': bool}. Each entry is {'key': LABEL, 'val': text}. `images` is the
+    album's whole photo set (unfiltered by any ?tag=), so the readouts describe
+    the album, not the current grid view."""
+    if (_cfg_first(cfg, "stats") or "").strip().lower() in _FALSE:
+        return {"context": [], "capture": [], "has": False}
+
+    # --- context: editorial, from album.cfg -----------------------------
+    context: list[dict] = []
+    loc = ", ".join(v.strip() for v in (cfg.get("loc") or []) if v.strip())
+    if loc:
+        context.append({"key": "LOC", "val": loc})
+    # freeform `stat = Label: Value` (one fact per line; avoid commas in the
+    # value — the cfg parser comma-splits list values, see _parse_cfg).
+    for raw in cfg.get("stat") or []:
+        raw = raw.strip()
+        if not raw:
+            continue
+        if ":" in raw:
+            k, _, v = raw.partition(":")
+            entry = {"key": k.strip().upper(), "val": v.strip()}
+        else:
+            entry = {"key": "", "val": raw}
+        if entry["val"]:
+            context.append(entry)
+
+    # --- capture: auto, from the photos' EXIF + size --------------------
+    total = 0
+    tmin = tmax = None
+    devices: Counter = Counter()
+    fnums: list[float] = []
+    focals: list[int] = []
+    for im in images:
+        total += im.get("size") or 0
+        t = im.get("taken_at")
+        if t:
+            tmin = t if tmin is None or t < tmin else tmin
+            tmax = t if tmax is None or t > tmax else tmax
+        try:
+            exif = json.loads(im["exif_json"]) if im.get("exif_json") else {}
+        except (ValueError, TypeError):
+            exif = {}
+        dev = _clean_device(exif.get("Make"), exif.get("Model"))
+        if dev:
+            devices[dev] += 1
+        fn = exif.get("FNumber")
+        if isinstance(fn, (int, float)) and fn > 0:
+            fnums.append(float(fn))
+        fl = exif.get("FocalLengthIn35mmFilm") or exif.get("FocalLength")
+        if isinstance(fl, (int, float)) and fl > 0:
+            focals.append(round(float(fl)))
+
+    capture: list[dict] = []
+    span = i18n.date_span(lang, tmin, tmax)
+    if span:
+        capture.append({"key": "SPAN", "val": span})
+    if devices:
+        dev = devices.most_common(1)[0][0]
+        # a couple of stray cameras shouldn't hide the dominant one, but note them
+        if len(devices) > 1:
+            dev = f"{dev} +{len(devices) - 1}"
+        capture.append({"key": "DEVICE", "val": dev})
+    if focals:
+        lo, hi = min(focals), max(focals)
+        capture.append({"key": "FOCAL", "val": f"{lo} MM" if lo == hi else f"{lo}–{hi} MM"})
+    if fnums:
+        lo, hi = min(fnums), max(fnums)
+        val = f"ƒ{_fmt_num(lo)}" if lo == hi else f"ƒ{_fmt_num(lo)}–{_fmt_num(hi)}"
+        capture.append({"key": "APERTURE", "val": val})
+    data = _humanize_bytes(total)
+    if data:
+        capture.append({"key": "DATA", "val": data})
+
+    return {"context": context, "capture": capture, "has": bool(context or capture)}
 
 
 def _config_cover_rel(album: str, manual: str | None) -> str | None:
@@ -1569,6 +1703,18 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     sort_options = _image_sort_options_for_template(current_sort, curated=bool(curated_order),
                                                     lang=lang)
     effect = (_cfg_first(album_cfg, "effect") or "").strip().lower()
+    # Stats block under the description. Computed over the album's WHOLE photo
+    # set, never the ?tag=-filtered grid — the readouts describe the album, so
+    # a tag filter mustn't skew SPAN/DEVICE/DATA. Reuse `images` when it already
+    # is the full set (no tag), else fetch the album scope just for the stats.
+    if tag:
+        stat_src = [dict(r) for r in c.execute(
+            f"SELECT size, width, height, taken_at, exif_json FROM images WHERE {where_simple}",
+            scope_params,
+        ).fetchall()]
+    else:
+        stat_src = images
+    album_stats = _album_stats(stat_src, album_cfg, lang)
     return templates.TemplateResponse(
         "album.html",
         {
@@ -1583,6 +1729,9 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             # album.cfg `tags = ...`, shown under the hero title. NOT the
             # per-image `tags` below, which drive the ?tag= grid filter.
             "album_tags": _album_tags(album),
+            # stats block under the description (auto EXIF/size readouts +
+            # editorial `loc`/`stat` from album.cfg); see _album_stats
+            "album_stats": album_stats,
             # generated stylesheet for the album's own title face
             # (album.cfg `font = ...`); None when it configures none
             "album_font_css": _album_font_css_url(album),
