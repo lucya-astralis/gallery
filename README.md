@@ -174,7 +174,7 @@ Optional file in the album's **`.album/` folder** (see above):
 
 | Key          | Values                          | Effect                                                                                     |
 |--------------|---------------------------------|--------------------------------------------------------------------------------------------|
-| `collection` | `true`                          | The album page shows every photo of its whole subtree (own + sub-folders) as one flat set. |
+| `collection` | `true`                          | The album page shows every photo of its whole subtree (own + sub-folders) as one flat set. The [API](#api) scopes the album the same way. |
 | `showcase`   | `true` / `false`                | Featured album: ★ rail on `/albums` and the welcome screen (replaces the `_` folder prefix). |
 | `featured`   | paths, or `*` / `all`           | Featured photos: welcome hero, `/api/showcase`, the album's reel (replaces the `_` filename prefix). Paths are relative to the album; bare filenames match anywhere in the subtree. The album's reel shows them in exactly this order. |
 | `cover`      | one path                        | Pin the album cover instead of auto-picking the newest photo.                              |
@@ -236,22 +236,52 @@ Rules for the hand-picked welcome list:
 
 ## API
 
-A small JSON endpoint exposes the showcased photos so you can embed them on your own site. CORS is open and responses are cached for 5 minutes.
+A read-only JSON view of everything the pages render — albums, photos, EXIF, tags, stats — so you can embed the gallery elsewhere or build your own front end on it. CORS is open, responses are cached for 5 minutes, errors come back as JSON (`{"error": …, "status": …}`).
+
+`GET /api` lists every endpoint with its parameters, so the API describes itself:
+
+| Endpoint                    | Returns                                                                 |
+|-----------------------------|-------------------------------------------------------------------------|
+| `GET /api`                  | Endpoint index, sort keys, languages, marker                            |
+| `GET /api/stats`            | Gallery-wide counters: photos, albums, featured, tags, bytes, date span |
+| `GET /api/albums`           | Album cards — top level, or the children of `?parent=`                  |
+| `GET /api/album/{album}`    | One album in full: meta, description, stats, reel, sub-albums, photos    |
+| `GET /api/photos`           | Photo query across the gallery or one album, paged                      |
+| `GET /api/photo/{rel_path}` | One photo: EXIF, tags, prev/next neighbours                             |
+| `GET /api/tags`             | Photo tags with counts                                                  |
+| `GET /api/showcase`         | Featured photos (the original embed endpoint)                           |
+| `GET /api/shuffle`          | Random photos (bare array — the welcome hero reads it)                  |
+
+Three rules hold everywhere:
+
+- **Collections are honoured.** An album with `collection = true` in its `album.cfg` answers with its *whole subtree*, exactly like its page does — `/api/album/…`, `/api/photos?album=…`, `/api/showcase?album=…` and `/api/tags?album=…` all agree. Every response carries a `scope` object saying what happened:
+
+  ```json
+  "scope": { "album": "_japan_2026", "collection": true, "subtree": true }
+  ```
+
+  Pass `subtree=0` to force the plain folder scope on a collection album, or `subtree=1` to widen a normal album. Album paths tolerate a stripped showcase marker (`japan_2026` finds `_japan_2026`).
+- **One shape per object.** Photos always look like the `items` entries below, albums always like the `album` object — in every endpoint, at every nesting level.
+- **Language follows `lang=`** (`en`/`de`/`jp`), else the visitor's cookie / `Accept-Language`. Anything language-dependent (album descriptions, EXIF labels, the SPAN readout) echoes the language it used in `lang` and sends `Vary: Accept-Language, Cookie`.
 
 ### `GET /api/showcase`
 
 | Query param | Default | Meaning                                                     |
 |-------------|---------|-------------------------------------------------------------|
 | `limit`     | `50`    | Max items, clamped to `1..200`                              |
-| `album`     | —       | Only return showcase photos inside this album folder        |
+| `album`     | —       | Only featured photos inside this album (collection-aware)   |
+| `subtree`   | —       | `0`/`1` to override that album's collection scope           |
 | `random`    | `0`     | `1` for random order; default is newest first (by EXIF date)|
+| `tags`      | `0`     | `1` to include each photo's tags                            |
 
 **Response shape:**
 
 ```json
 {
-  "count": 2,
+  "count": 1,
+  "total": 12,
   "marker": "_",
+  "scope": { "album": null, "collection": false, "subtree": false },
   "items": [
     {
       "rel_path": "holiday-2025/_favourite.jpg",
@@ -263,22 +293,146 @@ A small JSON endpoint exposes the showcased photos so you can embed them on your
       "height": 3024,
       "size": 8123456,
       "taken_at": "2025-08-14T19:42:01",
+      "mtime": 1755193321.0,
+      "featured": true,
       "urls": {
         "thumb":       "/thumb/holiday-2025/_favourite.jpg",
         "preview":     "/preview/holiday-2025/_favourite.jpg",
         "full":        "/full/holiday-2025/_favourite.jpg",
         "page":        "/image/holiday-2025/_favourite.jpg",
+        "api":         "/api/photo/holiday-2025/_favourite.jpg",
         "thumb_abs":   "https://gallery.example.com/thumb/holiday-2025/_favourite.jpg",
         "preview_abs": "https://gallery.example.com/preview/holiday-2025/_favourite.jpg",
         "full_abs":    "https://gallery.example.com/full/holiday-2025/_favourite.jpg",
-        "page_abs":    "https://gallery.example.com/image/holiday-2025/_favourite.jpg"
+        "page_abs":    "https://gallery.example.com/image/holiday-2025/_favourite.jpg",
+        "api_abs":     "https://gallery.example.com/api/photo/holiday-2025/_favourite.jpg"
       }
     }
   ]
 }
 ```
 
-The `*_abs` URLs use the `PUBLIC_BASE_URL` env if set (recommended when running behind a TLS-terminating reverse proxy), otherwise the request's own scheme + host.
+`count` is the items in this response, `total` the size of the whole match. The `*_abs` URLs use the `PUBLIC_BASE_URL` env if set (recommended when running behind a TLS-terminating reverse proxy), otherwise the request's own scheme + host. Every endpoint below returns photos in exactly this shape (plus `tags` when asked for).
+
+### `GET /api/albums`
+
+| Query param | Default | Meaning                                                                        |
+|-------------|---------|--------------------------------------------------------------------------------|
+| `parent`    | —       | List the children of this album; omit for the top level                        |
+| `sort`      | cfg     | `curated` (when `gallery.cfg` sets `album_order`) or any album sort key        |
+| `depth`     | `1`     | `1..4` — nest each card's own sub-albums under `children`                      |
+| `showcase`  | —       | `1` for showcase albums only, `0` for the archive                              |
+| `limit`     | `200`   | Max cards per level, `1..200`                                                  |
+
+Each album card:
+
+```json
+{
+  "album": "_japan_2026",
+  "name": "japan_2026",
+  "display_path": "japan_2026",
+  "count": 412,
+  "latest": "2026-09-02T18:11:44",
+  "sub_count": 3,
+  "is_showcase": true,
+  "collection": true,
+  "tags": ["travel", "summer"],
+  "cover": { "rel_path": "…", "urls": { "thumb": "…", "preview": "…", "thumb_abs": "…", "preview_abs": "…" } },
+  "urls": { "page": "/album/_japan_2026", "api": "/api/album/_japan_2026", "page_abs": "…", "api_abs": "…" }
+}
+```
+
+`count` is recursive (the whole subtree), so it matches the number on the album grid. When `sort=curated` and no `parent` is given, the response also carries `sections` — the `#group` frames of the curated view.
+
+### `GET /api/album/{album}`
+
+Everything one album page knows.
+
+| Query param | Default | Meaning                                                                 |
+|-------------|---------|--------------------------------------------------------------------------|
+| `images`    | `0`     | `1` to include the photo grid (otherwise only `images.total` comes back) |
+| `sort`      | cfg     | `curated` (when `album.cfg` sets `order`) or any image sort key          |
+| `tag`       | —       | Filter the grid by photo tag                                            |
+| `subtree`   | cfg     | `0`/`1` to override the album's collection scope                        |
+| `limit`     | `200`   | Grid page size, `1..200`                                                |
+| `offset`    | `0`     | Grid paging offset                                                      |
+| `tags`      | `0`     | `1` to include each photo's tags                                        |
+| `lang`      | request | `en` / `de` / `jp`                                                      |
+
+```json
+{
+  "album": { … the card above … },
+  "breadcrumbs": [{ "name": "japan_2026", "path": "_japan_2026" }],
+  "scope": { "album": "_japan_2026", "collection": true, "subtree": true },
+  "description": { "html": "<p>…</p>", "lang": "de" },
+  "stats": { "context": [{ "key": "LOC", "val": "Japan" }], "capture": [{ "key": "SPAN", "val": "…" }], "has": true },
+  "effect": "sakura",
+  "font": { "css": "/album-font.css/…?v=…", "scale": 1.25, "preload": { "href": "…", "type": "font/otf" } },
+  "trip": { "key": "japan_2026", "stops": [ … ] },
+  "reel": { "mode": "featured", "items": [ … photos … ] },
+  "sub_albums": [ … cards … ],
+  "photo_tags": ["night", "street"],
+  "sort": { "current": "curated", "default": "curated", "options": [{ "key": "curated", "label": "Curated", "active": true }] },
+  "images": { "total": 412, "count": 50, "limit": 50, "offset": 0, "tag": null, "items": [ … photos … ] },
+  "lang": "de"
+}
+```
+
+`reel.mode` is `featured` / `random` / `off` (album.cfg `reel =`), and its items come in the album's configured `featured` order. `photo_tags` are the `.tags` sidecar tags available inside the album's scope (what `?tag=` filters on) — the album's own display tags sit on `album.tags`. `font`, `effect` and `trip` are `null` when the album configures none.
+
+### `GET /api/photos`
+
+| Query param | Default     | Meaning                                                             |
+|-------------|-------------|----------------------------------------------------------------------|
+| `album`     | —           | Scope to an album (collection-aware)                                |
+| `subtree`   | cfg         | `0`/`1` to override that scope                                      |
+| `tag`       | —           | Photo tag                                                           |
+| `q`         | —           | Search album path, filename and tags                                |
+| `featured`  | `0`         | `1` for featured photos only                                        |
+| `sort`      | `date_desc` | Any image sort key                                                  |
+| `random`    | `0`         | `1` for random order                                                |
+| `tags`      | `0`         | `1` to include each photo's tags                                    |
+| `limit`     | `50`        | `1..200`                                                            |
+| `offset`    | `0`         | Paging offset                                                       |
+
+Filters compose, so `?album=_japan_2026&tag=night&featured=1` is a valid question. Returns `count`, `total`, `limit`, `offset`, `sort`, `scope`, `filters` and `items`.
+
+### `GET /api/photo/{rel_path}`
+
+One photo — the photo object above, plus:
+
+```json
+{
+  "tags": ["night", "street"],
+  "breadcrumbs": [ … ],
+  "description": "text embedded in the file's XMP/EXIF",
+  "exif": [{ "key": "Camera", "val": "X100V" }, { "key": "Aperture", "val": "f/2.0" }],
+  "exif_raw": { "FNumber": 2.0 },
+  "album_url": { "page": "/album/…", "api": "/api/album/…" },
+  "neighbours": {
+    "scope": { "album": "_japan_2026", "collection_root": "_japan_2026", "count": 412 },
+    "sort": "curated", "index": 17, "prev": "…/a.jpg", "next": "…/b.jpg"
+  }
+}
+```
+
+`exif` is formatted and translated (`lang=`), `exif_raw` is what the file carried — GPS is dropped from both when `HIDE_GPS=1`. Neighbours walk the photo's own folder by default; pass `col=<album>` (a collection root above it) to walk the whole collection instead, exactly like the single-image view does. `neighbours=0` skips the walk.
+
+### `GET /api/tags`
+
+Photo tags with how many photos carry each, most-used first. `album=` scopes them (collection-aware), `subtree=0|1` overrides that, `limit` caps the list.
+
+### `GET /api/stats`
+
+```json
+{
+  "images": 4211, "featured": 63,
+  "albums": { "top_level": 9, "total": 34, "showcase": 3 },
+  "tags": 57, "bytes": 91234567890, "bytes_h": "85 GB",
+  "span": { "from": "2019-04-02T…", "to": "2026-09-02T…", "label": "2019 – 2026" },
+  "marker": "_", "lang": "en"
+}
+```
 
 **Embed example** — drop into any HTML page:
 
@@ -395,8 +549,7 @@ All GET, all public:
 - `GET /album-font/{album}` — the font file itself; only ever the one named in that album's `album.cfg`
 - `GET /search?q=…` — search (`?sort=`)
 - `GET /lang/{en|de|jp}?next=…` — set the language cookie, 303 back to `next` (relative paths only)
-- `GET /api/showcase` — JSON list of showcased photos, CORS-enabled (see [API](#api))
-- `GET /api/shuffle?limit=N` — JSON list of random photos (used internally by the welcome CRT)
+- `GET /api` + `/api/stats` + `/api/albums` + `/api/album/{album}` + `/api/photos` + `/api/photo/{rel_path}` + `/api/tags` + `/api/showcase` + `/api/shuffle` — the JSON API, CORS-enabled (see [API](#api))
 - `GET /api/trip-weather?trip=…` — current conditions per trip stop, served as a same-origin proxy to [Open-Meteo](https://open-meteo.com/) (weather data CC BY 4.0). Server-side cache (15 min); the visitor's browser never contacts a third party, so no cookies and no consent banner are involved.
 
 ## Local development (without Docker)

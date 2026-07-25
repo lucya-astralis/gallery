@@ -158,19 +158,17 @@ templates.env.globals["showcase_marker"] = SHOWCASE_MARKER
 
 
 def _showcase_rows(album: str | None = None, limit: int = 50, random_order: bool = False,
-                   subtree: bool = False):
+                   subtree: bool | None = None):
     """Featured photos, optionally filtered to one album. `subtree=True`
     widens the filter to the album's whole folder tree, so photos featured
-    inside sub-albums surface on the parent album's page too. substr()
-    (not LIKE) keeps `_`/`%` in album names from acting as wildcards."""
+    inside sub-albums surface on the parent album's page too; `None` lets the
+    album decide (a `collection = true` album is its whole subtree, see
+    _photo_scope). substr() (not LIKE) keeps `_`/`%` in album names from
+    acting as wildcards."""
     c = db.conn()
-    if album is not None and subtree:
-        prefix = album + "/"
-        where = "WHERE is_showcase = 1 AND (album = ? OR substr(album, 1, ?) = ?)"
-        params: tuple = (album, len(prefix), prefix)
-    elif album is not None:
-        where = "WHERE is_showcase = 1 AND album = ?"
-        params = (album,)
+    if album is not None:
+        where_simple, _join, params, _coll, _wide = _photo_scope(album, subtree)
+        where = f"WHERE is_showcase = 1 AND {where_simple}"
     else:
         where = "WHERE is_showcase = 1"
         params = ()
@@ -200,9 +198,14 @@ def _showcase_album_rows(limit: int | None = None):
     return cards[:limit] if limit is not None else cards
 
 
-def _serialize_showcase_item(row: dict, base: str) -> dict:
+def _serialize_photo(row: dict, base: str, tags: list[str] | None = None) -> dict:
+    """One photo as the API returns it. The `_abs` URLs are what an external
+    embedder needs (they carry PUBLIC_BASE_URL, see _public_base_url); the
+    relative ones are handier same-origin. `tags` is only attached when the
+    caller actually loaded them (see _tags_for_images) — absent means "not
+    requested", never "none"."""
     rel = row["rel_path"]
-    return {
+    item = {
         "rel_path": rel,
         "album": row["album"],
         "filename": row["filename"],
@@ -212,25 +215,55 @@ def _serialize_showcase_item(row: dict, base: str) -> dict:
         "height": row.get("height"),
         "size": row.get("size"),
         "taken_at": row.get("taken_at"),
+        "mtime": row.get("mtime"),
+        "featured": bool(row.get("is_showcase")),
         "urls": {
             "thumb": f"/thumb/{rel}",
             "preview": f"/preview/{rel}",
             "full": f"/full/{rel}",
             "page": f"/image/{rel}",
+            "api": f"/api/photo/{rel}",
             "thumb_abs": f"{base}/thumb/{rel}",
             "preview_abs": f"{base}/preview/{rel}",
             "full_abs": f"{base}/full/{rel}",
             "page_abs": f"{base}/image/{rel}",
+            "api_abs": f"{base}/api/photo/{rel}",
         },
     }
+    if tags is not None:
+        item["tags"] = tags
+    return item
 
 
-def _json_cors(payload, max_age: int = 300) -> JSONResponse:
+def _tags_for_images(ids: list[int]) -> dict[int, list[str]]:
+    """{image_id: [tag, ...]} for a batch of photos — one query instead of one
+    per row. The id list travels as a JSON array (like _recompute_featured) so
+    a large page can't hit the host-parameter limit."""
+    if not ids:
+        return {}
+    rows = db.conn().execute(
+        """SELECT it.image_id AS iid, t.name AS name FROM image_tags it
+           JOIN tags t ON t.id = it.tag_id
+           WHERE it.image_id IN (SELECT value FROM json_each(?))
+           ORDER BY t.name""",
+        (json.dumps(ids),),
+    ).fetchall()
+    out: dict[int, list[str]] = {}
+    for r in rows:
+        out.setdefault(r["iid"], []).append(r["name"])
+    return out
+
+
+def _json_cors(payload, max_age: int = 300, vary: str | None = None) -> JSONResponse:
     resp = JSONResponse(payload)
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    resp.headers["Cache-Control"] = f"public, max-age={max_age}"
+    resp.headers["Cache-Control"] = f"public, max-age={max_age}" if max_age > 0 else "no-store"
+    if vary:
+        # language-dependent payloads (descriptions, stats, EXIF labels) must
+        # not be served to another language out of a shared cache
+        resp.headers["Vary"] = vary
     return resp
 
 
@@ -576,7 +609,7 @@ def _album_config(album: str) -> dict[str, list[str]]:
     return _parse_cfg(text)
 
 
-def _album_tags(album: str) -> list[str]:
+def _album_tags(album: str, cfg: dict[str, list[str]] | None = None) -> list[str]:
     """The album's `tags = a, b, c`, de-duplicated, order kept. A leading `#`
     is optional in the cfg — the hero renders one either way, so accept both
     spellings rather than printing `##night`.
@@ -584,9 +617,10 @@ def _album_tags(album: str) -> list[str]:
     These describe the ALBUM and are display-only. The per-image tags that a
     `.tags` sidecar feeds into the tags/image_tags tables are a separate
     thing (scanner._read_sidecar_tags) and still own the ?tag= grid filter."""
+    cfg = _album_config(album) if cfg is None else cfg
     out: list[str] = []
     seen: set[str] = set()
-    for raw in _album_config(album).get("tags") or []:
+    for raw in cfg.get("tags") or []:
         name = raw.strip().lstrip("#").strip()
         if not name:
             continue
@@ -596,6 +630,34 @@ def _album_tags(album: str) -> list[str]:
         seen.add(key)
         out.append(name)
     return out
+
+
+def _album_collection(album: str, cfg: dict[str, list[str]] | None = None) -> bool:
+    """album.cfg `collection = true`: the album stands for its whole subtree
+    (its own photos + every sub-folder's) rather than just the photos sitting
+    directly in it. One definition for the album page, the single-image
+    neighbour scroll and the JSON API — see _photo_scope."""
+    cfg = _album_config(album) if cfg is None else cfg
+    return _cfg_bool(_cfg_first(cfg, "collection"))
+
+
+def _photo_scope(album: str, subtree: bool | None = None) -> tuple[str, str, tuple, bool, bool]:
+    """SQL scope for "the photos of this album", collection-aware.
+
+    Returns (where_simple, where_join, params, collection, subtree) —
+    `where_simple` for queries over `images` alone, `where_join` for the ones
+    that join (columns qualified as `i.`). By default a `collection = true`
+    album resolves to its whole subtree and every other album to its own
+    folder; `subtree=True/False` forces either scope regardless of the cfg.
+    substr() (not LIKE) so `_`/`%` in album names can't act as wildcards."""
+    collection = _album_collection(album)
+    wide = collection if subtree is None else bool(subtree)
+    if wide:
+        prefix = album + "/"
+        return ("(album = ? OR substr(album, 1, ?) = ?)",
+                "(i.album = ? OR substr(i.album, 1, ?) = ?)",
+                (album, len(prefix), prefix), collection, True)
+    return ("album = ?", "i.album = ?", (album,), collection, False)
 
 
 # ----- album stats (auto EXIF/size readouts + editorial cfg facts) -------
@@ -868,8 +930,8 @@ def _album_font_preload(album: str) -> dict | None:
 # When a key is ABSENT the legacy marker still applies, so existing albums
 # keep working until migrated; when present, album.cfg wins (and can switch
 # a marked album/photo back off).
-def _album_is_showcase(album: str) -> bool:
-    cfg = _album_config(album)
+def _album_is_showcase(album: str, cfg: dict[str, list[str]] | None = None) -> bool:
+    cfg = _album_config(album) if cfg is None else cfg
     if "showcase" in cfg:
         return _cfg_bool(_cfg_first(cfg, "showcase"))
     return bool(SHOWCASE_MARKER) and album.rsplit("/", 1)[-1].startswith(SHOWCASE_MARKER)
@@ -1154,6 +1216,14 @@ def _pick_sort(value: str | None, allowed, default: str) -> str:
     return value if value in allowed else default
 
 
+def _qualify_sort(order_sql: str) -> str:
+    """Prefix the image columns of a SORT_IMAGE_SQL clause with the `i.` alias,
+    so the same clause also works in the queries that join tags."""
+    for col in ("filename", "taken_at", "mtime", "size"):
+        order_sql = order_sql.replace(col, f"i.{col}")
+    return order_sql
+
+
 def _image_sort_options_for_template(current: str, curated: bool = False,
                                      lang: str = i18n.DEFAULT_LANG) -> list[dict]:
     keys = ([(SORT_CURATED, SORT_CURATED_LABEL_KEY)] if curated else [])
@@ -1245,6 +1315,12 @@ async def security_headers(request: Request, call_next):
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    # API clients get JSON (with the CORS headers they need to read it),
+    # never the HTML 404 page
+    if request.url.path == "/api" or request.url.path.startswith("/api/"):
+        resp = _json_cors({"error": str(exc.detail), "status": exc.status_code}, max_age=0)
+        resp.status_code = exc.status_code
+        return resp
     if exc.status_code == 404:
         return templates.TemplateResponse(
             "404.html",
@@ -1555,44 +1631,634 @@ def albums_index(request: Request, sort: str | None = None):
     )
 
 
+# ----- JSON API ---------------------------------------------------------
+# A read-only JSON view of everything the pages render, CORS-open so the
+# gallery can be embedded elsewhere. Three rules hold across all of it:
+#
+#   * an album named in `album=` / the path resolves exactly like its page
+#     does — an album.cfg `collection = true` album answers with its WHOLE
+#     subtree (see _photo_scope), and says so via `scope.collection`.
+#     `subtree=0|1` overrides that per request.
+#   * photos always come back through _serialize_photo and albums through
+#     _serialize_album, so the shapes are identical everywhere.
+#   * anything language-dependent (descriptions, EXIF labels, date spans)
+#     follows `lang=`, else the request's own language, and says which one
+#     it picked in `lang`.
+#
+#   GET /api                   this index
+#   GET /api/stats             gallery-wide counters
+#   GET /api/albums            album cards (top level, or below ?parent=)
+#   GET /api/album/{album}     one album: meta, description, stats, reel, images
+#   GET /api/photos            photo query: album / tag / q / featured, paged
+#   GET /api/photo/{rel_path}  one photo: EXIF, tags, neighbours
+#   GET /api/tags              photo tags with counts
+#   GET /api/showcase          featured photos (the original endpoint)
+#   GET /api/shuffle           random photos
+#   GET /api/trip-weather      trip stop conditions (see the trip section)
+API_VERSION = 2
+API_MAX_LIMIT = 200
+API_VARY = "Accept-Language, Cookie"  # for the language-dependent payloads
+
+
+def _api_lang(request: Request, lang: str | None = None) -> str:
+    """An explicit `lang=` wins over the visitor's cookie/Accept-Language, so
+    an embedder can pin the language it wants without setting cookies."""
+    code = (lang or "").strip().lower()
+    return code if code in i18n.LANGS else _request_lang(request)
+
+
+def _api_limit(limit: int, default_max: int = API_MAX_LIMIT) -> int:
+    return max(1, min(default_max, limit))
+
+
+def _all_album_nodes() -> list[str]:
+    """Every album node including the intermediate folders that hold only
+    sub-folders — `images.album` alone lists just the ones with photos."""
+    nodes: set[str] = set()
+    for a in _distinct_albums():
+        parts = a.split("/")
+        for i in range(1, len(parts) + 1):
+            nodes.add("/".join(parts[:i]))
+    return sorted(nodes)
+
+
+def _album_exists(album: str) -> bool:
+    prefix = album + "/"
+    return db.conn().execute(
+        "SELECT 1 FROM images WHERE album = ? OR substr(album, 1, ?) = ? LIMIT 1",
+        (album, len(prefix), prefix),
+    ).fetchone() is not None
+
+
+def _resolve_album_path(album: str) -> str | None:
+    """Map an album path off the URL to a real indexed album, tolerating a
+    stripped showcase marker and different casing on any segment (so
+    `japan_2026/osaka` finds `_japan_2026/osaka`, mirroring what
+    _resolve_showcase_path does for photos). None when nothing matches."""
+    album = album.strip("/").replace("\\", "/")
+    if not album or ".." in album.split("/"):
+        return None
+    if _album_exists(album):
+        return album
+    key = _album_order_key(album)
+    return next((n for n in _all_album_nodes() if _album_order_key(n) == key), None)
+
+
+def _photo_rows(*, album: str | None = None, subtree: bool | None = None,
+                tag: str | None = None, q: str | None = None, featured: bool = False,
+                order_sql: str | None = None, random_order: bool = False,
+                limit: int | None = None, offset: int = 0):
+    """The one photo query behind /api/photos, /api/album and /api/showcase.
+    Returns (rows, total, scope) — `total` counts the whole match, not the
+    page. Filters compose; the tag/search ones use EXISTS rather than a JOIN
+    so a photo with several tags still comes back once (no DISTINCT needed,
+    which would fight the ORDER BY). `limit=None` fetches everything, which
+    is what the curated sort needs before it reorders in Python."""
+    where: list[str] = []
+    params: list = []
+    scope = {"album": album, "collection": False, "subtree": False}
+    if album:
+        _simple, where_join, scope_params, collection, wide = _photo_scope(album, subtree)
+        where.append(where_join)
+        params += list(scope_params)
+        scope.update(collection=collection, subtree=wide)
+    if featured:
+        where.append("i.is_showcase = 1")
+    if tag:
+        where.append("EXISTS (SELECT 1 FROM image_tags it JOIN tags t ON t.id = it.tag_id "
+                     "WHERE it.image_id = i.id AND t.name = ?)")
+        params.append(tag)
+    if q:
+        like = f"%{q}%"
+        where.append("(i.album LIKE ? OR i.filename LIKE ? OR EXISTS ("
+                     "SELECT 1 FROM image_tags it2 JOIN tags t2 ON t2.id = it2.tag_id "
+                     "WHERE it2.image_id = i.id AND t2.name LIKE ?))")
+        params += [like, like, like]
+    clause = ("WHERE " + " AND ".join(where)) if where else ""
+    c = db.conn()
+    total = c.execute(f"SELECT COUNT(*) AS n FROM images i {clause}", params).fetchone()["n"]
+    order = "RANDOM()" if random_order else _qualify_sort(
+        order_sql or SORT_IMAGE_SQL[SORT_IMAGE_DEFAULT])
+    rows = c.execute(
+        f"SELECT i.* FROM images i {clause} ORDER BY {order} LIMIT ? OFFSET ?",
+        params + [-1 if limit is None else limit, max(0, offset)],
+    ).fetchall()
+    return [dict(r) for r in rows], total, scope
+
+
+def _serialize_photos(rows: list[dict], base: str, with_tags: bool = False) -> list[dict]:
+    tag_map = _tags_for_images([r["id"] for r in rows if r.get("id")]) if with_tags else {}
+    return [_serialize_photo(r, base, tag_map.get(r.get("id"), []) if with_tags else None)
+            for r in rows]
+
+
+def _serialize_album(card: dict, base: str) -> dict:
+    """One album card as the API returns it — the same numbers the /albums
+    grid shows (recursive photo count, latest activity, cover from anywhere
+    in the subtree) plus the cfg flags a client needs to render it: whether
+    it is a showcase album and whether it is a collection."""
+    album = card["album"]
+    cfg = _album_config(album)
+    cover = card.get("cover")
+    return {
+        "album": album,
+        "name": card["name"],
+        "display_path": _pretty_rel(album),
+        "count": card["count"],
+        "latest": card["latest"],
+        "sub_count": card["sub_count"],
+        "is_showcase": _album_is_showcase(album, cfg),
+        "collection": _album_collection(album, cfg),
+        "tags": _album_tags(album, cfg),
+        "cover": {
+            "rel_path": cover,
+            "urls": {
+                "thumb": f"/thumb/{cover}",
+                "preview": f"/preview/{cover}",
+                "thumb_abs": f"{base}/thumb/{cover}",
+                "preview_abs": f"{base}/preview/{cover}",
+            },
+        } if cover else None,
+        "urls": {
+            "page": f"/album/{album}",
+            "api": f"/api/album/{album}",
+            "page_abs": f"{base}/album/{album}",
+            "api_abs": f"{base}/api/album/{album}",
+        },
+    }
+
+
+def _album_reel(album: str, cfg: dict[str, list[str]], limit: int = 8) -> tuple[str, list[dict]]:
+    """The album's hero slideshow (album.cfg `reel`), as (mode, rows).
+
+    `featured` (the default) shows featured photos from this album AND its
+    sub-albums, so a photo featured inside e.g. japan_2026/osaka surfaces on
+    the japan_2026 page too — a showcase ALBUM doesn't auto-promote its
+    contents, each photo opts in via album.cfg `featured` or the legacy `_`
+    prefix. The album's own `featured` list sets the order, exactly as
+    written; anything featured by sub-album cfgs or the marker follows
+    newest-first. `random` fills it from the subtree instead, `off` empties
+    it. Shared by the album page and /api/album."""
+    mode = (_cfg_first(cfg, "reel") or "").strip().lower()
+    if mode in _FALSE:
+        return "off", []
+    if mode in ("random", "shuffle"):
+        return "random", _random_subtree_rows(album, limit=limit)
+    # fetch wide before trimming so a date-based LIMIT can't cut off early
+    # entries of the configured list
+    rows = _showcase_rows(album=album, limit=100, random_order=False, subtree=True)
+    order_items = [i for i in cfg.get("featured", []) if i.strip().lower() not in ("*", "all")]
+    if order_items:
+        rows = _apply_curated_order(rows, _resolve_photo_refs(album, order_items))
+    return "featured", rows[:limit]
+
+
+@app.get("/api")
+def api_index(request: Request):
+    """What this API offers, so a client can discover it without the README."""
+    base = _public_base_url(request)
+    image_sorts = [SORT_CURATED] + list(SORT_IMAGE_SQL)
+    album_sorts = [SORT_CURATED] + list(SORT_ALBUM_SQL)
+    return _json_cors({
+        "name": app.title,
+        "version": API_VERSION,
+        "base_url": base,
+        "languages": list(i18n.LANGS),
+        "marker": SHOWCASE_MARKER,
+        "limits": {"max_limit": API_MAX_LIMIT},
+        "sorts": {"images": image_sorts, "albums": album_sorts},
+        "endpoints": [
+            {"path": "/api/stats", "about": "gallery-wide counters", "params": {}},
+            {"path": "/api/albums", "about": "album cards", "params": {
+                "parent": "album path; omit for the top level",
+                "sort": "|".join(album_sorts),
+                "depth": "1..4 — nest sub-albums as `children`",
+                "showcase": "1 = showcase albums only",
+                "limit": f"1..{API_MAX_LIMIT}",
+            }},
+            {"path": "/api/album/{album}", "about": "one album in full", "params": {
+                "images": "1 = include the photo grid",
+                "sort": "|".join(image_sorts),
+                "tag": "filter the grid by photo tag",
+                "subtree": "0|1 — override the album's collection scope",
+                "limit": f"1..{API_MAX_LIMIT}", "offset": "paging offset",
+                "lang": "|".join(i18n.LANGS),
+            }},
+            {"path": "/api/photos", "about": "photo query", "params": {
+                "album": "scope to an album (collection-aware)",
+                "subtree": "0|1 — override that scope",
+                "tag": "photo tag", "q": "search album / filename / tag",
+                "featured": "1 = featured photos only",
+                "sort": "|".join(SORT_IMAGE_SQL), "random": "1 = random order",
+                "tags": "1 = include each photo's tags",
+                "limit": f"1..{API_MAX_LIMIT}", "offset": "paging offset",
+            }},
+            {"path": "/api/photo/{rel_path}", "about": "one photo with EXIF + neighbours",
+             "params": {"col": "collection root the neighbours walk",
+                        "sort": "|".join(image_sorts),
+                        "neighbours": "0 = skip prev/next",
+                        "lang": "|".join(i18n.LANGS)}},
+            {"path": "/api/tags", "about": "photo tags with counts", "params": {
+                "album": "scope to an album (collection-aware)",
+                "subtree": "0|1 — override that scope",
+                "limit": f"1..{API_MAX_LIMIT}",
+            }},
+            {"path": "/api/showcase", "about": "featured photos", "params": {
+                "album": "scope to an album (collection-aware)",
+                "subtree": "0|1 — override that scope",
+                "random": "1 = random order", "limit": f"1..{API_MAX_LIMIT}",
+            }},
+            {"path": "/api/shuffle", "about": "random photos", "params": {
+                "album": "scope to an album (collection-aware)", "limit": "1..24",
+            }},
+            {"path": "/api/trip-weather", "about": "current conditions per trip stop",
+             "params": {"trip": "trip key (see an album's `trip`)"}},
+        ],
+    })
+
+
+@app.get("/api/stats")
+def api_stats(request: Request, lang: str | None = None):
+    """Gallery-wide counters — the numbers the welcome screen shows, plus the
+    totals that are only interesting to an API client."""
+    code = _api_lang(request, lang)
+    c = db.conn()
+    row = c.execute(
+        """SELECT COUNT(*) AS images, COALESCE(SUM(size), 0) AS bytes,
+                  COALESCE(SUM(is_showcase), 0) AS featured,
+                  MIN(taken_at) AS first, MAX(taken_at) AS last
+           FROM images"""
+    ).fetchone()
+    tags = c.execute("SELECT COUNT(*) AS n FROM tags").fetchone()["n"]
+    return _json_cors({
+        "images": row["images"],
+        "featured": row["featured"],
+        "albums": {
+            "top_level": len(_child_album_names(None)),
+            "total": len(_all_album_nodes()),
+            "showcase": len(_showcase_album_rows()),
+        },
+        "tags": tags,
+        "bytes": row["bytes"],
+        "bytes_h": _humanize_bytes(row["bytes"]),
+        "span": {
+            "from": row["first"],
+            "to": row["last"],
+            "label": i18n.date_span(code, row["first"], row["last"]) or None,
+        },
+        "marker": SHOWCASE_MARKER,
+        "lang": code,
+    }, vary=API_VARY)
+
+
+@app.get("/api/albums")
+def api_albums(request: Request, parent: str | None = None, sort: str | None = None,
+               depth: int = 1, showcase: bool | None = None, limit: int = API_MAX_LIMIT):
+    """Album cards: the top level by default, the children of `parent`
+    otherwise. `depth > 1` nests each card's own children under `children`,
+    so one request can pull a whole branch of the tree."""
+    base = _public_base_url(request)
+    root: str | None = None
+    if parent:
+        root = _resolve_album_path(parent)
+        if root is None:
+            raise HTTPException(404, "album not found")
+    has_curated = bool(_curated_album_positions())
+    allowed = set(SORT_ALBUM_SQL) | ({SORT_CURATED} if has_curated else set())
+    default_sort = _pick_sort(_cfg_first(_gallery_config(), "album_sort"), allowed, SORT_ALBUM_DEFAULT)
+    current_sort = _pick_sort(sort, allowed, default_sort)
+    depth = max(1, min(4, depth))
+    limit = _api_limit(limit)
+    all_albums = _distinct_albums()
+
+    def branch(node: str | None, level: int) -> list[dict]:
+        cards = [_album_card(n, all_albums) for n in _child_album_names(node, all_albums)]
+        cards = _sorted_album_cards(cards, current_sort)
+        out = []
+        for card in cards:
+            item = _serialize_album(card, base)
+            # ?showcase= splits the ★ rail from the archive grid, like /albums
+            if showcase is not None and level == 1 and item["is_showcase"] != bool(showcase):
+                continue
+            if level < depth and card["sub_count"]:
+                item["children"] = branch(card["album"], level + 1)
+            out.append(item)
+            if len(out) >= limit:
+                break
+        return out
+
+    albums = branch(root, 1)
+    payload = {
+        "count": len(albums),
+        "parent": root,
+        "sort": current_sort,
+        "default_sort": default_sort,
+        "depth": depth,
+        "albums": albums,
+    }
+    # `#group` markers in gallery.cfg album_order frame the curated top-level
+    # view into labeled sections; mirrored here so a client can rebuild it
+    if root is None and current_sort == SORT_CURATED:
+        sections = _curated_album_sections(
+            _sorted_album_cards(_top_level_album_cards(all_albums), SORT_CURATED))
+        payload["sections"] = [
+            {"label": s["label"], "albums": [_serialize_album(c, base) for c in s["cards"]]}
+            for s in sections
+        ]
+    return _json_cors(payload)
+
+
+@app.get("/api/album/{album:path}")
+def api_album(request: Request, album: str, images: bool = False, sort: str | None = None,
+              tag: str | None = None, subtree: bool | None = None, limit: int = API_MAX_LIMIT,
+              offset: int = 0, tags: bool = False, lang: str | None = None):
+    """One album in full: the same card as /api/albums plus everything its
+    page renders — description, stats block, album tags, hero reel, immediate
+    sub-albums, the photo tags available inside it and (with `images=1`) the
+    photo grid itself, in the album's own sort order.
+
+    The scope is the album's own: with `collection = true` in album.cfg both
+    the grid and the counters span the whole subtree, exactly like the page.
+    `scope` in the response spells out which it was."""
+    resolved = _resolve_album_path(album)
+    if resolved is None:
+        raise HTTPException(404, "album not found")
+    album = resolved
+    _refresh_featured_on_cfg_change(album)
+    cfg = _album_config(album)
+    code = _api_lang(request, lang)
+    base = _public_base_url(request)
+
+    curated_order = _curated_photo_order(album, cfg)
+    allowed = set(SORT_IMAGE_SQL) | ({SORT_CURATED} if curated_order else set())
+    default_sort = _pick_sort(_cfg_first(cfg, "sort"), allowed, SORT_IMAGE_DEFAULT)
+    current_sort = _pick_sort(sort, allowed, default_sort)
+    base_sort = SORT_IMAGE_DEFAULT if current_sort == SORT_CURATED else current_sort
+
+    where_simple, where_join, scope_params, collection, wide = _photo_scope(album, subtree)
+    c = db.conn()
+    reel_mode, reel_rows = _album_reel(album, cfg)
+    sub_albums = _sorted_album_cards([_album_card(n) for n in _child_album_names(album)], "name_asc")
+    photo_tags = [r["name"] for r in c.execute(
+        f"""SELECT DISTINCT t.name FROM tags t
+           JOIN image_tags it ON it.tag_id = t.id
+           JOIN images i ON i.id = it.image_id
+           WHERE {where_join} ORDER BY t.name""",
+        scope_params,
+    ).fetchall()]
+    # stats describe the album, so they are computed over its whole photo set
+    # and never over a ?tag= filtered view (same rule as the page)
+    stat_src = [dict(r) for r in c.execute(
+        f"SELECT size, width, height, taken_at, exif_json FROM images WHERE {where_simple}",
+        scope_params,
+    ).fetchall()]
+    font_css = _album_font_css_url(album)
+    effect = (_cfg_first(cfg, "effect") or "").strip().lower()
+
+    payload = {
+        "album": _serialize_album(_album_card(album), base),
+        "breadcrumbs": _album_breadcrumbs(album),
+        "scope": {"album": album, "collection": collection, "subtree": wide},
+        "description": {"html": _album_description(album, code), "lang": code},
+        "stats": _album_stats(stat_src, cfg, code),
+        "effect": effect if effect in ALBUM_EFFECTS else None,
+        "font": {"css": font_css, "scale": _album_font_scale(album),
+                 "preload": _album_font_preload(album)} if font_css else None,
+        "trip": _trip_for_album(album, code),
+        "reel": {"mode": reel_mode, "items": _serialize_photos(reel_rows, base)},
+        "sub_albums": [_serialize_album(s, base) for s in sub_albums],
+        "photo_tags": photo_tags,
+        "sort": {
+            "current": current_sort,
+            "default": default_sort,
+            "options": _image_sort_options_for_template(current_sort, bool(curated_order), code),
+        },
+        "lang": code,
+    }
+    if images:
+        limit = _api_limit(limit)
+        rows, total, _scope = _photo_rows(
+            album=album, subtree=subtree, tag=tag,
+            order_sql=SORT_IMAGE_SQL[base_sort],
+            limit=None if current_sort == SORT_CURATED else limit,
+            offset=0 if current_sort == SORT_CURATED else offset,
+        )
+        if current_sort == SORT_CURATED:
+            # curated order is a cfg list, not SQL — reorder the full set, then page
+            rows = _apply_curated_order(rows, curated_order)[max(0, offset):max(0, offset) + limit]
+        payload["images"] = {
+            "total": total,
+            "count": len(rows),
+            "limit": limit,
+            "offset": max(0, offset),
+            "tag": tag,
+            "items": _serialize_photos(rows, base, with_tags=tags),
+        }
+    else:
+        payload["images"] = {"total": _photo_rows(album=album, subtree=subtree, tag=tag, limit=0)[1]}
+    return _json_cors(payload, vary=API_VARY)
+
+
+@app.get("/api/photos")
+def api_photos(request: Request, album: str | None = None, subtree: bool | None = None,
+               tag: str | None = None, q: str | None = None, featured: bool = False,
+               sort: str | None = None, random: bool = False, tags: bool = False,
+               limit: int = 50, offset: int = 0):
+    """Photos across the gallery or inside one album, with the filters the UI
+    offers (tag, search, featured) and offset paging. An `album` that is a
+    collection is scoped to its whole subtree — `scope` in the response says
+    so, and `subtree=0` forces the plain folder scope."""
+    if album:
+        resolved = _resolve_album_path(album)
+        if resolved is None:
+            raise HTTPException(404, "album not found")
+        album = resolved
+    current_sort = _pick_sort(sort, SORT_IMAGE_SQL, SORT_IMAGE_DEFAULT)
+    limit = _api_limit(limit)
+    rows, total, scope = _photo_rows(
+        album=album, subtree=subtree, tag=tag, q=(q or "").strip() or None,
+        featured=featured, order_sql=SORT_IMAGE_SQL[current_sort],
+        random_order=bool(random), limit=limit, offset=offset,
+    )
+    base = _public_base_url(request)
+    return _json_cors({
+        "count": len(rows),
+        "total": total,
+        "limit": limit,
+        "offset": max(0, offset),
+        "sort": "random" if random else current_sort,
+        "scope": scope,
+        "filters": {"tag": tag, "q": (q or "").strip() or None, "featured": bool(featured)},
+        "items": _serialize_photos(rows, base, with_tags=tags),
+    })
+
+
+@app.get("/api/photo/{rel_path:path}")
+def api_photo(request: Request, rel_path: str, col: str | None = None,
+              sort: str | None = None, neighbours: bool = True, lang: str | None = None):
+    """One photo with everything its page shows: dimensions, EXIF (formatted
+    for the active language and raw), the embedded description, its tags, and
+    the prev/next neighbours in the order the grid would walk them.
+
+    Neighbours are scoped to the photo's own folder unless `col=<album>` names
+    a collection root above it — then they span that collection, matching what
+    the single-image view does when you enter it from a collection album."""
+    raw = rel_path.strip("/")
+    if "/" not in raw:
+        raise HTTPException(404, "image not found")
+    album, _, filename = raw.rpartition("/")
+    album, filename = _resolve_showcase_path(album, filename)
+    rel = _safe_rel(album, filename).as_posix()
+    c = db.conn()
+    row = c.execute("SELECT * FROM images WHERE rel_path = ?", (rel,)).fetchone()
+    if not row:
+        raise HTTPException(404, "image not found")
+    row = dict(row)
+    code = _api_lang(request, lang)
+    base = _public_base_url(request)
+    exif = json.loads(row["exif_json"]) if row["exif_json"] else {}
+    if HIDE_GPS:
+        exif.pop("GPSInfo", None)
+    photo_tags = _tags_for_images([row["id"]]).get(row["id"], [])
+    item = _serialize_photo(row, base, photo_tags)
+    item.update({
+        "breadcrumbs": _album_breadcrumbs(row["album"]),
+        "description": _extract_description(exif),
+        "exif": [{"key": k, "val": v} for k, v in _prettify_exif(exif, code)],
+        # already plain JSON types — the column stores it as JSON (scanner.py)
+        "exif_raw": exif,
+        "album_url": {"page": f"/album/{row['album']}", "api": f"/api/album/{row['album']}"},
+        "lang": code,
+    })
+
+    col_root = (col or "").strip("/")
+    scope_album = row["album"]
+    if (col_root and (scope_album == col_root or scope_album.startswith(col_root + "/"))
+            and _album_collection(col_root)):
+        scope_album = col_root
+    else:
+        col_root = ""
+    if neighbours:
+        cfg = _album_config(scope_album)
+        curated_order = _curated_photo_order(scope_album, cfg)
+        allowed = set(SORT_IMAGE_SQL) | ({SORT_CURATED} if curated_order else set())
+        default_sort = _pick_sort(_cfg_first(cfg, "sort"), allowed, SORT_IMAGE_DEFAULT)
+        current_sort = _pick_sort(sort, allowed, default_sort)
+        base_sort = SORT_IMAGE_DEFAULT if current_sort == SORT_CURATED else current_sort
+        # the neighbour walk has to mirror the grid exactly, so it uses the
+        # same scope (collection root or own folder) and the same order
+        rows, _total, _scope = _photo_rows(
+            album=scope_album, subtree=True if col_root else None,
+            order_sql=SORT_IMAGE_SQL[base_sort], limit=None,
+        )
+        rel_list = [r["rel_path"] for r in rows]
+        if current_sort == SORT_CURATED:
+            pos = {r: i for i, r in enumerate(curated_order)}
+            rel_list.sort(key=lambda r: pos.get(r, len(pos)))
+        idx = rel_list.index(rel) if rel in rel_list else -1
+        item["neighbours"] = {
+            "scope": {"album": scope_album, "collection_root": col_root or None,
+                      "count": len(rel_list)},
+            "sort": current_sort,
+            "index": idx,
+            "prev": rel_list[idx - 1] if idx > 0 else None,
+            "next": rel_list[idx + 1] if 0 <= idx < len(rel_list) - 1 else None,
+        }
+    return _json_cors(item, vary=API_VARY)
+
+
+@app.get("/api/tags")
+def api_tags(request: Request, album: str | None = None, subtree: bool | None = None,
+             limit: int = API_MAX_LIMIT):
+    """Photo tags (the `.tags` sidecar ones that drive the ?tag= filter) with
+    how many photos carry each, most-used first. Scoped to an album — again
+    collection-aware — when `album` is given. An album's own display tags are
+    a different thing and live on /api/album."""
+    where, params = "", []
+    scope = {"album": None, "collection": False, "subtree": False}
+    if album:
+        resolved = _resolve_album_path(album)
+        if resolved is None:
+            raise HTTPException(404, "album not found")
+        _simple, where_join, scope_params, collection, wide = _photo_scope(resolved, subtree)
+        where = f"WHERE {where_join}"
+        params = list(scope_params)
+        scope = {"album": resolved, "collection": collection, "subtree": wide}
+    limit = _api_limit(limit)
+    rows = db.conn().execute(
+        f"""SELECT t.name AS name, COUNT(*) AS count FROM tags t
+           JOIN image_tags it ON it.tag_id = t.id
+           JOIN images i ON i.id = it.image_id
+           {where}
+           GROUP BY t.name ORDER BY count DESC, t.name ASC LIMIT ?""",
+        params + [limit],
+    ).fetchall()
+    return _json_cors({
+        "count": len(rows),
+        "scope": scope,
+        "items": [{"name": r["name"], "count": r["count"]} for r in rows],
+    })
+
+
 @app.get("/api/showcase")
-def api_showcase(request: Request, limit: int = 50, album: str | None = None, random: bool = False):
+def api_showcase(request: Request, limit: int = 50, album: str | None = None,
+                 random: bool = False, subtree: bool | None = None, tags: bool = False):
     """
     Returns showcased photos as JSON. CORS-enabled for cross-origin embedding.
 
     Query params:
-      limit:  max number of items, 1..200 (default 50)
-      album:  optional album-name filter
-      random: pass `?random=1` to randomise order; default is newest-first
+      limit:   max number of items, 1..200 (default 50)
+      album:   optional album filter — a `collection = true` album covers its
+               whole subtree, just as its page does
+      subtree: 0|1 to force the scope regardless of the album's collection flag
+      random:  pass `?random=1` to randomise order; default is newest-first
+      tags:    pass `?tags=1` to include each photo's tags
     """
-    limit = max(1, min(200, limit))
-    rows = _showcase_rows(album=album, limit=limit, random_order=bool(random))
+    if album:
+        resolved = _resolve_album_path(album)
+        if resolved is None:
+            raise HTTPException(404, "album not found")
+        album = resolved
+    limit = _api_limit(limit)
+    rows, total, scope = _photo_rows(
+        album=album, subtree=subtree, featured=True,
+        random_order=bool(random), limit=limit,
+    )
     base = _public_base_url(request)
-    items = [_serialize_showcase_item(r, base) for r in rows]
+    items = _serialize_photos(rows, base, with_tags=tags)
     return _json_cors(
         {
             "count": len(items),
+            "total": total,
             "marker": SHOWCASE_MARKER,
+            "scope": scope,
             "items": items,
         }
     )
 
 
-@app.options("/api/showcase")
-def api_showcase_options():
-    # CORS pre-flight (most simple GETs don't trigger this but be polite)
-    return _json_cors({})
-
-
 @app.get("/api/shuffle")
-def api_shuffle(limit: int = 8):
-    limit = max(1, min(24, limit))
-    c = db.conn()
-    rows = c.execute(
-        "SELECT album, filename, rel_path FROM images ORDER BY RANDOM() LIMIT ?",
-        (limit,),
-    ).fetchall()
-    return [dict(r) for r in rows]
+def api_shuffle(request: Request, limit: int = 8, album: str | None = None,
+                subtree: bool | None = None):
+    """Random photos. Returns a bare array — the welcome hero's ⟳ TUNE button
+    reads it directly (see app.js), so the shape stays as it is."""
+    limit = _api_limit(limit, 24)
+    if album:
+        resolved = _resolve_album_path(album)
+        if resolved is None:
+            raise HTTPException(404, "album not found")
+        album = resolved
+    rows, _total, _scope = _photo_rows(album=album, subtree=subtree,
+                                       random_order=True, limit=limit)
+    base = _public_base_url(request)
+    # no-store: a cached "random" is not random (the ⟳ TUNE button re-asks)
+    return _json_cors(_serialize_photos(rows, base), max_age=0)
+
+
+@app.options("/api/{rest:path}")
+def api_options(rest: str):
+    # CORS pre-flight (most simple GETs don't trigger this, but be polite)
+    return _json_cors({})
 
 
 @app.get("/album/{album:path}", response_class=HTMLResponse)
@@ -1613,24 +2279,13 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     # curated is reordered in Python below; SQL runs with the date default
     base_sort = SORT_IMAGE_DEFAULT if current_sort == SORT_CURATED else current_sort
     # qualify column names so the JOIN query below isn't ambiguous
-    qualified_sql = SORT_IMAGE_SQL[base_sort].replace("filename", "i.filename")
-    qualified_sql = qualified_sql.replace("taken_at", "i.taken_at")
-    qualified_sql = qualified_sql.replace("mtime", "i.mtime")
-    qualified_sql = qualified_sql.replace("size", "i.size")
+    qualified_sql = _qualify_sort(SORT_IMAGE_SQL[base_sort])
     c = db.conn()
     # Collection mode (album.cfg `collection = true`): the grid shows every
     # photo in this album's whole subtree (its own + all sub-folders) as one
     # flat set, instead of only the photos sitting directly in this folder.
-    collection = _cfg_bool(_cfg_first(album_cfg, "collection"))
-    if collection:
-        prefix = album + "/"
-        where_simple = "(album = ? OR substr(album, 1, ?) = ?)"
-        where_join = "(i.album = ? OR substr(i.album, 1, ?) = ?)"
-        scope_params: tuple = (album, len(prefix), prefix)
-    else:
-        where_simple = "album = ?"
-        where_join = "i.album = ?"
-        scope_params = (album,)
+    # /api/album + /api/photos resolve the same scope through _photo_scope.
+    where_simple, where_join, scope_params, collection, _wide = _photo_scope(album)
     if tag:
         rows = c.execute(
             f"""SELECT i.* FROM images i
@@ -1672,33 +2327,9 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     # Showcase status now comes from album.cfg (`showcase = …`), with the
     # legacy `_` folder-name marker as a fallback.
     album_is_showcase = _album_is_showcase(album)
-    # Hero reel (album.cfg `reel`, like the welcome feed): default/featured
-    # shows featured photos from this album AND its sub-albums (subtree), so
-    # photos featured inside e.g. japan_2026/osaka surface on the japan_2026
-    # page too — a showcase ALBUM doesn't auto-promote its contents, each
-    # photo opts in via album.cfg `featured` or the legacy `_` prefix.
-    # `reel = random` fills it with random subtree photos instead, and
-    # `reel = off` hides the slideshow entirely.
-    reel_mode = (_cfg_first(album_cfg, "reel") or "").strip().lower()
-    if reel_mode in _FALSE:
-        featured = []
-        reel_mode = "off"
-    elif reel_mode in ("random", "shuffle"):
-        featured = _random_subtree_rows(album, limit=8)
-        reel_mode = "random"
-    else:
-        # The reel follows the album.cfg `featured` list order: photos from
-        # this album's own list come first, exactly as written; anything
-        # featured by sub-album cfgs or the legacy marker follows newest-
-        # first. Fetch wide before trimming so a date-based LIMIT can't cut
-        # off early list entries.
-        featured = _showcase_rows(album=album, limit=100, random_order=False, subtree=True)
-        order_items = [i for i in album_cfg.get("featured", [])
-                       if i.strip().lower() not in ("*", "all")]
-        if order_items:
-            featured = _apply_curated_order(featured, _resolve_photo_refs(album, order_items))
-        featured = featured[:8]
-        reel_mode = "featured"
+    # Hero reel (album.cfg `reel`, like the welcome feed) — see _album_reel,
+    # which /api/album serves from as well.
+    reel_mode, featured = _album_reel(album, album_cfg)
     lang = _request_lang(request)
     sort_options = _image_sort_options_for_template(current_sort, curated=bool(curated_order),
                                                     lang=lang)
@@ -1783,7 +2414,7 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
     if (
         col_root
         and (album == col_root or album.startswith(col_root + "/"))
-        and _cfg_bool(_cfg_first(_album_config(col_root), "collection"))
+        and _album_collection(col_root)
     ):
         prefix = col_root + "/"
         where_scope = "(album = ? OR substr(album, 1, ?) = ?)"
@@ -2009,10 +2640,7 @@ def search(request: Request, q: str = "", sort: str | None = None):
     if not q:
         return RedirectResponse("/albums")
     current_sort = _pick_sort(sort, SORT_IMAGE_SQL, SORT_IMAGE_DEFAULT)
-    qualified_sql = SORT_IMAGE_SQL[current_sort].replace("filename", "i.filename")
-    qualified_sql = qualified_sql.replace("taken_at", "i.taken_at")
-    qualified_sql = qualified_sql.replace("mtime", "i.mtime")
-    qualified_sql = qualified_sql.replace("size", "i.size")
+    qualified_sql = _qualify_sort(SORT_IMAGE_SQL[current_sort])
     like = f"%{q}%"
     rows = c.execute(
         f"""SELECT DISTINCT i.* FROM images i
