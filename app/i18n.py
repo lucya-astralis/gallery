@@ -45,6 +45,8 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "foot.operator": ("Operator", "Operator", "オペレーター"),
     "foot.about": ("lucya / about me ↗", "lucya / über mich ↗", "lucya / 私について ↗"),
     "foot.privacy": ("Privacy", "Datenschutz", "プライバシー"),
+    # same page as the privacy notice — lucya.sh/privacy carries both
+    "foot.imprint": ("Imprint", "Impressum", "運営者情報"),
 
     # ---- breadcrumbs / pathbar ---------------------------------------
     "crumb.home": ("HOME", "START", "ホーム"),
