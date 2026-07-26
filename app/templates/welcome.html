@@ -67,8 +67,8 @@
           <span class="jp vf__slug-sub">ギャラリー</span>
         </div>
         {# head/tail are scrambled separately (the scrambler flattens its
-           target's innerHTML — one wrapper would wipe the dot + tail spans) #}
-        <h1 class="vf__title"><span class="vf__title-head">LUCYA</span><span class="vf__title-dot">.</span><wbr><span class="vf__title-tail">GALLERY</span></h1>
+           target's innerHTML — one wrapper would wipe the tail span) #}
+        <h1 class="vf__title"><span class="vf__title-head">LUCYA</span> <span class="vf__title-tail">GALLERY</span></h1>
         <p class="vf__lead">{{ t('welcome.lead') }}</p>
         <div class="vf__actions">
           <a href="/albums" class="btn-link btn-link--primary">{{ t('welcome.browse') }}</a>
@@ -107,7 +107,7 @@
     </div>
     <div class="vf__empty">
       <span class="vf__rec vf__rec--off"><i aria-hidden="true"></i>NO SIGNAL</span>
-      <h1 class="vf__title"><span class="vf__title-head">LUCYA</span><span class="vf__title-dot">.</span><wbr><span class="vf__title-tail">GALLERY</span></h1>
+      <h1 class="vf__title"><span class="vf__title-head">LUCYA</span> <span class="vf__title-tail">GALLERY</span></h1>
       <div class="empty">
         <span class="stamp">NO INDEX</span>
         <p>{{ t('welcome.no_images') }}</p>
@@ -142,7 +142,6 @@
         </div>
       {% endif %}
     </div>
-    <span class="stamp stamp--ok vf-band__stamp">ONLINE</span>
   </div>
 </section>
 

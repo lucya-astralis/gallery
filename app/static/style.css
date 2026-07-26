@@ -2995,11 +2995,10 @@ body.page-welcome{ --page-max: 2400px; }
   text-shadow:
     0 2px 26px rgba(0,0,0,.7),
     0 0 30px rgba(91,138,255,.25);
-  /* no word-break here: the <wbr> after the dot is the ONLY soft break
-     point, so whenever the title wraps it wraps at the "." — never
+  /* no word-break here: the space between LUCYA and GALLERY is the ONLY
+     soft break point, so whenever the title wraps it wraps there — never
      mid-word ("GALLER/Y"). Mobile stacks it there unconditionally. */
 }
-.vf__title-dot{ color:var(--acc-cy); }
 .vf__lead{
   margin:0;
   color:rgba(228,231,250,.82);
@@ -3260,7 +3259,6 @@ body.page-welcome{ --page-max: 2400px; }
   align-self:stretch;
   background:linear-gradient(180deg, transparent, var(--line-strong) 25%, var(--line-strong) 75%, transparent);
 }
-.vf-band__stamp{ flex-shrink:0; }
 
 /* ---- showcase albums section below the band ---- */
 .showcase-page{ padding-top:34px; }
@@ -3288,8 +3286,8 @@ body.page-welcome{ --page-max: 2400px; }
   .vf .doc-min-hide,
   .vf-band .doc-min-hide{ display:none; }
   .vf__body{ bottom:50px; padding-bottom:20px; }
-  /* stacked title: always break at the dot on small screens — two short
-     lines allow much larger type than one squeezed line */
+  /* stacked title: always break between the words on small screens — two
+     short lines allow much larger type than one squeezed line */
   .vf__title{ letter-spacing:.02em; font-size:clamp(30px, 9.5vw, 52px); }
   .vf__title-tail{ display:block; }
   .vf__lead{ font-size:13.5px; }
@@ -3301,7 +3299,6 @@ body.page-welcome{ --page-max: 2400px; }
   .vf-band__inner{ padding:14px var(--page-pad); min-height:0; gap:16px; }
   .vf-band__cells{ margin-left:0; width:100%; justify-content:space-between; gap:14px; }
   .vf-band__divider{ display:none; }
-  .vf-band__stamp{ display:none; }
   .showcase-page{ padding-top:26px; }
 }
 
