@@ -1439,8 +1439,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-map-pref]').forEach((p) => { mapPref[p.dataset.mapPref] = p; });
   const mapSegs = Array.from(document.querySelectorAll('[data-map-seg]'));
 
-  // JST wall clock in the top bar (Japan has a single, DST-free zone).
+  // JST wall clock in the top bar (Japan has a single, DST-free zone). The
+  // place label and the zone code are static markup — only the digits are
+  // rewritten here; the whole readout hides when Intl can't do Asia/Tokyo.
   const clockEl = root.querySelector('[data-trip-clock]');
+  const clockTimeEl = root.querySelector('[data-trip-time]');
   let jstFmt = null;
   try {
     jstFmt = new Intl.DateTimeFormat('en-GB', {
@@ -1534,7 +1537,7 @@ document.addEventListener('DOMContentLoaded', () => {
       seg.classList.toggle('is-next', next);
     });
 
-    if (jstFmt && clockEl) clockEl.textContent = 'JST ' + jstFmt.format(now);
+    if (jstFmt && clockTimeEl) clockTimeEl.textContent = jstFmt.format(now);
 
     // phase + headline countdown (label is localized; the status stamp is
     // HUD chrome and stays English in every language)
@@ -1577,17 +1580,19 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   const tripKey = root.dataset.tripKey;
   if (tripKey && window.fetch && Object.keys(wxByCity).length) {
-    // WMO weather_code buckets -> [glyph, label]; ☀/☾ pick by is_day
+    // WMO weather_code buckets -> [glyph, label, kind]; ☀/☾ pick by is_day.
+    // `kind` lands on the chip as data-wx-kind and only tints the glyph
+    // (style.css) — sun amber, night violet, rain blue, snow ice, …
     const wmo = (code, isDay) => {
-      if (code <= 1) return [isDay ? '☀︎' : '☾︎', code === 0 ? 'Clear' : 'Mostly clear'];
-      if (code <= 3) return ['☁︎', code === 2 ? 'Partly cloudy' : 'Overcast'];
-      if (code <= 48) return ['≡', 'Fog'];
-      if (code <= 57) return ['☂︎', 'Drizzle'];
-      if (code <= 67) return ['☂︎', 'Rain'];
-      if (code <= 77) return ['❄︎', 'Snow'];
-      if (code <= 82) return ['☂︎', 'Rain showers'];
-      if (code <= 86) return ['❄︎', 'Snow showers'];
-      return ['⚡︎', 'Thunderstorm'];
+      if (code <= 1) return [isDay ? '☀︎' : '☾︎', code === 0 ? 'Clear' : 'Mostly clear', isDay ? 'sun' : 'night'];
+      if (code <= 3) return ['☁︎', code === 2 ? 'Partly cloudy' : 'Overcast', 'cloud'];
+      if (code <= 48) return ['≡', 'Fog', 'fog'];
+      if (code <= 57) return ['☂︎', 'Drizzle', 'rain'];
+      if (code <= 67) return ['☂︎', 'Rain', 'rain'];
+      if (code <= 77) return ['❄︎', 'Snow', 'snow'];
+      if (code <= 82) return ['☂︎', 'Rain showers', 'rain'];
+      if (code <= 86) return ['❄︎', 'Snow showers', 'snow'];
+      return ['⚡︎', 'Thunderstorm', 'storm'];
     };
     fetch('/api/trip-weather?trip=' + encodeURIComponent(tripKey), { credentials: 'omit' })
       .then((r) => (r.ok ? r.json() : null))
@@ -1599,12 +1604,25 @@ document.addEventListener('DOMContentLoaded', () => {
           const ico = el.querySelector('[data-wx-ico]');
           const temp = el.querySelector('[data-wx-temp]');
           const cond = el.querySelector('[data-wx-cond]');
+          const range = el.querySelector('[data-wx-range]');
           if (!ico || !temp) return;
-          const [glyph, label] = wmo(w.code, w.is_day);
+          const [glyph, label, kind] = wmo(w.code, w.is_day);
           ico.textContent = glyph;
           temp.textContent = Math.round(w.temp) + '°';
           if (cond) cond.textContent = label.toUpperCase();
-          el.title = label + ' · weather: open-meteo.com';
+          el.dataset.wxKind = kind;
+          // today's envelope is a bonus — the row stays hidden when the
+          // upstream payload carries no daily block
+          let tip = label;
+          if (range) {
+            const hasRange = typeof w.hi === 'number' && typeof w.lo === 'number';
+            if (hasRange) {
+              range.textContent = '↑' + w.hi + '° ↓' + w.lo + '°';
+              tip += ' · today ' + w.lo + '–' + w.hi + '°';
+            }
+            range.hidden = !hasRange;
+          }
+          el.title = tip + ' · weather: open-meteo.com';
           el.hidden = false;
         });
       })

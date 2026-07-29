@@ -550,7 +550,7 @@ All GET, all public:
 - `GET /search?q=…` — search (`?sort=`)
 - `GET /lang/{en|de|jp}?next=…` — set the language cookie, 303 back to `next` (relative paths only)
 - `GET /api` + `/api/stats` + `/api/albums` + `/api/album/{album}` + `/api/photos` + `/api/photo/{rel_path}` + `/api/tags` + `/api/showcase` + `/api/shuffle` — the JSON API, CORS-enabled (see [API](#api))
-- `GET /api/trip-weather?trip=…` — current conditions per trip stop, served as a same-origin proxy to [Open-Meteo](https://open-meteo.com/) (weather data CC BY 4.0). Server-side cache (15 min); the visitor's browser never contacts a third party, so no cookies and no consent banner are involved.
+- `GET /api/trip-weather?trip=…` — current conditions per trip stop plus today's high/low, served as a same-origin proxy to [Open-Meteo](https://open-meteo.com/) (weather data CC BY 4.0). Server-side cache (15 min); the visitor's browser never contacts a third party, so no cookies and no consent banner are involved.
 
 ## Local development (without Docker)
 

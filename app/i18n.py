@@ -166,6 +166,8 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "trip.tag": ("▸ TRIP", "▸ REISE", "▸ 旅"),
     "trip.status_aria": ("{title} — trip status", "{title} — Reisestatus", "{title} — 旅の状況"),
     "trip.jst_title": ("Local time in Japan", "Ortszeit in Japan", "日本の現地時間"),
+    # visible prefix on the live clock, so "16:20 JST" reads as a place
+    "trip.jst_label": ("Japan time", "Japan-Zeit", "日本時間"),
     "trip.departs_in": ("Departs in", "Abflug in", "出発まで"),
     "trip.days": ("Days", "Tage", "日"),
     "trip.hrs": ("Hrs", "Std", "時間"),

@@ -1132,24 +1132,39 @@ def _fetch_trip_weather(cfg: dict) -> dict:
         "https://api.open-meteo.com/v1/forecast"
         "?latitude=" + ",".join(str(s["lat"]) for s in stops) +
         "&longitude=" + ",".join(str(s["lon"]) for s in stops) +
-        "&current=temperature_2m,weather_code,is_day&timezone=Asia%2FTokyo"
+        "&current=temperature_2m,weather_code,is_day"
+        # today's envelope, so the widget can show a hi/lo next to "now"
+        "&daily=temperature_2m_max,temperature_2m_min&forecast_days=1"
+        "&timezone=Asia%2FTokyo"
     )
     req = urllib.request.Request(url, headers={"User-Agent": "lucya.systems-gallery"})
     with urllib.request.urlopen(req, timeout=8) as resp:
         payload = json.load(resp)
     if isinstance(payload, dict):  # single-location responses aren't wrapped
         payload = [payload]
+    def _first(daily: dict, key: str):
+        """Today's value from a `daily` block — absent/short arrays are fine
+        (hi/lo is a bonus line in the widget, never a hard requirement)."""
+        vals = (daily or {}).get(key) or []
+        try:
+            return round(float(vals[0]))
+        except (IndexError, TypeError, ValueError):
+            return None
+
     out = []
     for s, loc in zip(stops, payload):
         cur = (loc or {}).get("current") or {}
         temp, code = cur.get("temperature_2m"), cur.get("weather_code")
         if temp is None or code is None:
             continue
+        daily = (loc or {}).get("daily") or {}
         out.append({
             "city": s["city"],  # English key, matches data-city / data-stop-wx lookup
             "temp": float(temp),
             "code": int(code),
             "is_day": int(cur.get("is_day") or 0),
+            "hi": _first(daily, "temperature_2m_max"),
+            "lo": _first(daily, "temperature_2m_min"),
         })
     return {"updated": int(time.time()), "stops": out}
 
