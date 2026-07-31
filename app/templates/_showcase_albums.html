@@ -2,8 +2,8 @@
    /albums and the welcome screen. The section wrapper + header live in the
    including page so each can add its own context/links.
    Expects `showcase_albums`: rows of {album, name, count, latest, cover,
-   sub_count}. Set `feat_eager = N` before including to eager-load the first
-   N covers (used on /albums where the rail is above the fold). #}
+   icon, sub_count}. Set `feat_eager = N` before including to eager-load the
+   first N covers (used on /albums where the rail is above the fold). #}
 <ul class="feat__rail">
   {% for a in showcase_albums %}
     <li class="feat-card">
@@ -17,7 +17,7 @@
           {% endif %}
           <span class="feat-card__idx" aria-hidden="true">S/{{ '%02d' | format(loop.index) }}</span>
           <div class="feat-card__cap">
-            <span class="feat-card__name">{{ a.name }}</span>
+            <span class="feat-card__name">{% if a.icon %}<img class="album-ico album-ico--lg" src="{{ a.icon }}" alt="" aria-hidden="true" width="20" height="20" loading="lazy">{% endif %}{{ a.name }}</span>
             <span class="feat-card__meta">
               {{ a.count }} {% if a.count == 1 %}{{ t('unit.image') }}{% else %}{{ t('unit.images') }}{% endif %}{% if a.sub_count %} · {{ a.sub_count }} {% if a.sub_count != 1 %}{{ t('unit.dirs') }}{% else %}{{ t('unit.dir') }}{% endif %}{% endif %}{% if month_label(a.latest) %} · {{ month_label(a.latest) }}{% endif %}
             </span>

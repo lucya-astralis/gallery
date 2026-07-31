@@ -337,6 +337,8 @@ def _album_card(album: str, all_albums: list[str] | None = None) -> dict:
         "count": agg["count"] if agg else 0,
         "latest": agg["latest"] if agg else None,
         "cover": cover_rel,
+        # album.cfg `icon = …`, the album's own mark (None when it sets none)
+        "icon": _album_icon_url(album),
         "sub_count": len(_child_album_names(album, all_albums)),
     }
 
@@ -430,15 +432,18 @@ def _curated_album_sections(cards: list[dict]) -> list[dict]:
 
 
 def _album_breadcrumbs(album: str) -> list[dict]:
-    """[{name, path}, ...] for each ancestor segment of an album path, so
-    templates can render HOME / ALBUMS / japan / tokyo with linkable parts."""
+    """[{name, path, icon}, ...] for each ancestor segment of an album path,
+    so templates can render HOME / ALBUMS / japan / tokyo with linkable
+    parts. `icon` is that segment's album.cfg mark, or None."""
     acc: list[str] = []
     out: list[dict] = []
     for seg in album.split("/"):
         if not seg:
             continue
         acc.append(seg)
-        out.append({"name": _display_name(seg), "path": "/".join(acc)})
+        path = "/".join(acc)
+        out.append({"name": _display_name(seg), "path": path,
+                    "icon": _album_icon_url(path)})
     return out
 
 
@@ -496,6 +501,7 @@ def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
 #   photos/japan_2026/.album/album.cfg          <- settings (keys below)
 #   photos/japan_2026/.album/album_en.md        <- description, per language
 #   photos/japan_2026/.album/MusashiBrush.otf   <- `font = …` title face
+#   photos/japan_2026/.album/icon.svg           <- `icon = …` album mark
 #
 # This is the only place looked at — a cfg or description left in the photo
 # folder itself is ignored. gallery.cfg is NOT part of this: it configures
@@ -518,6 +524,9 @@ def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
 #                           what the ?tag= grid filter reads.
 #   effect = sakura      -> ambient effect layer on this album's page
 #                           (whitelisted in ALBUM_EFFECTS; see initAlbumFx).
+#   icon = mark.svg      -> the album's own mark, shown wherever the album is
+#                           named; the file sits next to the cfg in `.album/`
+#                           (see the per-album icon section further down).
 #   font = Musashi.otf   -> display face for the album's hero title; the file
 #                           sits next to the cfg in `.album/` (see the
 #                           per-album title font section further down).
@@ -917,6 +926,70 @@ def _album_font_preload(album: str) -> dict | None:
     }
 
 
+# ----- per-album icon (album.cfg `icon = ...`) --------------------------
+# Any album can carry a small mark of its own — a civic emblem, a crest, a
+# logo — rendered wherever the album is named: its card in the grids, the
+# hero title, the breadcrumb, and the city stops of the trip timeline. That
+# last one is where this started, as three hard-coded SVGs under
+# /static/emblems; the mark now belongs to the album instead, so every
+# album gets one for free and the timeline simply reads its stops' albums.
+#
+# Same shape as the title font: drop the file into the album's `.album/`
+# folder, name it in album.cfg
+#   icon = osaka.svg
+# and /album-icon/{album} serves it back. Nothing is looked at without that
+# key, so an album without one just renders without a mark.
+ALBUM_ICON_TYPES = {
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+}
+
+
+def _album_icon_file(album: str) -> Path | None:
+    """The album's configured icon as a real file, or None. Mirrors
+    _album_font_file: the cfg value is a bare filename resolved inside the
+    album's `.album/` folder, and anything carrying a path separator or an
+    extension outside ALBUM_ICON_TYPES is rejected — so this only ever
+    resolves to an image sitting next to the album.cfg that named it."""
+    meta = _album_meta_dir(album)
+    if meta is None:
+        return None
+    name = (_cfg_first(_album_config(album), "icon") or "").strip()
+    if not name or Path(name).name != name:
+        return None
+    if Path(name).suffix.lower() not in ALBUM_ICON_TYPES:
+        return None
+    path = meta / name
+    return path if path.is_file() else None
+
+
+def _album_icon_url(album: str | None) -> str | None:
+    """Cache-busting URL of an album's icon, or None when it configures
+    none — the file is served with a year-long cache, so the version stamp
+    is what makes an edit land. Newest mtime of the icon AND of the cfg
+    naming it, because pointing `icon =` at a different file doesn't change
+    this URL's path (the filename never travels in it)."""
+    if not album:
+        return None
+    icon = _album_icon_file(album)
+    if icon is None:
+        return None
+    meta = _album_meta_dir(album)
+    stamps = []
+    for path in (icon, (meta / "album.cfg") if meta else None):
+        if path is None:
+            continue
+        try:
+            stamps.append(int(path.stat().st_mtime))
+        except OSError:
+            pass
+    return f"/album-icon/{quote(album)}?v={max(stamps, default=0)}"
+
+
 # ----- showcase / featured (album.cfg owns it; `_` marker is fallback) --
 # album.cfg is the source of truth for two things that used to be driven by
 # the `_` prefix:
@@ -1056,12 +1129,14 @@ TRIPS: dict[str, dict] = {
         "jp": "日本",
         # flight out (local wall-clock). 12:00 = noon departure.
         "depart": "2026-08-09T12:00:00",
-        # lat/lon feed the /api/trip-weather proxy (see below); `icon` names a
-        # civic emblem SVG under /static/emblems (rendered on the timeline stop)
+        # lat/lon feed the /api/trip-weather proxy (see below). The civic
+        # emblem on a stop is NOT configured here — it is the `icon = …` of
+        # the city's own album (see the per-album icon section), so the mark
+        # travels with the album wherever it is named.
         "stops": [
-            {"city": "Osaka",   "jp": "大阪", "album": "osaka",   "icon": "osaka",   "start": "2026-08-10", "end": "2026-08-16", "lat": 34.6937, "lon": 135.5023},
-            {"city": "Sapporo", "jp": "札幌", "album": "sapporo", "icon": "sapporo", "start": "2026-08-16", "end": "2026-09-16", "lat": 43.0618, "lon": 141.3545},
-            {"city": "Tokyo",   "jp": "東京", "album": "tokyo",   "icon": "tokyo",   "start": "2026-09-16", "end": "2027-01-02", "lat": 35.6895, "lon": 139.6917},
+            {"city": "Osaka",   "jp": "大阪", "album": "osaka",   "start": "2026-08-10", "end": "2026-08-16", "lat": 34.6937, "lon": 135.5023},
+            {"city": "Sapporo", "jp": "札幌", "album": "sapporo", "start": "2026-08-16", "end": "2026-09-16", "lat": 43.0618, "lon": 141.3545},
+            {"city": "Tokyo",   "jp": "東京", "album": "tokyo",   "start": "2026-09-16", "end": "2027-01-02", "lat": 35.6895, "lon": 139.6917},
         ],
     },
 }
@@ -1086,7 +1161,8 @@ def _trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
         stops.append({
             "city": s["city"],
             "jp": s.get("jp", ""),
-            "icon": s.get("icon", ""),
+            # the stop's mark is the city album's own `icon = …`
+            "icon": _album_icon_url(sub),
             "start": s["start"],
             "end": s["end"],
             "start_h": i18n.fmt_date(lang, s["start"]),
@@ -1775,6 +1851,7 @@ def _serialize_album(card: dict, base: str) -> dict:
     album = card["album"]
     cfg = _album_config(album)
     cover = card.get("cover")
+    icon = card.get("icon") or _album_icon_url(album)
     return {
         "album": album,
         "name": card["name"],
@@ -1794,6 +1871,8 @@ def _serialize_album(card: dict, base: str) -> dict:
                 "preview_abs": f"{base}/preview/{cover}",
             },
         } if cover else None,
+        # album.cfg `icon = …` — the album's own mark, null when it sets none
+        "icon": {"url": icon, "url_abs": f"{base}{icon}"} if icon else None,
         "urls": {
             "page": f"/album/{album}",
             "api": f"/api/album/{album}",
@@ -2370,6 +2449,9 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             "album_description": _album_description(album, lang),
             # cover photo for the mobile hero header (see .album-hero)
             "album_cover": _album_cover_rel(album),
+            # the album's own mark (album.cfg `icon = ...`), shown next to
+            # the hero title; None when it configures none
+            "album_icon": _album_icon_url(album),
             # ambient page effect (album.cfg `effect = ...`, whitelisted)
             "album_effect": effect if effect in ALBUM_EFFECTS else None,
             # album.cfg `tags = ...`, shown under the hero title. NOT the
@@ -2598,6 +2680,19 @@ def serve_album_font(album: str):
         raise HTTPException(404, "not found")
     _fmt, mime = ALBUM_FONT_TYPES[font.suffix.lower()]
     return FileResponse(str(font), media_type=mime,
+                        headers={"Cache-Control": "public, max-age=31536000"})
+
+
+@app.get("/album-icon/{album:path}")
+def serve_album_icon(album: str):
+    """The image an album's cfg names in `icon = …`. Like the font route,
+    the filename never comes from the URL — it is read back out of the
+    album.cfg — so this cannot be used to pull anything else out of an
+    album's `.album/` folder."""
+    icon = _album_icon_file(album)
+    if icon is None:
+        raise HTTPException(404, "not found")
+    return FileResponse(str(icon), media_type=ALBUM_ICON_TYPES[icon.suffix.lower()],
                         headers={"Cache-Control": "public, max-age=31536000"})
 
 

@@ -59,7 +59,14 @@
       <a href="/albums">{{ t('crumb.albums') }}</a>
       {% for c in breadcrumbs %}
         <span class="sep">/</span>
-        {% if loop.last %}<b aria-current="page">{{ c.name }}</b>{% else %}<a href="/album/{{ c.path }}">{{ c.name }}</a>{% endif %}
+        {# each segment may carry its album's own mark (album.cfg `icon =`).
+           The mark sits NEXT TO the label, never inside it: the current
+           segment is a text-scramble target (`.crumb b` in app.js) and
+           scrambling flattens the element's innerHTML, which would eat it. #}
+        <span class="crumb__seg">
+          {%- if c.icon %}<img class="album-ico crumb__ico" src="{{ c.icon }}" alt="" aria-hidden="true" width="14" height="14">{% endif -%}
+          {%- if loop.last %}<b aria-current="page">{{ c.name }}</b>{% else %}<a href="/album/{{ c.path }}">{{ c.name }}</a>{% endif -%}
+        </span>
       {% endfor %}
     </div>
   </nav>
@@ -81,7 +88,10 @@
       {%- elif album_is_showcase %}{{ t('stamp.showcase_album') }}
       {%- else %}ALBUM{% endif -%}{# HUD token — stays English like FILE / #}
     </span>
-    <h1 class="album-hero__title">{{ hero_title }}<span class="album-hero__jp{% if not hero_jp %} album-hero__jp--deco{% endif %}" aria-hidden="true">{{ hero_jp or t('album.slug_deco') }}</span></h1>
+    {# the album's own mark (album.cfg `icon =`), leading its title — sized
+       in em so it scales with the hero type (and with a custom face's
+       font_scale) instead of drifting off it #}
+    <h1 class="album-hero__title">{% if album_icon %}<img class="album-hero__ico" src="{{ album_icon }}" alt="" aria-hidden="true">{% endif %}{{ hero_title }}<span class="album-hero__jp{% if not hero_jp %} album-hero__jp--deco{% endif %}" aria-hidden="true">{{ hero_jp or t('album.slug_deco') }}</span></h1>
     {# album.cfg `tags = ...`, the line under the title. Display only — the
        overlay is pointer-events:none, so these are labels, not filter links
        (the ?tag= filter runs on per-image sidecar tags, a separate thing).
@@ -222,7 +232,7 @@
                 <div class="album-card__hover" aria-hidden="true"><span>{{ t('card.enter') }}</span></div>
               </div>
               <div class="album-card__cap">
-                <span class="album-card__name">{{ a.name }}</span>
+                <span class="album-card__name">{% if a.icon %}<img class="album-ico" src="{{ a.icon }}" alt="" aria-hidden="true" width="16" height="16" loading="lazy">{% endif %}{{ a.name }}</span>
                 <span class="album-card__meta">
                   <span>{{ a.count }} {% if a.count == 1 %}{{ t('unit.image') }}{% else %}{{ t('unit.images') }}{% endif %}{% if a.sub_count %} · {{ a.sub_count }} {% if a.sub_count != 1 %}{{ t('unit.dirs') }}{% else %}{{ t('unit.dir') }}{% endif %}{% endif %}</span>
                   {% if month_label(a.latest) %}<span class="album-card__date">{{ month_label(a.latest) }}</span>{% endif %}

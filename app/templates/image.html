@@ -49,7 +49,14 @@
       <a href="/albums">{{ t('crumb.albums') }}</a>
       {% for c in breadcrumbs %}
         <span class="sep">/</span>
-        <a href="/album/{{ c.path }}">{{ c.name | upper }}</a>
+        {# same as the album page: the album's own mark (album.cfg `icon =`)
+           sits NEXT TO its label, never inside it — the crumb's current
+           segment is a text-scramble target and scrambling flattens the
+           element's innerHTML (see __scrambleSwapped in app.js). #}
+        <span class="crumb__seg">
+          {%- if c.icon %}<img class="album-ico crumb__ico" src="{{ c.icon }}" alt="" aria-hidden="true" width="14" height="14">{% endif -%}
+          <a href="/album/{{ c.path }}">{{ c.name | upper }}</a>
+        </span>
       {% endfor %}
       <span class="sep">/</span>
       <b aria-current="page">{{ image.filename }}</b>

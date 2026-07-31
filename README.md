@@ -106,7 +106,8 @@ photos/japan_2026/
 │   ├── album_en.md        ← description, English (also the fallback)
 │   ├── album_de.md        ← description, German
 │   ├── album_jp.md        ← description, Japanese
-│   └── MusashiBrush.otf   ← the album's own title face (`font =`)
+│   ├── MusashiBrush.otf   ← the album's own title face (`font =`)
+│   └── icon.svg           ← the album's own mark (`icon =`)
 ├── tokyo/                 ← sub-album (has its own .album/)
 └── skyline.jpg
 ```
@@ -141,6 +142,21 @@ styles, the binding is served as a real stylesheet at
 `.album-font .album-hero__title` in `style.css` reads; the file itself comes
 from `/album-font/{album}`. Only the file named in the cfg is ever served —
 the filename never travels in the URL.
+
+**An album's own icon.** Any album can carry a small mark — a civic emblem, a
+crest, a logo. Drop the image into `.album/` and name it in `album.cfg`:
+
+```ini
+icon = icon.svg             # .svg / .png / .webp / .gif / .jpg
+```
+
+It then shows up wherever that album is named: its card in the grids and the
+★ rail, the breadcrumb trail, the hero title, and — for a trip album — the
+city stops of the itinerary timeline, which read the mark off each stop's own
+sub-album. Sizing is relative to whatever type it sits in, so a mark works at
+every one of those places without per-page tuning. Served from
+`/album-icon/{album}`; as with the font, only the file named in the cfg is
+ever served and the filename never travels in the URL.
 
 **Japanese font subset:** the site ships a glyph subset of Noto Sans JP
 (`app/static/fonts/NotoSansJP-subset.woff2`, ~120 KB instead of the 8.8 MB
@@ -183,6 +199,7 @@ Optional file in the album's **`.album/` folder** (see above):
 | `sort`       | `curated`, `date_desc`, `date_asc`, `name_asc`, `name_desc`, `size_desc`, `size_asc` | Preselect the sort option for this album's grid (visitors can still switch). |
 | `tags`       | names, e.g. `paris, night`      | The album's tags, shown under its hero title and nowhere else. A leading `#` is optional. Album-level and display-only — see the note below. |
 | `effect`     | `sakura`                        | Ambient effect layer on this album's page (petals drifting down). |
+| `icon`       | a filename in `.album/`         | The album's own mark — `.svg` / `.png` / `.webp` / `.gif` / `.jpg` — shown wherever the album is named: cards, breadcrumb, hero title, trip stops (see above). |
 | `font`       | a filename in `.album/`         | Display face for the album's hero title — `.otf` / `.ttf` / `.woff2` / `.woff` (see above). |
 | `font_scale` | a number, `0.5`–`2.5`           | Size multiplier for that face, so a small-reading display face can be evened up. Only read when `font` is set; ignored when out of range. |
 
@@ -338,6 +355,7 @@ Each album card:
   "collection": true,
   "tags": ["travel", "summer"],
   "cover": { "rel_path": "…", "urls": { "thumb": "…", "preview": "…", "thumb_abs": "…", "preview_abs": "…" } },
+  "icon": { "url": "/album-icon/_japan_2026?v=…", "url_abs": "…" },
   "urls": { "page": "/album/_japan_2026", "api": "/api/album/_japan_2026", "page_abs": "…", "api_abs": "…" }
 }
 ```
@@ -362,7 +380,7 @@ Everything one album page knows.
 ```json
 {
   "album": { … the card above … },
-  "breadcrumbs": [{ "name": "japan_2026", "path": "_japan_2026" }],
+  "breadcrumbs": [{ "name": "japan_2026", "path": "_japan_2026", "icon": "/album-icon/_japan_2026?v=…" }],
   "scope": { "album": "_japan_2026", "collection": true, "subtree": true },
   "description": { "html": "<p>…</p>", "lang": "de" },
   "stats": { "context": [{ "key": "LOC", "val": "Japan" }], "capture": [{ "key": "SPAN", "val": "…" }], "has": true },
@@ -378,7 +396,7 @@ Everything one album page knows.
 }
 ```
 
-`reel.mode` is `featured` / `random` / `off` (album.cfg `reel =`), and its items come in the album's configured `featured` order. `photo_tags` are the `.tags` sidecar tags available inside the album's scope (what `?tag=` filters on) — the album's own display tags sit on `album.tags`. `font`, `effect` and `trip` are `null` when the album configures none.
+`reel.mode` is `featured` / `random` / `off` (album.cfg `reel =`), and its items come in the album's configured `featured` order. `photo_tags` are the `.tags` sidecar tags available inside the album's scope (what `?tag=` filters on) — the album's own display tags sit on `album.tags`. `font`, `effect` and `trip` are `null` when the album configures none, as is `album.icon` (and each breadcrumb's `icon`) for an album without a mark.
 
 ### `GET /api/photos`
 
@@ -547,6 +565,7 @@ All GET, all public:
 - `GET /full/{album}/{file}` — original file
 - `GET /album-font.css/{album}` — generated stylesheet for an album's `font =` face (`@font-face` + `--album-title-font`, plus `--album-title-scale` when it sets `font_scale =`); 404 when the album sets none
 - `GET /album-font/{album}` — the font file itself; only ever the one named in that album's `album.cfg`
+- `GET /album-icon/{album}` — the album's `icon =` mark; only ever the file named in that album's `album.cfg`, 404 when it sets none
 - `GET /search?q=…` — search (`?sort=`)
 - `GET /lang/{en|de|jp}?next=…` — set the language cookie, 303 back to `next` (relative paths only)
 - `GET /api` + `/api/stats` + `/api/albums` + `/api/album/{album}` + `/api/photos` + `/api/photo/{rel_path}` + `/api/tags` + `/api/showcase` + `/api/shuffle` — the JSON API, CORS-enabled (see [API](#api))

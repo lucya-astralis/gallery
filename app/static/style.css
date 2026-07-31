@@ -544,6 +544,28 @@ section{
    viewport and clip / force horizontal scroll, esp. on mobile. */
 .crumb a, .crumb b{ min-width:0; overflow-wrap:anywhere; }
 
+/* ---- per-album icon (album.cfg `icon = ...`) ------------------------
+   One mark per album, rendered wherever that album is named: the grid
+   cards, the showcase rail, this breadcrumb trail, the hero title and the
+   trip timeline's city stops. Sized in em so it tracks whatever type it
+   sits in instead of needing a rule per place, and set inline with a
+   baseline nudge so it reads as part of the name rather than a floating
+   badge. The drop-shadow keeps colored civic emblems legible where the
+   caption sits on a photo. */
+.album-ico{
+  display:inline-block; vertical-align:-.16em;
+  width:1.05em; height:1.05em; margin-right:.42em;
+  object-fit:contain;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.55));
+}
+/* the showcase rail sets its captions bigger; keep the mark in proportion */
+.album-ico--lg{ width:1.15em; height:1.15em; }
+/* the trail is mono caps at 11px — a 1em mark disappears in it. Mark and
+   label are one flex item (.crumb__seg) so they stay glued together while
+   the trail's own 8px gap keeps its distance to the `/` separators. */
+.crumb__seg{ display:inline-flex; align-items:center; gap:5px; min-width:0; }
+.crumb__ico{ flex:0 0 auto; width:1.35em; height:1.35em; margin-right:0; }
+
 /* ---- path bar: the page's route line, one bar claiming the full content
    width instead of a small block squeezed into the left corner. Desktop:
    back chip, the trail DIRECTLY beside it, then a rule fading out to the
@@ -631,6 +653,15 @@ section{
   font-size:30px; font-weight:700; line-height:1.02;
   letter-spacing:.01em; color:var(--text);
   min-width:0; overflow-wrap:anywhere;
+}
+/* the album's mark leading its hero title — a flex item here (the title is
+   a baseline row), so it centers on the line and lets the row's own gap do
+   the spacing. Sized off the title's em, so it follows the desktop type
+   boost and a custom face's font_scale without a second rule. */
+.album-hero__ico{
+  flex:0 0 auto; align-self:center;
+  width:.82em; height:.82em; object-fit:contain;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));
 }
 .album-hero__jp{
   font-family:"Noto Sans JP", sans-serif;
@@ -1362,14 +1393,17 @@ section{
   overflow:hidden;
   background:var(--bg-2);
 }
-.feat-card__img img{
+/* the cover only — direct child, because the caption rides INSIDE this box
+   and may carry the album's mark (.album-ico), which must not be blown up
+   to card size (nor zoomed on hover by the rule below) */
+.feat-card__img > img{
   width:100%; height:100%;
   object-fit:cover;
   display:block;
   filter:saturate(.94) brightness(.88);
   transition: transform .5s ease, filter .35s ease;
 }
-.feat-card:hover .feat-card__img img{
+.feat-card:hover .feat-card__img > img{
   transform:scale(1.04);
   filter:saturate(1.02) brightness(1);
 }
@@ -3616,9 +3650,10 @@ a.trip__stop-link:hover .trip__stop-media img{
   text-shadow:0 1px 6px rgba(0, 0, 0, .55);
 }
 .trip__stop-head{ display:flex; align-items:center; gap:8px; min-width:0; }
-/* civic emblem of the destination (Osaka/Sapporo/Tokyo), leading the city
-   name; the drop-shadow keeps the colored marks legible over the stop's
-   photo cover. Falls back gracefully when a stop has no icon. */
+/* civic emblem of the destination, leading the city name — the city
+   album's own `icon = …` (album.cfg), like everywhere else the album is
+   named (.album-ico). The drop-shadow keeps the colored marks legible over
+   the stop's photo cover. Falls back gracefully when a stop has no icon. */
 .trip__stop-emblem{
   flex:0 0 auto; align-self:center;
   width:18px; height:18px; object-fit:contain;
