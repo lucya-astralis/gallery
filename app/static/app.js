@@ -621,7 +621,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // when allowHeavyFx() + IntersectionObserver hold) — without it nothing is
 // ever tagged .rv and the page stays fully static, including for crawlers
 // and no-JS visitors.
-document.addEventListener('DOMContentLoaded', () => {
+// NOT wired to DOMContentLoaded — see the FIRST-FRAME STATE block below:
+// .rv is what hides the content, so it has to be on the elements before the
+// browser's first rendering opportunity.
+function scrollReveal() {
   if (!document.documentElement.classList.contains('fx-anim')) return;
 
   // Stepping back OUT of a photo must not rebuild the album around the
@@ -670,14 +673,16 @@ document.addEventListener('DOMContentLoaded', () => {
     el.classList.add('rv');
     io.observe(el);
   });
-});
+}
 
 // ---------- THUMBNAIL FADE-IN ----------------------------------
 // Grid covers and tiles fade in when they finish loading instead of popping.
 // Images already complete at wiring time (warm cache, bfcache restore) skip
 // the fade entirely, so revisits stay instant. The helper classes are dropped
 // after the fade so the cards' own hover transitions take back over.
-document.addEventListener('DOMContentLoaded', () => {
+// Synchronous like scrollReveal() — .img-fade hides the image, so a late
+// wiring would let one frame through with the images already visible.
+function thumbFadeIn() {
   if (!document.documentElement.classList.contains('fx-anim')) return;
   document.querySelectorAll(
     '.album-card__img img, .image-tile img, .feat-card__img img'
@@ -691,7 +696,7 @@ document.addEventListener('DOMContentLoaded', () => {
     img.addEventListener('load', done, { once: true });
     img.addEventListener('error', done, { once: true });
   });
-});
+}
 
 // ---------- STAGE PIXEL-IN (click-to-open decode) --------------
 // Opening a photo decodes it in like a feed acquiring signal: a coarse
@@ -823,6 +828,24 @@ window.__stagePixelIn = () => {
   const tile = link.closest('.image-tile');
   if (tile) tile.classList.add('is-returned');
 })();
+
+// ---------- FIRST-FRAME STATE (must stay synchronous) ----------
+// Everything that decides what the FIRST rendered frame looks like runs
+// here, inside this script's own task — never on DOMContentLoaded.
+// app.js is the last element in <body>, so the DOM is already complete;
+// DOMContentLoaded buys nothing but a task boundary, and the browser takes
+// a rendering opportunity inside that boundary (a rAF registered at the top
+// of this file reliably fires ~5-60 ms BEFORE DOMContentLoaded). Wiring the
+// hiding classes there let one frame slip out with the page fully visible
+// and the images still undecoded — the bare skeleton — after which .rv /
+// .img-fade / .px-wait landed and blanked everything for the real entrance.
+// Cross-document view transitions (@view-transition in style.css) froze
+// exactly that frame into ::view-transition-new(root), which is why the
+// glitch showed up on navigations and was independent of the cache.
+// Ordering: after photoAlbumContinuity(), whose html.fx-return decides
+// whether scrollReveal() replays the entrance cascade at all.
+scrollReveal();
+thumbFadeIn();
 
 // ---------- PREVIEW PRE-WARM (tile hover) ----------------------
 // Aiming at a tile warms the /preview/ file its photo page will need, so
@@ -1017,7 +1040,10 @@ function initImagePage() {
   }
 }
 window.__initImagePage = initImagePage;
-document.addEventListener('DOMContentLoaded', initImagePage);
+// first-frame state again (it adds .px-wait to the stage photo via
+// __stagePixelIn): synchronous, so the photo can't flash in un-pixelated
+// before the decode animation takes over. See FIRST-FRAME STATE above.
+initImagePage();
 
 // ---------- SORT DROPDOWN --------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
