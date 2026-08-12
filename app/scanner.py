@@ -240,11 +240,19 @@ def strip_gps_inplace(path: Path) -> bool:
             img.save(path, format=fmt, **save_kwargs)
         log.info("stripped GPS from %s", path.name)
         return True
-    except (UnidentifiedImageError, OSError, ValueError) as e:
+    except Exception as e:
+        # Broad on purpose — see make_thumbnail.
         log.warning("gps strip failed for %s: %s", path, e)
         return False
 
 
+# Decoding a damaged file throws far more than OSError: PIL's plugins raise
+# SyntaxError ("broken PNG file"), ValueError, struct.error, zlib.error and
+# Image.DecompressionBombError straight out of load(). Every decode path below
+# therefore catches Exception and turns the failure into a False/None return —
+# a single half-written upload on the share must never escape as an exception,
+# because in full_scan() it would abort the whole walk (see there) and in the
+# /thumb route it surfaces as a 500 with a traceback instead of a skipped file.
 def make_thumbnail(src: Path, dst: Path, size: int) -> bool:
     try:
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -258,8 +266,8 @@ def make_thumbnail(src: Path, dst: Path, size: int) -> bool:
                 img = img.convert("RGB")
             img.save(dst, "JPEG", quality=82, optimize=True, progressive=True)
         return True
-    except (UnidentifiedImageError, OSError) as e:
-        log.warning("thumb failed for %s: %s", src, e)
+    except Exception as e:
+        log.warning("thumb failed for %s: %s: %s", src, type(e).__name__, e)
         return False
 
 
@@ -275,8 +283,8 @@ def make_full_jpeg(src: Path, dst: Path) -> bool:
                 img = img.convert("RGB")
             img.save(dst, "JPEG", quality=92, optimize=True, progressive=True)
         return True
-    except (UnidentifiedImageError, OSError) as e:
-        log.warning("full jpeg conversion failed for %s: %s", src, e)
+    except Exception as e:
+        log.warning("full jpeg conversion failed for %s: %s: %s", src, type(e).__name__, e)
         return False
 
 
@@ -370,8 +378,8 @@ def index_image(photos_dir: Path, file: Path) -> bool:
                 exif, taken = extract_exif(img)
             except Exception as e:
                 log.warning("exif failed for %s: %s", file, e)
-    except (UnidentifiedImageError, OSError) as e:
-        log.warning("open failed for %s: %s", file, e)
+    except Exception as e:
+        log.warning("open failed for %s: %s: %s", file, type(e).__name__, e)
         return False
 
     # `is_showcase` (featured flag) is owned by main._recompute_featured(),
@@ -411,13 +419,15 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
     added = 0
     thumbed = 0
     previewed = 0
+    failed = 0
     seen: set[str] = set()
     if not photos_dir.exists():
         try:
             photos_dir.mkdir(parents=True, exist_ok=True)
         except (OSError, PermissionError):
             log.warning("photos dir does not exist and is not writable: %s", photos_dir)
-            return {"indexed": 0, "thumbnails": 0, "previews": 0, "removed": 0, "total_seen": 0}
+            return {"indexed": 0, "thumbnails": 0, "previews": 0, "removed": 0,
+                    "failed": 0, "total_seen": 0}
     # Walk the whole tree so albums can nest (photos/japan/tokyo/img.jpg).
     # Files sitting directly in photos_dir (no album folder) are skipped.
     for file in sorted(photos_dir.rglob("*")):
@@ -429,19 +439,39 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         if is_meta_path(relp):
             continue  # album metadata, not a photo — no index, no thumbs
         rel = relp.as_posix()
+        # Marked seen before any processing: whatever goes wrong below, the
+        # file is on disk, so the cleanup pass at the end must not drop its
+        # (possibly still valid) row from the index.
         seen.add(rel)
-        if index_image(photos_dir, file):
-            added += 1
-        mtime = file.stat().st_mtime
-        thumb_path = (thumbs_dir / rel).with_suffix(".jpg")
-        if not thumb_path.exists() or thumb_path.stat().st_mtime < mtime:
-            if make_thumbnail(file, thumb_path, thumb_size):
-                thumbed += 1
-        if previews_dir is not None:
-            preview_path = (previews_dir / rel).with_suffix(".jpg")
-            if not preview_path.exists() or preview_path.stat().st_mtime < mtime:
-                if make_thumbnail(file, preview_path, preview_size):
-                    previewed += 1
+        # One damaged or half-uploaded file must never take the scan down with
+        # it. Without this guard a single unreadable photo aborts the whole
+        # walk — every album sorting after it is left unindexed and un-thumbed,
+        # the stale-row cleanup never runs, and main._recompute_featured() is
+        # never reached, so the gallery silently loses everything past that
+        # file until it is removed.
+        broken = False  # counts the FILE once, however many derivatives failed
+        try:
+            if index_image(photos_dir, file):
+                added += 1
+            mtime = file.stat().st_mtime
+            thumb_path = (thumbs_dir / rel).with_suffix(".jpg")
+            if not thumb_path.exists() or thumb_path.stat().st_mtime < mtime:
+                if make_thumbnail(file, thumb_path, thumb_size):
+                    thumbed += 1
+                else:
+                    broken = True
+            if previews_dir is not None:
+                preview_path = (previews_dir / rel).with_suffix(".jpg")
+                if not preview_path.exists() or preview_path.stat().st_mtime < mtime:
+                    if make_thumbnail(file, preview_path, preview_size):
+                        previewed += 1
+                    else:
+                        broken = True
+        except Exception as e:
+            broken = True
+            log.warning("skipped %s: %s: %s", rel, type(e).__name__, e)
+        if broken:
+            failed += 1
 
     c = db.conn()
     with db.lock():
@@ -457,6 +487,7 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         "thumbnails": thumbed,
         "previews": previewed,
         "removed": removed,
+        "failed": failed,
         "total_seen": len(seen),
     }
 

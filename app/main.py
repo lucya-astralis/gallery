@@ -1425,17 +1425,27 @@ def _run_scan():
     if not _scan_lock.acquire(blocking=False):
         return
     try:
-        result = scanner.full_scan(
-            PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE,
-            previews_dir=PREVIEWS_DIR, preview_size=PREVIEW_SIZE,
-        )
-        # re-derive featured flags from album.cfg (+ legacy marker fallback)
-        # now that the index reflects the current files.
+        result = None
+        try:
+            result = scanner.full_scan(
+                PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE,
+                previews_dir=PREVIEWS_DIR, preview_size=PREVIEW_SIZE,
+            )
+        except Exception as e:
+            log.exception("scan failed: %s", e)
+        # Re-derive featured flags from album.cfg (+ legacy marker fallback).
+        # Runs even when the walk blew up: the index is then partial, but
+        # leaving is_showcase stale on top of it hides featured photos too.
         _recompute_featured()
-        if result["indexed"] or result["thumbnails"] or result["previews"] or result["removed"]:
+        if result and any(result[k] for k in ("indexed", "thumbnails", "previews", "removed", "failed")):
             log.info("scan: %s", result)
+        if result and result["failed"]:
+            log.warning("scan: %d file(s) unreadable — see the 'thumb failed' / "
+                        "'skipped' warnings above; they stay in the gallery "
+                        "without a thumbnail until fixed or removed",
+                        result["failed"])
     except Exception as e:
-        log.warning("scan failed: %s", e)
+        log.exception("scan bookkeeping failed: %s", e)
     finally:
         _scan_lock.release()
 
