@@ -277,6 +277,20 @@ def _distinct_albums() -> list[str]:
     return [r["album"] for r in c.execute("SELECT DISTINCT album FROM images").fetchall()]
 
 
+def _albums_with_ancestors() -> list[str]:
+    """Every folder that can carry an album.cfg: the albums holding photos
+    plus all their parents. A parent album whose photos all live in
+    sub-folders has no rows in `images`, so walking _distinct_albums() alone
+    would skip its cfg entirely (its `featured = sub/pic.jpg` never applied,
+    see _recompute_featured)."""
+    out: set[str] = set()
+    for album in _distinct_albums():
+        parts = album.split("/")
+        for i in range(1, len(parts) + 1):
+            out.add("/".join(parts[:i]))
+    return sorted(out)
+
+
 def _child_album_names(parent: str | None, all_albums: list[str] | None = None) -> list[str]:
     """Immediate sub-folder album-paths directly under `parent`
     (top-level albums when `parent` is None)."""
@@ -1013,13 +1027,19 @@ def _album_is_showcase(album: str, cfg: dict[str, list[str]] | None = None) -> b
 def _resolve_photo_refs(album: str, items: list[str]) -> list[str]:
     """Resolve photo references from an album.cfg list value (`featured`,
     `order`) to indexed rel_paths, keeping the given order (deduped). Each
-    item is a path relative to the album (sub-folders allowed); a bare
-    filename that isn't found at that exact path falls back to a filename
-    match anywhere in the album's subtree, so a parent cfg can reference
-    sub-folder photos without spelling out the folder (matches every
-    same-named file)."""
+    item is a path relative to the album (sub-folders allowed); an item that
+    isn't found at that exact path falls back to a fuzzy match inside the
+    album's subtree, so a parent cfg can reference sub-folder photos:
+      * a bare filename matches that filename anywhere in the subtree
+        (every same-named file),
+      * a path matches any photo whose rel_path ends with it.
+    The fallback normalizes like `album_order` does — showcase markers
+    stripped per segment, case-insensitive — because the paths shown in the
+    UI are marker-stripped (see _pretty_rel), so `osaka/pic.jpg` also finds
+    `_osaka/pic.jpg`."""
     c = db.conn()
     prefix = album + "/"
+    subtree = None  # fallback pool, loaded once and only if something misses
     out: list[str] = []
     seen: set[str] = set()
     for item in items:
@@ -1028,15 +1048,28 @@ def _resolve_photo_refs(album: str, items: list[str]) -> list[str]:
             continue
         rel = item if (item == album or item.startswith(prefix)) else f"{album}/{item}"
         row = c.execute("SELECT rel_path FROM images WHERE rel_path = ?", (rel,)).fetchone()
-        rows = [row] if row else c.execute(
-            "SELECT rel_path FROM images WHERE (album = ? OR substr(album, 1, ?) = ?) "
-            "AND filename = ? ORDER BY rel_path",
-            (album, len(prefix), prefix, item),
-        ).fetchall()
-        for r in rows:
-            if r["rel_path"] not in seen:
-                seen.add(r["rel_path"])
-                out.append(r["rel_path"])
+        if row:
+            matches = [row["rel_path"]]
+        else:
+            if subtree is None:
+                # substr() (not LIKE) keeps `_`/`%` in album names literal.
+                subtree = c.execute(
+                    "SELECT rel_path, filename FROM images "
+                    "WHERE album = ? OR substr(album, 1, ?) = ? ORDER BY rel_path",
+                    (album, len(prefix), prefix),
+                ).fetchall()
+            key = _album_order_key(item)
+            if "/" in key:
+                matches = [r["rel_path"] for r in subtree
+                           if (k := _album_order_key(r["rel_path"])) == key
+                           or k.endswith("/" + key)]
+            else:
+                matches = [r["rel_path"] for r in subtree
+                           if _album_order_key(r["filename"]) == key]
+        for rel_path in matches:
+            if rel_path not in seen:
+                seen.add(rel_path)
+                out.append(rel_path)
     return out
 
 
@@ -1057,7 +1090,7 @@ def _recompute_featured() -> None:
     and after every scan / album.cfg change."""
     c = db.conn()
     featured: set[str] = set()
-    for album in _distinct_albums():
+    for album in _albums_with_ancestors():
         cfg = _album_config(album)
         if "featured" in cfg:
             featured |= _resolve_featured(album, cfg["featured"])

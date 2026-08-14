@@ -192,7 +192,7 @@ Optional file in the album's **`.album/` folder** (see above):
 |--------------|---------------------------------|--------------------------------------------------------------------------------------------|
 | `collection` | `true`                          | The album page shows every photo of its whole subtree (own + sub-folders) as one flat set. The [API](#api) scopes the album the same way. |
 | `showcase`   | `true` / `false`                | Featured album: ★ rail on `/albums` and the welcome screen (replaces the `_` folder prefix). |
-| `featured`   | paths, or `*` / `all`           | Featured photos: welcome hero, `/api/showcase`, the album's reel (replaces the `_` filename prefix). Paths are relative to the album; bare filenames match anywhere in the subtree. The album's reel shows them in exactly this order. |
+| `featured`   | paths, or `*` / `all`           | Featured photos: welcome hero, `/api/showcase`, the album's reel (replaces the `_` filename prefix). Paths are relative to the album (`osaka/IMG_4853.png`, a leading `/` is fine); bare filenames match anywhere in the subtree. Matching ignores the `_` marker and casing, so `osaka/…` also finds `_osaka/…`. The album's reel shows them in exactly this order. |
 | `cover`      | one path                        | Pin the album cover instead of auto-picking the newest photo.                              |
 | `reel`       | `featured` / `random` / `off`   | What the hero slideshow at the top of the album shows: the featured photos (default), random photos from the album's subtree, or nothing (hidden). |
 | `order`      | paths                           | Curated photo order — adds a **Curated** entry to the album's sort menu. Photos not listed follow, newest first. |
