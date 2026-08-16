@@ -1167,9 +1167,12 @@ TRIPS: dict[str, dict] = {
         # the city's own album (see the per-album icon section), so the mark
         # travels with the album wherever it is named.
         "stops": [
-            {"city": "Osaka",   "jp": "大阪", "album": "osaka",   "start": "2026-08-10", "end": "2026-08-16", "lat": 34.6937, "lon": 135.5023},
-            {"city": "Sapporo", "jp": "札幌", "album": "sapporo", "start": "2026-08-16", "end": "2026-09-16", "lat": 43.0618, "lon": 141.3545},
-            {"city": "Tokyo",   "jp": "東京", "album": "tokyo",   "start": "2026-09-16", "end": "2027-01-02", "lat": 35.6895, "lon": 139.6917},
+            # A stop's end / the next stop's start is the domestic flight's
+            # departure (JST wall-clock), so the countdown runs to the gate
+            # rather than to midnight of the travel day.
+            {"city": "Osaka",   "jp": "大阪", "album": "osaka",   "start": "2026-08-10",          "end": "2026-08-16T14:30:00", "lat": 34.6937, "lon": 135.5023},
+            {"city": "Sapporo", "jp": "札幌", "album": "sapporo", "start": "2026-08-16T14:30:00", "end": "2026-09-16T10:30:00", "lat": 43.0618, "lon": 141.3545},
+            {"city": "Tokyo",   "jp": "東京", "album": "tokyo",   "start": "2026-09-16T10:30:00", "end": "2027-01-02",          "lat": 35.6895, "lon": 139.6917},
         ],
     },
 }
