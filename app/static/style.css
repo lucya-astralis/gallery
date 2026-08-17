@@ -3800,7 +3800,8 @@ a.trip__stop-link:hover .trip__stop-media img{
   fill:var(--surface-2); stroke:var(--line-strong); stroke-width:.7;
   stroke-linejoin:round;
 }
-/* prefectures the itinerary visits (Hokkaido carries the Sapporo stop) */
+/* the regions the itinerary visits — one path per stop, its prefectures
+   merged into a single shape */
 .trip-map__pref{
   fill:rgba(91,138,255,.12); stroke:rgba(91,138,255,.6); stroke-width:.8;
   stroke-linejoin:round;

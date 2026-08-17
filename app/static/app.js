@@ -1442,9 +1442,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const ceilDays = (from, to) => Math.max(0, Math.ceil((to - from) / DAY));
 
   const depart = parseLocal(root.dataset.depart);
-  // `city` stays the English key (matches _trip_map.html's data-map-city and
-  // the HUD status stamp); `cityLabel` is what countdown sentences display —
-  // the Japanese name on the JP page when the template provides one.
+  // `city` is the stop's region name and stays the English key (matches
+  // _trip_map.html's data-map-city and the HUD status stamp); `cityLabel` is
+  // what countdown sentences display — the Japanese name on the JP page when
+  // the template provides one.
   const stops = Array.from(root.querySelectorAll('[data-stop]')).map((el) => ({
     el,
     city: el.dataset.city || '',

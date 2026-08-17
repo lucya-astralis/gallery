@@ -943,14 +943,14 @@ def _album_font_preload(album: str) -> dict | None:
 # ----- per-album icon (album.cfg `icon = ...`) --------------------------
 # Any album can carry a small mark of its own — a civic emblem, a crest, a
 # logo — rendered wherever the album is named: its card in the grids, the
-# hero title, the breadcrumb, and the city stops of the trip timeline. That
+# hero title, the breadcrumb, and the stops of the trip timeline. That
 # last one is where this started, as three hard-coded SVGs under
 # /static/emblems; the mark now belongs to the album instead, so every
 # album gets one for free and the timeline simply reads its stops' albums.
 #
 # Same shape as the title font: drop the file into the album's `.album/`
 # folder, name it in album.cfg
-#   icon = osaka.svg
+#   icon = kansai.svg
 # and /album-icon/{album} serves it back. Nothing is looked at without that
 # key, so an album without one just renders without a mark.
 ALBUM_ICON_TYPES = {
@@ -1162,17 +1162,23 @@ TRIPS: dict[str, dict] = {
         "jp": "日本",
         # flight out (local wall-clock). 12:00 = noon departure.
         "depart": "2026-08-09T12:00:00",
-        # lat/lon feed the /api/trip-weather proxy (see below). The civic
-        # emblem on a stop is NOT configured here — it is the `icon = …` of
-        # the city's own album (see the per-album icon section), so the mark
-        # travels with the album wherever it is named.
+        # A stop is a REGION, not a single city: the trip stays put in one
+        # part of the country per leg, and its album holds everything shot
+        # there. lat/lon stay the region's base city (Kansai -> Osaka,
+        # Hokkaido -> Sapporo, Kanto -> Tokyo) — they feed the
+        # /api/trip-weather proxy (see below) and the route map's dot, both
+        # of which need one point. The map's highlight is the whole region
+        # (tools/generate_trip_map.py). The civic emblem on a stop is NOT
+        # configured here — it is the `icon = …` of the region's own album
+        # (see the per-album icon section), so the mark travels with the
+        # album wherever it is named.
         "stops": [
             # A stop's end / the next stop's start is the domestic flight's
             # departure (JST wall-clock), so the countdown runs to the gate
             # rather than to midnight of the travel day.
-            {"city": "Osaka",   "jp": "大阪", "album": "osaka",   "start": "2026-08-10",          "end": "2026-08-16T14:30:00", "lat": 34.6937, "lon": 135.5023},
-            {"city": "Sapporo", "jp": "札幌", "album": "sapporo", "start": "2026-08-16T14:30:00", "end": "2026-09-16T10:30:00", "lat": 43.0618, "lon": 141.3545},
-            {"city": "Tokyo",   "jp": "東京", "album": "tokyo",   "start": "2026-09-16T10:30:00", "end": "2027-01-02",          "lat": 35.6895, "lon": 139.6917},
+            {"city": "Kansai",   "jp": "関西",   "album": "kansai",   "start": "2026-08-10",          "end": "2026-08-16T14:30:00", "lat": 34.6937, "lon": 135.5023},
+            {"city": "Hokkaido", "jp": "北海道", "album": "hokkaido", "start": "2026-08-16T14:30:00", "end": "2026-09-16T10:30:00", "lat": 43.0618, "lon": 141.3545},
+            {"city": "Kanto",    "jp": "関東",   "album": "kanto",    "start": "2026-09-16T10:30:00", "end": "2027-01-02",          "lat": 35.6895, "lon": 139.6917},
         ],
     },
 }
@@ -1182,7 +1188,7 @@ def _trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
     no configured trip. Matched on the marker-stripped, lower-cased path so
     `_japan_2026` resolves to the `japan_2026` config. Each stop is wired to
     its sub-album — cover + photo count + link — so the timeline doubles as
-    navigation into the city galleries (empty city folders stay unlinked).
+    navigation into the region galleries (empty folders stay unlinked).
     Human-readable dates are localized; app.js re-renders them client-side
     in the same language (read from <html lang>)."""
     key = "/".join(_strip_marker_segment(s) for s in album.split("/")).lower()
@@ -1197,7 +1203,7 @@ def _trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
         stops.append({
             "city": s["city"],
             "jp": s.get("jp", ""),
-            # the stop's mark is the city album's own `icon = …`
+            # the stop's mark is the stop album's own `icon = …`
             "icon": _album_icon_url(sub),
             "start": s["start"],
             "end": s["end"],
@@ -1223,7 +1229,7 @@ def _trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
 # CSP-clean: the visitor's browser only ever talks to this origin (no
 # third-party request, no cookies, nothing stored on the device — GDPR/
 # ePrivacy don't require a banner for it), and connect-src 'self' stays.
-# Upstream sees only this server's IP plus fixed city coordinates.
+# Upstream sees only this server's IP plus fixed base-city coordinates.
 # Open-Meteo is keyless and cookie-free; data is CC BY 4.0 — attributed in
 # the widget tooltip (see initTrip) and README. One upstream call covers
 # all stops; results are cached for WEATHER_TTL so page-view bursts cost
@@ -1271,7 +1277,7 @@ def _fetch_trip_weather(cfg: dict) -> dict:
             continue
         daily = (loc or {}).get("daily") or {}
         out.append({
-            "city": s["city"],  # English key, matches data-city / data-stop-wx lookup
+            "city": s["city"],  # English stop key, matches data-city / data-stop-wx lookup
             "temp": float(temp),
             "code": int(code),
             "is_day": int(cur.get("is_day") or 0),
@@ -1830,7 +1836,7 @@ def _album_exists(album: str) -> bool:
 def _resolve_album_path(album: str) -> str | None:
     """Map an album path off the URL to a real indexed album, tolerating a
     stripped showcase marker and different casing on any segment (so
-    `japan_2026/osaka` finds `_japan_2026/osaka`, mirroring what
+    `japan_2026/kansai` finds `_japan_2026/kansai`, mirroring what
     _resolve_showcase_path does for photos). None when nothing matches."""
     album = album.strip("/").replace("\\", "/")
     if not album or ".." in album.split("/"):
@@ -1932,7 +1938,7 @@ def _album_reel(album: str, cfg: dict[str, list[str]], limit: int = 8) -> tuple[
     """The album's hero slideshow (album.cfg `reel`), as (mode, rows).
 
     `featured` (the default) shows featured photos from this album AND its
-    sub-albums, so a photo featured inside e.g. japan_2026/osaka surfaces on
+    sub-albums, so a photo featured inside e.g. japan_2026/kansai surfaces on
     the japan_2026 page too — a showcase ALBUM doesn't auto-promote its
     contents, each photo opts in via album.cfg `featured` or the legacy `_`
     prefix. The album's own `featured` list sets the order, exactly as

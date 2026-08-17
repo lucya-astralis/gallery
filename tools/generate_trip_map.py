@@ -4,11 +4,15 @@
 #   (by checking where known city coords land relative to prefecture bboxes)
 # - simplifies geometry (Douglas-Peucker), drops sub-pixel islands
 # - crops the viewBox to the route region (Kansai -> Hokkaido)
-# - emits the final inline-SVG partial with route arcs, city dots and labels
+# - emits the final inline-SVG partial with route arcs, stop dots and labels
+#
+# A stop is a REGION (Kansai / Hokkaido / Kanto), so its highlight is the
+# union of that region's prefectures; the dot sits on the region's base city,
+# which is also what the itinerary's lat/lon in main.py points at.
 #
 # Run from anywhere: `python tools/generate_trip_map.py` — paths are resolved
-# relative to this file. Tune CITIES / segment bulges / LBL offsets below when
-# the itinerary changes, then re-run.
+# relative to this file. Tune REGIONS / segment bulges / LBL offsets below
+# when the itinerary changes, then re-run.
 import math
 import re
 import sys
@@ -20,11 +24,16 @@ OUT = REPO / "app" / "templates" / "_trip_map.html"
 
 svg = SRC.read_text(encoding="utf-8")
 
-# ---- geo reference from the MapSVG header --------------------------------
-m = re.search(r'geoViewBox="([\d.\- ]+)"', svg)
-west, north, east, south = (float(x) for x in m.group(1).split())
-W = float(re.search(r'width="([\d.]+)"', svg).group(1))
-H = float(re.search(r'height="([\d.]+)"', svg).group(1))
+# ---- geo reference --------------------------------------------------------
+# The checked-in export carries neither the MapSVG geoViewBox header nor the
+# per-path `title=`, only the pixel viewBox and ISO `id="JP-nn"` codes. The
+# lon/lat envelope below is recovered by least-squares from the three anchor
+# cities against the dot positions of the previous generation (residuals
+# < 0.05px, i.e. below the 0.1 rounding of the emitted geometry) — the
+# assertion after the projection check keeps that honest.
+west, north, east, south = 123.6617, 45.5245, 145.8527, 24.1718
+W, H = (float(v) for v in re.search(
+    r'viewBox="0 0 ([\d.]+) ([\d.]+)"', svg).groups())
 print(f"geo: lon {west}..{east}  lat {south}..{north}  px {W:.1f}x{H:.1f}")
 
 def merc(lat):
@@ -42,13 +51,15 @@ def geo_y_merc(lat):
     return (MERC_N - merc(lat)) / (MERC_N - MERC_S) * H
 
 # ---- parse paths ----------------------------------------------------------
-paths = re.findall(r'<path\b[^>]*?d="([^"]+)"[^>]*?title="([^"]+)"', svg, re.S)
+# Prefectures are identified by their ISO 3166-2:JP code (`id="JP-nn"`).
+paths = re.findall(r'<path\b[^>]*?id="JP-(\d+)"[^>]*?d="([^"]+)"', svg, re.S)
 if len(paths) != 47:
     # attribute order may vary
-    paths = [(d, t) for t, d in re.findall(r'<path\b[^>]*?title="([^"]+)"[^>]*?d="([^"]+)"', svg, re.S)]
+    paths = [(c, d) for d, c in re.findall(
+        r'<path\b[^>]*?d="([^"]+)"[^>]*?id="JP-(\d+)"', svg, re.S)]
 print(f"paths: {len(paths)}")
 
-cmds_seen = set(re.findall(r"[a-zA-Z]", " ".join(d for d, _ in paths)))
+cmds_seen = set(re.findall(r"[a-zA-Z]", " ".join(d for _, d in paths)))
 print("commands:", sorted(cmds_seen))
 if not cmds_seen <= set("mMlLhHvVzZ"):
     sys.exit("unsupported path commands present — extend the parser")
@@ -112,33 +123,50 @@ def parse_path(d):
         rings.append(ring)
     return rings
 
-prefs = {}  # title -> rings
-for d, title in paths:
-    title = title.strip()
-    key = "Hokkaido" if title.startswith("Hokkaido") else title  # encoding artifact in source
-    prefs[key] = parse_path(d)
+prefs = {}  # ISO code (int) -> rings
+for code, d in paths:
+    prefs[int(code)] = parse_path(d)
 
 def bbox(rings):
     xs = [p[0] for r in rings for p in r]
     ys = [p[1] for r in rings for p in r]
     return min(xs), min(ys), max(xs), max(ys)
 
-# ---- projection check -----------------------------------------------------
-CITIES = {
-    "Osaka":   {"lat": 34.6937, "lon": 135.5023, "pref": "Osaka"},
-    "Sapporo": {"lat": 43.0618, "lon": 141.3545, "pref": "Hokkaido"},
-    "Tokyo":   {"lat": 35.6762, "lon": 139.6503, "pref": "Tokyo"},
+# ---- the itinerary's regions ----------------------------------------------
+# One entry per trip stop, in travel order, mirroring TRIPS["japan_2026"] in
+# app/main.py: `prefs` are the region's prefectures (ISO 3166-2:JP codes,
+# highlighted as one shape), `lat`/`lon` the base city the dot sits on, and
+# `base` names that city's own prefecture for the projection check below.
+# Kansai is taken as the 2府4県 (Mie counted to Tokai, as it usually is).
+REGIONS = {
+    "Kansai":   {"lat": 34.6937, "lon": 135.5023, "base": 27,  # Osaka
+                 "prefs": [25, 26, 27, 28, 29, 30]},           # Shiga Kyoto Osaka Hyogo Nara Wakayama
+    "Hokkaido": {"lat": 43.0618, "lon": 141.3545, "base": 1,   # Sapporo
+                 "prefs": [1]},
+    "Kanto":    {"lat": 35.6762, "lon": 139.6503, "base": 13,  # Tokyo
+                 "prefs": [8, 9, 10, 11, 12, 13, 14]},         # Ibaraki Tochigi Gunma Saitama Chiba Tokyo Kanagawa
 }
-for name, c in CITIES.items():
+ORDER = list(REGIONS)
+
+# ---- projection check -----------------------------------------------------
+for name, c in REGIONS.items():
     x = geo_x(c["lon"])
     yl, ym = geo_y_linear(c["lat"]), geo_y_merc(c["lat"])
-    bx0, by0, bx1, by1 = bbox(prefs[c["pref"]])
+    bx0, by0, bx1, by1 = bbox(prefs[c["base"]])
     print(f"{name:8s} x={x:7.1f}  y_lin={yl:7.1f}  y_merc={ym:7.1f}   "
-          f"{c['pref']} bbox x {bx0:.0f}..{bx1:.0f}  y {by0:.0f}..{by1:.0f}")
+          f"JP-{c['base']:02d} bbox x {bx0:.0f}..{bx1:.0f}  y {by0:.0f}..{by1:.0f}")
 
 # Mercator confirmed by the check above (linear lands outside the bboxes).
 def pt(lon, lat):
     return geo_x(lon), geo_y_merc(lat)
+
+# The recovered lon/lat envelope has to keep reproducing the anchor dots of
+# the previous generation — otherwise the whole map has silently shifted.
+for name, want in (("Kansai", (233.7, 279.2)), ("Hokkaido", (349.2, 67.6)),
+                   ("Kanto", (315.6, 255.5))):
+    got = pt(REGIONS[name]["lon"], REGIONS[name]["lat"])
+    if max(abs(a - b) for a, b in zip(got, want)) > 0.05:
+        sys.exit(f"projection drifted: {name} {got} != {want}")
 
 # ---- crop to the route region (Kansai -> Hokkaido) ------------------------
 X0, Y_TOP = pt(130.6, 45.523885)   # left edge / map top
@@ -218,20 +246,20 @@ def process(rings):
     return out
 
 pts_before = sum(len(r) for rings in prefs.values() for r in rings)
-visited_prefs = {"Osaka": "Osaka", "Tokyo": "Tokyo", "Hokkaido": "Sapporo"}  # pref -> stop city
-land_rings, visited = [], {}
-for name, rings in prefs.items():
+visited_prefs = {code: name for name, c in REGIONS.items() for code in c["prefs"]}
+land_rings, visited = [], {n: [] for n in ORDER}
+for code, rings in prefs.items():
     slim = process(rings)
-    if name in visited_prefs:
-        visited[visited_prefs[name]] = slim
+    if code in visited_prefs:
+        visited[visited_prefs[code]].extend(slim)
     else:
         land_rings.extend(slim)
 pts_after = sum(len(r) for r in land_rings) + sum(len(r) for rings in visited.values() for r in rings)
 print(f"points: {pts_before} -> {pts_after}")
 
-# ---- route + city markup ---------------------------------------------------
-DOTS = {name: pt(c["lon"], c["lat"]) for name, c in CITIES.items()}
-OSA, SPK, TYO = DOTS["Osaka"], DOTS["Sapporo"], DOTS["Tokyo"]
+# ---- route + stop markup ---------------------------------------------------
+DOTS = {name: pt(c["lon"], c["lat"]) for name, c in REGIONS.items()}
+OSA, SPK, TYO = (DOTS[n] for n in ORDER)
 
 def q(a, b, bulge):
     """Quadratic arc a->b, control point offset perpendicular by `bulge`."""
@@ -243,7 +271,7 @@ def q(a, b, bulge):
     return f"M{fmt(a[0])} {fmt(a[1])} Q{fmt(cx)} {fmt(cy)} {fmt(b[0])} {fmt(b[1])}"
 
 # seg index = the stop the leg ends AT (no leg into stop 0 — the map starts
-# at Osaka; the international arrival is told by the countdown, not the map)
+# in Kansai; the international arrival is told by the countdown, not the map)
 segs = [
     ("trip-map__seg", 1, q(OSA, SPK, 42)),
     ("trip-map__seg", 2, q(SPK, TYO, 34)),
@@ -251,9 +279,9 @@ segs = [
 
 # label placement: (dx, dy, text-anchor)
 LBL = {
-    "Osaka":   (-8, 12, "end"),
-    "Sapporo": (-8, -8, "end"),
-    "Tokyo":   (10, 5, "start"),
+    "Kansai":   (-8, 12, "end"),
+    "Hokkaido": (-8, -8, "end"),
+    "Kanto":    (10, 5, "start"),
 }
 
 def city_group(name):
@@ -269,25 +297,26 @@ def city_group(name):
     )
 
 pref_paths = "\n".join(
-    f'    <path class="trip-map__pref" data-map-pref="{city}" d="{rings_to_d(visited[city])}"/>'
-    for city in ("Osaka", "Sapporo", "Tokyo")
+    f'    <path class="trip-map__pref" data-map-pref="{name}" d="{rings_to_d(visited[name])}"/>'
+    for name in ORDER
 )
 seg_paths = "\n".join(
     f'      <path class="{cls}" data-map-seg="{i}" d="{d}"/>' for cls, i, d in segs
 )
-city_groups = "\n".join(city_group(n) for n in ("Osaka", "Sapporo", "Tokyo"))
+city_groups = "\n".join(city_group(n) for n in ORDER)
 
 html = f"""{{# Route map for the trip dashboard (generated — do not hand-edit paths).
    Source: tools/japan-prefectures.svg (MapSVG 47-prefecture map, Mercator),
    simplified + cropped to the route region by tools/generate_trip_map.py.
-   Regenerate with that script if the itinerary gains/loses cities.
+   Regenerate with that script if the itinerary gains/loses stops.
    State (is-upcoming / is-active / is-done on [data-map-city]/[data-map-pref],
    is-done / is-next on [data-map-seg]) is synced by initTrip() in app.js;
-   data-map-pref carries the STOP city (Hokkaido -> "Sapporo"), matching each
-   stop's data-city. #}}
+   both keys carry the STOP name — a region (Kansai / Hokkaido / Kanto),
+   whose [data-map-pref] shape is the union of its prefectures — matching
+   each stop's data-city. #}}
 <figure class="trip-map">
   <svg viewBox="{fmt(VB[0])} {fmt(VB[1])} {fmt(VB[2])} {fmt(VB[3])}" role="img"
-       aria-label="Route map: Osaka, then Sapporo, then Tokyo"
+       aria-label="Route map: {', then '.join(ORDER)}"
        preserveAspectRatio="xMidYMid meet">
     <path class="trip-map__land" d="{rings_to_d(land_rings)}"/>
 {pref_paths}

@@ -152,7 +152,7 @@ icon = icon.svg             # .svg / .png / .webp / .gif / .jpg
 
 It then shows up wherever that album is named: its card in the grids and the
 ★ rail, the breadcrumb trail, the hero title, and — for a trip album — the
-city stops of the itinerary timeline, which read the mark off each stop's own
+stops of the itinerary timeline, which read the mark off each stop's own
 sub-album. Sizing is relative to whatever type it sits in, so a mark works at
 every one of those places without per-page tuning. Served from
 `/album-icon/{album}`; as with the font, only the file named in the cfg is

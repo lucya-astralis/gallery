@@ -2,13 +2,13 @@
    timeline with a "you are here" marker. Numbers, labels, status stamp and
    per-stop state are filled/animated client-side by initTrip() in app.js,
    read from the data-* attributes against the viewer's own clock. Each stop
-   links into its city sub-album (cover + photo count), so the timeline
+   links into its region sub-album (cover + photo count), so the timeline
    doubles as navigation. The static markup is a sensible no-JS fallback.
    The matching route map (_trip_map.html) renders in the album sidebar —
    see album.html — and is state-synced by the same initTrip(). #}
-{# Leg card: the city cover fills the card behind a left-heavy shade; on top
-   a head row (state dot / emblem / city / kanji), the date span, and a footer
-   — the emblem is the city album's own `icon = …` (album.cfg), so a stop
+{# Leg card: the stop's cover fills the card behind a left-heavy shade; on
+   top a head row (state dot / emblem / region / kanji), the date span, and a
+   footer — the emblem is the stop album's own `icon = …` (album.cfg), so a stop
    whose album sets none simply renders without one.
    with the live weather readout (filled by initTrip() from /api/trip-weather
    — stays hidden without JS or data) opposite the day counter. #}
@@ -42,7 +42,7 @@
         </span>
       </span>
       {# day counter only — the photo tally and its arrow read as stray
-         chrome; the whole card is the link into the city album #}
+         chrome; the whole card is the link into the stop's album #}
       <span class="trip__stop-side">
         <span class="trip__stop-meta" data-stop-meta></span>
       </span>
