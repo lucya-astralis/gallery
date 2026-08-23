@@ -6,7 +6,7 @@ from pathlib import Path
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from . import scanner
+from . import control, scanner
 
 log = logging.getLogger("watcher")
 
@@ -33,6 +33,29 @@ class _Handler(FileSystemEventHandler):
         with self._lock:
             self._pending[path] = time.time()
 
+    def pending(self) -> int:
+        with self._lock:
+            return len(self._pending)
+
+    def _forget(self, fp: Path):
+        """A path that is gone: drop its row and its derivatives. Only ever
+        called for image paths — a deleted `notes.txt` must not take the
+        thumbnail of a `notes.jpg` sitting next to it with it."""
+        scanner.remove_image(self.photos_dir, fp)
+        try:
+            rel = fp.relative_to(self.photos_dir).as_posix()
+        except ValueError:
+            return
+        for d in (self.thumbs_dir, self.previews_dir, self.fulls_dir):
+            if d is None:
+                continue
+            f = (d / rel).with_suffix(".jpg")
+            try:
+                if f.exists():
+                    f.unlink()
+            except OSError:
+                pass
+
     def _is_meta(self, path: Path) -> bool:
         """True for anything in an album's `.album/` folder — descriptions,
         fonts, and any image that happens to live there (a font specimen,
@@ -55,6 +78,12 @@ class _Handler(FileSystemEventHandler):
     def _drain(self):
         while True:
             time.sleep(1.5)
+            # While paused, nothing is drained — but events keep piling up in
+            # `_pending` (keyed by path, so repeated churn on one file
+            # collapses into one entry). A pause therefore never loses a
+            # filesystem change; it defers it to the resume.
+            if control.is_paused():
+                continue
             now = time.time()
             ready: list[str] = []
             with self._lock:
@@ -79,7 +108,8 @@ class _Handler(FileSystemEventHandler):
                             log.warning("tag reindex failed for %s: %s", image, e)
                     continue
                 if not fp.exists():
-                    scanner.remove_image(self.photos_dir, fp)
+                    if scanner.is_image(fp):
+                        self._forget(fp)
                     continue
                 if not scanner.is_image(fp):
                     continue
@@ -107,37 +137,33 @@ class _Handler(FileSystemEventHandler):
 
     def on_moved(self, event):
         if not event.is_directory:
-            scanner.remove_image(self.photos_dir, Path(event.src_path))
+            # The source is gone and the destination is new — both go through
+            # the queue, where the drain tells them apart by existence.
+            self._enqueue(event.src_path)
             self._enqueue(event.dest_path)
 
     def on_deleted(self, event):
-        if event.is_directory:
-            return
-        fp = Path(event.src_path)
-        if fp.name == "album.cfg":
-            self._fire_config()
-            return
-        if self._is_meta(fp):
-            return  # album metadata — nothing indexed, nothing to clean up
-        if fp.suffix == ".tags":
-            image = fp.with_suffix("")
-            if image.exists() and scanner.is_image(image):
-                try:
-                    scanner.index_image(self.photos_dir, image)
-                except Exception as e:
-                    log.warning("tag-removal reindex failed for %s: %s", image, e)
-            return
-        scanner.remove_image(self.photos_dir, fp)
-        try:
-            rel = fp.relative_to(self.photos_dir).as_posix()
-            for d in (self.thumbs_dir, self.previews_dir, self.fulls_dir):
-                if d is None:
-                    continue
-                f = (d / rel).with_suffix(".jpg")
-                if f.exists():
-                    f.unlink()
-        except Exception:
-            pass
+        if not event.is_directory:
+            # Deletions are debounced like everything else: the drain sees a
+            # path that no longer exists and forgets it (row + derivatives).
+            # Routing them through the same queue keeps `pause` honest —
+            # otherwise a delete would still hit the index while paused.
+            self._enqueue(event.src_path)
+
+
+_handler: "_Handler | None" = None
+
+
+def is_running() -> bool:
+    """True once start() has installed a handler in this process."""
+    return _handler is not None
+
+
+def pending_count() -> int:
+    """Events waiting in the debounce buffer — 0 when the watcher is off.
+    Reported by `python -m app.debug status`, where a number that only grows
+    means the drain is stuck (or paused)."""
+    return _handler.pending() if _handler is not None else 0
 
 
 def start(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
@@ -147,7 +173,9 @@ def start(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         photos_dir.mkdir(parents=True, exist_ok=True)
     except (OSError, PermissionError):
         pass
+    global _handler
     handler = _Handler(photos_dir, thumbs_dir, thumb_size, previews_dir, preview_size, fulls_dir, on_config)
+    _handler = handler
     obs = Observer()
     obs.schedule(handler, str(photos_dir), recursive=True)
     obs.daemon = True

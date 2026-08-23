@@ -15,17 +15,6 @@ log = logging.getLogger("scanner")
 STRIP_GPS = os.environ.get("STRIP_GPS", "1") not in ("0", "false", "False", "")
 GPS_IFD_TAG = 0x8825
 
-# Showcase marker: prefix character used to flag featured items.
-#   - A *photo* whose filename (without extension) starts with the marker
-#     is a showcase photo (featured in the welcome CRT, in /api/showcase
-#     and in its own album's "featured" strip).
-#   - An *album* whose folder name starts with the marker is a showcase
-#     album (surfaced in the dedicated section on /albums).
-# The two flags are INDEPENDENT — putting a photo inside a showcase
-# album does NOT auto-feature it. Default marker is an underscore;
-# configurable via the SHOWCASE_MARKER env var. Set to empty to disable.
-SHOWCASE_MARKER = os.environ.get("SHOWCASE_MARKER", "_")
-
 # Per-album metadata folder. Everything that describes an album rather than
 # being one of its photos — album.cfg, the album_*.md descriptions, a custom
 # title font — lives in `<album>/.album/`, keeping the photo folder itself
@@ -40,24 +29,15 @@ def is_meta_path(relp: Path) -> bool:
     return ALBUM_META_DIR in relp.parts
 
 
-def is_showcase_photo(filename: str) -> bool:
-    """True if a photo's filename marks it as a showcase item."""
-    if not SHOWCASE_MARKER:
-        return False
-    stem = filename.rsplit(".", 1)[0] if "." in filename else filename
-    return stem.startswith(SHOWCASE_MARKER)
-
-
-def is_showcase_album(album: str) -> bool:
-    """True if an album's folder name marks it as a showcase album."""
-    if not SHOWCASE_MARKER:
-        return False
-    return album.startswith(SHOWCASE_MARKER)
-
+# iPhone photos are HEIC; without the plugin they cannot be opened at all,
+# so the flag is worth reporting rather than only logging once at import
+# (see `python -m app.debug status`).
 try:
     from pillow_heif import register_heif_opener
     register_heif_opener()
+    HEIF_SUPPORTED = True
 except ImportError:
+    HEIF_SUPPORTED = False
     log.warning("pillow-heif not installed; HEIC/HEIF support disabled")
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif", ".heic", ".heif"}
@@ -337,7 +317,7 @@ def _sync_tags(image_id: int, tag_names: list[str]):
         c.commit()
 
 
-def index_image(photos_dir: Path, file: Path) -> bool:
+def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
     relp = file.relative_to(photos_dir)
     rel = relp.as_posix()
     parts = relp.parts
@@ -360,7 +340,10 @@ def index_image(photos_dir: Path, file: Path) -> bool:
     c = db.conn()
     with db.lock():
         row = c.execute("SELECT id, mtime FROM images WHERE rel_path = ?", (rel,)).fetchone()
-        if row and abs(row["mtime"] - effective_mtime) < 1.0:
+        # `force` re-reads a file whose mtime says "unchanged" — the escape
+        # hatch for a row that went bad (bogus EXIF, a restored backup that
+        # kept its old timestamps). See app/debug.py `scan --force`.
+        if not force and row and abs(row["mtime"] - effective_mtime) < 1.0:
             return False
 
     if STRIP_GPS and strip_gps_inplace(file):
@@ -383,10 +366,10 @@ def index_image(photos_dir: Path, file: Path) -> bool:
         return False
 
     # `is_showcase` (featured flag) is owned by main._recompute_featured(),
-    # which derives it from each album's album.cfg (`featured = …`) with the
-    # legacy filename-marker as a fallback. We deliberately leave the column
-    # untouched here so a re-index never clobbers a computed flag: new rows
-    # default to 0, existing rows keep their value.
+    # which derives it from each album's album.cfg (`featured = …`). We
+    # deliberately leave the column untouched here so a re-index never
+    # clobbers a computed flag: new rows default to 0, existing rows keep
+    # their value.
     with db.lock():
         c.execute(
             """INSERT INTO images (album, filename, rel_path, mtime, size, width, height, exif_json, taken_at)
@@ -414,8 +397,24 @@ def remove_image(photos_dir: Path, file: Path):
         c.commit()
 
 
+def _empty_scan(root: str | None = None) -> dict:
+    return {"indexed": 0, "thumbnails": 0, "previews": 0, "removed": 0,
+            "failed": 0, "total_seen": 0, "root": root}
+
+
 def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
-              previews_dir: Path | None = None, preview_size: int = 1600) -> dict:
+              previews_dir: Path | None = None, preview_size: int = 1600,
+              root: str | None = None, force: bool = False) -> dict:
+    """Walk the photo tree, index what changed, build missing derivatives and
+    drop rows whose file is gone.
+
+    `root` narrows all of that to one album subtree (path relative to
+    photos_dir) — including the stale-row cleanup, which is then scoped to
+    rows inside that subtree. Without the scoping a partial walk would read
+    as "everything else disappeared" and wipe the rest of the index.
+
+    `force` re-indexes and re-derives even when mtimes say nothing changed.
+    """
     added = 0
     thumbed = 0
     previewed = 0
@@ -426,11 +425,21 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
             photos_dir.mkdir(parents=True, exist_ok=True)
         except (OSError, PermissionError):
             log.warning("photos dir does not exist and is not writable: %s", photos_dir)
-            return {"indexed": 0, "thumbnails": 0, "previews": 0, "removed": 0,
-                    "failed": 0, "total_seen": 0}
+            return _empty_scan(root)
+    base = photos_dir
+    if root:
+        base = (photos_dir / root).resolve()
+        try:
+            base.relative_to(photos_dir)
+        except ValueError:
+            log.warning("scan root outside the photo tree: %s", root)
+            return _empty_scan(root)
+        if not base.is_dir():
+            log.warning("scan root does not exist: %s", root)
+            return _empty_scan(root)
     # Walk the whole tree so albums can nest (photos/japan/tokyo/img.jpg).
     # Files sitting directly in photos_dir (no album folder) are skipped.
-    for file in sorted(photos_dir.rglob("*")):
+    for file in sorted(base.rglob("*")):
         if not file.is_file() or not is_image(file):
             continue
         relp = file.relative_to(photos_dir)
@@ -451,18 +460,18 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         # file until it is removed.
         broken = False  # counts the FILE once, however many derivatives failed
         try:
-            if index_image(photos_dir, file):
+            if index_image(photos_dir, file, force=force):
                 added += 1
             mtime = file.stat().st_mtime
             thumb_path = (thumbs_dir / rel).with_suffix(".jpg")
-            if not thumb_path.exists() or thumb_path.stat().st_mtime < mtime:
+            if force or not thumb_path.exists() or thumb_path.stat().st_mtime < mtime:
                 if make_thumbnail(file, thumb_path, thumb_size):
                     thumbed += 1
                 else:
                     broken = True
             if previews_dir is not None:
                 preview_path = (previews_dir / rel).with_suffix(".jpg")
-                if not preview_path.exists() or preview_path.stat().st_mtime < mtime:
+                if force or not preview_path.exists() or preview_path.stat().st_mtime < mtime:
                     if make_thumbnail(file, preview_path, preview_size):
                         previewed += 1
                     else:
@@ -475,7 +484,16 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
 
     c = db.conn()
     with db.lock():
-        existing = [r["rel_path"] for r in c.execute("SELECT rel_path FROM images").fetchall()]
+        if root:
+            # Scoped cleanup: only rows inside the walked subtree may be
+            # dropped. substr() (not LIKE) keeps `_`/`%` in album names from
+            # acting as wildcards.
+            prefix = root + "/"
+            existing = [r["rel_path"] for r in c.execute(
+                "SELECT rel_path FROM images WHERE album = ? OR substr(album, 1, ?) = ?",
+                (root, len(prefix), prefix)).fetchall()]
+        else:
+            existing = [r["rel_path"] for r in c.execute("SELECT rel_path FROM images").fetchall()]
         removed = 0
         for rel in existing:
             if rel not in seen:
@@ -489,6 +507,7 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         "removed": removed,
         "failed": failed,
         "total_seen": len(seen),
+        "root": root,
     }
 
 

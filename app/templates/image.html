@@ -29,7 +29,7 @@
      otherwise to the album this image physically lives in #}
   {% if collection_root %}
     {% set up_url = '/album/' ~ collection_root %}
-    {% set up_name = display_name(collection_root.split('/')[-1]) %}
+    {% set up_name = collection_root.split('/')[-1] %}
   {% elif breadcrumbs %}
     {% set up_url = '/album/' ~ breadcrumbs[-1].path %}
     {% set up_name = breadcrumbs[-1].name %}

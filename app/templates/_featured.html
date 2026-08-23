@@ -11,7 +11,7 @@
    random album photos instead (reel_mode tells us which), so the header
    is relabelled to match. #}
 {%- macro feat_label(img) -%}
-  {%- if img.album != album -%}{{ pretty_rel(img.album[(album | length) + 1:]) }} / {% endif -%}{{ display_name(img.filename) }}
+  {%- if img.album != album -%}{{ img.album[(album | length) + 1:] }} / {% endif -%}{{ img.filename }}
 {%- endmacro -%}
 {% set reel_random = reel_mode == 'random' %}
 {# fhero--hero: the reel doubles as the album's hero block on every viewport
@@ -23,11 +23,10 @@
   <div class="fhero__frame">
     <div class="fhero__stage" id="fhero-stage">
       {% for img in featured %}
-        {% set pretty = pretty_rel(img.rel_path) %}
-        <a class="fhero__slide{% if loop.first %} is-on{% endif %}" href="/image/{{ pretty }}"
+        <a class="fhero__slide{% if loop.first %} is-on{% endif %}" href="/image/{{ img.rel_path }}"
            data-filename="{{ feat_label(img) }}"
            tabindex="-1" aria-hidden="{% if loop.first %}false{% else %}true{% endif %}">
-          <img src="/preview/{{ pretty }}" alt="{{ feat_label(img) }}"
+          <img src="/preview/{{ img.rel_path }}" alt="{{ feat_label(img) }}"
                loading="{% if loop.first %}eager{% else %}lazy{% endif %}" decoding="async">
         </a>
       {% endfor %}
@@ -35,7 +34,7 @@
     </div>
     <span class="fhero__chip fhero__chip--star" aria-hidden="true">{% if reel_random %}⟳{% else %}★{% endif %}</span>
     <span class="fhero__chip fhero__chip--frm">FRM <b id="fhero-idx">01</b><span>/{{ '%02d' | format(featured | length) }}</span></span>
-    <a class="fhero__file" id="fhero-file" href="/image/{{ pretty_rel(featured[0].rel_path) }}">
+    <a class="fhero__file" id="fhero-file" href="/image/{{ featured[0].rel_path }}">
       <span class="fhero__file-name" id="fhero-name" data-scramble>{{ feat_label(featured[0]) }}</span>
       <span class="fhero__file-open" aria-hidden="true">{{ t('reel.open') }}</span>
     </a>

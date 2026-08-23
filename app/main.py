@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import db, i18n, scanner, watcher
+from . import control, db, i18n, scanner, watcher
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 log = logging.getLogger("main")
@@ -38,6 +38,7 @@ STRIP_GPS = os.environ.get("STRIP_GPS", "1") not in ("0", "false", "False", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 
 _scan_lock = threading.Lock()
+_STARTED_AT = time.time()
 
 try:
     PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
@@ -47,6 +48,8 @@ THUMBS_DIR.mkdir(parents=True, exist_ok=True)
 PREVIEWS_DIR.mkdir(parents=True, exist_ok=True)
 FULLS_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+# Flag-file channel the CLI talks to this process through (app/control.py).
+control.configure(DATA_DIR)
 
 app = FastAPI(title="lucya.systems gallery", docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -121,40 +124,6 @@ def _public_base_url(request: Request) -> str:
 
 
 templates.env.globals["public_base_url"] = _public_base_url
-
-
-# ----- showcase helpers -------------------------------------------------
-SHOWCASE_MARKER = scanner.SHOWCASE_MARKER
-
-
-def _display_name(s: str) -> str:
-    """Strip a single leading showcase-marker char for human display."""
-    if SHOWCASE_MARKER and s.startswith(SHOWCASE_MARKER):
-        stripped = s[len(SHOWCASE_MARKER):].lstrip("-_ ")
-        return stripped or s
-    return s
-
-
-def _strip_marker_segment(s: str) -> str:
-    if SHOWCASE_MARKER and s.startswith(SHOWCASE_MARKER):
-        return s[len(SHOWCASE_MARKER):] or s
-    return s
-
-
-def _pretty_rel(rel_path: str) -> str:
-    """Strip the leading showcase marker from each segment of a rel_path so
-    featured links don't expose the internal `_` prefix."""
-    if not SHOWCASE_MARKER:
-        return rel_path
-    parts = rel_path.split("/")
-    if not parts:
-        return rel_path
-    return "/".join(_strip_marker_segment(p) for p in parts)
-
-
-templates.env.globals["display_name"] = _display_name
-templates.env.globals["pretty_rel"] = _pretty_rel
-templates.env.globals["showcase_marker"] = SHOWCASE_MARKER
 # month_label is provided per request by _i18n_context (localized)
 
 
@@ -189,8 +158,8 @@ def _showcase_album_rows(limit: int | None = None):
     """Top-level showcase albums for the ★ FEATURED rails (welcome screen
     and /albums). Newest-active first — unless gallery.cfg defines a curated
     `album_order`, which then fixes the rail order too. Whether an album is
-    a showcase is decided by `_album_is_showcase` (album.cfg `showcase = …`,
-    legacy `_` folder marker as fallback). Same card shape as `albums_index`
+    a showcase is decided by `_album_is_showcase` (album.cfg
+    `showcase = …`). Same card shape as `albums_index`
     (album, name, count, latest, cover, sub_count) so the showcase-album
     partial can be reused on both pages."""
     cards = [c for c in _top_level_album_cards() if _album_is_showcase(c["album"])]
@@ -210,8 +179,6 @@ def _serialize_photo(row: dict, base: str, tags: list[str] | None = None) -> dic
         "rel_path": rel,
         "album": row["album"],
         "filename": row["filename"],
-        "display_album": _display_name(row["album"]),
-        "display_filename": _display_name(row["filename"]),
         "width": row.get("width"),
         "height": row.get("height"),
         "size": row.get("size"),
@@ -348,7 +315,7 @@ def _album_card(album: str, all_albums: list[str] | None = None) -> dict:
     cover_rel = _album_cover_rel(album)
     return {
         "album": album,
-        "name": _display_name(album.rsplit("/", 1)[-1]),
+        "name": album.rsplit("/", 1)[-1],
         "count": agg["count"] if agg else 0,
         "latest": agg["latest"] if agg else None,
         "cover": cover_rel,
@@ -366,10 +333,9 @@ def _top_level_album_cards(all_albums: list[str] | None = None) -> list[dict]:
 
 def _album_order_key(path: str) -> str:
     """Normalize an album path for matching against gallery.cfg
-    `album_order` entries: marker-stripped segments, lower-cased, so an
-    entry works with or without the showcase marker / exact casing."""
-    segs = path.replace("\\", "/").strip().strip("/").split("/")
-    return "/".join(_strip_marker_segment(s) for s in segs).lower()
+    `album_order` entries: lower-cased, so an entry works regardless of the
+    exact casing on disk."""
+    return path.replace("\\", "/").strip().strip("/").lower()
 
 
 def _curated_album_positions() -> dict[str, int]:
@@ -457,7 +423,7 @@ def _album_breadcrumbs(album: str) -> list[dict]:
             continue
         acc.append(seg)
         path = "/".join(acc)
-        out.append({"name": _display_name(seg), "path": path,
+        out.append({"name": seg, "path": path,
                     "icon": _album_icon_url(path)})
     return out
 
@@ -1005,9 +971,8 @@ def _album_icon_url(album: str | None) -> str | None:
     return f"/album-icon/{quote(album)}?v={max(stamps, default=0)}"
 
 
-# ----- showcase / featured (album.cfg owns it; `_` marker is fallback) --
-# album.cfg is the source of truth for two things that used to be driven by
-# the `_` prefix:
+# ----- showcase / featured (album.cfg owns it) --------------------------
+# album.cfg is the only source of truth for:
 #   showcase = true|false   -> is this a showcase album? (★ on /albums)
 #   featured = a.jpg, b.jpg -> which photos are featured (welcome hero,
 #                              /api/showcase, the featured hero slideshow of
@@ -1015,14 +980,11 @@ def _album_icon_url(album: str | None) -> str | None:
 #                              into sub-folders, bare filenames also match
 #                              anywhere in the subtree, and `*`/`all`
 #                              features every photo directly in the album.
-# When a key is ABSENT the legacy marker still applies, so existing albums
-# keep working until migrated; when present, album.cfg wins (and can switch
-# a marked album/photo back off).
+# A missing key simply means "not featured" — nothing is ever inferred from
+# a file or folder name.
 def _album_is_showcase(album: str, cfg: dict[str, list[str]] | None = None) -> bool:
     cfg = _album_config(album) if cfg is None else cfg
-    if "showcase" in cfg:
-        return _cfg_bool(_cfg_first(cfg, "showcase"))
-    return bool(SHOWCASE_MARKER) and album.rsplit("/", 1)[-1].startswith(SHOWCASE_MARKER)
+    return "showcase" in cfg and _cfg_bool(_cfg_first(cfg, "showcase"))
 
 
 def _resolve_photo_refs(album: str, items: list[str]) -> list[str]:
@@ -1034,10 +996,8 @@ def _resolve_photo_refs(album: str, items: list[str]) -> list[str]:
       * a bare filename matches that filename anywhere in the subtree
         (every same-named file),
       * a path matches any photo whose rel_path ends with it.
-    The fallback normalizes like `album_order` does — showcase markers
-    stripped per segment, case-insensitive — because the paths shown in the
-    UI are marker-stripped (see _pretty_rel), so `osaka/pic.jpg` also finds
-    `_osaka/pic.jpg`."""
+    The fallback normalizes like `album_order` does — case-insensitive, so
+    `Osaka/PIC.jpg` also finds `osaka/pic.jpg`."""
     c = db.conn()
     prefix = album + "/"
     subtree = None  # fallback pool, loaded once and only if something misses
@@ -1085,20 +1045,15 @@ def _resolve_featured(album: str, items: list[str]) -> set[str]:
 
 
 def _recompute_featured() -> None:
-    """Recompute the `is_showcase` flag for every photo from album.cfg
-    `featured` lists, falling back to the legacy filename marker for albums
-    that don't configure it. The single owner of the column — runs at startup
-    and after every scan / album.cfg change."""
+    """Recompute the `is_showcase` flag for every photo from the album.cfg
+    `featured` lists. The single owner of the column — runs at startup and
+    after every scan / album.cfg change."""
     c = db.conn()
     featured: set[str] = set()
     for album in _albums_with_ancestors():
         cfg = _album_config(album)
         if "featured" in cfg:
             featured |= _resolve_featured(album, cfg["featured"])
-        elif SHOWCASE_MARKER:
-            for r in c.execute("SELECT rel_path, filename FROM images WHERE album = ?", (album,)):
-                if scanner.is_showcase_photo(r["filename"]):
-                    featured.add(r["rel_path"])
     # Apply the whole set in ONE statement. Clearing the column and adding the
     # flags back row by row would be visible to anyone reading mid-flight: the
     # app shares a single sqlite connection (db.py), so concurrent SELECTs run
@@ -1151,9 +1106,8 @@ def _refresh_featured_on_cfg_change(album: str) -> None:
 # ----- trip dashboard ---------------------------------------------------
 # An optional "trip" overlay (a live flight countdown + an itinerary
 # timeline with a "you are here" marker) rendered at the top of one album.
-# Config is keyed by the album's marker-stripped, lower-cased path so it
-# matches whether or not the folder carries the showcase marker (e.g.
-# `_japan_2026` -> `japan_2026`). All dates are wall-clock; the live
+# Config is keyed by the album's lower-cased path (e.g. `japan_2026`).
+# All dates are wall-clock; the live
 # countdown and current-stop highlight are computed client-side (initTrip
 # in app.js) against the viewer's own clock — so it reads correctly both
 # from home before the flight and on the ground once the trip is underway.
@@ -1186,13 +1140,13 @@ TRIPS: dict[str, dict] = {
 
 def _trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
     """Render-ready trip dashboard for `album`, or None when the album has
-    no configured trip. Matched on the marker-stripped, lower-cased path so
-    `_japan_2026` resolves to the `japan_2026` config. Each stop is wired to
-    its sub-album — cover + photo count + link — so the timeline doubles as
-    navigation into the region galleries (empty folders stay unlinked).
+    no configured trip. Matched on the lower-cased album path. Each stop is
+    wired to its sub-album — cover + photo count + link — so the timeline
+    doubles as navigation into the region galleries (empty folders stay
+    unlinked).
     Human-readable dates are localized; app.js re-renders them client-side
     in the same language (read from <html lang>)."""
-    key = "/".join(_strip_marker_segment(s) for s in album.split("/")).lower()
+    key = album.lower()
     cfg = TRIPS.get(key)
     if not cfg:
         return None
@@ -1604,19 +1558,82 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     return Response(content=str(exc.detail), status_code=exc.status_code)
 
 
-def _run_scan():
+# ----- indexer control --------------------------------------------------
+# The gallery takes no orders over HTTP — there is no endpoint that makes the
+# server do work, by design. Operations (pause, resume, "scan now") arrive as
+# flag files in DATA_DIR/control, written by the CLI and picked up by
+# _control_loop; the same loop publishes status.json, which is the only window
+# the CLI has into this process. The channel itself lives in app/control.py.
+_HEARTBEAT_INTERVAL = 15.0
+
+_scan_state: dict = {
+    "scanning": False,
+    "started_at": None,
+    "trigger": None,
+    "last_scan": None,
+}
+_scan_state_lock = threading.Lock()
+
+
+def _publish_status() -> None:
+    """Snapshot this process for `python -m app.debug status`. Cheap enough to
+    call on every scan edge plus a slow heartbeat."""
+    with _scan_state_lock:
+        state = dict(_scan_state)
+    pause = control.pause_info()
+    control.publish_status({
+        "started_at": _STARTED_AT,
+        "paused": pause is not None,
+        "pause": pause,
+        "scanning": state["scanning"],
+        "scan_started_at": state["started_at"],
+        "scan_trigger": state["trigger"],
+        "last_scan": state["last_scan"],
+        "pending_request": control.pending_scan_request(),
+        "watcher": {
+            "enabled": ENABLE_WATCHER,
+            "running": watcher.is_running(),
+            "pending": watcher.pending_count(),
+        },
+        "config": {
+            "photos_dir": str(PHOTOS_DIR),
+            "thumbs_dir": str(THUMBS_DIR),
+            "previews_dir": str(PREVIEWS_DIR),
+            "data_dir": str(DATA_DIR),
+            "thumb_size": THUMB_SIZE,
+            "preview_size": PREVIEW_SIZE,
+            "scan_interval": SCAN_INTERVAL,
+            "hide_gps": HIDE_GPS,
+            "strip_gps": STRIP_GPS,
+        },
+    })
+
+
+def _run_scan(trigger: str = "periodic", album: str | None = None,
+              force: bool = False, request_id: str | None = None) -> dict | None:
+    """One indexing pass, then a featured recompute. Returns the run summary,
+    or None when a scan was already in flight — the lock is never waited on,
+    two overlapping scans would only fight over the same rows."""
     if not _scan_lock.acquire(blocking=False):
-        return
+        log.info("scan (%s) skipped: a scan is already running", trigger)
+        return None
+    started = time.time()
+    error = None
+    result = None
+    with _scan_state_lock:
+        _scan_state.update(scanning=True, started_at=started, trigger=trigger)
+    _publish_status()
     try:
-        result = None
         try:
             result = scanner.full_scan(
                 PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE,
                 previews_dir=PREVIEWS_DIR, preview_size=PREVIEW_SIZE,
+                root=album, force=force,
             )
         except Exception as e:
+            error = f"{type(e).__name__}: {e}"
             log.exception("scan failed: %s", e)
-        # Re-derive featured flags from album.cfg (+ legacy marker fallback).
+        # Re-derive featured flags from album.cfg.
         # Runs even when the walk blew up: the index is then partial, but
         # leaving is_showcase stale on top of it hides featured photos too.
         _recompute_featured()
@@ -1628,15 +1645,61 @@ def _run_scan():
                         "without a thumbnail until fixed or removed",
                         result["failed"])
     except Exception as e:
+        error = error or f"{type(e).__name__}: {e}"
         log.exception("scan bookkeeping failed: %s", e)
     finally:
+        finished = time.time()
+        summary = {
+            "trigger": trigger,
+            "request_id": request_id,
+            "album": album,
+            "force": force,
+            "started_at": started,
+            "finished_at": finished,
+            "seconds": round(finished - started, 3),
+            "error": error,
+            "result": result,
+        }
+        with _scan_state_lock:
+            _scan_state.update(scanning=False, started_at=None, trigger=None,
+                               last_scan=summary)
         _scan_lock.release()
+        _publish_status()
+    return summary
 
 
-def _periodic_scan_loop():
+def _control_loop():
+    """Heartbeat, control channel and periodic rescan in one thread.
+
+    Ticks every control.CONTROL_TICK seconds, so a manual scan starts within
+    ~2s instead of after a whole SCAN_INTERVAL. Runs even with
+    SCAN_INTERVAL=0: the periodic pass is off then, but pause/resume, manual
+    scans and the status heartbeat still work."""
+    last_periodic = time.monotonic()
+    last_beat = 0.0
     while True:
-        time.sleep(SCAN_INTERVAL)
-        _run_scan()
+        time.sleep(control.CONTROL_TICK)
+        try:
+            req = control.take_scan_request()
+            if req is not None:
+                # A requested scan ignores the pause on purpose: it was asked
+                # for explicitly, and it is how you index a one-off change
+                # without lifting a maintenance pause.
+                _run_scan(trigger="manual", album=req.get("album"),
+                          force=bool(req.get("force")), request_id=req.get("id"))
+                last_periodic = last_beat = time.monotonic()
+                continue
+            now = time.monotonic()
+            if (SCAN_INTERVAL > 0 and not control.is_paused()
+                    and now - last_periodic >= SCAN_INTERVAL):
+                _run_scan(trigger="periodic")
+                last_periodic = last_beat = time.monotonic()
+                continue
+            if now - last_beat >= _HEARTBEAT_INTERVAL:
+                last_beat = now
+                _publish_status()
+        except Exception as e:
+            log.warning("control tick failed: %s: %s", type(e).__name__, e)
 
 
 @app.on_event("startup")
@@ -1644,10 +1707,18 @@ def _startup():
     db.init(DATA_DIR)
     _recompute_featured()
     log.info(
-        "photos=%s thumbs=%s data=%s thumb_size=%d watcher=%s scan_interval=%ds hide_gps=%s strip_gps=%s showcase_marker=%r",
-        PHOTOS_DIR, THUMBS_DIR, DATA_DIR, THUMB_SIZE, ENABLE_WATCHER, SCAN_INTERVAL, HIDE_GPS, STRIP_GPS, scanner.SHOWCASE_MARKER,
+        "photos=%s thumbs=%s data=%s thumb_size=%d watcher=%s scan_interval=%ds hide_gps=%s strip_gps=%s",
+        PHOTOS_DIR, THUMBS_DIR, DATA_DIR, THUMB_SIZE, ENABLE_WATCHER, SCAN_INTERVAL, HIDE_GPS, STRIP_GPS,
     )
-    threading.Thread(target=_run_scan, daemon=True).start()
+    if control.is_paused():
+        info = control.pause_info() or {}
+        # A pause is deliberately persistent: it survives the restart it was
+        # very likely set for. No startup scan, no periodic scan; the watcher
+        # still starts, but only queues events (see watcher._drain).
+        log.warning("indexer PAUSED (%s) — resume with `python -m app.debug resume`",
+                    info.get("reason") or "no reason given")
+    else:
+        threading.Thread(target=_run_scan, kwargs={"trigger": "startup"}, daemon=True).start()
     if ENABLE_WATCHER:
         try:
             watcher.start(PHOTOS_DIR, THUMBS_DIR, THUMB_SIZE,
@@ -1655,9 +1726,17 @@ def _startup():
                           fulls_dir=FULLS_DIR, on_config=_recompute_featured)
         except Exception as e:
             log.warning("watcher failed to start: %s", e)
+    threading.Thread(target=_control_loop, daemon=True).start()
     if SCAN_INTERVAL > 0:
-        threading.Thread(target=_periodic_scan_loop, daemon=True).start()
         log.info("periodic rescan every %d seconds", SCAN_INTERVAL)
+    _publish_status()
+
+
+@app.on_event("shutdown")
+def _shutdown():
+    # Drop the snapshot so the CLI reports "not running" right away instead
+    # of waiting for the heartbeat to age out.
+    control.clear_status()
 
 
 def _safe_rel(album: str, filename: str) -> Path:
@@ -1679,30 +1758,6 @@ def _safe_rel(album: str, filename: str) -> Path:
     return rel
 
 
-def _resolve_showcase_path(album: str, filename: str) -> tuple[str, str]:
-    """Featured items expose marker-stripped URLs (see _pretty_rel). When a
-    request comes in for a pretty path, try the marker-prefixed variants so
-    the original file is found."""
-    if not SHOWCASE_MARKER:
-        return album, filename
-    pm = SHOWCASE_MARKER
-    variants = [(album, filename)]
-    if not filename.startswith(pm):
-        variants.append((album, pm + filename))
-    if not album.startswith(pm):
-        variants.append((pm + album, filename))
-        if not filename.startswith(pm):
-            variants.append((pm + album, pm + filename))
-    for a, f in variants:
-        try:
-            rel = _safe_rel(a, f)
-        except HTTPException:
-            continue
-        if (PHOTOS_DIR / rel).exists():
-            return a, f
-    return album, filename
-
-
 # ----- gallery-wide config (gallery.cfg) ---------------------------------
 # Optional `gallery.cfg` dropped into the photos ROOT (next to the album
 # folders). Same format as album.cfg (see _parse_cfg: `key = value`, list
@@ -1711,8 +1766,7 @@ def _resolve_showcase_path(album: str, filename: str) -> tuple[str, str]:
 #                                    (default; same as no file / no key)
 #   welcome = random              -> hero feed = random photos, ignore featured
 #   welcome = <album/file.jpg>,…  -> hand-picked hero feed in exactly this
-#                                    order (paths are relative to photos/,
-#                                    marker prefixes may be omitted).
+#                                    order (paths are relative to photos/).
 #                                    Unresolvable entries are skipped with a
 #                                    warning; if nothing resolves, falls back
 #                                    to showcase.
@@ -1762,26 +1816,15 @@ def _is_mobile_request(request: Request) -> bool:
 
 
 def _lookup_welcome_image(raw: str):
-    """Resolve one gallery.cfg welcome entry to an indexed image row. Accepts
-    backslashes and marker-stripped paths (the `_` prefix may be omitted)."""
+    """Resolve one gallery.cfg welcome entry to an indexed image row.
+    Backslashes are tolerated."""
     rel = raw.replace("\\", "/").strip().strip("/")
     if not rel or "/" not in rel:
         return None
     c = db.conn()
-    row = c.execute(
+    return c.execute(
         "SELECT album, filename, rel_path FROM images WHERE rel_path = ?", (rel,)
     ).fetchone()
-    if row:
-        return row
-    # second chance: re-add showcase markers the pretty path dropped
-    album, _, filename = rel.rpartition("/")
-    a, f = _resolve_showcase_path(album, filename)
-    if (a, f) != (album, filename):
-        return c.execute(
-            "SELECT album, filename, rel_path FROM images WHERE rel_path = ?",
-            (f"{a}/{f}",),
-        ).fetchone()
-    return None
 
 
 def _welcome_feed(mobile: bool = False) -> tuple[list[dict], str, str]:
@@ -1887,8 +1930,7 @@ def albums_index(request: Request, sort: str | None = None):
     default_sort = _pick_sort(_cfg_first(_gallery_config(), "album_sort"), allowed, SORT_ALBUM_DEFAULT)
     current_sort = _pick_sort(sort, allowed, default_sort)
     albums = _sorted_album_cards(_top_level_album_cards(), current_sort)
-    # annotate instead of a legacy `startswith(marker)` check in the template,
-    # so album.cfg-driven showcase albums are recognized too
+    # annotate here so the template only has to read the flag
     for a in albums:
         a["is_showcase"] = _album_is_showcase(a["album"])
     showcase_albums = [a for a in albums if a["is_showcase"]]
@@ -1975,10 +2017,8 @@ def _album_exists(album: str) -> bool:
 
 
 def _resolve_album_path(album: str) -> str | None:
-    """Map an album path off the URL to a real indexed album, tolerating a
-    stripped showcase marker and different casing on any segment (so
-    `japan_2026/kansai` finds `_japan_2026/kansai`, mirroring what
-    _resolve_showcase_path does for photos). None when nothing matches."""
+    """Map an album path off the URL to a real indexed album, tolerating
+    different casing on any segment. None when nothing matches."""
     album = album.strip("/").replace("\\", "/")
     if not album or ".." in album.split("/"):
         return None
@@ -2048,7 +2088,6 @@ def _serialize_album(card: dict, base: str) -> dict:
     return {
         "album": album,
         "name": card["name"],
-        "display_path": _pretty_rel(album),
         "count": card["count"],
         "latest": card["latest"],
         "sub_count": card["sub_count"],
@@ -2081,10 +2120,9 @@ def _album_reel(album: str, cfg: dict[str, list[str]], limit: int = 8) -> tuple[
     `featured` (the default) shows featured photos from this album AND its
     sub-albums, so a photo featured inside e.g. japan_2026/kansai surfaces on
     the japan_2026 page too — a showcase ALBUM doesn't auto-promote its
-    contents, each photo opts in via album.cfg `featured` or the legacy `_`
-    prefix. The album's own `featured` list sets the order, exactly as
-    written; anything featured by sub-album cfgs or the marker follows
-    newest-first. `random` fills it from the subtree instead, `off` empties
+    contents, each photo opts in via album.cfg `featured`. The album's own
+    `featured` list sets the order, exactly as written; anything featured by
+    sub-album cfgs follows newest-first. `random` fills it from the subtree instead, `off` empties
     it. Shared by the album page and /api/album."""
     mode = (_cfg_first(cfg, "reel") or "").strip().lower()
     if mode in _FALSE:
@@ -2111,7 +2149,6 @@ def api_index(request: Request):
         "version": API_VERSION,
         "base_url": base,
         "languages": list(i18n.LANGS),
-        "marker": SHOWCASE_MARKER,
         "limits": {"max_limit": API_MAX_LIMIT},
         "sorts": {"images": image_sorts, "albums": album_sorts},
         "endpoints": [
@@ -2193,7 +2230,6 @@ def api_stats(request: Request, lang: str | None = None):
             "to": row["last"],
             "label": i18n.date_span(code, row["first"], row["last"]) or None,
         },
-        "marker": SHOWCASE_MARKER,
         "lang": code,
     }, vary=API_VARY)
 
@@ -2393,7 +2429,6 @@ def api_photo(request: Request, rel_path: str, col: str | None = None,
     if "/" not in raw:
         raise HTTPException(404, "image not found")
     album, _, filename = raw.rpartition("/")
-    album, filename = _resolve_showcase_path(album, filename)
     rel = _safe_rel(album, filename).as_posix()
     c = db.conn()
     row = c.execute("SELECT * FROM images WHERE rel_path = ?", (rel,)).fetchone()
@@ -2516,7 +2551,6 @@ def api_showcase(request: Request, limit: int = 50, album: str | None = None,
         {
             "count": len(items),
             "total": total,
-            "marker": SHOWCASE_MARKER,
             "scope": scope,
             "items": items,
         }
@@ -2609,8 +2643,7 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
            WHERE {where_join} ORDER BY t.name""",
         scope_params,
     ).fetchall()
-    # Showcase status now comes from album.cfg (`showcase = …`), with the
-    # legacy `_` folder-name marker as a fallback.
+    # Showcase status comes from album.cfg (`showcase = …`).
     album_is_showcase = _album_is_showcase(album)
     # Hero reel (album.cfg `reel`, like the welcome feed) — see _album_reel,
     # which /api/album serves from as well.
@@ -2684,7 +2717,6 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
 
 @app.get("/image/{album:path}/{filename}", response_class=HTMLResponse)
 def image_view(request: Request, album: str, filename: str, sort: str | None = None, col: str | None = None):
-    album, filename = _resolve_showcase_path(album, filename)
     rel = _safe_rel(album, filename).as_posix()
     c = db.conn()
     row = c.execute("SELECT * FROM images WHERE rel_path = ?", (rel,)).fetchone()
@@ -2898,7 +2930,6 @@ def serve_album_icon(album: str):
 
 @app.get("/thumb/{album}/{filename:path}")
 def serve_thumb(album: str, filename: str):
-    album, filename = _resolve_showcase_path(album, filename)
     rel = _safe_rel(album, filename).as_posix()
     src = PHOTOS_DIR / rel
     if not src.exists():
@@ -2914,7 +2945,6 @@ def serve_thumb(album: str, filename: str):
 
 @app.get("/preview/{album}/{filename:path}")
 def serve_preview(album: str, filename: str):
-    album, filename = _resolve_showcase_path(album, filename)
     rel = _safe_rel(album, filename).as_posix()
     src = PHOTOS_DIR / rel
     if not src.exists():
@@ -2930,7 +2960,6 @@ def serve_preview(album: str, filename: str):
 
 @app.get("/full/{album}/{filename:path}")
 def serve_full(album: str, filename: str):
-    album, filename = _resolve_showcase_path(album, filename)
     rel = _safe_rel(album, filename).as_posix()
     src = PHOTOS_DIR / rel
     if not src.exists():

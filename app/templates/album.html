@@ -75,7 +75,7 @@
      onto whichever hero this album has: the reel slideshow when there is
      one (all viewports, see _featured.html), else the static cover hero
      (phones only). Defined before the include so _featured.html sees it. #}
-  {% set hero_title = trip.title if trip else (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | replace('_', ' ') %}
+  {% set hero_title = trip.title if trip else (breadcrumbs[-1].name if breadcrumbs else album) | replace('_', ' ') %}
   {# a trip brings its own kanji (japan_2026 -> 日本), which is part of the
      album's identity; every other album falls back to the generic ギャラリー
      deco. They share a slot but not a purpose, so the fallback is marked —
@@ -136,7 +136,7 @@
     <div class="album-desc">
       <div class="album-desc__head">
         <span class="album-desc__label">{{ t('album.about') }}</span>
-        <span class="album-desc__file">{{ (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | upper }}</span>
+        <span class="album-desc__file">{{ (breadcrumbs[-1].name if breadcrumbs else album) | upper }}</span>
       </div>
       {% if album_description %}<div class="album-desc__body">{{ album_description | safe }}</div>{% endif %}
       {% if album_stats and album_stats.has %}
@@ -151,7 +151,7 @@
   {# status bar first — it reads as the module's system line, docked right
      above whichever hero block follows (reel, trip module or static cover) #}
   <div class="section__doc">
-    <span class="doc-min-hide">FILE / {{ (breadcrumbs[-1].name if breadcrumbs else display_name(album)) | upper }}</span>
+    <span class="doc-min-hide">FILE / {{ (breadcrumbs[-1].name if breadcrumbs else album) | upper }}</span>
     {% if breadcrumbs | length > 1 %}<span>IN / <b>{{ breadcrumbs[-2].name }}</b></span>{% endif %}
     {% if images or not sub_albums %}<span>COUNT / <b>{{ images | length }}</b></span>{% endif %}
     {% if sub_albums %}<span>ALBUMS / <b>{{ sub_albums | length }}</b></span>{% endif %}
@@ -192,7 +192,7 @@
           <span class="section__parent-ico" aria-hidden="true">↑</span><span class="section__parent-name">{{ breadcrumbs[-2].name }}</span><span class="section__parent-slash" aria-hidden="true">/</span>
         </a>
       {% endif %}
-      <span class="name">{{ breadcrumbs[-1].name if breadcrumbs else display_name(album) }}</span>
+      <span class="name">{{ breadcrumbs[-1].name if breadcrumbs else album }}</span>
       <span class="jp">{{ t('album.slug_deco') }}</span>
     </div>
   </header>
@@ -296,7 +296,7 @@
         {% for img in items %}
           <li class="image-tile{% if img.is_showcase %} image-tile--showcase{% endif %}">
             <a href="/image/{{ img.rel_path }}{{ img_qs }}">
-              <img src="/thumb/{{ img.rel_path }}" alt="{{ display_name(img.filename) }}" loading="lazy">
+              <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
               {% if img.is_showcase %}<span class="image-tile__star" aria-label="Featured">★</span>{% endif %}
               <div class="image-tile__overlay"><span>OPEN ↗</span></div>
             </a>

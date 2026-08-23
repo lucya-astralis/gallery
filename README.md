@@ -9,12 +9,13 @@ A lean, read-only web image gallery with folder-based albums, EXIF display, side
 - **Two-tier images:** `/thumb/...` (480 px) for grids, `/preview/...` (1600 px) for the detail view stage. The original (`/full/...`) only loads when you click *Load original*.
 - **EXIF:** camera, lens, exposure, ISO, focal length, … on the detail page. GPS coordinates are stripped by default (privacy).
 - **Tags:** per-album ones come from `album.cfg` and label the album in its hero; per-photo ones are sidecar files (e.g. `IMG_0001.jpg.tags` containing `holiday, beach, sunset`) — click one in the album view to filter.
-- **Showcase:** mark a photo (`_hero.jpg`) or a whole album (`_best-of/`) with an underscore prefix to surface it on the welcome screen, on the album overview, and via `/api/showcase` JSON for embedding on other sites.
+- **Showcase:** flag photos (`featured = …`) or a whole album (`showcase = true`) in the album's `album.cfg` to surface them on the welcome screen, on the album overview, and via `/api/showcase` JSON for embedding on other sites.
 - **Search & sort:** top bar searches album, file, and tag names; sort by date, name or size on every list view — plus a "Curated" order defined in `album.cfg` / `gallery.cfg`, which can also preselect the default sort.
 - **By day:** an album whose photos span more than one day also offers a **By day** sort — newest day first, with the grid split into a framed section per capture day (day counter, weekday, photo count). On an album with a trip configured (`TRIPS` in `app/main.py`) the counter is the trip day, counted from the outbound flight, and each day carries a chip naming the leg it falls into — sub-albums of that trip inherit both.
 - **Three languages (EN / DE / JP):** selector in the top-right corner, cookie-backed with an `Accept-Language` fallback. Album descriptions are per-language markdown files (`album_en.md` / `album_de.md` / `album_jp.md`); UI strings live in `app/i18n.py`. See [Languages](#languages--i18n).
 - **Mobile-friendly:** responsive grid, large touch targets, keyboard navigation (← → ESC) on desktop.
 - **Read-only:** no write endpoints, no uploads. The `photos/` mount is `:ro`. No attack surface for upload/tag-injection exploits.
+- **Operations CLI:** `python -m app.debug` — run or pause the indexer, check index/config/derivative drift with `doctor`, and inspect exactly how a photo, an `album.cfg` or a trip resolves. See [Debug / operations CLI](#debug--operations-cli).
 - **Security headers:** CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy — all set by built-in middleware.
 - **Custom 404 page** with megacorp-terminal aesthetic.
 
@@ -49,29 +50,41 @@ For Linux server deployment with an SMB share see [DEPLOY-LINUX.md](DEPLOY-LINUX
 
 ## Showcase
 
-Mark individual photos and/or whole albums as **showcased** with a single character at the start of the filename or folder name (default: `_`).
+Featured photos and featured albums are configured in the album's
+[`album.cfg`](#album-settings-albumcfg) — nothing is inferred from file or
+folder names.
 
-| Where the marker sits         | Effect                                                                                |
-|-------------------------------|---------------------------------------------------------------------------------------|
-| **Filename** (`_hero.jpg`)    | Photo is featured: appears in the welcome hero feed, in the featured hero slideshow of its album *and its parent albums*, and in the `/api/showcase` feed. Gets a ★ in the album grid. |
-| **Album folder** (`_best-of/`)| Album is featured: shown in a dedicated "Showcase Albums" section on the welcome screen and on `/albums`, with a `★ FEATURED` badge. Photos inside still need their own `_` to be individually featured. |
+| Key in `album.cfg`      | Effect                                                                                |
+|-------------------------|---------------------------------------------------------------------------------------|
+| `featured = hero.jpg, …`| Those photos are featured: they appear in the welcome hero feed, in the featured hero slideshow of the album *and its parent albums*, and in the `/api/showcase` feed. They get a ★ in the album grid. `*` / `all` features every photo of the album. |
+| `showcase = true`       | The album is featured: shown in a dedicated "Showcase Albums" section on the welcome screen and on `/albums`, with a `★ FEATURED` badge. Photos inside still need their own `featured` entry to be individually featured. |
 
-The two flags are **independent** — putting a photo into a `_showcase` album does NOT auto-feature it. Each photo opts in with its own filename prefix. Display strips the leading marker, so `_best-of/` shows up as "best-of" and `_hero.jpg` as "hero.jpg"; URLs keep the raw name on disk.
+The two flags are **independent** — marking an album as `showcase` does NOT
+auto-feature its photos, and a photo can be featured in an album that isn't.
 
-Examples:
+Example — `photos/best-of/.album/album.cfg`:
+
+```
+showcase = true
+featured = portrait.jpg
+```
 
 ```
 photos/
-├── _best-of/                  ← showcase album
-│   ├── _portrait.jpg          ← also a showcase photo (in /api/showcase)
+├── best-of/
+│   ├── .album/album.cfg       ← showcase = true, featured = portrait.jpg
+│   ├── portrait.jpg           ← featured photo (in /api/showcase)
 │   └── filler.jpg             ← in the album, but not featured
-├── holiday-2025/              ← regular album
-│   ├── _favourite.jpg         ← showcase photo (featured even though album isn't)
+├── holiday-2025/
+│   ├── .album/album.cfg       ← featured = favourite.jpg
+│   ├── favourite.jpg          ← featured photo (album itself isn't a showcase)
 │   └── DSC_0042.jpg
 └── …
 ```
 
-Change the marker globally via `SHOWCASE_MARKER` (set it to an empty string to disable the whole feature). Showcase flags are re-evaluated on every startup, so toggling files / changing the marker takes effect after a restart without needing a full re-scan.
+Featured flags are recomputed on every startup, after every scan and
+whenever an `album.cfg` changes — an edit takes effect on the next reload,
+without a re-scan.
 
 ## Languages / i18n
 
@@ -192,8 +205,8 @@ Optional file in the album's **`.album/` folder** (see above):
 | Key          | Values                          | Effect                                                                                     |
 |--------------|---------------------------------|--------------------------------------------------------------------------------------------|
 | `collection` | `true`                          | The album page shows every photo of its whole subtree (own + sub-folders) as one flat set. The [API](#api) scopes the album the same way. |
-| `showcase`   | `true` / `false`                | Featured album: ★ rail on `/albums` and the welcome screen (replaces the `_` folder prefix). |
-| `featured`   | paths, or `*` / `all`           | Featured photos: welcome hero, `/api/showcase`, the album's reel (replaces the `_` filename prefix). Paths are relative to the album (`osaka/IMG_4853.png`, a leading `/` is fine); bare filenames match anywhere in the subtree. Matching ignores the `_` marker and casing, so `osaka/…` also finds `_osaka/…`. The album's reel shows them in exactly this order. |
+| `showcase`   | `true` / `false`                | Featured album: ★ rail on `/albums` and the welcome screen. |
+| `featured`   | paths, or `*` / `all`           | Featured photos: welcome hero, `/api/showcase`, the album's reel. Paths are relative to the album (`osaka/IMG_4853.png`, a leading `/` is fine); bare filenames match anywhere in the subtree. Matching ignores casing, so `Osaka/…` also finds `osaka/…`. The album's reel shows them in exactly this order. |
 | `cover`      | one path                        | Pin the album cover instead of auto-picking the newest photo.                              |
 | `reel`       | `featured` / `random` / `off`   | What the hero slideshow at the top of the album shows: the featured photos (default), random photos from the album's subtree, or nothing (hidden). |
 | `order`      | paths                           | Curated photo order — adds a **Curated** entry to the album's sort menu. Photos not listed follow, newest first. |
@@ -246,7 +259,7 @@ album_sort = curated
 
 Rules for the hand-picked welcome list:
 
-- Paths are relative to `photos/` (`album/file.jpg`, nested albums allowed). The showcase marker may be omitted (`best-of/hero.jpg` finds `_best-of/_hero.jpg`), backslashes are tolerated.
+- Paths are relative to `photos/` (`album/file.jpg`, nested albums allowed); backslashes are tolerated.
 - Entries accumulate in order (max 24, duplicates collapse).
 - Entries that aren't indexed are skipped with a log warning; if nothing resolves, the feed falls back to showcase/random as if the file weren't there.
 - With a hand-picked list the hero shows a `CURATED` label and hides the ⟳ TUNE (reshuffle) button.
@@ -260,7 +273,7 @@ A read-only JSON view of everything the pages render — albums, photos, EXIF, t
 
 | Endpoint                    | Returns                                                                 |
 |-----------------------------|-------------------------------------------------------------------------|
-| `GET /api`                  | Endpoint index, sort keys, languages, marker                            |
+| `GET /api`                  | Endpoint index, sort keys, languages                                    |
 | `GET /api/stats`            | Gallery-wide counters: photos, albums, featured, tags, bytes, date span |
 | `GET /api/albums`           | Album cards — top level, or the children of `?parent=`                  |
 | `GET /api/album/{album}`    | One album in full: meta, description, stats, reel, sub-albums, photos    |
@@ -275,10 +288,10 @@ Three rules hold everywhere:
 - **Collections are honoured.** An album with `collection = true` in its `album.cfg` answers with its *whole subtree*, exactly like its page does — `/api/album/…`, `/api/photos?album=…`, `/api/showcase?album=…` and `/api/tags?album=…` all agree. Every response carries a `scope` object saying what happened:
 
   ```json
-  "scope": { "album": "_japan_2026", "collection": true, "subtree": true }
+  "scope": { "album": "japan_2026", "collection": true, "subtree": true }
   ```
 
-  Pass `subtree=0` to force the plain folder scope on a collection album, or `subtree=1` to widen a normal album. Album paths tolerate a stripped showcase marker (`japan_2026` finds `_japan_2026`).
+  Pass `subtree=0` to force the plain folder scope on a collection album, or `subtree=1` to widen a normal album. Album paths tolerate different casing.
 - **One shape per object.** Photos always look like the `items` entries below, albums always like the `album` object — in every endpoint, at every nesting level.
 - **Language follows `lang=`** (`en`/`de`/`jp`), else the visitor's cookie / `Accept-Language`. Anything language-dependent (album descriptions, EXIF labels, the SPAN readout) echoes the language it used in `lang` and sends `Vary: Accept-Language, Cookie`.
 
@@ -298,15 +311,12 @@ Three rules hold everywhere:
 {
   "count": 1,
   "total": 12,
-  "marker": "_",
   "scope": { "album": null, "collection": false, "subtree": false },
   "items": [
     {
-      "rel_path": "holiday-2025/_favourite.jpg",
+      "rel_path": "holiday-2025/favourite.jpg",
       "album": "holiday-2025",
-      "filename": "_favourite.jpg",
-      "display_album": "holiday-2025",
-      "display_filename": "favourite.jpg",
+      "filename": "favourite.jpg",
       "width": 4032,
       "height": 3024,
       "size": 8123456,
@@ -314,16 +324,16 @@ Three rules hold everywhere:
       "mtime": 1755193321.0,
       "featured": true,
       "urls": {
-        "thumb":       "/thumb/holiday-2025/_favourite.jpg",
-        "preview":     "/preview/holiday-2025/_favourite.jpg",
-        "full":        "/full/holiday-2025/_favourite.jpg",
-        "page":        "/image/holiday-2025/_favourite.jpg",
-        "api":         "/api/photo/holiday-2025/_favourite.jpg",
-        "thumb_abs":   "https://gallery.example.com/thumb/holiday-2025/_favourite.jpg",
-        "preview_abs": "https://gallery.example.com/preview/holiday-2025/_favourite.jpg",
-        "full_abs":    "https://gallery.example.com/full/holiday-2025/_favourite.jpg",
-        "page_abs":    "https://gallery.example.com/image/holiday-2025/_favourite.jpg",
-        "api_abs":     "https://gallery.example.com/api/photo/holiday-2025/_favourite.jpg"
+        "thumb":       "/thumb/holiday-2025/favourite.jpg",
+        "preview":     "/preview/holiday-2025/favourite.jpg",
+        "full":        "/full/holiday-2025/favourite.jpg",
+        "page":        "/image/holiday-2025/favourite.jpg",
+        "api":         "/api/photo/holiday-2025/favourite.jpg",
+        "thumb_abs":   "https://gallery.example.com/thumb/holiday-2025/favourite.jpg",
+        "preview_abs": "https://gallery.example.com/preview/holiday-2025/favourite.jpg",
+        "full_abs":    "https://gallery.example.com/full/holiday-2025/favourite.jpg",
+        "page_abs":    "https://gallery.example.com/image/holiday-2025/favourite.jpg",
+        "api_abs":     "https://gallery.example.com/api/photo/holiday-2025/favourite.jpg"
       }
     }
   ]
@@ -346,9 +356,8 @@ Each album card:
 
 ```json
 {
-  "album": "_japan_2026",
+  "album": "japan_2026",
   "name": "japan_2026",
-  "display_path": "japan_2026",
   "count": 412,
   "latest": "2026-09-02T18:11:44",
   "sub_count": 3,
@@ -356,8 +365,8 @@ Each album card:
   "collection": true,
   "tags": ["travel", "summer"],
   "cover": { "rel_path": "…", "urls": { "thumb": "…", "preview": "…", "thumb_abs": "…", "preview_abs": "…" } },
-  "icon": { "url": "/album-icon/_japan_2026?v=…", "url_abs": "…" },
-  "urls": { "page": "/album/_japan_2026", "api": "/api/album/_japan_2026", "page_abs": "…", "api_abs": "…" }
+  "icon": { "url": "/album-icon/japan_2026?v=…", "url_abs": "…" },
+  "urls": { "page": "/album/japan_2026", "api": "/api/album/japan_2026", "page_abs": "…", "api_abs": "…" }
 }
 ```
 
@@ -381,8 +390,8 @@ Everything one album page knows.
 ```json
 {
   "album": { … the card above … },
-  "breadcrumbs": [{ "name": "japan_2026", "path": "_japan_2026", "icon": "/album-icon/_japan_2026?v=…" }],
-  "scope": { "album": "_japan_2026", "collection": true, "subtree": true },
+  "breadcrumbs": [{ "name": "japan_2026", "path": "japan_2026", "icon": "/album-icon/japan_2026?v=…" }],
+  "scope": { "album": "japan_2026", "collection": true, "subtree": true },
   "description": { "html": "<p>…</p>", "lang": "de" },
   "stats": { "context": [{ "key": "LOC", "val": "Japan" }], "capture": [{ "key": "SPAN", "val": "…" }], "has": true },
   "effect": "sakura",
@@ -414,7 +423,7 @@ Everything one album page knows.
 | `limit`     | `50`        | `1..200`                                                            |
 | `offset`    | `0`         | Paging offset                                                       |
 
-Filters compose, so `?album=_japan_2026&tag=night&featured=1` is a valid question. Returns `count`, `total`, `limit`, `offset`, `sort`, `scope`, `filters` and `items`.
+Filters compose, so `?album=japan_2026&tag=night&featured=1` is a valid question. Returns `count`, `total`, `limit`, `offset`, `sort`, `scope`, `filters` and `items`.
 
 ### `GET /api/photo/{rel_path}`
 
@@ -429,7 +438,7 @@ One photo — the photo object above, plus:
   "exif_raw": { "FNumber": 2.0 },
   "album_url": { "page": "/album/…", "api": "/api/album/…" },
   "neighbours": {
-    "scope": { "album": "_japan_2026", "collection_root": "_japan_2026", "count": 412 },
+    "scope": { "album": "japan_2026", "collection_root": "japan_2026", "count": 412 },
     "sort": "curated", "index": 17, "prev": "…/a.jpg", "next": "…/b.jpg"
   }
 }
@@ -449,7 +458,7 @@ Photo tags with how many photos carry each, most-used first. `album=` scopes the
   "albums": { "top_level": 9, "total": 34, "showcase": 3 },
   "tags": 57, "bytes": 91234567890, "bytes_h": "85 GB",
   "span": { "from": "2019-04-02T…", "to": "2026-09-02T…", "label": "2019 – 2026" },
-  "marker": "_", "lang": "en"
+  "lang": "en"
 }
 ```
 
@@ -469,7 +478,7 @@ fetch('https://gallery.example.com/api/showcase?limit=8&random=1')
       a.rel = 'noopener';
       const img = document.createElement('img');
       img.src = it.urls.thumb_abs;
-      img.alt = it.display_filename;
+      img.alt = it.filename;
       img.loading = 'lazy';
       a.appendChild(img);
       root.appendChild(a);
@@ -509,6 +518,7 @@ The scanner reads the file on the next indexing pass and links the tags. Empty o
 | `thumbnails/`  | Generated grid thumbnails (cache, can be wiped anytime)  |
 | `previews/`    | Generated stage previews (cache, can be wiped anytime)   |
 | `data/`        | SQLite DB with EXIF cache and tag index                  |
+| `data/control/`| Flag files the CLI and the server talk through (see below) |
 
 ## Configuration
 
@@ -524,8 +534,161 @@ The scanner reads the file on the next indexing pass and links the tags. Empty o
 | `ENABLE_WATCHER`| `1`           | inotify watcher (on SMB/NFS, prefer `0` and use interval)  |
 | `HIDE_GPS`      | `1`           | Strip GPS from EXIF display                                |
 | `STRIP_GPS`     | `1`           | Strip GPS from the original file on import (in-place)      |
-| `SHOWCASE_MARKER`| `_`          | Filename / folder prefix marking showcase items (empty = off) |
 | `PUBLIC_BASE_URL`| (auto)       | Absolute base URL used in OG tags + `/api/showcase` URLs   |
+
+## Debug / operations CLI
+
+Everything operational is one command:
+
+```bash
+python -m app.debug
+```
+
+Without arguments it draws the dashboard — masthead, what the server is
+doing, and what the archive holds — and then drops into an interactive menu
+(only when it actually has a terminal; piped or in a cron job it prints and
+exits).
+
+```
+ ██████  █████  ██      ██      ███████ ██████  ██    ██
+██      ██   ██ ██      ██      ██      ██   ██  ██  ██
+██  ███ ███████ ██      ██      █████   ██████    ████
+██   ██ ██   ██ ██      ██      ██      ██   ██    ██
+ ██████ ██   ██ ███████ ███████ ███████ ██   ██    ██
+LUCYA.SYSTEMS GALLERY  ·  OPS CONSOLE  ·  API v2
+
+── SYSTEM ──────────────────────────────────────────────────────
+SERVER      running · pid 4711 · up 2h 14m · heartbeat 6.0s ago
+INDEXER     running
+SCAN        idle · last periodic 4m 12s ago in 1.8s → indexed 12, …
+WATCHER     on · running · 0 event(s) queued
+
+── ARCHIVE ─────────────────────────────────────────────────────
+PHOTOS      328
+ALBUMS      10 with photos · 14 incl. parents
+FEATURED    5 photo(s) · 1 showcase album(s)
+…
+
+── LARGEST ALBUMS ──────────────────────────────────────────────
+  japan_2026/kansai/osaka       ██████████████████████    64 2.5 GB
+  japan_2026/hokkaido/sapporo   █████████████████████·    61 2.4 GB
+  …
+```
+
+Or go straight at a single command:
+
+```bash
+python -m app.debug <command> [options]
+```
+
+In Docker, run it inside the container:
+
+```bash
+docker compose exec gallery python -m app.debug status
+```
+
+| Command | What it does |
+|---------|--------------|
+| *(no command)* | Dashboard, then the menu — the same as `dash` followed by `menu` |
+| `dash` | Masthead, live state and archive statistics on one screen: counters, date span, largest albums and capture-month activity as meters, format breakdown, cache size, and a quick index-vs-disk check |
+| `menu` | Interactive console: pick a command by number or name, get prompted for its arguments, run it, come back. Needs a terminal |
+| `help` | Command overview and the usage cheat sheet |
+| `status` | Live state: is the server up, is the indexer paused, is a scan running (or what the last one did), how many events sit in the watcher queue, index counters, paths, effective config |
+| `scan [album] [--force]` | Run an indexing pass **now** instead of waiting for `SCAN_INTERVAL`. Optionally limited to one album subtree. `--force` re-indexes and re-derives even when mtimes say nothing changed |
+| `pause [reason]` | Suspend indexing: no periodic scan, and the watcher stops processing events (it keeps queueing them) |
+| `resume [--scan]` | Lift the pause; `--scan` also requests a scan right away |
+| `doctor [--album X]` | Full integrity check — see below. **Exits 1** when it found something, so it works as a cron/CI check |
+| `thumbs [--rebuild] [--all] [--prune]` | Report, rebuild or prune generated thumbnails and previews. Dry run by default: `--rebuild` builds missing/stale ones (`--all` rebuilds everything), `--prune` lists generated files with no source photo and only deletes them with `--apply` |
+| `featured [album]` | Which `album.cfg` entry featured which photo, which entries match nothing, and whether the `is_showcase` flags in the DB still agree. `--recompute` rewrites the flags |
+| `cfg <album>` / `cfg --gallery` | An `album.cfg` / `gallery.cfg` exactly as the app parses it, plus what it resolves to (cover, reel, description languages) and everything wrong with it |
+| `photo <rel_path>` | Everything the app knows about one photo: row, mtime drift, tags, why it is (not) featured, derivative state, URLs, prettified EXIF (`--exif` for the raw block) |
+| `trip [album]` | The resolved trip dashboard — stops, dates, which sub-album each leg links to, photo counts. Without an album: which trips are configured and whether their album exists |
+| `i18n` | EN/DE/JP completeness in `app/i18n.py`, keys used but undefined (they render as the key), and whether the `UI_STRINGS` mirror in `app.js` has the same keys in every language |
+
+Every command also takes `--json` for a machine-readable dump, and
+`--no-color` for plain output.
+
+Colour switches itself off when the output is piped into a file, when
+`NO_COLOR` is set, or with `--json` — so logs and pipelines stay clean.
+`FORCE_COLOR=1` keeps it on anyway (for `less -R` or a CI log that renders
+ANSI). Rules and meters follow the real terminal width, and the block logo
+collapses to a single line below 58 columns.
+
+### How `pause` and `scan` reach the running server
+
+The HTTP surface stays **read-only** — there is no debug endpoint that makes
+the server do something, and no token to leak. The CLI and the server talk
+through three small files in `data/control/` instead:
+
+| File | Written by | Meaning |
+|------|-----------|---------|
+| `paused.json` | CLI | Indexing is suspended (holds the reason and since when) |
+| `scan.request.json` | CLI | A scan is queued; the server consumes the file when it picks it up |
+| `status.json` | server | The live snapshot `status` reads, re-stamped as a heartbeat |
+
+The server's control loop looks at that directory every 2 seconds, so a
+requested scan starts within ~2s, and `scan` waits for the result by default
+(`--no-wait` to just queue it). The rules worth knowing:
+
+- **A pause is persistent.** It survives a restart on purpose — a pause set
+  before a maintenance restart is still in effect afterwards, including the
+  startup scan. Only `resume` lifts it.
+- **A pause never loses a change.** Watcher events keep accumulating while
+  paused (keyed by path, so churn on one file collapses into one entry) and
+  are processed on resume.
+- **A manual `scan` ignores the pause.** That is the escape hatch for
+  indexing one deliberate change without lifting a maintenance pause.
+- **`pause` works with the server down** — the flag file is simply already
+  there when it starts. `status` says so instead of pretending.
+
+### What `doctor` checks
+
+| Finding | Meaning |
+|---------|---------|
+| `unindexed` / `missing_file` | A photo on disk that no row knows about, or a row whose file is gone |
+| `stale_index` | The file changed after it was indexed (EXIF/date/size in the DB are outdated) |
+| `missing_thumb` / `stale_thumb` (same for previews) | A derivative was never built, or is older than its source |
+| `orphan_derivative` | A generated file with no source photo — left over from a deleted or renamed original |
+| `unreadable` | The source file cannot be opened at all (truncated upload, wrong extension). Those stay in the gallery without a thumbnail |
+| `config` | Anything wrong in an `album.cfg` / `gallery.cfg`: unknown keys, a `cover`/`featured`/`order` entry that matches no photo, a missing `icon`/`font` file, an invalid `reel`/`sort`/`effect` value, a `welcome` entry that does not resolve |
+| `featured_drift` | The `is_showcase` flags in the DB no longer match what the `album.cfg` files say |
+| `database` | `PRAGMA integrity_check`, orphaned tag links, tags no photo uses any more |
+
+### What writes what
+
+Nothing in the CLI ever touches `photos/` — the originals stay untouched, as
+everywhere else in this project.
+
+| Writes | Commands |
+|--------|----------|
+| nothing | `status`, `doctor`, `cfg`, `photo`, `trip`, `i18n`, `thumbs` (without flags), `featured` (without `--recompute`) |
+| the SQLite index | `scan`, `featured --recompute` |
+| generated thumbnails/previews | `scan`, `thumbs --rebuild`, `thumbs --prune --apply` (deletes) |
+| the control files | `pause`, `resume`, `scan` |
+
+### Examples
+
+```bash
+# is anything running, and what did the last scan do?
+python -m app.debug status
+
+# freshly dropped an album on the share and do not want to wait 5 minutes
+python -m app.debug scan japan_2026/kansai
+
+# reorganising folders — stop the indexer from reacting to every move
+python -m app.debug pause "resorting kansai"
+python -m app.debug resume --scan
+
+# why is this photo not in the reel?
+python -m app.debug photo japan_2026/kansai/osaka/IMG_4853.png
+python -m app.debug featured japan_2026
+
+# after changing THUMB_SIZE
+python -m app.debug thumbs --rebuild --all
+
+# nightly health check (exits 1 when it finds something)
+python -m app.debug doctor --json
+```
 
 ## Security / hosting
 
@@ -588,3 +751,4 @@ uvicorn app.main:app --reload
 - Delete an image: remove it from `photos/` — watcher/scan clean up DB entry, thumbnail, and preview.
 - Rename a tag: edit the `.tags` file.
 - Thumbnails, previews, and DB can be wiped any time — they are regenerated on the next scan.
+- Something looks off? `python -m app.debug doctor` compares index, files, derivatives and config in one pass.

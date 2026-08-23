@@ -111,6 +111,16 @@ Thumbnails, previews, and the DB persist in `./thumbnails`, `./previews`, and `.
 
 **New images not appearing:**
 - With `SCAN_INTERVAL=300` it takes up to 5 minutes.
+- Do not want to wait: `docker compose exec gallery python -m app.debug scan`
+  (add an album path to limit it to one subtree).
+- Still missing: `docker compose exec gallery python -m app.debug doctor` lists
+  files the index does not know about, unreadable originals and config errors.
+  `… python -m app.debug status` shows whether the indexer is paused or stuck.
+
+**Maintenance on the share:**
+- `docker compose exec gallery python -m app.debug pause "resorting"` stops the
+  indexer from reacting while you move folders around; `… resume --scan` picks
+  everything up in one pass afterwards. The pause survives a restart.
 
 **Permissions:**
 - The container runs as `root` so it can read everything. The `uid` option in the mount only affects how files appear to the host user — irrelevant for the container as long as the mount is readable.
