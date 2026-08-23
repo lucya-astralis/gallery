@@ -16,6 +16,8 @@ or the new characters render as tofu (the shipped Noto Sans JP woff2 is a
 glyph subset).
 """
 
+from datetime import date as _date
+
 # Cookie / file-suffix language codes. "jp" (not ISO "ja") because the album
 # markdown files are named album_jp.md; HTML_LANG maps to proper BCP-47.
 LANGS = ("en", "de", "jp")
@@ -122,6 +124,13 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "sort.count_desc": ("Most photos", "Meiste Fotos", "写真が多い順"),
     "sort.count_asc": ("Fewest photos", "Wenigste Fotos", "写真が少ない順"),
     "sort.curated": ("Curated", "Kuratiert", "キュレーション"),
+    # chronological, split into one framed section per capture day
+    # (only offered when an album's photos span more than one day)
+    "sort.days": ("By day", "Nach Tagen", "日付ごと"),
+
+    # ---- day sections (Sort → By day) -----------------------------------
+    "day.n": ("DAY {n}", "TAG {n}", "{n}日目"),
+    "day.undated": ("UNDATED", "OHNE DATUM", "日付なし"),
 
     # ---- album page -----------------------------------------------------
     "album.og_desc": (
@@ -279,6 +288,32 @@ def fmt_date(lang: str, iso_date: str) -> str:
     if lang == "de":
         return f"{d}. {_MONTHS_DE[m - 1]} {y}"
     return f"{d} {_MONTHS_EN[m - 1]} {y}"
+
+
+_WEEKDAYS_EN = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+_WEEKDAYS_DE = ("MO", "DI", "MI", "DO", "FR", "SA", "SO")
+_WEEKDAYS_JP = ("月", "火", "水", "木", "金", "土", "日")
+
+
+def day_label(lang: str, n: int) -> str:
+    """Day counter for the day-section headers: 'DAY 05' / 'TAG 05' / '5日目'.
+    en/de are zero-padded so the mono headers line up in a long list; the
+    Japanese counter reads wrong padded, so it stays bare."""
+    return t(lang, "day.n", n=str(n) if lang == "jp" else f"{n:02d}")
+
+
+def weekday_label(lang: str, iso: str | None) -> str | None:
+    """'2026-08-14' -> 'FRI' / 'FR' / '金' for the day-section headers.
+    None when the date doesn't parse (the header drops the chip then)."""
+    if not iso:
+        return None
+    try:
+        d = _date(int(iso[:4]), int(iso[5:7]), int(iso[8:10]))
+    except (ValueError, IndexError, TypeError):
+        return None
+    if lang == "jp":
+        return _WEEKDAYS_JP[d.weekday()]
+    return (_WEEKDAYS_DE if lang == "de" else _WEEKDAYS_EN)[d.weekday()]
 
 
 def month_label(lang: str, iso: str | None) -> str | None:

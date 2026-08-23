@@ -291,17 +291,43 @@
         <span class="sub-albums__count">{{ images | length }} {% if images | length == 1 %}{{ t('unit.image_one') }}{% else %}{{ t('unit.image_many') }}{% endif %}</span>
       </header>
     {% endif %}
-    <ul class="image-grid">
-      {% for img in images %}
-        <li class="image-tile{% if img.is_showcase %} image-tile--showcase{% endif %}">
-          <a href="/image/{{ img.rel_path }}{{ img_qs }}">
-            <img src="/thumb/{{ img.rel_path }}" alt="{{ display_name(img.filename) }}" loading="lazy">
-            {% if img.is_showcase %}<span class="image-tile__star" aria-label="Featured">★</span>{% endif %}
-            <div class="image-tile__overlay"><span>OPEN ↗</span></div>
-          </a>
-        </li>
-      {% endfor %}
-    </ul>
+    {% macro image_tiles(items) %}
+      <ul class="image-grid">
+        {% for img in items %}
+          <li class="image-tile{% if img.is_showcase %} image-tile--showcase{% endif %}">
+            <a href="/image/{{ img.rel_path }}{{ img_qs }}">
+              <img src="/thumb/{{ img.rel_path }}" alt="{{ display_name(img.filename) }}" loading="lazy">
+              {% if img.is_showcase %}<span class="image-tile__star" aria-label="Featured">★</span>{% endif %}
+              <div class="image-tile__overlay"><span>OPEN ↗</span></div>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endmacro %}
+
+    {% if day_sections %}
+      {# ---- "By day" sort: one framed section per capture day, same
+             bracketed-set language as the curated frames on /albums. The
+             day number counts from the trip start on a trip album, and the
+             region chip names the leg that day belongs to. ---- #}
+      <div class="day-groups">
+        {% for sec in day_sections %}
+          <section class="day-group{% if not sec.date %} day-group--undated{% endif %}"
+                   aria-label="{{ sec.date_h or t('day.undated') }}">
+            <header class="day-group__head">
+              {% if sec.day_h %}<span class="day-group__n">{{ sec.day_h }}</span>{% endif %}
+              <span class="day-group__date">{{ sec.date_h or t('day.undated') }}</span>
+              {% if sec.weekday %}<span class="day-group__wd">{{ sec.weekday }}</span>{% endif %}
+              {% if sec.stop %}<span class="day-group__stop">{{ sec.stop }}</span>{% endif %}
+              <span class="day-group__count">{{ sec.images | length }} {% if sec.images | length == 1 %}{{ t('unit.image_one') }}{% else %}{{ t('unit.image_many') }}{% endif %}</span>
+            </header>
+            {{ image_tiles(sec.images) }}
+          </section>
+        {% endfor %}
+      </div>
+    {% else %}
+      {{ image_tiles(images) }}
+    {% endif %}
   {% elif active_tag %}
     <div class="empty">
       <span class="stamp">EMPTY</span>

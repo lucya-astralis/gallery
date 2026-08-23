@@ -1758,6 +1758,15 @@ section{
   .album-groups{ gap:14px; }
   .album-group{ padding:9px 8px 10px; }
   .album-group__head{ margin-bottom:9px; }
+
+  .day-groups{ gap:16px; }
+  .day-group{ padding-left:9px; }
+  .day-group__head{ margin-bottom:8px; gap:6px 8px; }
+  .day-group__n,
+  .day-group__date{ font-size:10px; letter-spacing:.14em; }
+  .day-group__wd,
+  .day-group__stop,
+  .day-group__count{ font-size:8.5px; letter-spacing:.12em; }
 }
 
 /* ================================================================
@@ -1961,6 +1970,65 @@ section{
 }
 /* a label-less free `stat =` line reads as one left-aligned note */
 .album-stat:has(.album-stat__key:empty) .album-stat__val{ text-align:left; }
+
+/* ---- day groups: the "By day" sort (SORT_DAYS) splits the grid into one
+       framed section per capture day. Same bracketed-set language as the
+       curated frames on /albums (.album-group), one level quieter — the
+       frame sits on a rail instead of a full box, so a long trip album
+       doesn't read as dozens of stacked panels. ---- */
+.day-groups{
+  display:flex; flex-direction:column;
+  gap:26px;
+}
+.day-group{
+  position:relative;
+  /* nested <section>: undo the page-container margin + width cap */
+  margin:0; max-width:none;
+  padding-left:14px;
+  border-left:1px solid var(--line);
+}
+/* cyan tick at the head of the rail — marks the day boundary */
+.day-group::before{
+  content:"";
+  position:absolute; left:-1px; top:0;
+  width:1px; height:18px;
+  background:var(--acc-cy); opacity:.7;
+}
+.day-group__head{
+  display:flex; align-items:baseline; gap:8px 12px; flex-wrap:wrap;
+  margin-bottom:12px;
+  padding-bottom:8px;
+  border-bottom:1px dashed var(--line);
+  font-family:"JetBrains Mono", monospace;
+  text-transform:uppercase;
+}
+.day-group__n{
+  font-size:11px; letter-spacing:.24em;
+  color:var(--acc-cy);
+}
+.day-group__date{
+  font-size:11px; letter-spacing:.14em;
+  color:var(--text);
+}
+.day-group__wd{
+  font-size:9.5px; letter-spacing:.18em;
+  color:var(--text-ghost);
+}
+/* the leg this day belongs to on a trip album (Kansai / Hokkaido / …) */
+.day-group__stop{
+  font-size:9px; letter-spacing:.18em;
+  color:var(--acc-mag);
+  border:1px solid var(--line-strong);
+  padding:2px 6px;
+}
+.day-group__count{
+  margin-left:auto;
+  font-size:9.5px; letter-spacing:.18em;
+  color:var(--text-ghost);
+}
+/* photos without an EXIF date land in one trailing, unnumbered section */
+.day-group--undated::before{ background:var(--text-ghost); }
+.day-group--undated .day-group__date{ color:var(--text-dim); }
 
 /* ================================================================
    IMAGE GRID  (inside album)

@@ -11,6 +11,7 @@ A lean, read-only web image gallery with folder-based albums, EXIF display, side
 - **Tags:** per-album ones come from `album.cfg` and label the album in its hero; per-photo ones are sidecar files (e.g. `IMG_0001.jpg.tags` containing `holiday, beach, sunset`) — click one in the album view to filter.
 - **Showcase:** mark a photo (`_hero.jpg`) or a whole album (`_best-of/`) with an underscore prefix to surface it on the welcome screen, on the album overview, and via `/api/showcase` JSON for embedding on other sites.
 - **Search & sort:** top bar searches album, file, and tag names; sort by date, name or size on every list view — plus a "Curated" order defined in `album.cfg` / `gallery.cfg`, which can also preselect the default sort.
+- **By day:** an album whose photos span more than one day also offers a **By day** sort — newest day first, with the grid split into a framed section per capture day (day counter, weekday, photo count). On an album with a trip configured (`TRIPS` in `app/main.py`) the counter is the trip day, counted from the outbound flight, and each day carries a chip naming the leg it falls into — sub-albums of that trip inherit both.
 - **Three languages (EN / DE / JP):** selector in the top-right corner, cookie-backed with an `Accept-Language` fallback. Album descriptions are per-language markdown files (`album_en.md` / `album_de.md` / `album_jp.md`); UI strings live in `app/i18n.py`. See [Languages](#languages--i18n).
 - **Mobile-friendly:** responsive grid, large touch targets, keyboard navigation (← → ESC) on desktop.
 - **Read-only:** no write endpoints, no uploads. The `photos/` mount is `:ro`. No attack surface for upload/tag-injection exploits.
@@ -196,7 +197,7 @@ Optional file in the album's **`.album/` folder** (see above):
 | `cover`      | one path                        | Pin the album cover instead of auto-picking the newest photo.                              |
 | `reel`       | `featured` / `random` / `off`   | What the hero slideshow at the top of the album shows: the featured photos (default), random photos from the album's subtree, or nothing (hidden). |
 | `order`      | paths                           | Curated photo order — adds a **Curated** entry to the album's sort menu. Photos not listed follow, newest first. |
-| `sort`       | `curated`, `date_desc`, `date_asc`, `name_asc`, `name_desc`, `size_desc`, `size_asc` | Preselect the sort option for this album's grid (visitors can still switch). |
+| `sort`       | `curated`, `days`, `date_desc`, `date_asc`, `name_asc`, `name_desc`, `size_desc`, `size_asc` | Preselect the sort option for this album's grid (visitors can still switch). `curated` needs an `order` list, `days` needs photos on more than one day — a preset that the album can't offer falls back to `date_desc`. |
 | `tags`       | names, e.g. `paris, night`      | The album's tags, shown under its hero title and nowhere else. A leading `#` is optional. Album-level and display-only — see the note below. |
 | `effect`     | `sakura`                        | Ambient effect layer on this album's page (petals drifting down). |
 | `icon`       | a filename in `.album/`         | The album's own mark — `.svg` / `.png` / `.webp` / `.gif` / `.jpg` — shown wherever the album is named: cards, breadcrumb, hero title, trip stops (see above). |
@@ -369,7 +370,7 @@ Everything one album page knows.
 | Query param | Default | Meaning                                                                 |
 |-------------|---------|--------------------------------------------------------------------------|
 | `images`    | `0`     | `1` to include the photo grid (otherwise only `images.total` comes back) |
-| `sort`      | cfg     | `curated` (when `album.cfg` sets `order`) or any image sort key          |
+| `sort`      | cfg     | `curated` (when `album.cfg` sets `order`), `days` (when the album spans more than one day) or any image sort key |
 | `tag`       | —       | Filter the grid by photo tag                                            |
 | `subtree`   | cfg     | `0`/`1` to override the album's collection scope                        |
 | `limit`     | `200`   | Grid page size, `1..200`                                                |

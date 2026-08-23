@@ -5,6 +5,7 @@ import threading
 import time
 import urllib.request
 from collections import Counter
+from datetime import date
 from functools import partial
 from pathlib import Path
 from urllib.parse import quote
@@ -1344,9 +1345,147 @@ SORT_ALBUM_SQL = {k: sql for k, _, sql in SORT_ALBUM_OPTIONS}
 SORT_CURATED = "curated"
 SORT_CURATED_LABEL_KEY = "sort.curated"
 
+# Second pseudo key: newest day first, with the grid split into one framed
+# section per capture day — the same "labeled set" language the Curated view
+# uses on /albums, but derived from EXIF instead of a cfg list. It runs on the
+# plain `date_desc` SQL (which also parks undated photos at the end, so their
+# section stays last); only the grouping is extra, so every consumer that
+# doesn't render sections (the API, the neighbour walk on the image page) just
+# gets the ordinary newest-first list. Offered only when an album's photos
+# actually span more than one day (see _scope_day_count).
+SORT_DAYS = "days"
+SORT_DAYS_LABEL_KEY = "sort.days"
+SORT_DAYS_BASE = "date_desc"
+
 
 def _pick_sort(value: str | None, allowed, default: str) -> str:
     return value if value in allowed else default
+
+
+def _scope_day_count(where_sql: str, params) -> int:
+    """How many distinct capture days the photos in a scope cover. Drives
+    whether the "By day" sort is offered at all — a single-day album (or one
+    without any EXIF dates) has nothing to group."""
+    row = db.conn().execute(
+        f"SELECT COUNT(DISTINCT substr(taken_at, 1, 10)) FROM images "
+        f"WHERE {where_sql} AND taken_at IS NOT NULL",
+        params,
+    ).fetchone()
+    return int(row[0] or 0) if row else 0
+
+
+def _resolve_image_sort(cfg: dict[str, list[str]], sort: str | None,
+                        curated_order: list[str], days: bool = False
+                        ) -> tuple[str, str, str]:
+    """(current, default, base) sort keys for an image scope. `default` comes
+    from album.cfg `sort =`, the ?sort= query param wins over it, and both are
+    filtered against what this album actually offers — the two pseudo keys are
+    only allowed when their backing data exists. `base` is the SORT_IMAGE_SQL
+    key to run: curated is reordered in Python afterwards, "by day" is plain
+    chronological SQL that the caller may then group."""
+    allowed = set(SORT_IMAGE_SQL)
+    if curated_order:
+        allowed.add(SORT_CURATED)
+    if days:
+        allowed.add(SORT_DAYS)
+    default_sort = _pick_sort(_cfg_first(cfg, "sort"), allowed, SORT_IMAGE_DEFAULT)
+    current = _pick_sort(sort, allowed, default_sort)
+    if current == SORT_CURATED:
+        base = SORT_IMAGE_DEFAULT
+    elif current == SORT_DAYS:
+        base = SORT_DAYS_BASE
+    else:
+        base = current
+    return current, default_sort, base
+
+
+def _ancestor_trip(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
+    """The trip config of `album` or of its nearest configured ancestor. The
+    trip DASHBOARD only ever renders on the album that configures it, but the
+    day sections of a sub-album (japan_2026/hokkaido/sapporo) should still
+    count trip days and name the leg — so they look the trip up upwards."""
+    parts = album.split("/")
+    for i in range(len(parts), 0, -1):
+        trip = _trip_for_album("/".join(parts[:i]), lang)
+        if trip:
+            return trip
+    return None
+
+
+def _trip_stop_on(trip: dict | None, day: str, lang: str) -> str | None:
+    """Name of the trip stop a given day (YYYY-MM-DD) falls into, for the day
+    headers of a trip album ("14 AUG · KANSAI"). Start-inclusive, so a travel
+    day is filed under the region you arrive in — the same rule initTrip()
+    uses for the live "you are here" marker. None outside the itinerary, and
+    for albums without a trip."""
+    if not trip:
+        return None
+    hit = None
+    for s in trip.get("stops") or []:
+        start, end = (s.get("start") or "")[:10], (s.get("end") or "")[:10]
+        if start and start <= day and (not end or day <= end):
+            hit = s
+    if not hit:
+        return None
+    return (hit.get("jp") or hit["city"]) if lang == "jp" else hit["city"]
+
+
+def _day_sections(images: list[dict], trip: dict | None,
+                  lang: str = i18n.DEFAULT_LANG) -> list[dict]:
+    """Split a date-ordered image list into one section per capture day, in
+    whatever direction the list already has (SORT_DAYS runs newest first):
+    [{key, date, weekday, day, stop, images}, …]. `day` is the trip day number
+    for a trip album (counted from the outbound flight, so a gap in the photos
+    still shows as a jump) and a plain 1..n index counted from the album's
+    OLDEST day otherwise — so the numbers stay stable no matter which way the
+    list runs. Photos without EXIF date keep their SQL position at the end and
+    land in a single trailing section (date None)."""
+    trip_start = ""
+    if trip:
+        stops = trip.get("stops") or []
+        trip_start = (trip.get("depart") or "")[:10]
+        if not trip_start and stops:
+            trip_start = (stops[0].get("start") or "")[:10]
+    sections: list[dict] = []
+    by_key: dict[str, dict] = {}
+    for im in images:
+        key = (im.get("taken_at") or "")[:10] or ""
+        sec = by_key.get(key)
+        if sec is None:
+            sec = {
+                "key": key or "undated",
+                "date": key or None,
+                "date_h": i18n.fmt_date(lang, key) if key else None,
+                "weekday": i18n.weekday_label(lang, key),
+                "stop": _trip_stop_on(trip, key, lang) if key else None,
+                "day": None,
+                "day_h": None,
+                "images": [],
+            }
+            by_key[key] = sec
+            sections.append(sec)
+        sec["images"].append(im)
+    dated = sorted((s for s in sections if s["date"]), key=lambda s: s["date"])
+    for i, sec in enumerate(dated):
+        if trip_start:
+            n = _days_between(trip_start, sec["date"])
+            sec["day"] = n + 1 if n is not None and n >= 0 else None
+        else:
+            sec["day"] = i + 1
+        if sec["day"]:
+            sec["day_h"] = i18n.day_label(lang, sec["day"])
+    return sections
+
+
+def _days_between(start: str, end: str) -> int | None:
+    """Whole days from `start` to `end` (both YYYY-MM-DD), None if either
+    side doesn't parse."""
+    try:
+        a = date(int(start[:4]), int(start[5:7]), int(start[8:10]))
+        b = date(int(end[:4]), int(end[5:7]), int(end[8:10]))
+    except (ValueError, IndexError, TypeError):
+        return None
+    return (b - a).days
 
 
 def _qualify_sort(order_sql: str) -> str:
@@ -1358,8 +1497,10 @@ def _qualify_sort(order_sql: str) -> str:
 
 
 def _image_sort_options_for_template(current: str, curated: bool = False,
-                                     lang: str = i18n.DEFAULT_LANG) -> list[dict]:
+                                     lang: str = i18n.DEFAULT_LANG,
+                                     days: bool = False) -> list[dict]:
     keys = ([(SORT_CURATED, SORT_CURATED_LABEL_KEY)] if curated else [])
+    keys += ([(SORT_DAYS, SORT_DAYS_LABEL_KEY)] if days else [])
     keys += [(k, label_key) for k, label_key, _ in SORT_IMAGE_OPTIONS]
     return [{"key": k, "label": i18n.t(lang, label_key), "active": k == current}
             for k, label_key in keys]
@@ -1963,7 +2104,7 @@ def _album_reel(album: str, cfg: dict[str, list[str]], limit: int = 8) -> tuple[
 def api_index(request: Request):
     """What this API offers, so a client can discover it without the README."""
     base = _public_base_url(request)
-    image_sorts = [SORT_CURATED] + list(SORT_IMAGE_SQL)
+    image_sorts = [SORT_CURATED, SORT_DAYS] + list(SORT_IMAGE_SQL)
     album_sorts = [SORT_CURATED] + list(SORT_ALBUM_SQL)
     return _json_cors({
         "name": app.title,
@@ -2135,14 +2276,12 @@ def api_album(request: Request, album: str, images: bool = False, sort: str | No
     code = _api_lang(request, lang)
     base = _public_base_url(request)
 
-    curated_order = _curated_photo_order(album, cfg)
-    allowed = set(SORT_IMAGE_SQL) | ({SORT_CURATED} if curated_order else set())
-    default_sort = _pick_sort(_cfg_first(cfg, "sort"), allowed, SORT_IMAGE_DEFAULT)
-    current_sort = _pick_sort(sort, allowed, default_sort)
-    base_sort = SORT_IMAGE_DEFAULT if current_sort == SORT_CURATED else current_sort
-
     where_simple, where_join, scope_params, collection, wide = _photo_scope(album, subtree)
     c = db.conn()
+    curated_order = _curated_photo_order(album, cfg)
+    day_count = _scope_day_count(where_simple, scope_params)
+    current_sort, default_sort, base_sort = _resolve_image_sort(
+        cfg, sort, curated_order, days=day_count > 1)
     reel_mode, reel_rows = _album_reel(album, cfg)
     sub_albums = _sorted_album_cards([_album_card(n) for n in _child_album_names(album)], "name_asc")
     photo_tags = [r["name"] for r in c.execute(
@@ -2177,7 +2316,8 @@ def api_album(request: Request, album: str, images: bool = False, sort: str | No
         "sort": {
             "current": current_sort,
             "default": default_sort,
-            "options": _image_sort_options_for_template(current_sort, bool(curated_order), code),
+            "options": _image_sort_options_for_template(current_sort, bool(curated_order), code,
+                                                        days=day_count > 1),
         },
         "lang": code,
     }
@@ -2287,10 +2427,10 @@ def api_photo(request: Request, rel_path: str, col: str | None = None,
     if neighbours:
         cfg = _album_config(scope_album)
         curated_order = _curated_photo_order(scope_album, cfg)
-        allowed = set(SORT_IMAGE_SQL) | ({SORT_CURATED} if curated_order else set())
-        default_sort = _pick_sort(_cfg_first(cfg, "sort"), allowed, SORT_IMAGE_DEFAULT)
-        current_sort = _pick_sort(sort, allowed, default_sort)
-        base_sort = SORT_IMAGE_DEFAULT if current_sort == SORT_CURATED else current_sort
+        where_simple, _wj, sp, _coll, _wide = _photo_scope(
+            scope_album, True if col_root else None)
+        current_sort, default_sort, base_sort = _resolve_image_sort(
+            cfg, sort, curated_order, days=_scope_day_count(where_simple, sp) > 1)
         # the neighbour walk has to mirror the grid exactly, so it uses the
         # same scope (collection root or own folder) and the same order
         rows, _total, _scope = _photo_rows(
@@ -2416,22 +2556,21 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     # featured set, grid stars) without waiting for the watcher's debounce
     _refresh_featured_on_cfg_change(album)
     album_cfg = _album_config(album)
-    # album.cfg `order` adds a "Curated" sort option; `sort` presets the
-    # default sort for this album (query param still wins).
-    curated_order = _curated_photo_order(album, album_cfg)
-    allowed = set(SORT_IMAGE_SQL) | ({SORT_CURATED} if curated_order else set())
-    default_sort = _pick_sort(_cfg_first(album_cfg, "sort"), allowed, SORT_IMAGE_DEFAULT)
-    current_sort = _pick_sort(sort, allowed, default_sort)
-    # curated is reordered in Python below; SQL runs with the date default
-    base_sort = SORT_IMAGE_DEFAULT if current_sort == SORT_CURATED else current_sort
-    # qualify column names so the JOIN query below isn't ambiguous
-    qualified_sql = _qualify_sort(SORT_IMAGE_SQL[base_sort])
     c = db.conn()
     # Collection mode (album.cfg `collection = true`): the grid shows every
     # photo in this album's whole subtree (its own + all sub-folders) as one
     # flat set, instead of only the photos sitting directly in this folder.
     # /api/album + /api/photos resolve the same scope through _photo_scope.
     where_simple, where_join, scope_params, collection, _wide = _photo_scope(album)
+    # album.cfg `order` adds a "Curated" sort option, photos spanning more
+    # than one day add "By day"; `sort` presets the default sort for this
+    # album (query param still wins).
+    curated_order = _curated_photo_order(album, album_cfg)
+    day_count = _scope_day_count(where_simple, scope_params)
+    current_sort, default_sort, base_sort = _resolve_image_sort(
+        album_cfg, sort, curated_order, days=day_count > 1)
+    # qualify column names so the JOIN query below isn't ambiguous
+    qualified_sql = _qualify_sort(SORT_IMAGE_SQL[base_sort])
     if tag:
         rows = c.execute(
             f"""SELECT i.* FROM images i
@@ -2478,7 +2617,13 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
     reel_mode, featured = _album_reel(album, album_cfg)
     lang = _request_lang(request)
     sort_options = _image_sort_options_for_template(current_sort, curated=bool(curated_order),
-                                                    lang=lang)
+                                                    lang=lang, days=day_count > 1)
+    trip = _trip_for_album(album, lang)
+    # "By day": the grid renders as one framed section per capture day
+    # instead of a single flat grid (album.html falls back to the flat grid
+    # whenever this is None).
+    day_sections = (_day_sections(images, trip or _ancestor_trip(album, lang), lang)
+                    if current_sort == SORT_DAYS else None)
     effect = (_cfg_first(album_cfg, "effect") or "").strip().lower()
     # Stats block under the description. Computed over the album's WHOLE photo
     # set, never the ?tag=-filtered grid — the readouts describe the album, so
@@ -2518,13 +2663,15 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
             # preload for that same face, so it downloads alongside the sheet
             # instead of after it (no fallback→face swap on load)
             "album_font_preload": _album_font_preload(album),
-            "trip": _trip_for_album(album, lang),
+            "trip": trip,
             "collection": collection,
             "sub_albums": sub_albums,
             "album_is_showcase": album_is_showcase,
             "featured": featured,
             "reel_mode": reel_mode,
             "images": images,
+            # None unless the "By day" sort is active — see _day_sections
+            "day_sections": day_sections,
             "tags": [r["name"] for r in tag_rows],
             "active_tag": tag,
             "current_sort": current_sort,
@@ -2578,10 +2725,11 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
     # including a cfg-preset default and the curated order.
     scope_cfg = _album_config(col_root or album)
     curated_order = _curated_photo_order(col_root or album, scope_cfg)
-    allowed = set(SORT_IMAGE_SQL) | ({SORT_CURATED} if curated_order else set())
-    default_sort = _pick_sort(_cfg_first(scope_cfg, "sort"), allowed, SORT_IMAGE_DEFAULT)
-    current_sort = _pick_sort(sort, allowed, default_sort)
-    base_sort = SORT_IMAGE_DEFAULT if current_sort == SORT_CURATED else current_sort
+    # "By day" is chronological SQL plus grouping, so the walk resolves it
+    # like date_asc and pages through the grid's day sections in order
+    current_sort, default_sort, base_sort = _resolve_image_sort(
+        scope_cfg, sort, curated_order,
+        days=_scope_day_count(where_scope, scope_params) > 1)
     order_sql = SORT_IMAGE_SQL[base_sort]
     neighbours = c.execute(
         f"SELECT rel_path FROM images WHERE {where_scope} ORDER BY {order_sql}",
