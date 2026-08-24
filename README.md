@@ -185,6 +185,20 @@ python tools/build_jp_subset.py     # needs: pip install fonttools brotli
 The subset always contains the full kana blocks plus every kanji currently
 in use (the script scans the repo), so kana-only edits never need a rebuild.
 
+**Logo raster:** the terminal CLI can draw the real logo as a picture (see
+[Terminals](#terminals)), which needs a bitmap. `app/static/logo/lucya_logo.png`
+is rasterised from the SVG on a developer machine, so the container needs no
+SVG stack at all — Pillow and nothing else:
+
+```bash
+python tools/render_logo.py         # needs nothing beyond the app's own deps
+```
+
+Re-run it after changing `lucya_logo.svg`. The renderer covers exactly what
+that file uses (nested `matrix(…)` groups, absolute `M`/`L`/`C`/`Z` paths,
+solid fills) and refuses loudly on anything else, rather than quietly
+producing a wrong picture.
+
 ## Config files (`gallery.cfg` / `album.cfg`)
 
 Both files share one format: plain `key = value` lines, `#`/`;` start comments. List values accumulate — comma-separate them, repeat the key, or (easiest to read) put **one entry per line** below the key; any non-comment line without a `=` continues the key above it:
@@ -545,35 +559,48 @@ python -m app.debug
 ```
 
 Without arguments it draws the dashboard — masthead, what the server is
-doing, and what the archive holds — and then drops into an interactive menu
-(only when it actually has a terminal; piped or in a cron job it prints and
-exits).
+doing, and what the archive holds — and then keeps an interactive menu
+underneath it (only when it actually has a terminal; piped or in a cron job
+it prints the dashboard and exits).
 
 ```
- ██████  █████  ██      ██      ███████ ██████  ██    ██
-██      ██   ██ ██      ██      ██      ██   ██  ██  ██
-██  ███ ███████ ██      ██      █████   ██████    ████
-██   ██ ██   ██ ██      ██      ██      ██   ██    ██
- ██████ ██   ██ ███████ ███████ ███████ ██   ██    ██
-LUCYA.SYSTEMS GALLERY  ·  OPS CONSOLE  ·  API v2
-
-── SYSTEM ──────────────────────────────────────────────────────
-SERVER      running · pid 4711 · up 2h 14m · heartbeat 6.0s ago
-INDEXER     running
-SCAN        idle · last periodic 4m 12s ago in 1.8s → indexed 12, …
-WATCHER     on · running · 0 event(s) queued
-
-── ARCHIVE ─────────────────────────────────────────────────────
-PHOTOS      328
-ALBUMS      10 with photos · 14 incl. parents
-FEATURED    5 photo(s) · 1 showcase album(s)
-…
-
-── LARGEST ALBUMS ──────────────────────────────────────────────
-  japan_2026/kansai/osaka       ██████████████████████    64 2.5 GB
-  japan_2026/hokkaido/sapporo   █████████████████████·    61 2.4 GB
-  …
+┌─ LUCYA.SYSTEMS GALLERY ──────────────────────────────────── OPS CONSOLE ─┐
+│                                                                          │
+│   ________       .__  .__                                                │
+│  /  _____/_____  |  | |  |   ___________ ___.__.                         │
+│ /   \  ___\__  \ |  | |  | _/ __ \_  __ <   |  |                         │
+│ \    \_\  \/ __ \|  |_|  |_\  ___/|  | \/\___  |                         │
+│  \______  (____  /____/____/\___  >__|   / ____|                         │
+│         \/     \/               \/       \/                              │
+│                                                                          │
+│ LUCYA.SYSTEMS GALLERY  ·  OPS CONSOLE  ·  API v2                         │
+│                                                                          │
+├─ SYSTEM ─────────────────────────────────────────────────────────────────┤
+│ SERVER      running · pid 4711 · up 2h 14m · heartbeat 6.0s ago           │
+│ INDEXER     running                                                      │
+│ SCAN        idle · last periodic 4m 12s ago in 1.8s → 12 indexed         │
+│ WATCHER     on · running · 0 event(s) queued                             │
+├─ ARCHIVE ────────────────────────────────────────────────────────────────┤
+│ PHOTOS      328                                                          │
+│ ALBUMS      10 with photos · 14 incl. parents                            │
+│ FEATURED    5 photo(s) · 1 showcase album(s)                             │
+│ …                                                                        │
+├─ LARGEST ALBUMS ─────────────────────────────────────────────────────────┤
+│   japan_2026/kansai/osaka       ██████████████████████    64 2.5 GB      │
+│   japan_2026/hokkaido/sapporo   █████████████████████·    61 2.4 GB      │
+│   …                                                                      │
+├─ MENU ───────────────────────────────────────────────────────────────────┤
+│   1   status   server, indexer, last scan, watcher queue                 │
+│   2   scan     index now (optionally one album, --force)                 │
+│   …                                                                      │
+│   r redraw · w live dashboard · h help · q quit                          │
+└──────────────────────────────────────────────────────────────────────────┘
+  select ›
 ```
+
+Every view is one frame — the dashboard, the menu, and each report — so the
+CLI reads as a single interface rather than a stack of loose output. Long
+values fold under their own column instead of being cut off.
 
 Or go straight at a single command:
 
@@ -590,9 +617,10 @@ docker compose exec gallery python -m app.debug status
 | Command | What it does |
 |---------|--------------|
 | *(no command)* | Dashboard, then the menu — the same as `dash` followed by `menu` |
-| `dash` | Masthead, live state and archive statistics on one screen: counters, date span, largest albums and capture-month activity as meters, format breakdown, cache size, and a quick index-vs-disk check |
-| `menu` | Interactive console: pick a command by number or name, get prompted for its arguments, run it, come back. Needs a terminal |
+| `dash` | Masthead, live state and archive statistics on one screen: counters, date span, largest albums and capture-month activity as meters, format breakdown, cache size, and a quick index-vs-disk check. `--watch` repaints it on a timer (`--interval`, default 5s) until ctrl-c — a live view of what the indexer is doing |
+| `menu` | Interactive console: pick a command by number or name, get prompted for its arguments, run it, come back. `↵` repeats the last one, `r` redraws, `w` opens the live dashboard, `q` quits |
 | `help` | Command overview and the usage cheat sheet |
+| `term` | What this terminal supports and why colour or the menu are off — see [Terminals](#terminals) |
 | `status` | Live state: is the server up, is the indexer paused, is a scan running (or what the last one did), how many events sit in the watcher queue, index counters, paths, effective config |
 | `scan [album] [--force]` | Run an indexing pass **now** instead of waiting for `SCAN_INTERVAL`. Optionally limited to one album subtree. `--force` re-indexes and re-derives even when mtimes say nothing changed |
 | `pause [reason]` | Suspend indexing: no periodic scan, and the watcher stops processing events (it keeps queueing them) |
@@ -605,14 +633,78 @@ docker compose exec gallery python -m app.debug status
 | `trip [album]` | The resolved trip dashboard — stops, dates, which sub-album each leg links to, photo counts. Without an album: which trips are configured and whether their album exists |
 | `i18n` | EN/DE/JP completeness in `app/i18n.py`, keys used but undefined (they render as the key), and whether the `UI_STRINGS` mirror in `app.js` has the same keys in every language |
 
-Every command also takes `--json` for a machine-readable dump, and
-`--no-color` for plain output.
+Every command also takes `--json` for a machine-readable dump, `--no-color`
+for plain output, `--color` to force it on, and `-i` / `--interactive` to
+force the prompts on.
 
-Colour switches itself off when the output is piped into a file, when
-`NO_COLOR` is set, or with `--json` — so logs and pipelines stay clean.
-`FORCE_COLOR=1` keeps it on anyway (for `less -R` or a CI log that renders
-ANSI). Rules and meters follow the real terminal width, and the block logo
-collapses to a single line below 58 columns.
+### Terminals
+
+Long operations show a spinner or a progress meter while they run (`scan`
+waiting on the server, `doctor`, `thumbs --rebuild`), and the dashboard can
+repaint itself with `dash --watch`. All of that needs to know whether a human
+is actually watching, which `isatty()` alone does not reliably answer:
+
+- **Git Bash / MSYS2 / Cygwin (mintty) on Windows** reach a native Python
+  through a *named pipe*, so `isatty()` says "not a terminal" and the classic
+  symptom is "no colours in Git Bash". The CLI therefore asks the handle for
+  its pipe name and recognises an MSYS/Cygwin pty
+  (`\msys-…-pty0-to-master`) — while a real redirect (`… > out.txt`) on the
+  same machine still correctly counts as *not* a terminal.
+- **stdin redirected, screen still attached** (`… < file`, some `docker exec`
+  invocations): the menu falls back to reading `/dev/tty`.
+- **No terminal at all** (cron, CI, `docker compose exec -T`): the menu
+  refuses to prompt instead of hanging, `--watch` prints once instead of
+  looping forever, and spinners stay silent so log files do not fill up with
+  half-drawn frames.
+
+Colour is on when stdout is a terminal, off when it is piped, off with
+`NO_COLOR` or `--json`, and on regardless with `FORCE_COLOR=1` or `--color`.
+Rules and meters follow the real terminal width; the logo collapses to a
+single line below 50 columns.
+
+When something looks wrong, ask:
+
+```bash
+python -m app.debug term
+```
+
+It prints what was detected (`stdout.isatty`, mintty, `/dev/tty`, `TERM`,
+`COLORTERM`, `NO_COLOR`, width, encoding), the resulting verdict for colour /
+menu / repainting / pictures, and what to do about it — `ssh -t`,
+`docker compose exec` without `-T`, or simply `--color` / `--interactive`.
+
+### Pictures in the terminal
+
+The masthead is text by default — the letterforms are part of the interface,
+and the logo itself is too fine-grained to survive being squeezed into
+terminal cells. Terminals that can show a real bitmap can have one anyway;
+`--logo` picks how:
+
+| Mode | What it does | Where it works |
+|------|--------------|----------------|
+| `ascii` | the block letterforms — **the default** | any terminal |
+| `auto` | the best picture protocol this terminal supports | everywhere |
+| `kitty` | PNG through the kitty graphics protocol, pixel-perfect | kitty, ghostty |
+| `iterm` | PNG through iTerm2 inline images, pixel-perfect | iTerm2, WezTerm |
+| `blocks` | two pixels per cell as a half-block in 24-bit colour — coarse, and it shows on a detailed logo | anything with truecolor: Windows Terminal, mintty, VS Code, gnome-terminal, … |
+| `off` | no masthead at all | any terminal |
+
+Detection (for `auto`) is env-sniffing only (`KITTY_WINDOW_ID`, `TERM`,
+`TERM_PROGRAM`, `COLORTERM`) — no escape-sequence queries, so a terminal that
+never answers can never hang the CLI. Sixel terminals are not auto-detected
+for the same reason; `--logo blocks` covers them. Into a pipe or a log file
+`auto` falls back to the letterforms, so a redirect never collects binary
+image data — and `kitty`/`iterm` are skipped inside a frame, because those
+protocols move the cursor themselves and would tear the box apart.
+
+The picture comes from `app/static/logo/lucya_logo.png`; if it is missing,
+run `python tools/render_logo.py` (see above) — `term` says so too. Its
+transparency is preserved in every mode: the logo sits on your terminal
+background, not in a white box.
+
+```bash
+python -m app.debug --logo kitty
+```
 
 ### How `pause` and `scan` reach the running server
 

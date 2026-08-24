@@ -372,6 +372,12 @@ def _check_gallery_cfg() -> list[dict]:
 
 
 # ----- commands ---------------------------------------------------------
+def _screen(right: str = ""):
+    """Every full-page view gets the same frame: app name left, what you are
+    looking at right."""
+    return ui.screen(gallery.app.title, right)
+
+
 def _render_system(st: dict | None, live: bool, pause: dict | None) -> None:
     """The server / indexer / scan / watcher block, shared by `status` and
     the dashboard."""
@@ -404,8 +410,11 @@ def _render_system(st: dict | None, live: bool, pause: dict | None) -> None:
             last = st.get("last_scan") or {}
             if last:
                 res = last.get("result") or {}
-                bits = ", ".join(f"{k} {res.get(k, 0)}" for k in
-                                 ("indexed", "thumbnails", "previews", "removed", "failed"))
+                # only what actually happened — a row of zeroes says nothing
+                # and pushes the interesting part off the line
+                bits = ", ".join(f"{res[k]} {k}" for k in
+                                 ("indexed", "thumbnails", "previews", "removed", "failed")
+                                 if res.get(k)) or "no changes"
                 scope = f" [{last['album']}]" if last.get("album") else ""
                 err = f" · {ui.state('ERROR ' + str(last['error']), 'bad')}" if last.get("error") else ""
                 kv("scan", f"idle · last {last.get('trigger')}{scope} {_ago(last.get('finished_at'))} "
@@ -435,8 +444,15 @@ def cmd_status(args) -> int:
               "control_dir": str(control.control_dir())})
         return 0
 
+    with _screen("status"):
+        _render_status_body(st, live, pause, counts)
+    return 0
+
+
+def _render_status_body(st, live, pause, counts) -> None:
     _render_system(st, live, pause)
-    kv("index", f"{counts['images']} photos · {counts['albums']} albums · "
+    ui.head("index")
+    kv("totals", f"{counts['images']} photos · {counts['albums']} albums · "
                 f"{counts['featured']} featured · {counts['tags']} tags · "
                 f"{_bytes(counts['bytes'])} of originals · db {_bytes(counts['db_bytes'])}")
     kv("paths", f"photos={gallery.PHOTOS_DIR}")
@@ -449,35 +465,44 @@ def cmd_status(args) -> int:
                  f"preview={cfg.get('preview_size', gallery.PREVIEW_SIZE)} · "
                  f"watcher={'on' if gallery.ENABLE_WATCHER else 'off'} · "
                  f"hide_gps={int(gallery.HIDE_GPS)} · strip_gps={int(gallery.STRIP_GPS)}")
-    return 0
 
 
-def _wait_for_scan(request_id: str, timeout: float) -> dict | None:
-    """Poll status.json until the server reports our request as finished."""
+def _wait_for_scan(request_id: str, timeout: float, quiet: bool = False) -> dict | None:
+    """Poll status.json until the server reports our request as finished,
+    spinning while we wait so a long scan does not look like a hang."""
     deadline = time.time() + timeout
-    while time.time() < deadline:
-        time.sleep(0.5)
-        st = control.read_status()
-        last = (st or {}).get("last_scan") or {}
-        if last.get("request_id") == request_id:
-            return last
-        if not control.status_is_live(st):
-            return None
-    return None
+    started = time.time()
+    live = ui.Live("waiting for the server", enabled=not quiet)
+    try:
+        while time.time() < deadline:
+            st = control.read_status()
+            last = (st or {}).get("last_scan") or {}
+            if last.get("request_id") == request_id:
+                return last
+            if not control.status_is_live(st):
+                return None
+            live.label = (f"scanning ({st.get('scan_trigger')})" if st.get("scanning")
+                          else "waiting for the server")
+            live.tick(_dur(time.time() - started))
+            time.sleep(0.2)
+        return None
+    finally:
+        live.done()
 
 
 def _print_scan_result(summary: dict) -> None:
     res = summary.get("result") or {}
     if summary.get("error"):
-        out(f"scan finished WITH ERRORS in {_dur(summary.get('seconds'))}: {summary['error']}")
+        kv("finished", ui.state(f"with errors in {_dur(summary.get('seconds'))} · "
+                                f"{summary['error']}", "bad"))
     else:
-        out(f"scan finished in {_dur(summary.get('seconds'))}")
+        kv("finished", f"in {_dur(summary.get('seconds'))}")
     for key in ("indexed", "thumbnails", "previews", "removed", "failed", "total_seen"):
         if key in res:
-            out(f"  {key:<12}{res[key]}")
+            kv(key, res[key])
     if res.get("failed"):
-        out("  → unreadable files stay in the gallery without a thumbnail; "
-            "see `python -m app.debug doctor`")
+        kv("note", "unreadable files stay in the gallery without a thumbnail — "
+                   "see `doctor`")
 
 
 def cmd_scan(args) -> int:
@@ -490,20 +515,22 @@ def cmd_scan(args) -> int:
         req = control.request_scan(album=album, force=args.force)
         scope = f" of {album}" if album else ""
         if not args.json:
-            out(f"scan{scope} requested{' (force)' if args.force else ''} — "
-                f"the server picks it up within {control.CONTROL_TICK:.0f}s (id {req['id']})")
+            kv("requested", f"{album or 'whole gallery'}"
+                            f"{' · force' if args.force else ''} · the server picks it up "
+                            f"within {control.CONTROL_TICK:.0f}s")
+            kv("request id", req["id"])
         if args.no_wait:
             if args.json:
                 dump({"queued": req, "waited": False})
             return 0
-        summary = _wait_for_scan(req["id"], args.timeout)
+        summary = _wait_for_scan(req["id"], args.timeout, quiet=args.json)
         if summary is None:
             if args.json:
                 dump({"queued": req, "waited": True, "result": None,
                       "error": "timeout or server gone"})
             else:
-                out(f"gave up waiting after {_dur(args.timeout)} — the scan may still be running; "
-                    f"check `python -m app.debug status`")
+                kv("gave up", ui.state(f"after {_dur(args.timeout)} — the scan may still be "
+                                       f"running, check `status`", "warn"))
             return 1
         if args.json:
             dump(summary)
@@ -516,7 +543,7 @@ def cmd_scan(args) -> int:
               "as its own indexer. Prefer plain `scan`, which routes the request to it.",
               file=sys.stderr)
     elif not live and not args.json:
-        out("server not running — scanning in this process")
+        kv("mode", "server not running — scanning in this process")
 
     _connect()
     started = time.time()
@@ -541,11 +568,12 @@ def cmd_pause(args) -> int:
     if args.json:
         dump({"paused": True, "info": info, "server_live": live})
         return 0
-    out("indexer paused" + ("" if live else " (server is not running — takes effect at its next start)"))
-    out("  periodic scan  off")
-    out("  watcher        keeps queueing events, processes them on resume")
-    out("  manual scan    still works: `python -m app.debug scan`")
-    out("  the pause survives a restart — lift it with `python -m app.debug resume`")
+    kv("paused", ui.state("yes", "warn") + (f" · {reason}" if reason else "")
+       + ("" if live else " · server is not running, takes effect at its next start"))
+    kv("periodic", "off")
+    kv("watcher", "keeps queueing events, processes them on resume")
+    kv("manual", "a `scan` still works, it ignores the pause")
+    kv("note", "the pause survives a restart — lift it with `resume`")
     return 0
 
 
@@ -557,20 +585,23 @@ def cmd_resume(args) -> int:
     if args.json:
         dump({"was_paused": was_paused, "server_live": live, "scan_requested": bool(args.scan and live)})
         return 0
-    out("indexer resumed" if was_paused else "indexer was not paused")
+    kv("resumed", ui.state("yes") if was_paused else "it was not paused")
     if live:
-        out(f"  queued watcher events are drained within ~{control.CONTROL_TICK:.0f}s")
+        kv("watcher", f"queued events are drained within ~{control.CONTROL_TICK:.0f}s")
         if args.scan:
-            out("  scan requested")
+            kv("scan", "requested")
     else:
-        out("  server is not running — indexing starts with it")
+        kv("server", "not running — indexing starts with it")
     return 0
 
 
 def cmd_doctor(args) -> int:
     c = _connect()
     album = _norm_album(args.album)
+    live = ui.Live("checking", enabled=not args.json)
+    live.tick("reading the index")
     rows = _scope_rows(c, album)
+    live.tick("walking the photo tree")
     disk = _photo_files(album)
     disk_set = set(disk)
     row_by_rel = {r["rel_path"]: r for r in rows}
@@ -595,7 +626,9 @@ def cmd_doctor(args) -> int:
 
     # --- derivatives ---
     expected: set[Path] = set()
-    for rel in disk:
+    for seen, rel in enumerate(disk, 1):
+        if seen % 25 == 0 or seen == len(disk):
+            live.progress(seen, len(disk), "derivatives")
         for kind, path in _derivatives(rel).items():
             expected.add(path)
         for kind, state in _derivative_state(rel).items():
@@ -605,6 +638,7 @@ def cmd_doctor(args) -> int:
                 note(f"{state}_{kind}", {"rel_path": rel, "detail": f"{kind} is {state}"})
 
     derivative_dirs = [gallery.THUMBS_DIR, gallery.PREVIEWS_DIR, gallery.FULLS_DIR]
+    live.tick("looking for orphaned derivatives")
     if album is None:  # orphan sweep only makes sense over the whole tree
         for d in derivative_dirs:
             if not d.is_dir():
@@ -632,6 +666,7 @@ def cmd_doctor(args) -> int:
             note("unreadable", {"rel_path": rel, "detail": f"{type(e).__name__}: {e}"})
 
     # --- config ---
+    live.tick("parsing album.cfg files")
     for a in (gallery._albums_with_ancestors() if album is None else [album]):
         for issue in _check_album_cfg(a):
             note("config", issue)
@@ -666,6 +701,7 @@ def cmd_doctor(args) -> int:
     if unused_tags:
         note("database", {"rel_path": "-", "detail": f"{unused_tags} tag(s) no longer used by any photo"})
 
+    live.done()
     total = sum(len(v) for v in problems.values())
     if args.json:
         dump({"scope": album, "photos_on_disk": len(disk), "rows": len(rows),
@@ -673,11 +709,9 @@ def cmd_doctor(args) -> int:
         return 1 if total else 0
 
     kv("scope", album or "whole gallery")
-    kv("on disk", f"{len(disk)} photo(s)")
-    kv("indexed", f"{len(rows)} row(s)")
+    kv("checked", f"{len(disk)} file(s) on disk · {len(rows)} row(s) indexed")
     if not total:
-        out()
-        out("no problems found")
+        kv("result", ui.state("no problems found"))
         return 0
     for check in sorted(problems):
         items = problems[check]
@@ -690,11 +724,15 @@ def cmd_doctor(args) -> int:
                 out(f"      {item['detail']}")
         if len(items) > args.limit:
             out(f"  … {len(items) - args.limit} more (--limit {len(items)} to see all, or --json)")
-    out()
-    out(f"{total} problem(s) found")
-    out("hints: stale/missing derivatives → `thumbs --rebuild`, orphans → `thumbs --prune`,")
-    out("       unindexed / stale index   → `scan` (add --force to ignore mtimes),")
-    out("       featured_drift            → `featured --recompute`")
+    ui.head("what now")
+    ui.columns([
+        ("thumbs --rebuild", "missing or stale thumbnails and previews"),
+        ("thumbs --prune", "generated files with no source photo"),
+        ("scan [--force]", "unindexed files, stale index (--force ignores mtimes)"),
+        ("featured --recompute", "flags that drifted away from album.cfg"),
+    ])
+    print()
+    kv("total", f"{total} problem(s) found")
     return 1
 
 
@@ -723,8 +761,10 @@ def cmd_thumbs(args) -> int:
                     orphans.append(f)
 
     built = failed = pruned = 0
+    broken: list[str] = []
     if args.rebuild:
-        for rel, kind in todo:
+        live = ui.Live("building", enabled=not args.json)
+        for done, (rel, kind) in enumerate(todo, 1):
             src = gallery.PHOTOS_DIR / rel
             size = gallery.THUMB_SIZE if kind == "thumb" else gallery.PREVIEW_SIZE
             dst = _derivatives(rel)[kind]
@@ -732,7 +772,12 @@ def cmd_thumbs(args) -> int:
                 built += 1
             else:
                 failed += 1
-                out(f"  failed: {rel} ({kind})")
+                broken.append(f"{rel} ({kind})")
+            # the name trails the meter, so you can see where a slow share is
+            live.progress(done, len(todo), Path(rel).name)
+        live.done()
+        for item in broken:
+            ui.warn(f"  failed: {item}")
     if args.prune and args.apply:
         for f in orphans:
             try:
@@ -756,18 +801,17 @@ def cmd_thumbs(args) -> int:
     if args.rebuild:
         kv("built", f"{built} ok, {failed} failed")
     elif todo:
-        out()
-        out("dry run — add --rebuild to actually generate them")
+        kv("dry run", "add --rebuild to actually generate them")
     if args.prune:
         if args.apply:
             kv("pruned", f"{pruned} file(s) deleted")
         else:
+            ui.head("orphans")
             for f in orphans[:args.limit]:
                 out(f"  {f}")
             if len(orphans) > args.limit:
                 out(f"  … {len(orphans) - args.limit} more")
-            out()
-            out("dry run — add --apply to actually delete these")
+            kv("dry run", "add --apply to actually delete these")
     return 0
 
 
@@ -827,8 +871,7 @@ def cmd_featured(args) -> int:
             out(f"  ! {rel} — configured, but flag is 0")
         for rel in drift_extra[:args.limit]:
             out(f"  ! {rel} — flag is 1, but nothing features it")
-        out()
-        out("run `python -m app.debug featured --recompute` (or any scan) to fix the flags")
+        kv("fix", "`featured --recompute`, or any scan")
     return 1 if (unresolved or drift_missing or drift_extra) else 0
 
 
@@ -856,8 +899,7 @@ def cmd_cfg(args) -> int:
     kv("file", str(path))
     kv("exists", "yes" if path.is_file() else "NO — the app falls back to defaults")
     if not cfg:
-        out()
-        out("nothing parsed (no file, or an empty one)")
+        kv("parsed", "nothing (no file, or an empty one)")
         return 0
     head("parsed")
     for key in sorted(cfg):
@@ -866,23 +908,24 @@ def cmd_cfg(args) -> int:
         out(f"  {key:<12}{shown}")
     if not args.gallery:
         album = _norm_album(args.album)
-        head("resolved")
-        out(f"  showcase album  {gallery._album_is_showcase(album)}")
-        out(f"  collection      {gallery._album_collection(album)}")
-        cover = gallery._album_cover_rel(album)
-        out(f"  cover           {cover or '— (no photo found)'}")
+        ui.head("resolved")
         mode, reel = gallery._album_reel(album, cfg)
-        out(f"  reel            {mode} ({len(reel)} photo(s))")
-        out(f"  tags            {', '.join(gallery._album_tags(album, cfg)) or '—'}")
-        for lang in i18n.LANGS:
-            desc = gallery._album_description(album, lang)
-            out(f"  album_{lang}.md   {'present' if desc else '—'}")
+        cover = gallery._album_cover_rel(album)
+        langs = [lang for lang in i18n.LANGS if gallery._album_description(album, lang)]
+        ui.columns([
+            ("showcase album", str(gallery._album_is_showcase(album))),
+            ("collection", str(gallery._album_collection(album))),
+            ("cover", cover or "— (no photo found)"),
+            ("reel", f"{mode} ({len(reel)} photo(s))"),
+            ("tags", ", ".join(gallery._album_tags(album, cfg)) or "—"),
+            ("descriptions", ", ".join(f"album_{l}.md" for l in langs) or "—"),
+        ], key_tint=ui.C.gy)
     if issues:
         head(f"issues  ({len(issues)})")
         for item in issues:
             out(f"  [{item['level']}] {item['key']}: {item['detail']}")
         return 1 if any(i["level"] == "error" for i in issues) else 0
-    head("issues")
+    ui.head("issues")
     out("  none")
     return 0
 
@@ -948,8 +991,9 @@ def cmd_photo(args) -> int:
     for label, value in gallery._prettify_exif(exif, i18n.DEFAULT_LANG):
         out(f"  {label:<18}{value}")
     if args.exif:
-        head("exif (raw)")
-        dump(exif)
+        ui.head("exif (raw)")
+        for key in sorted(exif):
+            out(f"  {key:<26}{exif[key]}")
     return 0
 
 
@@ -975,15 +1019,14 @@ def cmd_trip(args) -> int:
     kv("album", album)
     kv("trip", f"{trip.get('title')} ({trip.get('key')})")
     kv("depart", str(trip.get("depart")))
-    head("stops")
+    ui.head("stops")
     for stop in trip.get("stops", []):
         # `href` is the resolved sub-album link — None when that folder holds
         # no photos, which is exactly what you want to see here
         out(f"  {stop.get('city'):<12}{stop.get('start')} -> {stop.get('end')}")
         out(f"      {stop.get('count', 0)} photo(s) · link {stop.get('href') or 'none (empty folder)'} "
             f"· icon {stop.get('icon') or 'none'}")
-    head("raw")
-    dump(trip)
+    hint("  the full structure, exactly as the template gets it: `trip <album> --json`")
     return 0
 
 
@@ -1109,14 +1152,15 @@ def cmd_i18n(args) -> int:
             out(f"  {detail}")
         if len(items) > args.limit:
             out(f"  … {len(items) - args.limit} more")
-    out()
+    ui.head("result")
     if not total:
-        out("no problems found")
+        kv("result", ui.state("no problems found"))
     elif not hard:
-        out(f"{total} note(s), nothing broken (blank/untranslated/unused are informational)")
+        kv("result", f"{total} note(s), nothing broken "
+                     f"(blank/untranslated/unused are informational)")
     else:
-        out(f"{hard} problem(s) that affect rendering")
-        out("reminder: new Japanese glyphs need `python tools/build_jp_subset.py`")
+        kv("result", ui.state(f"{hard} problem(s) that affect rendering", "warn"))
+        kv("reminder", "new Japanese glyphs need `python tools/build_jp_subset.py`")
     return 1 if hard else 0
 
 
@@ -1167,6 +1211,61 @@ def _dir_stats(path):
 
 
 def cmd_dash(args) -> int:
+    if args.json:
+        c = _connect()
+        st, live = _server_status()
+        span = c.execute(
+            "SELECT MIN(taken_at) AS a, MAX(taken_at) AS b FROM images "
+            "WHERE taken_at IS NOT NULL").fetchone()
+        dump({"index": _index_counts(c), "span": {"from": span["a"], "to": span["b"]},
+              "albums": [dict(r) for r in _top_albums(c, 12)],
+              "months": [dict(r) for r in _months(c)],
+              "formats": _formats(c), "server": st, "live": live,
+              "paused": control.pause_info() is not None})
+        return 0
+    if getattr(args, "watch", False):
+        return _watch_dash(args)
+    _render_dash()
+    return 0
+
+
+def _render_dash(footer: bool = True) -> None:
+    """The dashboard as its own screen."""
+    with _screen("ops console"):
+        _dash_body(footer)
+
+
+def _watch_dash(args) -> int:
+    """Repaint the dashboard on a timer — the closest thing to a live view of
+    what the indexer is up to. Ctrl-C leaves it."""
+    if not ui.ansi():
+        # Without cursor control every refresh would append another full
+        # dashboard — an endless log instead of a live view.
+        ui.warn("--watch needs a terminal that can repaint; printing once instead")
+        _render_dash()
+        return 1
+    interval = max(1.0, float(getattr(args, "interval", 5.0) or 5.0))
+    ui.hide_cursor()
+    try:
+        while True:
+            ui.clear_screen()
+            _render_dash(footer=False)
+            countdown = ui.Live("live · ctrl-c to stop · next refresh in")
+            end = time.time() + interval
+            while time.time() < end:
+                countdown.tick(f"{max(0, end - time.time()):.0f}s")
+                time.sleep(0.2)
+            countdown.done()
+    except KeyboardInterrupt:
+        print()
+        return 0
+    finally:
+        ui.show_cursor()
+
+
+def _dash_body(footer: bool = True) -> None:
+    """The dashboard content — drawn inside whatever frame is already open,
+    so the menu can lead with it without nesting a second box."""
     c = _connect()
     st, live = _server_status()
     pause = control.pause_info()
@@ -1175,16 +1274,7 @@ def cmd_dash(args) -> int:
         "SELECT MIN(taken_at) AS a, MAX(taken_at) AS b FROM images "
         "WHERE taken_at IS NOT NULL").fetchone()
 
-    if args.json:
-        dump({"index": counts, "span": {"from": span["a"], "to": span["b"]},
-              "albums": [dict(r) for r in _top_albums(c, 12)],
-              "months": [dict(r) for r in _months(c)],
-              "formats": _formats(c),
-              "server": st, "live": live, "paused": pause is not None})
-        return 0
-
     ui.logo(SUBTITLE_FMT.format(title=gallery.app.title.upper(), api=gallery.API_VERSION))
-
     ui.rule("system")
     _render_system(st, live, pause)
 
@@ -1244,12 +1334,11 @@ def cmd_dash(args) -> int:
     else:
         hint(f"  skipped — over {QUICK_CHECK_MAX_ROWS} rows; run `doctor` for the full check")
 
-    print()
-    ui.rule("commands")
-    _command_columns()
-    print()
-    hint("  python -m app.debug <command> --help   ·   `menu` for the interactive console")
-    return 0
+    if footer:
+        ui.head("commands")
+        _command_columns()
+        print()
+        hint("  <command> --help   ·   `menu` for the console   ·   `dash --watch` for a live view")
 
 
 def _command_columns() -> None:
@@ -1285,7 +1374,7 @@ MENU_ITEMS = [
 
 def _ask(prompt: str) -> str:
     try:
-        return input(f"{ui.C.cy}  {prompt}: {ui.C.off}").strip()
+        return ui.read_line(f"{ui.C.cy}  {prompt}{ui.C.off} {ui.C.gy}›{ui.C.off} ")
     except EOFError:
         return ""
 
@@ -1313,49 +1402,128 @@ def _menu_argv(command: str, prompts) -> list[str] | None:
     return argv
 
 
+def _menu_status_line() -> None:
+    """One live line above the menu: is the server up, is it paused, is a scan
+    running, how big is the index. Re-read on every repaint."""
+    st, live = _server_status()
+    pause = control.pause_info()
+    counts = _index_counts(db.conn())
+    if not live:
+        server = ui.state("server down", "idle")
+    elif st.get("scanning"):
+        server = ui.state(f"scanning ({st.get('scan_trigger')})", "warn")
+    else:
+        server = ui.state("server up", "ok")
+    indexer = ui.state("PAUSED", "warn") if pause else ui.state("indexing", "ok")
+    queued = (st or {}).get("watcher", {}).get("pending", 0) if live else 0
+    queue = f" · {ui.state(f'{queued} queued', 'warn')}" if queued else ""
+    print(f"  {server} · {indexer}{queue} · "
+          f"{ui.C.bold}{counts['images']}{ui.C.off} photos · "
+          f"{counts['albums']} albums · {counts['featured']} featured")
+
+
 def cmd_menu(args) -> int:
-    """Interactive console. Refuses to run without a terminal — a prompt that
-    nobody can answer would just hang a pipe or a cron job."""
-    if not ui.is_tty():
-        ui.warn("no terminal attached — printing the command overview instead")
+    """Interactive console. Without a terminal it prints the overview instead
+    of prompting — a question nobody can answer would hang a pipe or a cron
+    job. `--interactive` overrides the detection, `term` explains it."""
+    if not ui.interactive():
+        ui.warn("no terminal detected — printing the command overview instead")
         _command_columns()
-        return 1
-    while True:
         print()
-        ui.rule("menu")
-        ui.columns([(str(i), f"{ui.C.bold}{name:<9}{ui.C.off}{ui.C.gy}{desc}{ui.C.off}")
-                    for i, (name, desc, _) in enumerate(MENU_ITEMS, 1)])
-        ui.columns([("q", "quit")])
-        choice = _ask("select").lower()
+        hint("  `python -m app.debug term` shows what was detected")
+        hint("  `python -m app.debug menu --interactive` forces the menu anyway")
+        return 1
+    _connect()
+    last: list[str] | None = None
+    intro = bool(getattr(args, "intro", False))
+    while True:
+        if not intro:
+            ui.clear_screen()
+        with _screen("menu"):
+            if intro:
+                # entered by plain `python -m app.debug`: lead with the whole
+                # dashboard, with the menu as the last section of the screen
+                intro = False
+                _dash_body(footer=False)
+            else:
+                ui.logo(SUBTITLE_FMT.format(title=gallery.app.title.upper(),
+                                            api=gallery.API_VERSION))
+                _menu_status_line()
+            ui.head("menu")
+            ui.columns([(str(i), f"{ui.C.bold}{name:<9}{ui.C.off}{ui.C.gy}{desc}{ui.C.off}")
+                        for i, (name, desc, _) in enumerate(MENU_ITEMS, 1)])
+            print()
+            keys = []
+            if last:
+                keys.append(f"{ui.C.mg}↵{ui.C.off} repeat {ui.C.bold}{' '.join(last)}{ui.C.off}")
+            keys += [f"{ui.C.mg}r{ui.C.off} redraw",
+                     f"{ui.C.mg}w{ui.C.off} live dashboard",
+                     f"{ui.C.mg}h{ui.C.off} help",
+                     f"{ui.C.mg}q{ui.C.off} quit"]
+            print("  " + f"{ui.C.gy} · {ui.C.off}".join(keys))
+        try:
+            choice = _ask("select").lower()
+        except KeyboardInterrupt:
+            print()
+            return 0
         if choice in ("q", "quit", "exit"):
             return 0
-        item = None
-        if choice.isdigit() and 1 <= int(choice) <= len(MENU_ITEMS):
-            item = MENU_ITEMS[int(choice) - 1]
+        if choice == "r":
+            continue
+        argv: list[str] | None
+        if choice == "":
+            if not last:
+                continue
+            argv = last
+        elif choice == "h":
+            argv = ["help"]
+        elif choice == "w":
+            argv = ["dash", "--watch"]
         else:
-            item = next((m for m in MENU_ITEMS if m[0] == choice), None)
-        if item is None:
-            ui.warn("  no such entry")
-            continue
-        argv = _menu_argv(item[0], item[2])
-        if argv is None:
-            continue
+            if choice.isdigit() and 1 <= int(choice) <= len(MENU_ITEMS):
+                item = MENU_ITEMS[int(choice) - 1]
+            else:
+                item = next((m for m in MENU_ITEMS if m[0] == choice), None)
+            if item is None:
+                ui.warn("  no such entry")
+                time.sleep(0.8)
+                continue
+            argv = _menu_argv(item[0], item[2])
+            if argv is None:
+                time.sleep(0.8)
+                continue
+        last = argv
+        ui.clear_screen()
         print()
+        started = time.time()
+        code = 0
         try:
-            main(argv)
-        except SystemExit:
-            pass  # argparse complained; it already said why
+            code = main(argv)
+        except SystemExit as e:  # argparse complained; it already said why
+            code = e.code if isinstance(e.code, int) else 1
+        except KeyboardInterrupt:
+            print()
+            ui.warn("  interrupted")
         except Exception as e:  # a broken command must not kill the console
             ui.error(f"  {type(e).__name__}: {e}")
+            code = 1
         print()
-        hint("  ── enter to return to the menu ──")
+        ui.rule()
+        verdict = ui.state("ok", "ok") if not code else ui.state(f"exit {code}", "warn")
+        hint(f"  {' '.join(argv)} · {verdict} · {_dur(time.time() - started)}")
         try:
-            input()
-        except EOFError:
+            _ask("enter to return")
+        except KeyboardInterrupt:
             return 0
 
 
 def cmd_help(args) -> int:
+    with _screen("help"):
+        _help_body()
+    return 0
+
+
+def _help_body() -> None:
     ui.logo(SUBTITLE_FMT.format(title=gallery.app.title.upper(), api=gallery.API_VERSION))
     ui.rule("usage")
     ui.columns([
@@ -1363,6 +1531,7 @@ def cmd_help(args) -> int:
         ("python -m app.debug <cmd>", "run one command"),
         ("… <cmd> --help", "options of that command"),
         ("… <cmd> --json", "machine-readable output"),
+        ("--logo blocks", "draw the real logo as a picture (see `term`)"),
     ])
     ui.head("commands")
     _command_columns()
@@ -1370,16 +1539,87 @@ def cmd_help(args) -> int:
     hint(f"  the server is driven through flag files in {control.control_dir()}")
     hint("  status.json (server) · paused.json + scan.request.json (this CLI)")
     hint("  there is no debug HTTP endpoint — the web surface stays read-only")
-    print()
+
+
+_PROTOCOL_NAMES = {
+    "kitty": "kitty graphics protocol (pixel-perfect)",
+    "iterm": "iTerm2 inline images (pixel-perfect)",
+    "blocks": "24-bit half-blocks (two pixels per cell)",
+    "none": "no pictures — ASCII letterforms instead",
+}
+
+
+def _picture_verdict(report: dict) -> str:
+    protocol = report["images"]
+    text = _PROTOCOL_NAMES.get(protocol, protocol)
+    if report["logo_mode"] == "ascii":
+        suffix = f"{text}, but the masthead is text by default"
+        return ui.state(suffix, "idle") if protocol != "none" else ui.state(text, "idle")
+    if protocol == "none":
+        return ui.state(text, "warn")
+    if report["logo_png"] is None and protocol != "blocks":
+        return ui.state(f"{text} — but the PNG is missing, run "
+                        "`python tools/render_logo.py`", "warn")
+    return ui.state(text, "ok")
+
+
+def cmd_term(args) -> int:
+    """Why this terminal is (not) getting colours and a menu. The answer to
+    "works on my machine, not on the server"."""
+    report = ui.term_report()
+    if args.json:
+        dump(report)
+        return 0
+    with _screen("terminal"):
+        _term_body(report)
     return 0
 
 
+def _term_body(report: dict) -> None:
+    # the frame is already captioned TERMINAL
+    ui.columns([(key, "—" if report.get(key) is None else str(report.get(key)))
+                for key in ("platform", "os.name", "stdout.isatty", "stdin.isatty",
+                            "mintty_out", "mintty_in", "dev_tty", "TERM", "COLORTERM",
+                            "MSYSTEM", "TERM_PROGRAM", "NO_COLOR", "FORCE_COLOR",
+                            "encoding", "columns")],
+               key_tint=ui.C.gy)
+    ui.head("verdict")
+    ui.columns([
+        ("colour", ui.state("on", "ok") if report["color"] else ui.state("off", "warn")),
+        ("menu", ui.state("available", "ok") if report["interactive"]
+         else ui.state("not available", "warn")),
+        ("repaint", ui.state("yes", "ok") if report["ansi"] else ui.state("no", "warn")),
+        ("pictures", _picture_verdict(report)),
+    ], key_tint=ui.C.gy)
+    if not report["color"] or not report["interactive"]:
+        ui.head("what to do")
+        if not report["stdout.isatty"] and not report["mintty_out"]:
+            hint("  stdout is not a terminal — output is piped or redirected.")
+            hint("  In Docker use `docker compose exec` (it allocates a TTY);")
+            hint("  `-T` explicitly disables it. Over SSH use `ssh -t`.")
+        if report["NO_COLOR"] is not None:
+            hint("  NO_COLOR is set in this environment — that disables colour by design.")
+        hint("  Force it: FORCE_COLOR=1, or --color / --interactive on any command.")
+    if report["images"] == "none" and report["ansi"]:
+        ui.head("pictures")
+        hint("  No picture protocol detected. Terminals that can:")
+        hint("    kitty, ghostty          -> kitty graphics protocol")
+        hint("    iTerm2, WezTerm         -> inline images")
+        hint("    anything with 24-bit colour (Windows Terminal, mintty, VS Code,")
+        hint("    gnome-terminal, …)      -> `--logo blocks`")
+        hint("  Force one with --logo kitty|iterm|blocks; `--logo ascii` keeps the")
+        hint("  letterforms, `--logo off` drops the masthead entirely.")
+
+
 def cmd_home() -> int:
-    """No arguments: dashboard, and the menu when someone is watching."""
-    args = argparse.Namespace(json=False, no_color=False)
-    cmd_dash(args)
-    if ui.is_tty():
+    """No arguments: dashboard plus menu when someone is watching, dashboard
+    alone when this is a pipe or a log."""
+    args = argparse.Namespace(json=False, no_color=False, color=False,
+                              interactive=False, watch=False, interval=5.0,
+                              intro=True, logo="ascii")
+    if ui.interactive():
         return cmd_menu(args)
+    cmd_dash(args)
     return 0
 
 
@@ -1399,12 +1639,25 @@ def build_parser() -> argparse.ArgumentParser:
         sp = sub.add_parser(name, help=help_text, description=help_text, **kwargs)
         sp.set_defaults(func=func)
         sp.add_argument("--json", action="store_true", help="machine-readable output")
+        # The four below are consumed by _take_presentation_flags before
+        # parsing (so they also work in front of the command); they are
+        # declared here purely so `<command> --help` lists them.
         sp.add_argument("--no-color", action="store_true", help="plain output, no ANSI")
+        sp.add_argument("--color", action="store_true",
+                        help="force colour even when stdout is not a terminal")
+        sp.add_argument("-i", "--interactive", action="store_true",
+                        help="force the prompts on when terminal detection fails")
+        sp.add_argument("--logo", choices=LOGO_MODES, default="ascii",
+                        help="masthead: letterforms (default), a picture protocol, or nothing")
         return sp
 
-    add("dash", cmd_dash, "Masthead, live state and archive statistics on one screen.")
+    sp = add("dash", cmd_dash, "Masthead, live state and archive statistics on one screen.")
+    sp.add_argument("--watch", action="store_true", help="repaint on a timer until ctrl-c")
+    sp.add_argument("--interval", type=float, default=5.0,
+                    help="seconds between repaints with --watch (default: 5)")
     add("menu", cmd_menu, "Interactive console (needs a terminal).")
     add("help", cmd_help, "Command overview with the usage cheat sheet.")
+    add("term", cmd_term, "What this terminal supports, and why colour / the menu are off.")
 
     add("status", cmd_status, "Live state: server, pause, last scan, watcher queue, index counters.")
 
@@ -1463,19 +1716,75 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+LOGO_MODES = ("auto", "kitty", "iterm", "blocks", "ascii", "off")
+# Commands whose output is wrapped in the shared frame by the dispatcher.
+# The rest draw their own screen (see _screen) or are pure JSON.
+FRAMED_COMMANDS = {"scan", "pause", "resume", "doctor", "thumbs", "featured",
+                   "cfg", "photo", "trip", "i18n"}
+
+
+def _take_presentation_flags(argv: list[str]):
+    """Pull the look-and-feel flags out of argv wherever they sit.
+
+    They are not really per-command options: they configure the console
+    itself. Handling them here makes `--logo blocks status` work as well as
+    `status --logo blocks`, lets the bare `python -m app.debug` take them,
+    and — because they are applied to the console module rather than to one
+    parsed namespace — keeps them in effect for the commands the menu starts
+    afterwards.
+    """
+    rest: list[str] = []
+    flags = {"color": False, "no_color": False, "interactive": False, "logo": None}
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--color":
+            flags["color"] = True
+        elif arg == "--no-color":
+            flags["no_color"] = True
+        elif arg in ("-i", "--interactive"):
+            flags["interactive"] = True
+        elif arg == "--logo" and i + 1 < len(argv):
+            flags["logo"] = argv[i + 1]
+            i += 1
+        elif arg.startswith("--logo="):
+            flags["logo"] = arg.split("=", 1)[1]
+        else:
+            rest.append(arg)
+        i += 1
+    return rest, flags
+
+
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    argv, flags = _take_presentation_flags(argv)
+    if flags["logo"] is not None:
+        if flags["logo"] not in LOGO_MODES:
+            return fail(f"--logo must be one of {', '.join(LOGO_MODES)}")
+        ui.set_logo_mode(flags["logo"])
+    if flags["interactive"]:
+        ui.force_interactive(True)
     if not argv:
-        ui.init_color(None)
+        ui.init_color(False if flags["no_color"] else (True if flags["color"] else None))
         try:
             return cmd_home()
         except KeyboardInterrupt:
             print()
             return 130
     args = build_parser().parse_args(argv)
-    # JSON never carries escape codes, and --no-color is the manual override.
-    ui.init_color(False if (args.json or args.no_color) else None)
+    # JSON never carries escape codes; --color / --no-color are the manual
+    # overrides for when the detection gets it wrong (see `term`).
+    if args.json or flags["no_color"]:
+        ui.init_color(False)
+    else:
+        ui.init_color(True if flags["color"] else None)
     try:
+        # Reports share the screens\' frame, so the whole CLI reads as one
+        # interface. `dash`/`menu`/`help`/`term`/`status` draw their own (they
+        # repaint, or nest a body), and --json output must stay plain.
+        if args.command in FRAMED_COMMANDS and not args.json:
+            with ui.screen(gallery.app.title, args.command):
+                return args.func(args) or 0
         return args.func(args) or 0
     except KeyboardInterrupt:
         print()
