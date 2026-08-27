@@ -5,7 +5,7 @@ import threading
 import time
 import urllib.request
 from collections import Counter
-from datetime import date
+from datetime import date, datetime
 from functools import partial
 from pathlib import Path
 from urllib.parse import quote
@@ -93,6 +93,7 @@ def _i18n_context(request: Request) -> dict:
         ],
         "t": partial(i18n.t, lang),
         "month_label": partial(i18n.month_label, lang),
+        "date_label": partial(i18n.date_label, lang),
     }
 
 
@@ -1892,6 +1893,25 @@ def set_lang(code: str, next: str = "/"):
     return resp
 
 
+def _archive_updated_at() -> str | None:
+    """ISO timestamp of the most recent photo file in the archive, for the
+    readout band's LAST UPDATE cell.
+
+    Deliberately MAX(mtime) — the file's own date on disk — and not
+    MAX(indexed_at): indexed_at is stamped when the scanner inserts a row, so
+    a from-scratch DB rebuild would reset every photo to "today" and the
+    archive would claim it was updated when in fact nothing new arrived.
+    mtime survives rebuilds and still moves when photos are dropped in."""
+    row = db.conn().execute("SELECT MAX(mtime) AS m FROM images").fetchone()
+    m = row["m"] if row else None
+    if not m:
+        return None
+    try:
+        return datetime.fromtimestamp(float(m)).isoformat()
+    except (ValueError, OSError, OverflowError):
+        return None
+
+
 @app.get("/", response_class=HTMLResponse)
 def welcome(request: Request):
     c = db.conn()
@@ -1914,6 +1934,7 @@ def welcome(request: Request):
             "album_count": top_level_albums,
             "showcase_count": showcase_count["n"] if showcase_count else 0,
             "showcase_albums": showcase_albums,
+            "updated_at": _archive_updated_at(),
         },
         # the hero feed can differ per device class (welcome_mobile/_desktop),
         # so shared caches must key on the UA

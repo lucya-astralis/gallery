@@ -79,6 +79,7 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "band.images": ("Images", "Bilder", "写真"),
     "band.albums": ("Albums", "Alben", "アルバム"),
     "band.featured": ("Featured", "Ausgewählt", "特集"),
+    "band.updated": ("Last update", "Letztes Update", "最終更新"),
     "showcase.head": ("SHOWCASE ALBUMS", "AUSGEWÄHLTE ALBEN", "特集アルバム"),
     "showcase.all": ("ALL ALBUMS", "ALLE ALBEN", "すべてのアルバム"),
     "aria.prev_frame": ("Previous frame", "Vorheriger Frame", "前のフレーム"),
@@ -331,6 +332,13 @@ def month_label(lang: str, iso: str | None) -> str | None:
         return f"{y}年{m}月"
     months = _MONTHS_DE if lang == "de" else _MONTHS_EN
     return f"{months[m - 1]} {y}".upper()
+
+
+def date_label(lang: str, iso: str | None) -> str | None:
+    """'2026-08-27T18:57:15' -> '27 AUG 2026' / '27. AUG 2026' / '2026年8月27日'.
+    The single-day case of date_span, for the archive's LAST UPDATE readout.
+    (Not to be confused with day_label above — that one counts trip days.)"""
+    return date_span(lang, iso, iso)
 
 
 def date_span(lang: str, iso_min: str | None, iso_max: str | None) -> str | None:

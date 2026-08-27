@@ -2226,6 +2226,22 @@ section{
   text-transform:uppercase;
   color:var(--text-ghost);
   align-self:center;
+  /* .kv sets overflow-wrap:anywhere so long VALUES (lens strings, paths)
+     can break — but dt inherited it too, and German labels are single
+     compound nouns with no space to break at, so the browser chopped them
+     mid-word: "KAMERAHERSTE / LLER", "BELICHTUNGSP / ROGRAMM".
+
+     The real fix is the language-specific column width below; this just
+     stops the chopping. hyphens:auto is a bonus, NOT the mechanism — it is
+     inert unless the browser ships a dictionary for the active language,
+     and plenty of Chromium builds do not. break-word is the last-resort
+     guard: it fires only when a word cannot fit a line on its own, which
+     the sized column already prevents — and an ugly break still beats the
+     label overflowing into the value beside it. */
+  word-break:normal;
+  overflow-wrap:break-word;
+  -webkit-hyphens:auto;
+  hyphens:auto;
 }
 .kv dd{
   margin:0;
@@ -2233,6 +2249,12 @@ section{
   font-family:"JetBrains Mono", monospace;
   font-size:12px;
 }
+/* German label column. Measured against the longest label the EXIF panel
+   can produce — "Belichtungsprogramm", 142px at the desktop dt size with
+   the tightened tracking below — so every German label fits on one line
+   without breaking or overflowing. EN and JP keep the shared 100px. */
+html[lang="de"] .kv{ grid-template-columns: 148px minmax(0, 1fr); }
+html[lang="de"] .kv dt{ letter-spacing:.1em; }
 .kv dd a{ color:var(--acc-cy); }
 .kv dd a:hover{ text-decoration:underline; }
 
@@ -2458,14 +2480,16 @@ details[open] > summary::before{ content:"▾ "; }
   .detail{ gap:14px; }
   .stage{ min-height:240px; }
   .stage img{ max-height:62vh; }
-  .stage__corner{ font-size:9px; padding:2px 6px; }
-  .stage__corner--tl, .stage__corner--tr{ top:6px; }
-  .stage__corner--tl, .stage__corner--bl{ left:6px; }
-  .stage__corner--tr, .stage__corner--br{ right:6px; }
-  .stage__corner--bl, .stage__corner--br{ bottom:6px; }
+  /* the HUD corners (FRAME / 01, the pixel dimensions, the filename) are
+     desktop chrome: on a phone the photo is most of the screen and they sit
+     on top of the picture itself. Nothing is lost — the dimensions and file
+     size are in the .section__doc chip row directly above the stage, and the
+     filename repeats in the FILE META panel below it. */
+  .stage__corner{ display:none; }
   .panel{ padding:13px 14px; }
   .panel h2{ font-size:10px; margin-bottom:10px; padding-bottom:7px; }
   .kv{ grid-template-columns: 86px minmax(0, 1fr); gap:5px 10px; font-size:12px; }
+  html[lang="de"] .kv{ grid-template-columns: 122px minmax(0, 1fr); }
   .kv dt{ font-size:9.5px; letter-spacing:.12em; }
   .kv dd{ font-size:11.5px; }
   .raw-exif{ font-size:10px; max-height:240px; padding:8px 10px; }
@@ -3123,9 +3147,37 @@ body.page-welcome{ --page-max: 2400px; }
   background:#7aa0ff;
   border-color:#7aa0ff;
 }
+/* ---- the hero's primary call to action ----------------------------------
+   The flat cyan face and soft bloom, as before — but stated in full from
+   one 0-3-0 selector, because the modifier could not win a hover on its own.
+
+   Three rules used to collide here. `.btn-link--primary:hover` and
+   `.btn-link:hover` both carry 0-2-0, and the generic one is declared LATER
+   in this sheet, so it took every property: it pushed `color:var(--acc-cy)`
+   onto the cyan face (cyan on cyan) and swapped the background for a 6%
+   tint — which then lost anyway to the non-hover `.vf .btn-link--primary`
+   at 0-3-0. Net effect: the label vanished and the fill never reacted.
+
+   Both states now set colour, background, border and shadow explicitly at
+   0-3-0, so nothing downstream can take one property and leave the rest.
+   Hover goes a step DEEPER rather than lighter — the label is white, and a
+   lighter fill would only make it harder to read. */
 .vf .btn-link--primary{
+  color:var(--text);
   background:var(--acc-cy);
+  border-color:var(--acc-cy);
   box-shadow:0 0 24px rgba(91,138,255,.35);
+}
+.vf .btn-link--primary:hover{
+  color:var(--text);
+  background:#4a78e8;
+  border-color:#7aa0ff;
+  box-shadow:0 0 30px rgba(91,138,255,.5);
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference){
+  .vf .btn-link--primary{ transition:background .18s, border-color .18s, box-shadow .18s, transform .15s ease; }
+  .btn-link__go{ transition:transform .22s ease; }
+  .btn-link--primary:hover .btn-link__go{ transform:translateX(3px); }
 }
 
 /* file meta block (bottom right) links to the current frame */
@@ -3315,12 +3367,21 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .vf-band__sig{ color:var(--text-dim); }
 .vf-band__cells{
-  display:flex; align-items:center; gap:26px;
+  /* flex-END, not center: the LAST UPDATE cell is shorter than the three
+     digit cells, and centring it would float its caption above theirs.
+     Bottom-aligning puts every caption on one baseline and lets the shorter
+     date simply sit lower, which is what it is. The dividers keep their own
+     align-self:stretch and are unaffected. */
+  display:flex; align-items:flex-end; gap:26px;
   margin-left:auto;
 }
 .vf-band__cell{
   display:flex; flex-direction:column; gap:3px;
-  align-items:flex-start;
+  /* centred, not flex-start: value and caption are different widths (and the
+     caption carries an icon), so hugging the left leaves the number visibly
+     off to one side of the word it belongs to */
+  align-items:center;
+  text-align:center;
   min-width:0;
 }
 .vf-band__digits{
@@ -3347,6 +3408,19 @@ body.page-welcome{ --page-max: 2400px; }
   letter-spacing:.3em;
   text-transform:uppercase;
   color:var(--text-ghost);
+}
+/* the archive's last-update stamp. Deliberately NOT the glowing Ethnocentric
+   digits: it is a date, so it stays in the readout mono at half the size and
+   in plain --text, leaving the three counts as the row's coloured anchors. */
+.vf-band__stamp{
+  font-family:"JetBrains Mono", monospace;
+  font-size:clamp(14px, 1.6vw, 19px);
+  line-height:1;
+  letter-spacing:.06em;
+  color:var(--text);
+  white-space:nowrap;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 .vf-band__divider{
   width:1px;
@@ -3390,8 +3464,30 @@ body.page-welcome{ --page-max: 2400px; }
   .vf__auto{ display:none; }
   .vf__track{ gap:4px; }
   .vf-band__inner{ padding:14px var(--page-pad); min-height:0; gap:16px; }
-  .vf-band__cells{ margin-left:0; width:100%; justify-content:space-between; gap:14px; }
+  /* Four cells across does not survive a phone in every language — German
+     ("LETZTES UPDATE", "AUSGEWÄHLT") ran the row off its own edge. Rather
+     than let the break land wherever the active language happens to put it,
+     the three counts keep the top row and the date takes a line of its own:
+     it is a different kind of fact anyway, and the layout is now identical
+     in EN, DE and JP. */
+  .vf-band__cells{
+    margin-left:0; width:100%;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    column-gap:14px; row-gap:12px;
+  }
+  .vf-band__cell--stamp{
+    flex-basis:100%;
+    flex-direction:row; align-items:baseline; gap:10px;
+    text-align:left;
+  }
   .vf-band__divider{ display:none; }
+  /* .3em tracking is a lot of width for an 11-character caption: on a phone
+     "LAST UPDATE" broke to two lines while its three neighbours stayed on
+     one, which tilted the whole row. Tightened just enough to hold. */
+  .vf-band__caption{ letter-spacing:.16em; white-space:nowrap; }
+  .vf-band__caption > .fa{ margin-right:.5em; }
+  .vf-band__stamp{ font-size:13px; letter-spacing:.03em; }
   .showcase-page{ padding-top:26px; }
 }
 
@@ -4390,6 +4486,7 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__img{
 .foot__links a > .fa,
 .panel h2 > .fa,
 .vf-band__caption > .fa,
+.kv dd a > .fa,
 .album-card__badge--folder > .fa{ margin-right:.6em; }
 
 /* the mono labels are tracked out hard; a leading icon needs a little more
@@ -4403,7 +4500,10 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__img{
 .showcase__more > .fa,
 .fhero__file-open > .fa,
 .btn-link--about > .fa,
+.btn-link__go,
 .foot__op-ext{ margin-left:.55em; font-size:.8em; }
+/* …but the CTA's arrow is the invitation, so it keeps the label's weight */
+.btn-link--primary .btn-link__go{ margin-left:.8em; font-size:.9em; }
 
 /* --- nav search: the magnifier is a flex sibling of the input ---------- */
 .nav__search-ico{
