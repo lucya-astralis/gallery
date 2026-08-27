@@ -1,8 +1,8 @@
-"""Terminal presentation layer for the debug CLI (app/debug.py).
+"""Terminal presentation layer for the operator CLI (app/cli.py).
 
 Same editorial line as the site itself: a megacorp-terminal HUD — uppercase
 labels, thin rules, cyan accents, numbers that line up. Everything here is
-about *how* things are printed; what to print lives in debug.py.
+about *how* things are printed; what to print lives in cli.py.
 
 Terminal detection is deliberately generous, because `isatty()` lies in two
 common setups:
@@ -17,7 +17,7 @@ common setups:
 
 So: colour follows *stdout*, interactivity follows "is there any terminal I
 can read from", and both can be forced with `--color` / `--interactive`,
-`FORCE_COLOR` / `NO_COLOR`. `python -m app.debug term` prints what was
+`FORCE_COLOR` / `NO_COLOR`. `python -m app.cli term` prints what was
 detected and why.
 """
 
@@ -387,7 +387,7 @@ def truncate(text: str, limit: int) -> str:
 def wrap(text: str, limit: int, indent: int = 0) -> list[str]:
     """Fold a line to `limit` visible columns, breaking on spaces where it
     can. Continuation lines are indented, so a long value stays under its own
-    label instead of being cut off — a debug tool must never hide data."""
+    label instead of being cut off — an ops tool must never hide data."""
     if visible_len(text) <= limit:
         return [text]
     lines: list[str] = []

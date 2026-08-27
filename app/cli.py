@@ -1,7 +1,7 @@
-"""Operator / debug CLI for the gallery backend.
+"""Operator CLI for the gallery backend.
 
-    python -m app.debug <command> [options]
-    docker compose exec gallery python -m app.debug <command>
+    python -m app.cli <command> [options]
+    docker compose exec gallery python -m app.cli <command>
 
 Two kinds of command live in here:
 
@@ -118,9 +118,19 @@ def _server_status() -> tuple[dict | None, bool]:
     return st, control.status_is_live(st)
 
 
+class UnknownAlbum(Exception):
+    """An album was named on the command line but matches nothing.
+
+    Raised rather than quietly scoping to a folder that is not there: a typo
+    used to come back as "0 files · no problems found", which reads exactly
+    like a clean bill of health for the album you meant.
+    """
+
+
 def _norm_album(raw: str | None) -> str | None:
     """Normalize an album path off the command line and resolve its casing
-    against the index, so `Japan_2026/kansai` finds the real folder."""
+    against the index, so `Japan_2026/kansai` finds the real folder. Raises
+    UnknownAlbum when a name was given and nothing matches it."""
     if not raw:
         return None
     album = raw.replace("\\", "/").strip().strip("/")
@@ -129,7 +139,9 @@ def _norm_album(raw: str | None) -> str | None:
     if (gallery.PHOTOS_DIR / album).is_dir():
         return album
     resolved = gallery._resolve_album_path(album)
-    return resolved or album
+    if not resolved:
+        raise UnknownAlbum(album)
+    return resolved
 
 
 def _photo_files(root: str | None = None):
@@ -1064,7 +1076,7 @@ def _i18n_sources() -> str:
     for path in sorted((gallery.BASE_DIR / "templates").glob("*.html")):
         parts.append(path.read_text(encoding="utf-8"))
     for path in sorted(gallery.BASE_DIR.glob("*.py")):
-        if path.name in ("i18n.py", "debug.py"):
+        if path.name in ("i18n.py", "cli.py"):
             continue
         parts.append(path.read_text(encoding="utf-8"))
     return "\n".join(parts)
@@ -1094,6 +1106,454 @@ def _js_ui_strings() -> dict[str, set[str]]:
         if m and current:
             blocks[current].add(m.group(1))
     return blocks
+
+
+# ----- tags -------------------------------------------------------------
+def _sidecar_tags_on_disk(album: str | None = None) -> tuple[dict, list[str]]:
+    """Every `.tags` sidecar under PHOTOS_DIR, parsed the way the scanner
+    parses it: {rel_path: [tag, ...]}, plus the sidecars whose photo is gone.
+
+    Read off the filesystem rather than the index on purpose — the whole point
+    of this command is catching the two drifting apart.
+    """
+    found: dict[str, list[str]] = {}
+    orphans: list[str] = []
+    root = gallery.PHOTOS_DIR
+    base = (root / album) if album else root
+    if not base.is_dir():
+        return found, orphans
+    for path in sorted(base.rglob("*.tags")):
+        photo = path.with_suffix("")          # strip `.tags`, keep `.png`
+        rel = photo.relative_to(root).as_posix()
+        if not photo.is_file():
+            orphans.append(path.relative_to(root).as_posix())
+            continue
+        found[rel] = scanner._read_sidecar_tags(photo)
+    return found, orphans
+
+
+def cmd_tags(args) -> int:
+    c = _connect()
+    album = _norm_album(args.album)
+
+    # What the index believes.
+    where, params = "", []
+    if album:
+        where = "WHERE i.album = ? OR substr(i.album, 1, ?) = ?"
+        params = [album, len(album) + 1, album + "/"]
+    rows = c.execute(
+        f"""SELECT t.name AS tag, i.rel_path AS rel
+            FROM tags t
+            JOIN image_tags it ON it.tag_id = t.id
+            JOIN images i ON i.id = it.image_id
+            {where}
+            ORDER BY t.name COLLATE NOCASE, i.rel_path""",
+        params,
+    ).fetchall()
+    indexed: dict[str, list[str]] = {}
+    for row in rows:
+        indexed.setdefault(row["tag"], []).append(row["rel"])
+
+    # One tag asked for by name: just list what carries it.
+    if args.tag:
+        want = args.tag.strip().lower()
+        hits = {t: r for t, r in indexed.items() if t.lower() == want}
+        if args.json:
+            dump({"tag": args.tag, "photos": sorted(next(iter(hits.values()), []))})
+            return 0 if hits else 1
+        if not hits:
+            kv("tag", f"{args.tag!r} is on no indexed photo")
+            hint(f"  known tags: {', '.join(sorted(indexed)) or '—'}")
+            return 1
+        for tag, rels in hits.items():
+            kv("tag", f"{tag} · {len(rels)} photo(s)")
+            for rel in rels[:args.limit]:
+                out(f"  {rel}")
+            if len(rels) > args.limit:
+                out(f"  … {len(rels) - args.limit} more")
+        return 0
+
+    disk, orphans = _sidecar_tags_on_disk(album)
+
+    # Drift: the sidecar is the source of truth, the index is the copy.
+    drift_unindexed: list[str] = []   # on disk, not in the index
+    drift_stale: list[str] = []       # in the index, not on disk
+    by_photo_indexed: dict[str, set[str]] = {}
+    for tag, rels in indexed.items():
+        for rel in rels:
+            by_photo_indexed.setdefault(rel, set()).add(tag.lower())
+    for rel, tags in disk.items():
+        have = by_photo_indexed.get(rel, set())
+        for tag in tags:
+            if tag.lower() not in have:
+                drift_unindexed.append(f"{rel} · {tag}")
+    for rel, tags in by_photo_indexed.items():
+        on_disk = {t.lower() for t in disk.get(rel, [])}
+        for tag in sorted(tags):
+            if tag not in on_disk:
+                drift_stale.append(f"{rel} · {tag}")
+
+    if args.json:
+        dump({"album": album,
+              "vocabulary": {t: len(r) for t, r in indexed.items()},
+              "photos_tagged": len(by_photo_indexed),
+              "sidecars": len(disk),
+              "drift": {"not_indexed": sorted(drift_unindexed),
+                        "indexed_without_sidecar": sorted(drift_stale)},
+              "orphan_sidecars": orphans})
+        return 1 if (drift_unindexed or drift_stale or orphans) else 0
+
+    kv("scope", album or "whole gallery")
+    kv("vocabulary", f"{len(indexed)} tag(s) on {len(by_photo_indexed)} photo(s)")
+    kv("sidecars", f"{len(disk)} `.tags` file(s) on disk")
+
+    head("tags")
+    if indexed:
+        ui.columns([(t, f"{len(r)} photo(s)") for t, r in
+                    sorted(indexed.items(), key=lambda kv: (-len(kv[1]), kv[0].lower()))])
+    else:
+        out("  none — write a `<photo>.tags` sidecar, or use the configurator")
+
+    if drift_unindexed:
+        head(f"on disk, not indexed  ({len(drift_unindexed)})")
+        for item in sorted(drift_unindexed)[:args.limit]:
+            out(f"  ! {item}")
+        if len(drift_unindexed) > args.limit:
+            out(f"  … {len(drift_unindexed) - args.limit} more")
+        kv("fix", "`scan` — a sidecar's mtime counts as the photo's")
+    if drift_stale:
+        head(f"indexed, no sidecar  ({len(drift_stale)})")
+        for item in sorted(drift_stale)[:args.limit]:
+            out(f"  ! {item}")
+        kv("fix", "`scan --force` on that album")
+    if orphans:
+        head(f"orphaned sidecars  ({len(orphans)})")
+        for item in orphans[:args.limit]:
+            out(f"  ! {item} — the photo it belongs to is gone")
+    return 1 if (drift_unindexed or drift_stale or orphans) else 0
+
+
+# ----- welcome ----------------------------------------------------------
+def _welcome_report(mobile: bool) -> dict:
+    """What the welcome hero resolves to for one device class, and which
+    gallery.cfg entries were dropped getting there."""
+    cfg = gallery._gallery_config()
+    key = "welcome_mobile" if mobile else "welcome_desktop"
+    spec = cfg.get(key)
+    source = key
+    if not spec:
+        spec = cfg.get("welcome", [])
+        source = "welcome" if spec else "(unset)"
+
+    skipped = []
+    if not (len(spec) == 1 and spec[0].lower() in gallery._WELCOME_KEYWORDS):
+        for raw in spec:
+            if gallery._lookup_welcome_image(raw) is None:
+                skipped.append(raw)
+
+    feed, label, mode = gallery._welcome_feed(mobile=mobile)
+    return {"device": "mobile" if mobile else "desktop",
+            "source_key": source, "spec": list(spec), "skipped": skipped,
+            "mode": mode, "label": label,
+            "feed": [f["rel_path"] for f in feed]}
+
+
+MODE_NOTE = {
+    "manual": " — the cfg list, in this order",
+    "showcase": " — random featured photos, so this list changes per load",
+    "random": " — random photos, so this list changes per load",
+}
+
+
+def cmd_welcome(args) -> int:
+    _connect()
+    devices = []
+    if not args.mobile_only:
+        devices.append(_welcome_report(mobile=False))
+    if not args.desktop_only:
+        devices.append(_welcome_report(mobile=True))
+
+    if args.json:
+        dump({"devices": devices,
+              "feed_max": gallery.WELCOME_FEED_MAX,
+              "keywords": sorted(set(gallery._WELCOME_KEYWORDS))})
+        return 1 if any(d["skipped"] for d in devices) else 0
+
+    for report in devices:
+        head(report["device"])
+        kv("key", report["source_key"])
+        kv("mode", report["mode"] + MODE_NOTE.get(report["mode"], ""))
+        kv("label", report["label"])
+        kv("shows", f"{len(report['feed'])} photo(s)")
+        for rel in report["feed"][:args.limit]:
+            out(f"  {rel}")
+        if len(report["feed"]) > args.limit:
+            out(f"  … {len(report['feed']) - args.limit} more")
+        if report["skipped"]:
+            out("")
+            for raw in report["skipped"]:
+                out(f"  ! {raw} — not indexed, entry skipped")
+    if any(d["skipped"] for d in devices):
+        kv("fix", "`scan`, or correct the path in gallery.cfg")
+        return 1
+    return 0
+
+
+# ----- gps --------------------------------------------------------------
+def cmd_gps(args) -> int:
+    """Which originals still carry coordinates. WRITES with --strip."""
+    _connect()
+    album = _norm_album(args.album)
+    base = (gallery.PHOTOS_DIR / album) if album else gallery.PHOTOS_DIR
+    if not base.is_dir():
+        return fail(f"no such album: {args.album!r}")
+
+    files = [p for p in sorted(base.rglob("*"))
+             if p.is_file() and scanner.is_image(p)
+             and scanner.ALBUM_META_DIR not in p.parts]
+
+    live = ui.Live("reading EXIF", enabled=not args.json)
+    carrying: list[str] = []
+    stripped: list[str] = []
+    unreadable: list[str] = []
+    for seen, path in enumerate(files, 1):
+        if seen % 25 == 0 or seen == len(files):
+            live.progress(seen, len(files), "photos")
+        try:
+            with Image.open(path) as img:
+                has = scanner._has_gps(img.getexif())
+        except Exception as exc:
+            unreadable.append(f"{path.relative_to(gallery.PHOTOS_DIR).as_posix()} — {exc}")
+            continue
+        if not has:
+            continue
+        rel = path.relative_to(gallery.PHOTOS_DIR).as_posix()
+        carrying.append(rel)
+        if args.strip and scanner.strip_gps_inplace(path):
+            stripped.append(rel)
+    live.done()
+
+    if args.json:
+        dump({"album": album, "checked": len(files),
+              "with_gps": carrying, "stripped": stripped,
+              "unreadable": unreadable,
+              "settings": {"hide_gps": bool(gallery.HIDE_GPS),
+                           "strip_gps": bool(gallery.STRIP_GPS)}})
+        return 1 if carrying and not args.strip else 0
+
+    kv("scope", album or "whole gallery")
+    kv("checked", f"{len(files)} original(s)")
+    kv("settings", f"hide_gps={int(gallery.HIDE_GPS)} · strip_gps={int(gallery.STRIP_GPS)}",
+       "" if gallery.STRIP_GPS else ui.C.ye)
+    kv("with gps", f"{len(carrying)} photo(s)", ui.C.gn if not carrying else ui.C.ye)
+    if carrying:
+        head("coordinates present")
+        for rel in carrying[:args.limit]:
+            mark = "stripped" if rel in stripped else "!"
+            out(f"  {mark:>8}  {rel}")
+        if len(carrying) > args.limit:
+            out(f"  … {len(carrying) - args.limit} more")
+    if unreadable:
+        head(f"unreadable  ({len(unreadable)})")
+        for item in unreadable[:args.limit]:
+            out(f"  ! {item}")
+    if args.strip:
+        kv("stripped", f"{len(stripped)} file(s) rewritten in place")
+        if stripped:
+            kv("next", "`scan --force` on that album — the mtimes changed")
+    elif carrying:
+        kv("fix", "`gps --strip` rewrites them in place (originals are modified)")
+    return 1 if carrying and not args.strip else 0
+
+
+# ----- album ------------------------------------------------------------
+def cmd_album(args) -> int:
+    c = _connect()
+    album = _norm_album(args.album)
+
+    if not album:
+        listing = []
+        for name in gallery._all_album_nodes():
+            row = c.execute(
+                "SELECT COUNT(*) AS n FROM images WHERE album = ? OR substr(album, 1, ?) = ?",
+                (name, len(name) + 1, name + "/")).fetchone()
+            cfg = gallery._album_config(name)
+            listing.append({"album": name, "photos": row["n"], "has_cfg": bool(cfg),
+                            "showcase": gallery._album_is_showcase(name),
+                            "collection": gallery._album_collection(name, cfg)})
+        if args.json:
+            dump({"albums": listing})
+            return 0
+        kv("albums", f"{len(listing)}")
+        head("albums")
+        ui.columns([(a["album"],
+                     f"{a['photos']:>5} photo(s)"
+                     + ("  ·  cfg" if a["has_cfg"] else "")
+                     + ("  ·  showcase" if a["showcase"] else "")
+                     + ("  ·  collection" if a["collection"] else ""))
+                    for a in listing])
+        hint("  `album <name>` for one in full")
+        return 0
+
+    cfg = gallery._album_config(album)
+    rows = c.execute(
+        "SELECT rel_path, taken_at, size FROM images "
+        "WHERE album = ? OR substr(album, 1, ?) = ? ORDER BY taken_at",
+        (album, len(album) + 1, album + "/")).fetchall()
+    dates = [r["taken_at"] for r in rows if r["taken_at"]]
+    meta = gallery._album_meta_dir(album)
+    descriptions = sorted(p.name for p in meta.glob("album_*.md")) if meta else []
+    children = [n for n in gallery._all_album_nodes() if n.startswith(album + "/")]
+    featured = gallery._resolve_photo_refs(album, cfg.get("featured", []))
+    icon = gallery._album_icon_file(album)
+    font = gallery._album_font_file(album)
+
+    info = {
+        "album": album,
+        "photos": len(rows),
+        "bytes": sum(r["size"] or 0 for r in rows),
+        "span": [dates[0], dates[-1]] if dates else None,
+        "undated": sum(1 for r in rows if not r["taken_at"]),
+        "has_cfg": bool(cfg),
+        "cfg": dict(cfg),
+        "cover": gallery._config_cover_rel(album, gallery._cfg_first(cfg, "cover")),
+        "featured": featured,
+        "showcase": gallery._album_is_showcase(album),
+        "collection": gallery._album_collection(album, cfg),
+        "tags": gallery._album_tags(album, cfg),
+        "descriptions": descriptions,
+        "icon": icon.name if icon else None,
+        "font": font.name if font else None,
+        "sub_albums": children,
+        "issues": _check_album_cfg(album),
+    }
+    if args.json:
+        dump(info)
+        return 1 if info["issues"] else 0
+
+    kv("album", album)
+    kv("photos", f"{info['photos']} · {_bytes(info['bytes'])}"
+                 + (f" · {info['undated']} undated" if info["undated"] else ""))
+    if info["span"]:
+        kv("span", f"{info['span'][0][:10]} → {info['span'][1][:10]}")
+    kv("flags", ", ".join(filter(None, [
+        "showcase" if info["showcase"] else None,
+        "collection" if info["collection"] else None,
+    ])) or "—")
+    kv("cover", info["cover"] or "auto (newest photo)")
+    kv("featured", f"{len(featured)} photo(s)" if featured else "—")
+    kv("tags", ", ".join(info["tags"]) or "—")
+    kv("look", ", ".join(filter(None, [
+        f"icon={info['icon']}" if info["icon"] else None,
+        f"font={info['font']}" if info["font"] else None,
+        f"effect={gallery._cfg_first(cfg, 'effect')}" if cfg.get("effect") else None,
+    ])) or "—")
+    kv("text", ", ".join(info["descriptions"]) or "no album_*.md")
+    if children:
+        head(f"sub-albums  ({len(children)})")
+        for name in children[:args.limit]:
+            out(f"  {name}")
+    if info["issues"]:
+        head(f"cfg issues  ({len(info['issues'])})")
+        for issue in info["issues"]:
+            out(f"  {issue['level']:>5}  {issue['key']} — {issue['detail']}")
+        return 1
+    return 0
+
+
+# ----- search -----------------------------------------------------------
+def cmd_search(args) -> int:
+    """The same query the /search page runs, so what this lists is what the
+    page would list."""
+    c = _connect()
+    query = (args.query or "").strip()
+    if not query:
+        return fail("nothing to search for")
+    like = f"%{query}%"
+    rows = c.execute(
+        """SELECT DISTINCT i.rel_path, i.album, i.filename, i.taken_at
+           FROM images i
+           LEFT JOIN image_tags it ON it.image_id = i.id
+           LEFT JOIN tags t ON t.id = it.tag_id
+           WHERE i.album LIKE ? OR i.filename LIKE ? OR t.name LIKE ?
+           ORDER BY i.taken_at IS NULL, i.taken_at DESC, i.filename""",
+        (like, like, like)).fetchall()
+
+    album = _norm_album(args.album)
+    if album:
+        rows = [r for r in rows
+                if r["album"] == album or r["album"].startswith(album + "/")]
+
+    if args.json:
+        dump({"query": query, "album": album, "matches": len(rows),
+              "photos": [dict(r) for r in rows[:args.limit]]})
+        return 0 if rows else 1
+
+    kv("query", query + (f" · in {album}" if album else ""))
+    kv("matches", f"{len(rows)} photo(s)")
+    if not rows:
+        hint("  the page matches album name, file name and tag — nothing else")
+        return 1
+    head("matches")
+    ui.columns([(r["rel_path"], (r["taken_at"] or "undated")[:10])
+                for r in rows[:args.limit]])
+    if len(rows) > args.limit:
+        out(f"  … {len(rows) - args.limit} more  (--limit)")
+    return 0
+
+
+# ----- export -----------------------------------------------------------
+def cmd_export(args) -> int:
+    """Snapshot every hand-written file: gallery.cfg and each `.album/`.
+
+    Photos are deliberately left out — they are the one thing that already is
+    the backup. What this captures is the part that cannot be regenerated: the
+    config, the descriptions, the icons and the title fonts.
+    """
+    import tarfile
+
+    root = gallery.PHOTOS_DIR
+    members: list[tuple[Path, str]] = []
+    gallery_cfg = root / gallery.GALLERY_CFG_NAME
+    if gallery_cfg.is_file():
+        members.append((gallery_cfg, gallery.GALLERY_CFG_NAME))
+    for meta in sorted(root.rglob(scanner.ALBUM_META_DIR)):
+        if not meta.is_dir():
+            continue
+        for path in sorted(meta.rglob("*")):
+            if path.is_file() and path.name not in ("Thumbs.db", ".DS_Store"):
+                members.append((path, path.relative_to(root).as_posix()))
+
+    total = sum(p.stat().st_size for p, _ in members)
+    if args.list:
+        if args.json:
+            dump({"files": [name for _, name in members], "bytes": total})
+            return 0
+        kv("contents", f"{len(members)} file(s) · {_bytes(total)}")
+        kv("archive", "not written — drop --list to create it")
+        head("files")
+        for _, name in members[:args.limit]:
+            out(f"  {name}")
+        if len(members) > args.limit:
+            out(f"  … {len(members) - args.limit} more")
+        return 0
+
+    target = Path(args.out or f"gallery-config-{datetime.now():%Y%m%dT%H%M%S}.tar.gz")
+    if target.exists() and not args.force:
+        return fail(f"{target} exists — pass --force to overwrite")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(target, "w:gz") as tar:
+        for path, name in members:
+            tar.add(path, arcname=name)
+
+    if args.json:
+        dump({"archive": str(target), "files": len(members),
+              "bytes": target.stat().st_size})
+        return 0
+    kv("archive", str(target))
+    kv("contents", f"{len(members)} file(s) · {_bytes(target.stat().st_size)}")
+    hint("  restore with:  tar -xzf <archive> -C <photos dir>")
+    return 0
 
 
 def cmd_i18n(args) -> int:
@@ -1181,10 +1641,10 @@ def cmd_i18n(args) -> int:
 
 
 # ----- dashboard / menu / help -----------------------------------------
-# `python -m app.debug` with no arguments lands here: the masthead, what the
+# `python -m app.cli` with no arguments lands here: the masthead, what the
 # server is doing, and what the archive currently holds. On a terminal it
 # then drops into the menu; piped or redirected it just prints and exits.
-SUBTITLE_FMT = "{title}  ·  OPS CONSOLE  ·  API v{api}"
+SUBTITLE_FMT = "{title}  ·  CLI v{app}  ·  API v{api}"
 # Above this many rows the dashboard skips the two directory walks (health +
 # cache size) instead of making you wait for them.
 QUICK_CHECK_MAX_ROWS = 20000
@@ -1290,7 +1750,8 @@ def _dash_body(footer: bool = True) -> None:
         "SELECT MIN(taken_at) AS a, MAX(taken_at) AS b FROM images "
         "WHERE taken_at IS NOT NULL").fetchone()
 
-    ui.logo(SUBTITLE_FMT.format(title=gallery.app.title.upper(), api=gallery.API_VERSION))
+    ui.logo(SUBTITLE_FMT.format(title=gallery.app.title.upper(),
+                                app=gallery.APP_VERSION, api=gallery.API_VERSION))
     ui.rule("system")
     _render_system(st, live, pause)
 
@@ -1382,7 +1843,19 @@ MENU_ITEMS = [
     ("cfg", "album.cfg / gallery.cfg as the app parses it",
      [("arg", "album", "album (blank = gallery.cfg)")]),
     ("photo", "one photo in full", [("arg!", "rel_path", "rel_path")]),
+    ("album", "one album in full, or the list of them",
+     [("arg", "album", "album (blank = list every album)")]),
     ("trip", "trip dashboard", [("arg", "album", "album (blank = list trips)")]),
+    ("welcome", "what the welcome hero resolves to", []),
+    ("tags", "per-photo tags, and sidecar vs index drift",
+     [("arg", "tag", "tag (blank = the whole vocabulary)"),
+      ("opt", "--album", "album (blank = whole gallery)")]),
+    ("search", "run the /search query", [("arg!", "query", "search for")]),
+    ("gps", "originals still carrying coordinates",
+     [("arg", "album", "album (blank = whole gallery)"),
+      ("flag", "--strip", "remove the coordinates from every hit? [y/N]")]),
+    ("export", "archive gallery.cfg and every .album/",
+     [("flag", "--list", "only list what would go in? [y/N]")]),
     ("i18n", "EN/DE/JP completeness + app.js mirror", []),
     ("dash", "redraw this dashboard", []),
 ]
@@ -1446,8 +1919,8 @@ def cmd_menu(args) -> int:
         ui.warn("no terminal detected — printing the command overview instead")
         _command_columns()
         print()
-        hint("  `python -m app.debug term` shows what was detected")
-        hint("  `python -m app.debug menu --interactive` forces the menu anyway")
+        hint("  `python -m app.cli term` shows what was detected")
+        hint("  `python -m app.cli menu --interactive` forces the menu anyway")
         return 1
     _connect()
     last: list[str] | None = None
@@ -1457,12 +1930,13 @@ def cmd_menu(args) -> int:
             ui.clear_screen()
         with _screen("menu"):
             if intro:
-                # entered by plain `python -m app.debug`: lead with the whole
+                # entered by plain `python -m app.cli`: lead with the whole
                 # dashboard, with the menu as the last section of the screen
                 intro = False
                 _dash_body(footer=False)
             else:
                 ui.logo(SUBTITLE_FMT.format(title=gallery.app.title.upper(),
+                                            app=gallery.APP_VERSION,
                                             api=gallery.API_VERSION))
                 _menu_status_line()
             ui.head("menu")
@@ -1540,11 +2014,12 @@ def cmd_help(args) -> int:
 
 
 def _help_body() -> None:
-    ui.logo(SUBTITLE_FMT.format(title=gallery.app.title.upper(), api=gallery.API_VERSION))
+    ui.logo(SUBTITLE_FMT.format(title=gallery.app.title.upper(),
+                                app=gallery.APP_VERSION, api=gallery.API_VERSION))
     ui.rule("usage")
     ui.columns([
-        ("python -m app.debug", "dashboard, then the interactive menu"),
-        ("python -m app.debug <cmd>", "run one command"),
+        ("python -m app.cli", "dashboard, then the interactive menu"),
+        ("python -m app.cli <cmd>", "run one command"),
         ("… <cmd> --help", "options of that command"),
         ("… <cmd> --json", "machine-readable output"),
         ("--logo blocks", "draw the real logo as a picture (see `term`)"),
@@ -1554,7 +2029,7 @@ def _help_body() -> None:
     ui.head("control channel")
     hint(f"  the server is driven through flag files in {control.control_dir()}")
     hint("  status.json (server) · paused.json + scan.request.json (this CLI)")
-    hint("  there is no debug HTTP endpoint — the web surface stays read-only")
+    hint("  there is no control HTTP endpoint — the web surface stays read-only")
 
 
 _PROTOCOL_NAMES = {
@@ -1642,12 +2117,12 @@ def cmd_home() -> int:
 # ----- argument parsing -------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="python -m app.debug",
-        description="Operator / debug CLI for the gallery backend.",
+        prog="python -m app.cli",
+        description="Operator CLI for the gallery backend.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Run without arguments for the dashboard and the interactive menu.\n"
                "Server control (status/scan/pause/resume) goes through the flag files in\n"
-               "DATA_DIR/control — there is no debug HTTP endpoint, by design.",
+               "DATA_DIR/control — there is no control HTTP endpoint, by design.",
     )
     sub = p.add_subparsers(dest="command", required=True)
 
@@ -1729,6 +2204,41 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("i18n", cmd_i18n, "Check EN/DE/JP completeness and the app.js UI_STRINGS mirror.")
     sp.add_argument("--limit", type=int, default=20, help="findings per group (default: 20)")
 
+    sp = add("tags", cmd_tags, "Per-photo tags: the vocabulary, and `.tags` sidecar vs index drift.")
+    sp.add_argument("tag", nargs="?", help="one tag — list the photos carrying it")
+    sp.add_argument("--album", help="limit to an album and its sub-albums")
+    sp.add_argument("--limit", type=int, default=40, help="rows per group (default: 40)")
+
+    sp = add("welcome", cmd_welcome, "What the welcome hero resolves to, per device class.")
+    sp.add_argument("--desktop", dest="desktop_only", action="store_true",
+                    help="only the desktop feed")
+    sp.add_argument("--mobile", dest="mobile_only", action="store_true",
+                    help="only the mobile feed")
+    sp.add_argument("--limit", type=int, default=30, help="entries shown (default: 30)")
+
+    sp = add("gps", cmd_gps, "Which originals still carry coordinates "
+                             "(--strip REWRITES those files).")
+    sp.add_argument("album", nargs="?", help="album (blank = whole gallery)")
+    sp.add_argument("--strip", action="store_true",
+                    help="remove the GPS block from every hit, in place")
+    sp.add_argument("--limit", type=int, default=40, help="rows shown (default: 40)")
+
+    sp = add("album", cmd_album, "One album in full, or the list of them.")
+    sp.add_argument("album", nargs="?", help="album (blank = list every album)")
+    sp.add_argument("--limit", type=int, default=40, help="rows shown (default: 40)")
+
+    sp = add("search", cmd_search, "Run the /search query from the terminal.")
+    sp.add_argument("query", nargs="?", help="matches album name, file name and tag")
+    sp.add_argument("--album", help="limit to an album and its sub-albums")
+    sp.add_argument("--limit", type=int, default=40, help="rows shown (default: 40)")
+
+    sp = add("export", cmd_export, "Archive gallery.cfg and every .album/ folder "
+                                   "(writes the archive, reads photos/).")
+    sp.add_argument("--out", help="archive path (default: ./gallery-config-<stamp>.tar.gz)")
+    sp.add_argument("--list", action="store_true", help="show what would go in, write nothing")
+    sp.add_argument("--force", action="store_true", help="overwrite an existing archive")
+    sp.add_argument("--limit", type=int, default=40, help="rows shown with --list (default: 40)")
+
     return p
 
 
@@ -1736,7 +2246,8 @@ LOGO_MODES = ("auto", "kitty", "iterm", "blocks", "ascii", "off")
 # Commands whose output is wrapped in the shared frame by the dispatcher.
 # The rest draw their own screen (see _screen) or are pure JSON.
 FRAMED_COMMANDS = {"scan", "pause", "resume", "doctor", "thumbs", "featured",
-                   "cfg", "photo", "trip", "i18n"}
+                   "cfg", "photo", "trip", "i18n",
+                   "tags", "welcome", "gps", "album", "search", "export"}
 
 
 def _take_presentation_flags(argv: list[str]):
@@ -1744,7 +2255,7 @@ def _take_presentation_flags(argv: list[str]):
 
     They are not really per-command options: they configure the console
     itself. Handling them here makes `--logo blocks status` work as well as
-    `status --logo blocks`, lets the bare `python -m app.debug` take them,
+    `status --logo blocks`, lets the bare `python -m app.cli` take them,
     and — because they are applied to the console module rather than to one
     parsed namespace — keeps them in effect for the commands the menu starts
     afterwards.
@@ -1802,6 +2313,8 @@ def main(argv=None) -> int:
             with ui.screen(gallery.app.title, args.command):
                 return args.func(args) or 0
         return args.func(args) or 0
+    except UnknownAlbum as exc:
+        return fail(f"no such album: {exc.args[0]!r} — `album` lists them")
     except KeyboardInterrupt:
         print()
         return 130

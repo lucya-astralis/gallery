@@ -161,7 +161,7 @@ def is_running() -> bool:
 
 def pending_count() -> int:
     """Events waiting in the debounce buffer — 0 when the watcher is off.
-    Reported by `python -m app.debug status`, where a number that only grows
+    Reported by `python -m app.cli status`, where a number that only grows
     means the drain is stuck (or paused)."""
     return _handler.pending() if _handler is not None else 0
 

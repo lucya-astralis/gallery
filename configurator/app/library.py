@@ -36,6 +36,7 @@ class Node:
     total_photos: int = 0           # own + whole subtree
     has_cfg: bool = False
     has_meta: bool = False
+    cover: str | None = None        # photo to show for this album, root-relative
 
     def as_dict(self) -> dict:
         return {
@@ -45,6 +46,7 @@ class Node:
             "total_photos": self.total_photos,
             "has_cfg": self.has_cfg,
             "has_meta": self.has_meta,
+            "cover": self.cover,
             "children": [c.as_dict() for c in self.children],
         }
 
@@ -88,6 +90,7 @@ class Library:
 
     def _scan(self, folder: Path, rel: str, name: str) -> Node:
         node = Node(path=rel, name=name)
+        first_own: str | None = None
         try:
             entries = sorted(os.scandir(folder), key=lambda e: e.name.lower())
         except OSError:
@@ -101,11 +104,57 @@ class Library:
                     self._scan(Path(entry.path), child_rel, entry.name))
             elif entry.is_file() and is_image(entry.name):
                 node.own_photos += 1
+                if first_own is None:
+                    first_own = ("%s/%s" % (rel, entry.name)) if rel else entry.name
         node.total_photos = node.own_photos + sum(c.total_photos for c in node.children)
         meta = folder / schema.ALBUM_META_DIR
         node.has_meta = meta.is_dir()
         node.has_cfg = (meta / schema.ALBUM_CFG_NAME).is_file()
+
+        # The face the album shows in the tree: what album.cfg pins, else the
+        # first photo here, else whatever the first sub-album is showing -- so
+        # a folder that only holds sub-albums still gets a picture.
+        node.cover = self._cfg_cover(rel, meta) or first_own
+        if node.cover is None:
+            for child in node.children:
+                if child.cover:
+                    node.cover = child.cover
+                    break
         return node
+
+    def _cfg_cover(self, rel: str, meta: Path) -> str | None:
+        """The `cover = ...` an album.cfg pins, as a root-relative path.
+
+        Deliberately only the literal path: the tree is drawn on every render,
+        and the gallery's fuzzy subtree fallback would mean walking every album
+        again. A cover that needs the fallback just shows the folder's first
+        photo here, and `Check all` still reports it if it resolves nowhere.
+        """
+        cfg_path = meta / schema.ALBUM_CFG_NAME
+        if not cfg_path.is_file():
+            return None
+        try:
+            text = cfg_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line[0] in "#;" or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            if key.strip().lower() != "cover":
+                continue
+            val = val.split(",")[0].replace("\\", "/").strip().strip("/")
+            if not val:
+                return None
+            candidate = ("%s/%s" % (rel, val)) if rel else val
+            try:
+                if self.safe(candidate).is_file():
+                    return candidate
+            except ValueError:
+                return None
+            return None
+        return None
 
     def album_paths(self) -> list[str]:
         """Every album path in the tree, root excluded, depth-first."""
@@ -226,6 +275,98 @@ class Library:
                 "size": entry.stat().st_size,
             })
         return out
+
+    # ----- folders --------------------------------------------------------
+    def folders(self, album: str = "") -> list[dict]:
+        """The immediate sub-folders of one album, with a photo count and a
+        cover to put on the folder tile. Feeds the picker's folder-by-folder
+        browsing, so a 391-photo trip never arrives as one flat wall."""
+        base = self.safe(album)
+        if not base.is_dir():
+            return []
+        out: list[dict] = []
+        prefix = (album.strip("/") + "/") if album.strip("/") else ""
+        try:
+            entries = sorted(os.scandir(base), key=lambda e: e.name.lower())
+        except OSError:
+            return []
+        for entry in entries:
+            if not entry.is_dir() or not _visible_dir(entry.name):
+                continue
+            rel = prefix + entry.name
+            inside = self.photos(rel, recursive=True)
+            out.append({
+                "path": rel,
+                "name": entry.name,
+                "count": len(inside),
+                "cover": inside[0]["rel"] if inside else None,
+            })
+        return out
+
+    # ----- per-image tags --------------------------------------------------
+    def tags_path(self, rel: str) -> Path:
+        """The `.tags` sidecar for one photo. Same convention the gallery's
+        scanner reads: the photo's full name plus `.tags`."""
+        photo = self.safe(rel)
+        return photo.with_suffix(photo.suffix + ".tags")
+
+    def read_tags(self, rel: str) -> list[str]:
+        """Tags on one photo, parsed exactly as the gallery's scanner does:
+        commas and newlines both separate, blanks drop, and a repeat that only
+        differs in case is dropped as a duplicate."""
+        try:
+            raw = self.tags_path(rel).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return []
+        out: list[str] = []
+        seen: set[str] = set()
+        for chunk in raw.replace("\n", ",").split(","):
+            tag = chunk.strip()
+            if not tag or tag.lower() in seen:
+                continue
+            seen.add(tag.lower())
+            out.append(tag)
+        return out
+
+    def write_tags(self, rel: str, tags: list[str]) -> list[str]:
+        """Replace a photo's tags. An empty list removes the sidecar entirely
+        rather than leaving an empty file behind."""
+        clean: list[str] = []
+        seen: set[str] = set()
+        for tag in tags:
+            tag = str(tag).strip().replace(",", " ").strip()
+            if not tag or tag.lower() in seen:
+                continue
+            seen.add(tag.lower())
+            clean.append(tag)
+        path = self.tags_path(rel)
+        if not clean:
+            path.unlink(missing_ok=True)
+            return []
+        # One tag per line: the gallery accepts either form, and this is the
+        # one that stays readable in a diff.
+        path.write_text("\n".join(clean) + "\n", encoding="utf-8", newline="\n")
+        return clean
+
+    def all_tags(self) -> dict[str, int]:
+        """Every tag in use across the gallery, with how many photos carry it.
+        Backs the tag autocomplete, so the vocabulary stays consistent."""
+        counts: dict[str, int] = {}
+        for folder, dirnames, filenames in os.walk(self.root):
+            dirnames[:] = [d for d in dirnames if _visible_dir(d)]
+            for filename in filenames:
+                if not filename.endswith(".tags"):
+                    continue
+                try:
+                    raw = (Path(folder) / filename).read_text(
+                        encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                for chunk in raw.replace("\n", ",").split(","):
+                    tag = chunk.strip()
+                    if tag:
+                        counts[tag] = counts.get(tag, 0) + 1
+        return counts
 
     def read_desc(self, album: str, lang: str) -> str:
         path = self.desc_path(album, lang)

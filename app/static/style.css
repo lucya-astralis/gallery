@@ -284,6 +284,15 @@ code{
   text-transform:uppercase;
   color:var(--text);
 }
+/* the app name under the wordmark — violet, so the gallery and the
+   configurator read as two faces of the same system */
+.nav__brand .brand-sub{
+  font-family:"JetBrains Mono", ui-monospace, monospace;
+  font-size:9.5px;
+  letter-spacing:.28em;
+  text-transform:uppercase;
+  color:var(--acc-mag);
+}
 .nav__brand .jp{
   font-family:"Noto Sans JP", sans-serif;
   color:var(--text-ghost);

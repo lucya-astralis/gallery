@@ -182,7 +182,7 @@ body {
   font-size: 9.5px;
   letter-spacing: .28em;
   text-transform: uppercase;
-  color: var(--acc-cy);
+  color: var(--acc-mag);
 }
 
 .brand-jp {
@@ -339,16 +339,26 @@ body {
   letter-spacing: .04em;
 }
 
-.tree__dot {
-  width: 5px;
-  height: 5px;
-  flex: 0 0 auto;
-  background: transparent;
-  transform: rotate(45deg);
+/* The album's own cover, so the tree reads as pictures rather than paths.
+   The ring carries what the old status dot said: violet = has an album.cfg,
+   red = that cfg has issues. */
+.tree__cover {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 
-.tree__dot.has-cfg { background: var(--acc-cy); }
-.tree__dot.has-err { background: var(--acc-red); box-shadow: 0 0 6px rgba(255, 103, 103, .7); }
+.tree__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.tree__cover.has-cfg { box-shadow: inset 0 0 0 1px var(--acc-mag); }
+.tree__cover.has-err { box-shadow: inset 0 0 0 1px var(--acc-red), 0 0 6px rgba(255, 103, 103, .55); }
+
+/* Bigger rows now that each carries a picture. */
+.tree__row { padding: 3px 12px 3px 0; }
 
 .tree__row--gallery {
   padding-left: 12px;
@@ -438,44 +448,76 @@ body {
 .tabpanel[hidden] { display: none; }
 
 /* ----- fields ---------------------------------------------------------- */
-.field {
-  padding: 16px 0;
-  border-bottom: 1px solid var(--line);
+/* Every key used to be a full-width row with its label in a 210px column, so
+   a three-state toggle got 90px of height and 700px of empty space. One-line
+   controls now tile; only list-shaped ones take the full width. */
+.fields {
   display: grid;
-  grid-template-columns: 210px 1fr;
-  gap: 8px 22px;
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
   align-items: start;
 }
 
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--acc-mag);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-width: 0;
+}
+
+.field--wide { grid-column: 1 / -1; }
+
+/* An unset key is still listed — it is part of the vocabulary — but it
+   recedes: no fill, no accent edge. */
+.field.is-unset {
+  background: transparent;
+  border-left-color: var(--line);
+}
+
+.field__top { display: flex; align-items: center; gap: 8px; }
+
 .field__label {
+  flex: 1 1 auto;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: .1em;
+  letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--text);
-  padding-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.field__label small {
-  display: block;
-  font-weight: 400;
-  font-size: 9.5px;
-  letter-spacing: .18em;
+.field.is-unset .field__label { color: var(--text-ghost); font-weight: 400; }
+
+.field__unset {
+  appearance: none;
+  flex: 0 0 auto;
+  background: none;
+  border: 0;
+  padding: 2px 4px;
   color: var(--text-ghost);
-  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
 }
+
+.field__unset:hover { color: var(--acc-red); }
 
 .field__help {
-  grid-column: 2;
   color: var(--text-ghost);
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
-.field__control { display: flex; flex-direction: column; gap: 9px; }
-
-.field.is-unset .field__label { color: var(--text-ghost); }
+.field__control { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 
 /* ----- inputs ---------------------------------------------------------- */
 input[type="text"], input[type="search"], input[type="number"], select, textarea {
@@ -662,8 +704,8 @@ select option { background: var(--surface); color: var(--text); }
 .cover-preview { display: flex; gap: 14px; align-items: flex-start; }
 
 .cover-preview img {
-  width: 118px;
-  height: 118px;
+  width: 80px;
+  height: 80px;
   object-fit: cover;
   border-radius: var(--radius);
   border: 1px solid var(--line);
@@ -1007,10 +1049,262 @@ select option { background: var(--surface); color: var(--text); }
   flex: 0 0 auto;
 }
 
+/* ----- setting groups --------------------------------------------------- */
+/* Fifteen keys as one flat list is a wall. Grouped, each block answers one
+   question, and the blurb says which. */
+.group { margin-bottom: 30px; }
+
+.group__head {
+  border-bottom: 1px solid var(--line-strong);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.group__title {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.group__blurb {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-ghost);
+}
+
+/* ----- breadcrumbs ------------------------------------------------------ */
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .06em;
+}
+
+.crumbs__sep { color: var(--text-ghost); }
+
+.crumbs__link {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  font: inherit;
+  color: var(--acc-cy);
+  cursor: pointer;
+}
+
+.crumbs__link:hover { text-decoration: underline; }
+.crumbs__here { color: var(--text); font-weight: 600; }
+
+/* ----- folder tiles ----------------------------------------------------- */
+.folders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.foldertile {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--acc-mag);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color .15s ease, background .15s ease;
+}
+
+.foldertile:hover { background: var(--surface-2); border-color: var(--acc-cy); }
+
+.foldertile img,
+.foldertile__blank {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  object-fit: cover;
+  background: var(--bg-2);
+}
+
+.foldertile__body { display: flex; flex-direction: column; min-width: 0; padding-right: 10px; }
+
+.foldertile__name {
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foldertile__count {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: .1em;
+  color: var(--text-ghost);
+  text-transform: uppercase;
+}
+
+.browser { min-height: 120px; }
+
+/* ----- photo detail panel ----------------------------------------------- */
+.detail {
+  position: sticky;
+  bottom: 0;
+  margin-top: 18px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.detail__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.detail__name {
+  flex: 1 1 auto;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail__body {
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 6px 16px;
+  align-items: start;
+  max-height: 30vh;
+  overflow-y: auto;
+}
+
+.detail__thumb {
+  grid-row: span 5;
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.detail__sub {
+  grid-column: 2;
+  margin: 10px 0 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+}
+
+.detail__body > .field__help,
+.detail__body > .chips,
+.detail__body > .empty-note,
+.detail__body > input,
+.detail__body > .facts { grid-column: 2; }
+
+/* ----- fact list -------------------------------------------------------- */
+.facts {
+  grid-column: 2;
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 3px 14px;
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .facts { grid-template-columns: auto minmax(0, 1fr); }
+}
+
+.facts dt {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+  padding-top: 2px;
+}
+
+.facts dd { margin: 0; color: var(--text-dim); }
+
+/* ----- tag chips -------------------------------------------------------- */
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px 3px 9px;
+  border: 1px solid var(--line-strong);
+  border-left: 2px solid var(--acc-ok);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.chip__x {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--text-ghost);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+}
+
+.chip__x:hover { color: var(--acc-red); }
+
+.tagbar__input { max-width: 220px; }
+
+.cell__tags {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  max-width: 70%;
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  background: rgba(61, 255, 165, .82);
+  color: #04140c;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell.is-detail { box-shadow: 0 0 0 2px var(--acc-mag); border-color: var(--acc-mag); }
+
+.cover-preview__side { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+
+img.is-broken { opacity: .2; }
+
 /* ----- small utilities -------------------------------------------------- */
 .u-mb  { margin-bottom: 14px; }
 .u-gap { height: 16px; }
 .u-tall { min-height: 52vh; }
+.u-hidden { display: none; }
 
 .iconpreview {
   width: 52px;
@@ -1036,8 +1330,7 @@ select option { background: var(--surface); color: var(--text); }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { max-height: 38vh; border-right: 0; border-bottom: 1px solid var(--line); }
-  .field { grid-template-columns: 1fr; }
-  .field__help { grid-column: 1; }
+  .fields { grid-template-columns: 1fr; }
   .nav__path { display: none; }
   .brand-jp { display: none; }
 }

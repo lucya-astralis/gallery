@@ -31,7 +31,7 @@ def is_meta_path(relp: Path) -> bool:
 
 # iPhone photos are HEIC; without the plugin they cannot be opened at all,
 # so the flag is worth reporting rather than only logging once at import
-# (see `python -m app.debug status`).
+# (see `python -m app.cli status`).
 try:
     from pillow_heif import register_heif_opener
     register_heif_opener()
@@ -342,7 +342,7 @@ def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
         row = c.execute("SELECT id, mtime FROM images WHERE rel_path = ?", (rel,)).fetchone()
         # `force` re-reads a file whose mtime says "unchanged" — the escape
         # hatch for a row that went bad (bogus EXIF, a restored backup that
-        # kept its old timestamps). See app/debug.py `scan --force`.
+        # kept its old timestamps). See app/cli.py `scan --force`.
         if not force and row and abs(row["mtime"] - effective_mtime) < 1.0:
             return False
 

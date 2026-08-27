@@ -117,6 +117,11 @@ def _static_url(path: str) -> str:
 
 templates.env.globals["static_url"] = _static_url
 
+# The gallery's own release version, shown in the nav and the footer.
+# Distinct from API_VERSION, which versions the JSON API contract.
+APP_VERSION = "4.0"
+templates.env.globals["app_version"] = APP_VERSION
+
 
 def _public_base_url(request: Request) -> str:
     if PUBLIC_BASE_URL:
@@ -1577,7 +1582,7 @@ _scan_state_lock = threading.Lock()
 
 
 def _publish_status() -> None:
-    """Snapshot this process for `python -m app.debug status`. Cheap enough to
+    """Snapshot this process for `python -m app.cli status`. Cheap enough to
     call on every scan edge plus a slow heartbeat."""
     with _scan_state_lock:
         state = dict(_scan_state)
@@ -1716,7 +1721,7 @@ def _startup():
         # A pause is deliberately persistent: it survives the restart it was
         # very likely set for. No startup scan, no periodic scan; the watcher
         # still starts, but only queues events (see watcher._drain).
-        log.warning("indexer PAUSED (%s) — resume with `python -m app.debug resume`",
+        log.warning("indexer PAUSED (%s) — resume with `python -m app.cli resume`",
                     info.get("reason") or "no reason given")
     else:
         threading.Thread(target=_run_scan, kwargs={"trigger": "startup"}, daemon=True).start()

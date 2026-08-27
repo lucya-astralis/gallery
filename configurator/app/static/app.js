@@ -1,9 +1,11 @@
 /* Gallery Configurator — client.
  *
- * One page, three moving parts: a tree of albums on the left, a tabbed editor
- * on the right, and a photo picker modal shared by every key that points at
- * photos. Edits collect into `state.edits` and only reach disk on Save, so a
- * half-finished list never lands in a cfg the gallery is reading live.
+ * Three moving parts: the album tree on the left, a tabbed editor on the
+ * right, and one photo browser reused by both the Photos tab and the picker
+ * modal. Config edits collect into `state.edits` and only reach disk on Save,
+ * so a half-finished list never lands in a cfg the gallery is reading live.
+ * Tag edits are the exception — they apply straight away, because bulk
+ * tagging forty photos is not something to stage and forget.
  */
 'use strict';
 
@@ -14,29 +16,30 @@ const state = {
   meta: null,
   tree: null,
   issuesByAlbum: {},
-  sel: null,        // {kind: 'gallery'|'album', album: string}
-  data: null,       // last payload for the selection
-  edits: {},        // key -> value staged for the next save
+  sel: null,          // {kind: 'gallery'|'album', album}
+  data: null,         // payload for the current selection
+  edits: {},          // config key -> value staged for the next save
   tab: 'settings',
   descLang: 'en',
-  photoCache: new Map(),
+  vocab: [],          // every tag in use, for autocomplete
+  browse: null,       // Photos-tab browser state
+  openPaths: new Set(),
 };
 
 const READ_ONLY = document.documentElement.dataset.readOnly === '1';
 
-/* ----- tiny helpers ----------------------------------------------------- */
+/* ----- helpers ---------------------------------------------------------- */
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
     if (v === null || v === undefined || v === false) continue;
     if (k === 'class') node.className = v;
     else if (k === 'text') node.textContent = v;
-    else if (k === 'html') node.innerHTML = v;
     else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
     else if (v === true) node.setAttribute(k, '');
     else node.setAttribute(k, v);
   }
-  for (const child of children.flat()) {
+  for (const child of children.flat(Infinity)) {
     if (child === null || child === undefined || child === false) continue;
     node.append(child.nodeType ? child : document.createTextNode(child));
   }
@@ -66,32 +69,38 @@ async function api(path, options = {}) {
   return payload;
 }
 
-const bytes = (n) => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB'
-                   : n > 1024 ? Math.round(n / 1024) + ' KB' : n + ' B';
+const bytes = (n) => !n ? '—'
+  : n > 1048576 ? (n / 1048576).toFixed(1) + ' MB'
+  : n > 1024 ? Math.round(n / 1024) + ' KB' : n + ' B';
 
+/* Previews always come from /api/thumb, which hands back the gallery's own
+ * thumbnail when that tree is mounted — a grid of 200px tiles must never pull
+ * the full-size originals. */
 const thumbUrl = (rel, size) =>
-  '/api/thumb?size=' + (size || 160) + '&path=' + encodeURIComponent(rel);
+  '/api/thumb?size=' + (size || 200) + '&path=' + encodeURIComponent(rel);
 
-/* Split a photo path into folder + filename for two-tone list labels. */
 function splitPath(value) {
-  const i = value.lastIndexOf('/');
-  return i < 0 ? ['', value] : [value.slice(0, i + 1), value.slice(i + 1)];
+  const i = String(value).lastIndexOf('/');
+  return i < 0 ? ['', String(value)] : [String(value).slice(0, i + 1), String(value).slice(i + 1)];
 }
+
+const strip = (v) => String(v).replace(/^\/+/, '');
 
 /* ----- boot ------------------------------------------------------------- */
 async function boot() {
   try {
     state.meta = await api('/api/meta');
-    await loadTree();
+    await Promise.all([loadTree(), loadVocab()]);
     select({ kind: 'gallery' });
   } catch (err) {
     $('#pane').innerHTML = '';
     $('#pane').append(el('div', { class: 'pane__empty', text: 'Cannot reach the backend: ' + err.message }));
   }
   $('#btn-reload').addEventListener('click', async () => {
-    await loadTree();
+    photoCache.clear();
+    await Promise.all([loadTree(), loadVocab()]);
     if (state.sel) select(state.sel, true);
-    toast('Tree reloaded');
+    toast('Reloaded');
   });
   $('#btn-check').addEventListener('click', checkAll);
   $('#tree-filter').addEventListener('input', renderTree);
@@ -99,26 +108,30 @@ async function boot() {
 }
 
 async function loadTree() {
-  const payload = await api('/api/tree');
-  state.tree = payload.root;
+  state.tree = (await api('/api/tree')).root;
   renderTree();
 }
 
-/* ----- tree ------------------------------------------------------------- */
+async function loadVocab() {
+  try {
+    state.vocab = (await api('/api/tags')).tags;
+  } catch (_) { state.vocab = []; }
+}
+
+/* ----- album tree ------------------------------------------------------- */
 function renderTree() {
   const list = $('#tree');
   const filter = $('#tree-filter').value.trim().toLowerCase();
   list.innerHTML = '';
 
-  const galleryRow = el('div', {
+  list.append(el('li', {}, el('div', {
     class: 'tree__row tree__row--gallery' +
       (state.sel && state.sel.kind === 'gallery' ? ' is-active' : ''),
     onclick: () => select({ kind: 'gallery' }),
   },
     el('span', { class: 'tree__twisty is-leaf' }),
     el('span', { class: 'tree__name', text: 'gallery.cfg' }),
-    el('span', { class: 'tree__count', text: 'root' }));
-  list.append(el('li', {}, galleryRow));
+    el('span', { class: 'tree__count', text: 'root' }))));
 
   if (!state.tree) return;
   for (const child of state.tree.children) {
@@ -138,14 +151,8 @@ function renderNode(node, depth, filter) {
   if (!selfMatch && !kids.length) return null;
 
   const active = state.sel && state.sel.kind === 'album' && state.sel.album === node.path;
-  const open = filter ? true : isOpen(node.path);
+  const open = filter ? true : state.openPaths.has(node.path);
   const errored = (state.issuesByAlbum[node.path] || 0) > 0;
-
-  const twisty = el('span', {
-    class: 'tree__twisty' + (kids.length ? '' : ' is-leaf') + (open ? ' is-open' : ''),
-    text: '▶',
-    onclick: (ev) => { ev.stopPropagation(); toggleOpen(node.path); renderTree(); },
-  });
 
   const row = el('div', {
     class: 'tree__row' + (active ? ' is-active' : ''),
@@ -153,11 +160,23 @@ function renderNode(node, depth, filter) {
     title: node.path,
     onclick: () => select({ kind: 'album', album: node.path }),
   },
-    twisty,
     el('span', {
-      class: 'tree__dot' + (errored ? ' has-err' : node.has_cfg ? ' has-cfg' : ''),
-      title: errored ? 'has config issues' : node.has_cfg ? 'has an album.cfg' : '',
+      class: 'tree__twisty' + (kids.length ? '' : ' is-leaf') + (open ? ' is-open' : ''),
+      text: '▶',
+      onclick: (ev) => {
+        ev.stopPropagation();
+        if (state.openPaths.has(node.path)) state.openPaths.delete(node.path);
+        else state.openPaths.add(node.path);
+        renderTree();
+      },
     }),
+    el('span', {
+      class: 'tree__cover' + (errored ? ' has-err' : node.has_cfg ? ' has-cfg' : ''),
+      title: errored ? 'has config issues' : node.has_cfg ? 'has an album.cfg' : '',
+    }, node.cover
+      ? el('img', { src: thumbUrl(node.cover, 64), alt: '', loading: 'lazy',
+                    onerror: (ev) => { ev.target.remove(); } })
+      : null),
     el('span', { class: 'tree__name', text: node.name }),
     el('span', { class: 'tree__count', text: String(node.total_photos || '') }));
 
@@ -166,24 +185,17 @@ function renderNode(node, depth, filter) {
   return item;
 }
 
-const openPaths = new Set();
-const isOpen = (path) => openPaths.has(path);
-function toggleOpen(path) {
-  if (openPaths.has(path)) openPaths.delete(path);
-  else openPaths.add(path);
-}
-
 /* ----- selection -------------------------------------------------------- */
 async function select(sel, keepTab = false) {
   if (!keepTab && state.sel && dirty() &&
       !confirm('Discard the unsaved changes on this page?')) return;
   state.sel = sel;
   state.edits = {};
+  state.browse = null;
   if (!keepTab) state.tab = 'settings';
-  // Keep the whole path to the selected album expanded.
   if (sel.kind === 'album') {
     const parts = sel.album.split('/');
-    for (let i = 1; i < parts.length; i++) openPaths.add(parts.slice(0, i).join('/'));
+    for (let i = 1; i < parts.length; i++) state.openPaths.add(parts.slice(0, i).join('/'));
   }
   renderTree();
   $('#pane').innerHTML = '';
@@ -202,17 +214,15 @@ async function select(sel, keepTab = false) {
 
 const dirty = () => Object.keys(state.edits).length > 0;
 
-/* Current value of a key: staged edit first, then what is on disk. */
 function value(key) {
   if (key in state.edits) return state.edits[key];
   const raw = state.data.values[key];
   if (raw === undefined) return null;
   const spec = state.meta.spec[key] || {};
-  // Every type whose on-disk form is a list of entries rather than one scalar.
   const listy = ['photo_list', 'list', 'kv_list', 'welcome', 'album_list'].includes(spec.type);
   if (listy) return raw;
-  // `joined` keys (loc) are one logical line the parser happened to split
-  // on commas; the gallery rejoins them, so the editor shows them rejoined.
+  // `joined` keys (loc) are one logical line the parser happened to split on
+  // commas; the gallery rejoins them, so the editor shows them rejoined.
   if (spec.joined) return raw.join(', ');
   return raw.length ? raw[0] : '';
 }
@@ -222,13 +232,9 @@ function setValue(key, next) {
   renderPane();
 }
 
-/* Re-rendering the pane on every change would drop the caret out of whatever
- * field triggered it. Inputs carry a stable `data-fk`, so focus and selection
- * can be put back on the freshly built node. */
-function focusKey(node) {
-  return node && node.dataset ? node.dataset.fk : null;
-}
-
+/* Re-rendering the pane on every keystroke would drop the caret out of the
+ * field that triggered it. Inputs carry a stable `data-fk`, so focus and
+ * selection can be put back on the freshly built node. */
 function restoreFocus(fk, start, end) {
   if (!fk) return;
   const next = document.querySelector('[data-fk="' + CSS.escape(fk) + '"]');
@@ -240,11 +246,26 @@ function restoreFocus(fk, start, end) {
 }
 
 /* ----- pane ------------------------------------------------------------- */
+/* Settings are grouped rather than dumped as one flat list of fifteen keys:
+ * what an album *is*, how it presents itself, which photos it leans on, and
+ * the editorial text. Each group is the answer to one question. */
+const ALBUM_GROUPS = [
+  ['The album', 'What this folder is to the gallery.', ['collection', 'showcase', 'cover']],
+  ['Photos it leans on', 'Which photos get pulled out of the grid.', ['featured', 'order', 'reel', 'sort']],
+  ['Look', 'Its own mark, title face and page effect.', ['icon', 'font', 'font_scale', 'effect']],
+  ['Text & stats', 'What is written under the hero.', ['tags', 'loc', 'stat', 'stats']],
+];
+
+const GALLERY_GROUPS = [
+  ['Welcome hero', 'Which photos cycle on the front page.', ['welcome_desktop', 'welcome_mobile', 'welcome']],
+  ['Album list', 'The order and default sort on /albums.', ['album_order', 'album_sort']],
+];
+
 function renderPane() {
   const pane = $('#pane');
   const isGallery = state.sel.kind === 'gallery';
   const active = document.activeElement;
-  const fk = focusKey(active);
+  const fk = active && active.dataset ? active.dataset.fk : null;
   const selStart = fk && active.selectionStart !== undefined ? active.selectionStart : null;
   const selEnd = fk && active.selectionEnd !== undefined ? active.selectionEnd : null;
   const scrollTop = pane.scrollTop;
@@ -252,7 +273,7 @@ function renderPane() {
 
   const tabs = isGallery
     ? [['settings', 'Settings'], ['raw', 'Raw file']]
-    : [['settings', 'Settings'], ['photos', 'Photos'], ['text', 'Description'],
+    : [['settings', 'Settings'], ['photos', 'Photos & tags'], ['text', 'Description'],
        ['assets', 'Icon & font'], ['raw', 'Raw file']];
   if (!tabs.some(([id]) => id === state.tab)) state.tab = 'settings';
 
@@ -260,22 +281,24 @@ function renderPane() {
   pane.append(el('div', { class: 'tabs' }, tabs.map(([id, label]) =>
     el('button', {
       class: 'tab' + (state.tab === id ? ' is-active' : ''),
-      type: 'button',
-      text: label,
+      type: 'button', text: label,
       onclick: () => { state.tab = id; renderPane(); },
     }))));
 
   if (state.data.issues && state.data.issues.length) {
-    pane.append(el('div', { class: 'issues' }, state.data.issues.map(renderIssue)));
+    pane.append(el('div', { class: 'issues' }, state.data.issues.map((issue) =>
+      el('div', { class: 'issue issue--' + (issue.level === 'error' ? 'error' : 'warn') },
+        el('span', { class: 'issue__key', text: issue.key }),
+        el('span', { class: 'issue__detail', text: issue.detail })))));
   }
 
-  if (state.tab === 'settings') pane.append(renderSettings(isGallery));
-  else if (state.tab === 'raw') pane.append(renderRaw());
+  if (state.tab === 'settings') {
+    pane.append(renderSettings(isGallery ? GALLERY_GROUPS : ALBUM_GROUPS));
+    pane.append(renderSaveBar());
+  } else if (state.tab === 'raw') pane.append(renderRaw());
   else if (state.tab === 'photos') pane.append(renderPhotosTab());
   else if (state.tab === 'text') pane.append(renderDescriptions());
   else if (state.tab === 'assets') pane.append(renderAssets());
-
-  if (state.tab === 'settings') pane.append(renderSaveBar());
 
   pane.scrollTop = scrollTop;
   restoreFocus(fk, selStart, selEnd);
@@ -283,11 +306,10 @@ function renderPane() {
 
 function renderHead(isGallery) {
   const data = state.data;
-  const meta = [];
-  meta.push(el('span', {
+  const meta = [el('span', {
     class: 'pill ' + (data.exists ? 'pill--ok' : ''),
     text: data.exists ? 'cfg present' : 'no cfg yet',
-  }));
+  })];
   if (!isGallery) {
     meta.push(el('span', { class: 'pill', text: data.own_count + ' here' }));
     if (data.photo_count !== data.own_count) {
@@ -296,8 +318,8 @@ function renderHead(isGallery) {
   }
   const errors = (data.issues || []).filter((i) => i.level === 'error').length;
   const warns = (data.issues || []).filter((i) => i.level === 'warn').length;
-  if (errors) meta.push(el('span', { class: 'pill pill--err', text: errors + ' error' + (errors > 1 ? 's' : '') }));
-  if (warns) meta.push(el('span', { class: 'pill pill--warn', text: warns + ' warning' + (warns > 1 ? 's' : '') }));
+  if (errors) meta.push(el('span', { class: 'pill pill--err', text: errors + ' errors' }));
+  if (warns) meta.push(el('span', { class: 'pill pill--warn', text: warns + ' warnings' }));
 
   return el('div', { class: 'head' },
     el('div', {
@@ -309,16 +331,19 @@ function renderHead(isGallery) {
     el('div', { class: 'head__meta' }, meta));
 }
 
-function renderIssue(issue) {
-  return el('div', { class: 'issue issue--' + (issue.level === 'error' ? 'error' : 'warn') },
-    el('span', { class: 'issue__key', text: issue.key }),
-    el('span', { class: 'issue__detail', text: issue.detail }));
-}
+/* ----- settings --------------------------------------------------------- */
+/* Keys whose control is a list of rows: those get the full width. Everything
+ * else is a one-line control that was sitting in a 210px column next to an
+ * acre of nothing, so those tile two or three across instead. */
+const WIDE_TYPES = new Set(['photo_list', 'welcome', 'album_list', 'kv_list']);
 
-/* ----- settings tab ----------------------------------------------------- */
-function renderSettings(isGallery) {
-  const keys = isGallery ? state.meta.gallery_keys : state.meta.album_keys;
-  return el('div', { class: 'tabpanel' }, keys.map(renderField));
+function renderSettings(groups) {
+  return el('div', { class: 'tabpanel' }, groups.map(([title, blurb, keys]) =>
+    el('section', { class: 'group' },
+      el('header', { class: 'group__head' },
+        el('h2', { class: 'group__title', text: title }),
+        el('p', { class: 'group__blurb', text: blurb })),
+      el('div', { class: 'fields' }, keys.map(renderField)))));
 }
 
 function renderField(key) {
@@ -326,25 +351,18 @@ function renderField(key) {
   const help = state.meta.help[key] || '';
   const unset = value(key) === null;
 
-  const label = el('div', { class: 'field__label' },
-    key,
-    el('small', { text: spec.type }));
-
-  const control = el('div', { class: 'field__control' });
-  control.append(buildControl(key, spec));
-  if (!unset && !READ_ONLY) {
-    control.append(el('div', { class: 'row' },
-      el('button', {
-        class: 'btn btn--sm btn--ghost btn--danger',
-        type: 'button',
-        text: 'Unset',
-        title: 'remove this line from the file',
+  return el('div', {
+    class: 'field' + (WIDE_TYPES.has(spec.type) ? ' field--wide' : '') +
+           (unset ? ' is-unset' : ''),
+  },
+    el('div', { class: 'field__top' },
+      el('span', { class: 'field__label', text: key }),
+      unset || READ_ONLY ? null : el('button', {
+        class: 'field__unset', type: 'button', text: '✕',
+        title: 'unset — remove this line from the file',
         onclick: () => setValue(key, null),
-      })));
-  }
-
-  return el('div', { class: 'field' + (unset ? ' is-unset' : '') },
-    label, control,
+      })),
+    el('div', { class: 'field__control' }, buildControl(key, spec)),
     help ? el('div', { class: 'field__help', text: help }) : null);
 }
 
@@ -369,40 +387,36 @@ function buildControl(key, spec) {
 function toggle(options, current, onPick) {
   return el('div', { class: 'toggle' }, options.map(([val, label]) =>
     el('button', {
-      type: 'button',
-      class: current === val ? 'is-on' : '',
-      text: label,
-      disabled: READ_ONLY,
-      onclick: () => onPick(val),
+      type: 'button', class: current === val ? 'is-on' : '', text: label,
+      disabled: READ_ONLY, onclick: () => onPick(val),
     })));
 }
 
 function boolControl(key) {
   const raw = value(key);
-  const current = raw === null ? '' : (String(raw).toLowerCase() === 'true' || raw === true ? 'true' : 'false');
-  return toggle([['', 'not set'], ['true', 'true'], ['false', 'false']], current,
+  const current = raw === null ? ''
+    : (String(raw).toLowerCase() === 'true' || raw === true ? 'true' : 'false');
+  return toggle([['', 'not set'], ['true', 'yes'], ['false', 'no']], current,
     (val) => setValue(key, val === '' ? null : val));
 }
 
 function statsControl(key) {
-  const raw = value(key);
-  const current = raw === null ? '' : 'off';
-  return toggle([['', 'stats block shown'], ['off', 'stats block hidden']], current,
+  return toggle([['', 'shown'], ['off', 'hidden']], value(key) === null ? '' : 'off',
     (val) => setValue(key, val === '' ? null : 'off'));
 }
 
 function choiceControl(key, choices) {
   const current = value(key);
-  const select = el('select', {
+  const node = el('select', {
     disabled: READ_ONLY,
     onchange: (ev) => setValue(key, ev.target.value === '' ? null : ev.target.value),
   },
     el('option', { value: '', text: '(not set — gallery default)' }),
     choices.map((c) => el('option', { value: c, text: c, selected: current === c })));
   if (current && !choices.includes(current)) {
-    select.append(el('option', { value: current, text: current + '  (not a known value)', selected: true }));
+    node.append(el('option', { value: current, text: current + '  (unknown value)', selected: true }));
   }
-  return select;
+  return node;
 }
 
 function numberControl(key) {
@@ -422,15 +436,13 @@ function textControl(key) {
   });
 }
 
-/* A plain list of freeform strings, one per row (tags, stat). */
 function listControl(key) {
   const items = value(key) || [];
   const box = el('div', { class: 'picklist' });
   items.forEach((item, index) => {
     box.append(el('div', { class: 'pickitem' },
       el('input', {
-        type: 'text', value: item, disabled: READ_ONLY,
-        'data-fk': key + ':' + index,
+        type: 'text', value: item, disabled: READ_ONLY, 'data-fk': key + ':' + index,
         oninput: (ev) => {
           const next = items.slice();
           next[index] = ev.target.value;
@@ -442,32 +454,29 @@ function listControl(key) {
         onclick: () => setValue(key, items.filter((_, i) => i !== index)),
       })));
   });
+  if (!items.length) box.append(el('div', { class: 'empty-note', text: 'None.' }));
   if (!READ_ONLY) {
-    box.append(el('div', { class: 'row' },
-      el('button', {
-        class: 'btn btn--sm', type: 'button',
-        text: key === 'stat' ? '+ Add stat line' : '+ Add entry',
-        onclick: () => setValue(key, items.concat([key === 'stat' ? 'Label: Value' : 'new'])),
-      })));
+    box.append(el('div', { class: 'row' }, el('button', {
+      class: 'btn btn--sm', type: 'button', text: '+ Add',
+      onclick: () => setValue(key, items.concat([''])),
+    })));
   }
   return box;
 }
 
 /* An album's custom attributes (`stat`). The gallery stores each as one
  * "Label: Value" line and splits on the first colon, so the editor works in
- * those two halves directly — no way left to write a line that has no colon,
- * which is the one way to make the gallery drop it silently. */
+ * those two halves directly — which removes the only two ways to write a line
+ * the gallery drops silently: no colon, or an empty value. */
 function kvListControl(key) {
   const items = value(key) || [];
   const pairs = items.map((item) => {
     const at = String(item).indexOf(':');
-    return at < 0 ? [String(item).trim(), ''] : [
-      String(item).slice(0, at).trim(),
-      String(item).slice(at + 1).trim(),
-    ];
+    return at < 0 ? [String(item).trim(), '']
+      : [String(item).slice(0, at).trim(), String(item).slice(at + 1).trim()];
   });
-  // A blank row is kept as an empty entry so the user can actually type into
-  // it; the server drops empty entries on save, so it never reaches the file.
+  // A blank row is kept as an empty entry so it can be typed into; the server
+  // drops empty entries on save, so it never reaches the file.
   const commit = (next) => setValue(key,
     next.map(([k, v]) => (k || v) ? (k + ': ' + v) : ''));
 
@@ -481,8 +490,7 @@ function kvListControl(key) {
     box.append(el('div', { class: 'pickitem' + (val.includes(',') ? ' pickitem--missing' : '') },
       el('input', {
         class: 'kv__key', type: 'text', value: label, placeholder: 'Label',
-        'data-fk': key + ':' + index + ':k',
-        disabled: READ_ONLY, oninput: edit(0),
+        'data-fk': key + ':' + index + ':k', disabled: READ_ONLY, oninput: edit(0),
       }),
       el('span', { class: 'kv__sep', text: ':' }),
       el('input', {
@@ -500,14 +508,13 @@ function kvListControl(key) {
   if (!pairs.length) box.append(el('div', { class: 'empty-note', text: 'No custom attributes.' }));
   if (pairs.some(([, v]) => v.includes(','))) {
     box.append(el('div', { class: 'field__help' },
-      'A value with a comma is split into two entries by the cfg parser — the gallery will not show it whole.'));
+      'A value with a comma gets split into two entries by the cfg parser.'));
   }
   if (!READ_ONLY) {
-    box.append(el('div', { class: 'row' },
-      el('button', {
-        class: 'btn btn--sm', type: 'button', text: '+ Add attribute',
-        onclick: () => commit(pairs.concat([['', '']])),
-      })));
+    box.append(el('div', { class: 'row' }, el('button', {
+      class: 'btn btn--sm', type: 'button', text: '+ Add attribute',
+      onclick: () => commit(pairs.concat([['', '']])),
+    })));
   }
   return box;
 }
@@ -516,45 +523,42 @@ function kvListControl(key) {
 function coverControl(key) {
   const current = value(key);
   const album = state.sel.album;
-  const resolved = current ? album + '/' + String(current).replace(/^\/+/, '') : null;
   const box = el('div', { class: 'cover-preview' });
   if (current) {
     box.append(el('img', {
-      src: thumbUrl(resolved, 220), alt: '', loading: 'lazy',
-      onerror: (ev) => { ev.target.style.opacity = '.25'; },
+      src: thumbUrl(album + '/' + strip(current), 160), alt: '', loading: 'lazy',
+      onerror: (ev) => { ev.target.classList.add('is-broken'); },
     }));
   }
-  box.append(el('div', { class: 'field__control' },
-    el('div', { class: 'pickitem__label', html: current
-      ? '<b>' + escapeHtml(splitPath(current)[1]) + '</b> <span>' + escapeHtml(splitPath(current)[0]) + '</span>'
-      : '<span>auto — newest photo in the album</span>' }),
-    READ_ONLY ? null : el('div', { class: 'row' },
-      el('button', {
-        class: 'btn btn--sm', type: 'button', text: current ? 'Change…' : 'Pick a cover…',
-        onclick: () => openPicker({
-          title: 'Cover photo', album, single: true, picked: current ? [current] : [],
-          onApply: (list) => setValue(key, list[0] || null),
-        }),
-      }))));
+  const [folder, name] = splitPath(strip(current || ''));
+  box.append(el('div', { class: 'cover-preview__side' },
+    current
+      ? el('div', { class: 'pickitem__label' },
+          el('b', { text: name }), ' ', el('span', { text: folder }))
+      : el('div', { class: 'empty-note', text: 'Auto — newest photo in the album.' }),
+    READ_ONLY ? null : el('button', {
+      class: 'btn btn--sm', type: 'button', text: current ? 'Change…' : 'Pick a cover…',
+      onclick: () => openPicker({
+        title: 'Cover photo', root: album, single: true,
+        picked: current ? [strip(current)] : [],
+        onApply: (list) => setValue(key, list[0] || null),
+      }),
+    })));
   return box;
 }
 
-const escapeHtml = (s) => String(s).replace(/[&<>"']/g,
-  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-/* ----- ordered photo lists (featured / order) --------------------------- */
+/* ----- ordered photo lists ---------------------------------------------- */
 function photoListControl(key) {
   const items = value(key) || [];
   const album = state.sel.album;
   const box = el('div', { class: 'picklist' });
 
   items.forEach((item, index) => {
-    const rel = album + '/' + String(item).replace(/^\/+/, '');
-    const [folder, name] = splitPath(String(item).replace(/^\/+/, ''));
+    const [folder, name] = splitPath(strip(item));
     box.append(sortableRow({
       index, items, key,
-      thumb: thumbUrl(rel, 96),
-      html: '<b>' + escapeHtml(name) + '</b> <span>' + escapeHtml(folder) + '</span>',
+      thumb: thumbUrl(album + '/' + strip(item), 120),
+      label: [el('b', { text: name }), ' ', el('span', { text: folder })],
     }));
   });
 
@@ -565,7 +569,7 @@ function photoListControl(key) {
         class: 'btn btn--sm', type: 'button', text: '+ Pick photos…',
         onclick: () => openPicker({
           title: key === 'featured' ? 'Featured photos' : 'Curated photo order',
-          album, picked: items.map((i) => String(i).replace(/^\/+/, '')),
+          root: album, picked: items.map(strip),
           onApply: (list) => setValue(key, list),
         }),
       }),
@@ -577,39 +581,74 @@ function photoListControl(key) {
   return box;
 }
 
-/* A drag-reorderable row. Reordering rewrites the whole list, which is what
- * `featured` / `order` / `album_order` mean — the file order is the display
- * order, so there is nothing else to store. */
-function sortableRow({ index, items, key, thumb, html, group }) {
+/* Drag to reorder. The file order *is* the display order for `featured`,
+ * `order`, `album_order` and the welcome reel, so rearranging the rows is the
+ * whole edit — there is nothing else to store. Dropping on a row inserts the
+ * dragged entry at that row's position. */
+let dragFrom = null;
+
+function sortableRow({ index, items, key, thumb, label, group, extraClass }) {
   const row = el('div', {
-    class: 'pickitem' + (group ? ' pickitem--group' : ''),
-    draggable: !READ_ONLY,
+    class: 'pickitem' + (group ? ' pickitem--group' : '') + (extraClass || ''),
+    // `draggable` is an enumerated attribute, not a boolean one: an empty
+    // value means "auto", which is NOT draggable. It has to be the string.
+    draggable: READ_ONLY ? 'false' : 'true',
     ondragstart: (ev) => {
+      dragFrom = index;
+      ev.dataTransfer.effectAllowed = 'move';
       ev.dataTransfer.setData('text/plain', String(index));
       row.classList.add('is-dragging');
     },
-    ondragend: () => row.classList.remove('is-dragging'),
-    ondragover: (ev) => { ev.preventDefault(); row.classList.add('is-over'); },
+    ondragend: () => {
+      dragFrom = null;
+      row.classList.remove('is-dragging');
+      $$('.pickitem.is-over').forEach((n) => n.classList.remove('is-over'));
+    },
+    ondragover: (ev) => {
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'move';
+      row.classList.add('is-over');
+    },
     ondragleave: () => row.classList.remove('is-over'),
     ondrop: (ev) => {
       ev.preventDefault();
       row.classList.remove('is-over');
-      const from = Number(ev.dataTransfer.getData('text/plain'));
-      if (Number.isNaN(from) || from === index) return;
+      const raw = ev.dataTransfer.getData('text/plain');
+      const from = raw === '' ? dragFrom : Number(raw);
+      if (from === null || Number.isNaN(from) || from === index) return;
       const next = items.slice();
       next.splice(index, 0, next.splice(from, 1)[0]);
       setValue(key, next);
     },
   });
-  row.append(el('span', { class: 'pickitem__grip', text: '≡' }));
+  row.append(el('span', { class: 'pickitem__grip', title: 'drag to reorder', text: '⠿' }));
   if (thumb) {
     row.append(el('img', {
-      class: 'pickitem__thumb', src: thumb, alt: '', loading: 'lazy',
-      onerror: (ev) => { ev.target.style.opacity = '.2'; },
+      class: 'pickitem__thumb', src: thumb, alt: '', loading: 'lazy', draggable: 'false',
+      onerror: (ev) => { ev.target.classList.add('is-broken'); },
     }));
   }
-  row.append(el('span', { class: 'pickitem__label', html }));
+  row.append(el('span', { class: 'pickitem__label' }, label));
   if (!READ_ONLY) {
+    // Keyboard equivalent of the drag, so reordering does not need a mouse.
+    row.append(el('button', {
+      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', text: '↑',
+      title: 'move up', disabled: index === 0,
+      onclick: () => {
+        const next = items.slice();
+        next.splice(index - 1, 0, next.splice(index, 1)[0]);
+        setValue(key, next);
+      },
+    }));
+    row.append(el('button', {
+      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', text: '↓',
+      title: 'move down', disabled: index === items.length - 1,
+      onclick: () => {
+        const next = items.slice();
+        next.splice(index + 1, 0, next.splice(index, 1)[0]);
+        setValue(key, next);
+      },
+    }));
     row.append(el('button', {
       class: 'btn btn--sm btn--ghost btn--icon', type: 'button', text: '✕', title: 'remove',
       onclick: () => setValue(key, items.filter((_, i) => i !== index)),
@@ -618,53 +657,52 @@ function sortableRow({ index, items, key, thumb, html, group }) {
   return row;
 }
 
-/* ----- welcome (gallery-wide photo paths, or a keyword) ----------------- */
+/* ----- welcome ---------------------------------------------------------- */
 function welcomeControl(key) {
   const items = value(key) || [];
   const keywords = state.meta.welcome_keywords;
   const isKeyword = items.length === 1 && keywords.includes(String(items[0]).toLowerCase());
   const box = el('div', { class: 'picklist' });
 
-  box.append(el('div', { class: 'row' },
-    el('select', {
-      disabled: READ_ONLY,
-      onchange: (ev) => {
-        const val = ev.target.value;
-        setValue(key, val === 'list' ? (isKeyword ? [] : items) : val ? [val] : null);
-      },
+  box.append(el('select', {
+    disabled: READ_ONLY,
+    onchange: (ev) => {
+      const val = ev.target.value;
+      setValue(key, val === 'list' ? (isKeyword ? [] : items) : val ? [val] : null);
     },
-      el('option', { value: '', text: '(not set)', selected: !items.length }),
-      el('option', { value: 'list', text: 'hand-picked list', selected: items.length > 0 && !isKeyword }),
-      keywords.map((kw) => el('option', {
-        value: kw, text: kw + ' (keyword)', selected: isKeyword && items[0].toLowerCase() === kw,
-      })))));
+  },
+    el('option', { value: '', text: '(not set)', selected: !items.length }),
+    el('option', { value: 'list', text: 'hand-picked list', selected: items.length > 0 && !isKeyword }),
+    keywords.map((kw) => el('option', {
+      value: kw, text: kw + ' (keyword)',
+      selected: isKeyword && items[0].toLowerCase() === kw,
+    }))));
 
   if (isKeyword || !items.length) return box;
 
   items.forEach((item, index) => {
-    const [folder, name] = splitPath(String(item).replace(/^\/+/, ''));
+    const [folder, name] = splitPath(strip(item));
     box.append(sortableRow({
       index, items, key,
-      thumb: thumbUrl(String(item).replace(/^\/+/, ''), 96),
-      html: '<b>' + escapeHtml(name) + '</b> <span>' + escapeHtml(folder) + '</span>',
+      thumb: thumbUrl(strip(item), 120),
+      label: [el('b', { text: name }), ' ', el('span', { text: folder })],
     }));
   });
 
   if (!READ_ONLY) {
-    box.append(el('div', { class: 'row' },
-      el('button', {
-        class: 'btn btn--sm', type: 'button', text: '+ Pick photos…',
-        onclick: () => openPicker({
-          title: key.replace('_', ' '), album: '', gallery: true,
-          picked: items.map((i) => String(i).replace(/^\/+/, '')),
-          onApply: (list) => setValue(key, list),
-        }),
-      })));
+    box.append(el('div', { class: 'row' }, el('button', {
+      class: 'btn btn--sm', type: 'button', text: '+ Pick photos…',
+      onclick: () => openPicker({
+        title: key.replace(/_/g, ' '), root: '', gallery: true,
+        picked: items.map(strip),
+        onApply: (list) => setValue(key, list),
+      }),
+    })));
   }
   return box;
 }
 
-/* ----- album_order (albums plus #group headers) ------------------------- */
+/* ----- album_order ------------------------------------------------------ */
 function albumOrderControl(key) {
   const items = value(key) || [];
   const known = state.data.albums || [];
@@ -674,16 +712,16 @@ function albumOrderControl(key) {
     const str = String(item);
     const group = str.startsWith('#');
     const missing = !group && !known.some((a) =>
-      a.toLowerCase() === str.toLowerCase().replace(/^\/+/, '') ||
-      a.toLowerCase().replace(/^_/, '') === str.toLowerCase().replace(/^[/_]+/, ''));
-    const row = sortableRow({
+      a.toLowerCase() === strip(str).toLowerCase() ||
+      a.toLowerCase().replace(/^_/, '') === strip(str).toLowerCase().replace(/^_/, ''));
+    box.append(sortableRow({
       index, items, key, group,
-      html: group
-        ? '<b>' + escapeHtml(str.slice(1)) + '</b> <span>group header</span>'
-        : '<b>' + escapeHtml(str) + '</b>' + (missing ? ' <span>no such folder</span>' : ''),
-    });
-    if (missing) row.classList.add('pickitem--missing');
-    box.append(row);
+      extraClass: missing ? ' pickitem--missing' : '',
+      label: group
+        ? [el('b', { text: str.slice(1) }), ' ', el('span', { text: 'group header' })]
+        : [el('b', { text: str }), missing ? ' ' : null,
+           missing ? el('span', { text: 'no such folder' }) : null],
+    }));
   });
 
   if (!items.length) box.append(el('div', { class: 'empty-note', text: 'No curated order set.' }));
@@ -695,14 +733,13 @@ function albumOrderControl(key) {
   box.append(el('div', { class: 'row' },
     el('select', {
       onchange: (ev) => {
-        if (!ev.target.value) return;
-        setValue(key, items.concat([ev.target.value]));
+        if (ev.target.value) setValue(key, items.concat([ev.target.value]));
       },
     },
-      el('option', { value: '', text: unused.length ? '+ Add album…' : '(every top-level album is listed)' }),
+      el('option', { value: '', text: unused.length ? '+ Add album…' : '(all top-level albums listed)' }),
       unused.map((a) => el('option', { value: a, text: a }))),
     el('button', {
-      class: 'btn btn--sm', type: 'button', text: '+ Add group header',
+      class: 'btn btn--sm', type: 'button', text: '+ Group header',
       onclick: () => {
         const label = prompt('Group label (frames the albums listed below it):', 'trips');
         if (label && label.trim()) setValue(key, items.concat(['#' + label.trim()]));
@@ -734,30 +771,23 @@ function assetControl(key, spec) {
 
   if (!files.length) {
     box.append(el('div', { class: 'field__help', text:
-      'No ' + kind + ' in this album’s .album/ folder yet — add one on the “Icon & font” tab. Accepted: ' + spec.exts.join(', ') }));
+      'No ' + kind + ' in this album’s .album/ yet — add one on the “Icon & font” tab. Accepted: ' +
+      spec.exts.join(', ') }));
   }
-  if (current && kind === 'icon' && files.some((f) => f.name === current)) {
-    box.append(el('img', {
-      class: 'iconpreview', alt: '',
-      src: '/api/asset?name=' + encodeURIComponent(current) + '&path=' + encodeURIComponent(state.sel.album),
-    }));
-  }
-  if (current && kind === 'font' && files.some((f) => f.name === current)) {
-    box.append(fontSample(current));
+  if (current && files.some((f) => f.name === current)) {
+    const url = '/api/asset?name=' + encodeURIComponent(current) +
+                '&path=' + encodeURIComponent(state.sel.album);
+    if (kind === 'icon') box.append(el('img', { class: 'iconpreview', src: url, alt: '' }));
+    else box.append(fontSample(current, url));
   }
   return box;
 }
 
-/* Load the album's own title face and show the album name set in it, the way
- * the gallery renders its hero. */
-function fontSample(name) {
+function fontSample(name, url) {
   const family = 'cfgfont_' + name.replace(/[^a-z0-9]/gi, '_');
-  const url = '/api/asset?name=' + encodeURIComponent(name) +
-              '&path=' + encodeURIComponent(state.sel.album);
   const sample = el('div', { class: 'fontsample', text: state.data.name || 'Sample' });
   if (window.FontFace) {
-    const face = new FontFace(family, 'url("' + url + '")');
-    face.load().then((loaded) => {
+    new FontFace(family, 'url("' + url + '")').load().then((loaded) => {
       document.fonts.add(loaded);
       sample.style.fontFamily = '"' + family + '", serif';
     }).catch(() => { sample.textContent = state.data.name + '  (font could not be loaded)'; });
@@ -768,7 +798,7 @@ function fontSample(name) {
 /* ----- save bar --------------------------------------------------------- */
 function renderSaveBar() {
   const changed = Object.keys(state.edits);
-  const bar = el('div', { class: 'savebar' + (changed.length ? ' is-dirty' : '') },
+  return el('div', { class: 'savebar' + (changed.length ? ' is-dirty' : '') },
     el('span', {
       class: 'savebar__note',
       text: READ_ONLY ? 'readonly mount · saving disabled'
@@ -781,23 +811,21 @@ function renderSaveBar() {
     }) : null,
     el('button', {
       class: 'btn btn--primary', type: 'button', text: 'Save',
-      disabled: READ_ONLY || !changed.length,
-      onclick: saveSettings,
+      disabled: READ_ONLY || !changed.length, onclick: saveSettings,
     }));
-  return bar;
 }
 
 async function saveSettings() {
-  const body = JSON.stringify({ album: state.sel.album || '', values: state.edits });
-  const url = state.sel.kind === 'gallery' ? '/api/gallery/cfg' : '/api/album/cfg';
   try {
-    const payload = await api(url, { method: 'PUT', body });
+    const payload = await api(
+      state.sel.kind === 'gallery' ? '/api/gallery/cfg' : '/api/album/cfg',
+      { method: 'PUT', body: JSON.stringify({ album: state.sel.album || '', values: state.edits }) });
     Object.assign(state.data, {
       values: payload.values, raw: payload.raw, issues: payload.issues, exists: true,
     });
     state.edits = {};
     renderPane();
-    await refreshIssueDots();
+    refreshIssueDots();
     toast('Saved');
   } catch (err) {
     toast('Save failed: ' + err.message, 'err');
@@ -806,11 +834,9 @@ async function saveSettings() {
 
 /* ----- raw tab ---------------------------------------------------------- */
 function renderRaw() {
-  const area = el('textarea', {
-    class: 'u-tall', spellcheck: 'false', disabled: READ_ONLY,
-  });
+  const area = el('textarea', { class: 'u-tall', spellcheck: 'false', disabled: READ_ONLY });
   area.value = state.data.raw || '';
-  const panel = el('div', { class: 'tabpanel' },
+  return el('div', { class: 'tabpanel' },
     el('div', { class: 'field__help u-mb' },
       'The file exactly as it sits on disk. Saving here replaces it wholesale — ' +
       'the structured tabs only ever rewrite the lines they own.'),
@@ -825,92 +851,314 @@ function renderRaw() {
       el('button', {
         class: 'btn btn--primary', type: 'button', text: 'Save file', disabled: READ_ONLY,
         onclick: async () => {
-          const url = state.sel.kind === 'gallery' ? '/api/gallery/raw' : '/api/album/raw';
           try {
-            const payload = await api(url, {
-              method: 'PUT',
-              body: JSON.stringify({ album: state.sel.album || '', raw: area.value }),
-            });
+            const payload = await api(
+              state.sel.kind === 'gallery' ? '/api/gallery/raw' : '/api/album/raw',
+              { method: 'PUT', body: JSON.stringify({ album: state.sel.album || '', raw: area.value }) });
             Object.assign(state.data, {
               values: payload.values, raw: payload.raw, issues: payload.issues, exists: true,
             });
             state.edits = {};
             renderPane();
-            await refreshIssueDots();
+            refreshIssueDots();
             toast('File written');
           } catch (err) {
             toast('Save failed: ' + err.message, 'err');
           }
         },
       })));
-  return panel;
 }
 
-/* ----- photos tab ------------------------------------------------------- */
+/* ----- photo loading ---------------------------------------------------- */
+/* One folder per request, never the whole subtree: a picker that flattens a
+ * 391-photo trip into one wall is unusable, and it makes the browser fetch
+ * hundreds of thumbnails nobody asked to see. */
+const photoCache = new Map();
+
+async function loadFolder(path, withTags = false) {
+  const key = (path || '::root') + (withTags ? '|t' : '');
+  if (photoCache.has(key)) return photoCache.get(key);
+  const payload = await api('/api/photos?recursive=0' +
+    (withTags ? '&tags=1' : '') + '&path=' + encodeURIComponent(path || ''));
+  photoCache.set(key, payload);
+  return payload;
+}
+
+function invalidateFolder(path) {
+  photoCache.delete((path || '::root') + '|t');
+  photoCache.delete(path || '::root');
+}
+
+/* Breadcrumb from the browse root down to the current folder. */
+function crumbs(root, current, onGo) {
+  const rootLabel = root ? (root.split('/').pop() || root) : 'photos';
+  const trail = [[root, rootLabel]];
+  if (current !== root) {
+    const rest = root ? current.slice(root.length + 1) : current;
+    let acc = root;
+    for (const part of rest.split('/')) {
+      acc = acc ? acc + '/' + part : part;
+      trail.push([acc, part]);
+    }
+  }
+  return el('nav', { class: 'crumbs' }, trail.map(([path, label], i) => [
+    i ? el('span', { class: 'crumbs__sep', text: '/' }) : null,
+    i === trail.length - 1
+      ? el('span', { class: 'crumbs__here', text: label })
+      : el('button', { class: 'crumbs__link', type: 'button', text: label,
+                       onclick: () => onGo(path) }),
+  ]));
+}
+
+function folderTile(folder, onOpen) {
+  return el('button', {
+    class: 'foldertile', type: 'button', title: folder.path,
+    onclick: () => onOpen(folder.path),
+  },
+    folder.cover
+      ? el('img', { src: thumbUrl(folder.cover, 200), alt: '', loading: 'lazy' })
+      : el('span', { class: 'foldertile__blank' }),
+    el('span', { class: 'foldertile__body' },
+      el('span', { class: 'foldertile__name', text: folder.name }),
+      el('span', { class: 'foldertile__count',
+                   text: folder.count + (folder.count === 1 ? ' photo' : ' photos') })));
+}
+
+/* ----- Photos & tags tab ------------------------------------------------ */
 function renderPhotosTab() {
-  const panel = el('div', { class: 'tabpanel' },
-    el('div', { class: 'field__help u-mb' },
-      'Every photo in this album’s subtree. Photos a config key points at are marked.'),
-    el('div', { class: 'grid', id: 'photos-grid' }, el('div', { class: 'empty-note', text: 'Loading…' })));
-  loadPhotos(state.sel.album).then((photos) => {
-    const grid = $('#photos-grid', panel);
-    if (!grid) return;
-    grid.innerHTML = '';
-    if (!photos.length) {
-      grid.append(el('div', { class: 'empty-note', text: 'No photos in this folder.' }));
+  const album = state.sel.album;
+  if (!state.browse) state.browse = { path: album, selected: new Set(), detail: null };
+  const b = state.browse;
+
+  const panel = el('div', { class: 'tabpanel' });
+  panel.append(el('div', { class: 'field__help u-mb' },
+    'Browse folder by folder. Click to select, ctrl/shift-click to extend — ' +
+    'then tag everything selected in one go. Photo files are never modified: ' +
+    'tags go into a .tags sidecar next to each photo, which is what the gallery reads.'));
+  panel.append(crumbs(album, b.path, (path) => { b.path = path; b.detail = null; renderPane(); }));
+
+  const body = el('div', { class: 'browser' });
+  panel.append(body);
+  body.append(el('div', { class: 'empty-note', text: 'Loading…' }));
+
+  loadFolder(b.path, true).then((payload) => {
+    if (!state.browse || state.browse.path !== b.path) return;
+    body.innerHTML = '';
+
+    if (payload.folders.length) {
+      body.append(el('div', { class: 'folders' },
+        payload.folders.map((f) => folderTile(f, (path) => {
+          b.path = path; b.detail = null; renderPane();
+        }))));
+    }
+
+    if (!payload.photos.length) {
+      if (!payload.folders.length) {
+        body.append(el('div', { class: 'empty-note', text: 'Nothing in this folder.' }));
+      }
       return;
     }
+
     const cover = value('cover');
-    const featured = (value('featured') || []).map((v) => String(v).replace(/^\/+/, ''));
-    const order = (value('order') || []).map((v) => String(v).replace(/^\/+/, ''));
-    for (const photo of photos) {
+    const featured = (value('featured') || []).map(strip);
+    const order = (value('order') || []).map(strip);
+    const subOf = (rel) => album ? rel.slice(album.length + 1) : rel;
+
+    const grid = el('div', { class: 'grid' });
+    payload.photos.forEach((photo, index) => {
       const roles = [];
-      if (cover && String(cover).replace(/^\/+/, '') === photo.sub) roles.push('cover');
-      if (featured.includes(photo.sub)) roles.push('featured');
-      if (order.includes(photo.sub)) roles.push('#' + (order.indexOf(photo.sub) + 1));
+      const sub = subOf(photo.rel);
+      if (cover && strip(cover) === sub) roles.push('cover');
+      if (featured.includes(sub)) roles.push('featured');
+      if (order.includes(sub)) roles.push('#' + (order.indexOf(sub) + 1));
+
       grid.append(el('div', {
-        class: 'cell' + (roles.length ? ' is-picked' : ''),
-        title: photo.sub + '\n' + bytes(photo.size),
+        class: 'cell' + (b.selected.has(photo.rel) ? ' is-picked' : '') +
+               (b.detail === photo.rel ? ' is-detail' : ''),
+        title: photo.rel,
+        onclick: (ev) => {
+          if (ev.shiftKey && b.lastIndex !== undefined) {
+            const [from, to] = [Math.min(b.lastIndex, index), Math.max(b.lastIndex, index)];
+            for (let i = from; i <= to; i++) b.selected.add(payload.photos[i].rel);
+          } else if (ev.ctrlKey || ev.metaKey) {
+            if (b.selected.has(photo.rel)) b.selected.delete(photo.rel);
+            else b.selected.add(photo.rel);
+          } else {
+            b.selected.clear();
+            b.selected.add(photo.rel);
+          }
+          b.lastIndex = index;
+          b.detail = photo.rel;
+          renderPane();
+        },
       },
-        el('img', { src: thumbUrl(photo.rel, 200), alt: '', loading: 'lazy' }),
+        el('img', { src: thumbUrl(photo.rel, 220), alt: '', loading: 'lazy' }),
         roles.length ? el('span', { class: 'cell__order', text: roles.join(' · ') }) : null,
+        (photo.tags || []).length
+          ? el('span', { class: 'cell__tags', text: photo.tags.join(' · '),
+                         title: photo.tags.join(', ') })
+          : null,
         el('span', { class: 'cell__name', text: photo.name })));
-    }
+    });
+    body.append(grid);
+  }).catch((err) => {
+    body.innerHTML = '';
+    body.append(el('div', { class: 'empty-note', text: err.message }));
   });
+
+  if (b.detail) panel.append(renderDetail(b.detail));
+  if (b.selected.size) panel.append(renderTagBar(b));
   return panel;
 }
 
-async function loadPhotos(album) {
-  const cacheKey = album || '::root';
-  if (state.photoCache.has(cacheKey)) return state.photoCache.get(cacheKey);
-  const payload = await api('/api/photos?recursive=1&path=' + encodeURIComponent(album));
-  state.photoCache.set(cacheKey, payload.photos);
-  return payload.photos;
+/* Read-only EXIF for the photo last clicked, plus its own tags. */
+function renderDetail(rel) {
+  const box = el('aside', { class: 'detail' });
+  box.append(el('div', { class: 'detail__head' },
+    el('span', { class: 'detail__name', text: splitPath(rel)[1] }),
+    el('button', {
+      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', text: '✕',
+      onclick: () => { state.browse.detail = null; renderPane(); },
+    })));
+  const body = el('div', { class: 'detail__body' },
+    el('div', { class: 'empty-note', text: 'Reading metadata…' }));
+  box.append(body);
+
+  api('/api/image?path=' + encodeURIComponent(rel)).then((info) => {
+    if (!state.browse || state.browse.detail !== rel) return;
+    body.innerHTML = '';
+    const m = info.meta;
+
+    body.append(el('img', { class: 'detail__thumb', src: thumbUrl(rel, 420), alt: '' }));
+
+    const facts = [
+      ['Dimensions', m.width ? m.width + ' × ' + m.height : '—'],
+      ['File', (m.format || '?') + ' · ' + bytes(m.size)],
+    ].concat((m.fields || []).map((f) => [f.label, f.value]));
+    if (m.gps) facts.push(['GPS', 'present in the file']);
+    if (m.error) facts.push(['Unreadable', m.error]);
+
+    body.append(el('dl', { class: 'facts' }, facts.map(([k, v]) => [
+      el('dt', { text: k }), el('dd', { text: v }),
+    ])));
+    body.append(el('p', { class: 'field__help', text:
+      'Read-only — the configurator never rewrites a photo file.' }));
+
+    body.append(el('h3', { class: 'detail__sub', text: 'Tags' }));
+    body.append(tagChips(info.tags, READ_ONLY ? null : (next) =>
+      applyTags({ photos: [rel], set: next })));
+    if (!READ_ONLY) {
+      body.append(tagInput('Add a tag…', (tag) => applyTags({ photos: [rel], add: [tag] })));
+    }
+  }).catch((err) => {
+    body.innerHTML = '';
+    body.append(el('div', { class: 'empty-note', text: err.message }));
+  });
+
+  return box;
+}
+
+/* The bulk bar: whatever is selected gets tagged together. */
+function renderTagBar(b) {
+  const count = b.selected.size;
+  const bar = el('div', { class: 'savebar is-dirty' });
+  bar.append(el('span', { class: 'savebar__note',
+    text: count + ' photo' + (count > 1 ? 's' : '') + ' selected' }));
+
+  if (!READ_ONLY) {
+    bar.append(tagInput('Tag all selected…', (tag) =>
+      applyTags({ photos: [...b.selected], add: [tag] }), 'tagbar__input'));
+    bar.append(el('button', {
+      class: 'btn btn--sm', type: 'button', text: 'Remove a tag…',
+      onclick: () => {
+        const tag = prompt('Remove which tag from the ' + count + ' selected photos?');
+        if (tag && tag.trim()) applyTags({ photos: [...b.selected], remove: [tag.trim()] });
+      },
+    }));
+    bar.append(el('button', {
+      class: 'btn btn--sm btn--ghost btn--danger', type: 'button', text: 'Clear tags',
+      onclick: () => {
+        if (confirm('Remove every tag from the ' + count + ' selected photos?')) {
+          applyTags({ photos: [...b.selected], set: [] });
+        }
+      },
+    }));
+  }
+  bar.append(el('button', {
+    class: 'btn btn--sm btn--ghost', type: 'button', text: 'Deselect',
+    onclick: () => { b.selected.clear(); renderPane(); },
+  }));
+  return bar;
+}
+
+async function applyTags(payload) {
+  try {
+    const res = await api('/api/tags', { method: 'PUT', body: JSON.stringify(payload) });
+    invalidateFolder(state.browse ? state.browse.path : '');
+    await loadVocab();
+    renderPane();
+    toast('Tags updated on ' + res.changed + ' photo' + (res.changed > 1 ? 's' : ''));
+  } catch (err) {
+    toast('Tagging failed: ' + err.message, 'err');
+  }
+}
+
+function tagChips(tags, onChange) {
+  if (!tags.length) return el('div', { class: 'empty-note', text: 'No tags yet.' });
+  return el('div', { class: 'chips' }, tags.map((tag) =>
+    el('span', { class: 'chip' }, tag,
+      onChange ? el('button', {
+        class: 'chip__x', type: 'button', text: '✕', title: 'remove',
+        onclick: () => onChange(tags.filter((t) => t !== tag)),
+      }) : null)));
+}
+
+/* A tag field backed by the gallery-wide vocabulary, so the same idea does
+ * not end up spelled three ways across an album. */
+function tagInput(placeholder, onSubmit, extraClass) {
+  const listId = 'tagvocab';
+  if (!$('#' + listId)) {
+    document.body.append(el('datalist', { id: listId }));
+  }
+  const datalist = $('#' + listId);
+  datalist.innerHTML = '';
+  for (const t of state.vocab) {
+    datalist.append(el('option', { value: t.name, label: t.name + ' (' + t.count + ')' }));
+  }
+  return el('input', {
+    class: extraClass || '', type: 'text', placeholder, list: listId, autocomplete: 'off',
+    onkeydown: (ev) => {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      const tag = ev.target.value.trim();
+      if (!tag) return;
+      ev.target.value = '';
+      onSubmit(tag);
+    },
+  });
 }
 
 /* ----- description tab -------------------------------------------------- */
 function renderDescriptions() {
-  const langs = state.meta.langs;
   const area = el('textarea', { class: 'u-tall', spellcheck: 'false', disabled: READ_ONLY });
   area.value = state.data.descriptions[state.descLang] || '';
-
-  const switcher = el('div', { class: 'desc-langs' }, langs.map((lang) =>
-    el('button', {
-      class: 'btn' + (state.descLang === lang ? ' btn--primary' : ''),
-      type: 'button',
-      text: 'album_' + lang + '.md' + (state.data.descriptions[lang] ? '' : '  (empty)'),
-      onclick: () => {
-        state.data.descriptions[state.descLang] = area.value;
-        state.descLang = lang;
-        renderPane();
-      },
-    })));
 
   return el('div', { class: 'tabpanel' },
     el('div', { class: 'field__help u-mb' },
       'Markdown shown under the album hero, one file per language. Saving an empty ' +
       'editor deletes that language’s file.'),
-    switcher, area,
+    el('div', { class: 'desc-langs' }, state.meta.langs.map((lang) =>
+      el('button', {
+        class: 'btn' + (state.descLang === lang ? ' btn--primary' : ''),
+        type: 'button',
+        text: 'album_' + lang + '.md' + (state.data.descriptions[lang] ? '' : ' (empty)'),
+        onclick: () => {
+          state.data.descriptions[state.descLang] = area.value;
+          state.descLang = lang;
+          renderPane();
+        },
+      }))),
+    area,
     el('div', { class: 'savebar' },
       el('span', { class: 'savebar__note', text: 'editing album_' + state.descLang + '.md' }),
       el('button', {
@@ -938,6 +1186,10 @@ function renderAssets() {
     ? usable.map(renderAssetRow)
     : el('div', { class: 'empty-note', text: 'Nothing in this album’s .album/ folder yet.' }));
 
+  const input = el('input', {
+    type: 'file', class: 'u-hidden',
+    onchange: (ev) => { if (ev.target.files.length) upload(ev.target.files[0]); },
+  });
   const drop = el('div', {
     class: 'dropzone',
     text: READ_ONLY ? 'Read-only — uploads are disabled.'
@@ -951,10 +1203,6 @@ function renderAssets() {
       drop.classList.remove('is-over');
       if (!READ_ONLY && ev.dataTransfer.files.length) upload(ev.dataTransfer.files[0]);
     },
-  });
-  const input = el('input', {
-    type: 'file', style: 'display:none',
-    onchange: (ev) => { if (ev.target.files.length) upload(ev.target.files[0]); },
   });
 
   async function upload(file) {
@@ -983,13 +1231,11 @@ function renderAssets() {
 function renderAssetRow(asset) {
   const url = '/api/asset?name=' + encodeURIComponent(asset.name) +
               '&path=' + encodeURIComponent(state.sel.album);
-  const inUse = value(asset.kind) === asset.name;
   return el('div', { class: 'asset' },
-    el('div', { class: 'asset__icon' }, asset.kind === 'icon'
-      ? el('img', { src: url, alt: '' })
-      : 'Aa'),
+    el('div', { class: 'asset__icon' },
+      asset.kind === 'icon' ? el('img', { src: url, alt: '' }) : 'Aa'),
     el('span', { class: 'asset__name', text: asset.name }),
-    inUse ? el('span', { class: 'pill pill--ok', text: 'in use' }) : null,
+    value(asset.kind) === asset.name ? el('span', { class: 'pill pill--ok', text: 'in use' }) : null,
     el('span', { class: 'asset__meta', text: bytes(asset.size) }),
     READ_ONLY ? null : el('button', {
       class: 'btn btn--sm btn--ghost btn--danger', type: 'button', text: 'Delete',
@@ -1009,7 +1255,10 @@ function renderAssetRow(asset) {
 }
 
 /* ----- photo picker modal ----------------------------------------------- */
-const picker = { picked: [], photos: [], single: false, onApply: null, gallery: false };
+/* Same folder-by-folder browsing as the Photos tab. `picked` holds paths in
+ * the form the cfg stores them: relative to the album for album.cfg, relative
+ * to the photos root for gallery.cfg. */
+const picker = { picked: [], root: '', path: '', single: false, onApply: null, gallery: false };
 
 function wireModal() {
   $$('#modal [data-close]').forEach((node) =>
@@ -1024,60 +1273,104 @@ function wireModal() {
   });
 }
 
-async function openPicker({ title, album, picked, single, onApply, gallery }) {
-  picker.picked = (picked || []).slice();
-  picker.single = !!single;
-  picker.onApply = onApply;
-  picker.gallery = !!gallery;
+function openPicker({ title, root, picked, single, onApply, gallery }) {
+  Object.assign(picker, {
+    picked: (picked || []).slice(),
+    root: root || '', path: root || '',
+    single: !!single, onApply, gallery: !!gallery,
+  });
   $('#modal-title').textContent = title;
   $('#modal-filter').value = '';
-  $('#modal-body').innerHTML = '';
-  $('#modal-body').append(el('div', { class: 'empty-note', text: 'Loading photos…' }));
   $('#modal').hidden = false;
-  picker.photos = await loadPhotos(gallery ? '' : album);
   drawPicker();
 }
 
+/* The key a picked photo is stored under, given its full path. */
+const pickKey = (rel) => picker.gallery ? rel
+  : (picker.root ? rel.slice(picker.root.length + 1) : rel);
+
 function drawPicker() {
-  const filter = $('#modal-filter').value.trim().toLowerCase();
-  // Picked entries are keyed the way the cfg stores them: relative to the
-  // album for album.cfg, relative to the photos root for gallery.cfg.
-  const keyOf = (photo) => picker.gallery ? photo.rel : photo.sub;
-  const shown = filter
-    ? picker.photos.filter((p) => keyOf(p).toLowerCase().includes(filter))
-    : picker.photos;
-
-  const grid = el('div', { class: 'grid' });
-  for (const photo of shown.slice(0, 1200)) {
-    const key = keyOf(photo);
-    const at = picker.picked.indexOf(key);
-    grid.append(el('div', {
-      class: 'cell' + (at >= 0 ? ' is-picked' : ''),
-      title: key,
-      onclick: () => {
-        const idx = picker.picked.indexOf(key);
-        if (picker.single) picker.picked = idx >= 0 ? [] : [key];
-        else if (idx >= 0) picker.picked.splice(idx, 1);
-        else picker.picked.push(key);
-        drawPicker();
-      },
-    },
-      el('img', { src: thumbUrl(photo.rel, 200), alt: '', loading: 'lazy' }),
-      at >= 0 && !picker.single ? el('span', { class: 'cell__order', text: String(at + 1) }) : null,
-      at >= 0 && picker.single ? el('span', { class: 'cell__order', text: '✓' }) : null,
-      el('span', { class: 'cell__name', text: photo.name })));
-  }
-
   const body = $('#modal-body');
+  const filter = $('#modal-filter').value.trim().toLowerCase();
+
+  const head = el('div', {}, crumbs(picker.root, picker.path, (path) => {
+    picker.path = path;
+    $('#modal-filter').value = '';
+    drawPicker();
+  }));
+
   body.innerHTML = '';
-  body.append(shown.length ? grid : el('div', { class: 'empty-note', text: 'Nothing matches.' }));
-  if (shown.length > 1200) {
-    body.append(el('div', { class: 'empty-note', text:
-      'Showing the first 1200 of ' + shown.length + ' — narrow the filter to reach the rest.' }));
-  }
+  body.append(head);
+  const slot = el('div', {}, el('div', { class: 'empty-note', text: 'Loading…' }));
+  body.append(slot);
+  updateModalCount();
+
+  const wanted = picker.path;
+  // With a filter typed, search the whole subtree — otherwise the filter would
+  // only ever see the handful of photos in the folder you happen to be in.
+  const req = filter
+    ? api('/api/photos?recursive=1&path=' + encodeURIComponent(wanted))
+    : loadFolder(wanted);
+
+  req.then((payload) => {
+    if (picker.path !== wanted) return;
+    slot.innerHTML = '';
+
+    if (!filter && payload.folders.length) {
+      slot.append(el('div', { class: 'folders' },
+        payload.folders.map((f) => folderTile(f, (path) => {
+          picker.path = path;
+          drawPicker();
+        }))));
+    }
+
+    const photos = filter
+      ? payload.photos.filter((p) => p.rel.toLowerCase().includes(filter))
+      : payload.photos;
+
+    if (!photos.length) {
+      slot.append(el('div', { class: 'empty-note',
+        text: filter ? 'Nothing matches in this folder or below.'
+                     : payload.folders.length ? 'No photos directly here — open a folder above.'
+                     : 'This folder is empty.' }));
+      return;
+    }
+
+    const grid = el('div', { class: 'grid' });
+    for (const photo of photos.slice(0, 600)) {
+      const key = pickKey(photo.rel);
+      const at = picker.picked.indexOf(key);
+      grid.append(el('div', {
+        class: 'cell' + (at >= 0 ? ' is-picked' : ''),
+        title: key,
+        onclick: () => {
+          const idx = picker.picked.indexOf(key);
+          if (picker.single) picker.picked = idx >= 0 ? [] : [key];
+          else if (idx >= 0) picker.picked.splice(idx, 1);
+          else picker.picked.push(key);
+          drawPicker();
+        },
+      },
+        el('img', { src: thumbUrl(photo.rel, 220), alt: '', loading: 'lazy' }),
+        at >= 0 ? el('span', { class: 'cell__order',
+                               text: picker.single ? '✓' : String(at + 1) }) : null,
+        el('span', { class: 'cell__name', text: photo.name })));
+    }
+    slot.append(grid);
+    if (photos.length > 600) {
+      slot.append(el('div', { class: 'empty-note',
+        text: 'Showing the first 600 of ' + photos.length + ' — narrow the filter.' }));
+    }
+  }).catch((err) => {
+    slot.innerHTML = '';
+    slot.append(el('div', { class: 'empty-note', text: err.message }));
+  });
+}
+
+function updateModalCount() {
   $('#modal-count').textContent = picker.single
     ? (picker.picked.length ? picker.picked[0] : 'nothing selected')
-    : picker.picked.length + ' selected (click order becomes list order)';
+    : picker.picked.length + ' selected · click order becomes list order';
 }
 
 /* ----- whole-gallery check ---------------------------------------------- */
@@ -1090,12 +1383,7 @@ async function checkAll() {
     toast('Check failed: ' + err.message, 'err');
     return;
   }
-  state.issuesByAlbum = {};
-  for (const issue of payload.issues) {
-    if (issue.scope === 'album') {
-      state.issuesByAlbum[issue.album] = (state.issuesByAlbum[issue.album] || 0) + 1;
-    }
-  }
+  countIssues(payload);
   renderTree();
 
   const pane = $('#pane');
@@ -1103,14 +1391,10 @@ async function checkAll() {
   pane.append(el('div', { class: 'head' },
     el('h1', { class: 'head__title', text: 'Config check' }),
     el('div', { class: 'head__meta' },
-      el('span', {
-        class: 'pill ' + (payload.errors ? 'pill--err' : 'pill--ok'),
-        text: payload.errors + ' errors',
-      }),
-      el('span', {
-        class: 'pill ' + (payload.warnings ? 'pill--warn' : ''),
-        text: payload.warnings + ' warnings',
-      }),
+      el('span', { class: 'pill ' + (payload.errors ? 'pill--err' : 'pill--ok'),
+                   text: payload.errors + ' errors' }),
+      el('span', { class: 'pill ' + (payload.warnings ? 'pill--warn' : ''),
+                   text: payload.warnings + ' warnings' }),
       el('span', { class: 'pill', text: payload.took_ms + ' ms' }))));
 
   if (!payload.issues.length) {
@@ -1130,16 +1414,19 @@ async function checkAll() {
   state.sel = null;
 }
 
+function countIssues(payload) {
+  state.issuesByAlbum = {};
+  for (const issue of payload.issues) {
+    if (issue.scope === 'album') {
+      state.issuesByAlbum[issue.album] = (state.issuesByAlbum[issue.album] || 0) + 1;
+    }
+  }
+}
+
 /* Refresh the per-album error dots after a save, quietly. */
 async function refreshIssueDots() {
   try {
-    const payload = await api('/api/validate');
-    state.issuesByAlbum = {};
-    for (const issue of payload.issues) {
-      if (issue.scope === 'album') {
-        state.issuesByAlbum[issue.album] = (state.issuesByAlbum[issue.album] || 0) + 1;
-      }
-    }
+    countIssues(await api('/api/validate'));
     renderTree();
   } catch (_) { /* the dots are a nicety, not worth a toast */ }
 }

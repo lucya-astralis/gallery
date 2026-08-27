@@ -21,8 +21,11 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import cfgio, schema, validate
+from . import cfgio, imagemeta, schema, validate
 from .library import Library, is_image
+
+# This tool's own release version, reported by /api/meta and shown in the UI.
+APP_VERSION = "1.0"
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BASE_DIR.parent
@@ -42,6 +45,9 @@ def _default(env: str, in_container: str, beside: str) -> Path:
 
 PHOTOS_DIR = _default("PHOTOS_DIR", "/photos", "photos")
 DATA_DIR = _default("DATA_DIR", "/data", "configurator/data")
+# The gallery's own thumbnail tree, mounted read-only when available. Nothing
+# breaks without it -- previews just get generated here instead.
+THUMBS_DIR = _default("THUMBS_DIR", "/thumbnails", "thumbnails")
 CACHE_DIR = DATA_DIR / "thumbcache"
 BACKUP_DIR = DATA_DIR / "backups"
 READ_ONLY = os.environ.get("READ_ONLY", "0").strip().lower() in {"1", "true", "yes", "on"}
@@ -62,6 +68,22 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 lib = Library(PHOTOS_DIR)
+
+
+def _static_url(path: str) -> str:
+    """`/static/<path>` stamped with the file's mtime.
+
+    Without this a browser keeps serving the app.js it cached before an
+    update, and the UI silently runs last week's code against this week's API.
+    """
+    try:
+        stamp = int((BASE_DIR / "static" / path).stat().st_mtime)
+    except OSError:
+        return "/static/%s" % path
+    return "/static/%s?v=%d" % (path, stamp)
+
+
+templates.env.globals["static_url"] = _static_url
 
 
 # ----- helpers ----------------------------------------------------------
@@ -103,6 +125,25 @@ def _backup(path: Path, label: str) -> None:
     for stale in sorted(folder.iterdir(), reverse=True)[BACKUPS:]:
         if stale not in keep:
             stale.unlink(missing_ok=True)
+
+
+def _gallery_thumb(rel: str, source_mtime: float) -> Path | None:
+    """The gallery's own thumbnail for a photo, when it has one that is not
+    stale. Mirrors the gallery's layout: THUMBS_DIR holds the photo tree with
+    every file re-suffixed to .jpg."""
+    if not THUMBS_DIR.is_dir():
+        return None
+    try:
+        candidate = (THUMBS_DIR / rel).with_suffix(".jpg").resolve()
+        candidate.relative_to(THUMBS_DIR.resolve())
+    except (ValueError, OSError):
+        return None
+    try:
+        if candidate.is_file() and candidate.stat().st_mtime >= source_mtime:
+            return candidate
+    except OSError:
+        return None
+    return None
 
 
 def _updates_from(payload: dict) -> dict[str, list[str] | None]:
@@ -151,6 +192,7 @@ def index(request: Request):
         "request": request,
         "photos_dir": PHOTOS_DIR.as_posix(),
         "read_only": READ_ONLY,
+        "app_version": APP_VERSION,
     })
 
 
@@ -159,7 +201,9 @@ def api_meta():
     """Everything the UI needs to build its forms: the key list, the write
     style and allowed values per key, and the help text."""
     return {
+        "version": APP_VERSION,
         "photos_dir": PHOTOS_DIR.as_posix(),
+        "shared_thumbs": THUMBS_DIR.is_dir(),
         "read_only": READ_ONLY,
         "album_keys": schema.ALBUM_KEYS,
         "gallery_keys": schema.GALLERY_KEYS,
@@ -318,15 +362,39 @@ async def api_gallery_raw(request: Request):
 
 # ----- photos -----------------------------------------------------------
 @app.get("/api/photos")
-def api_photos(path: str = "", recursive: int = 1, limit: int = 5000):
+def api_photos(path: str = "", recursive: int = 0, limit: int = 5000,
+               tags: int = 0):
+    """Photos in one folder, plus its sub-folders so a picker can drill in.
+
+    `recursive` defaults to off: a trip album holds hundreds of photos across a
+    dozen sub-folders, and flattening that into one wall is exactly what makes
+    picking a cover painful. `tags=1` also returns each photo's sidecar tags.
+    """
     album = _album_or_400(path) if path else ""
     photos = lib.photos(album, recursive=bool(recursive))
-    return {"album": album, "total": len(photos), "photos": photos[:limit]}
+    shown = photos[:limit]
+    if tags:
+        for photo in shown:
+            photo["tags"] = lib.read_tags(photo["rel"])
+    return {
+        "album": album,
+        "parent": album.rsplit("/", 1)[0] if "/" in album else ("" if album else None),
+        "folders": lib.folders(album),
+        "total": len(photos),
+        "photos": shown,
+    }
 
 
 @app.get("/api/thumb")
 def api_thumb(path: str, size: int = 0):
-    """A downscaled JPEG of one photo, cached on disk by path+mtime+size."""
+    """A small JPEG of one photo.
+
+    The gallery already renders a thumbnail per photo into THUMBS_DIR, so when
+    that folder is mounted this hands the existing file straight back -- no
+    decode of a 20 MB original just to draw a 200px tile. Only a photo the
+    gallery has not thumbed yet (or a stale one) falls through to Pillow, and
+    that result is cached under DATA_DIR so it happens once.
+    """
     try:
         source = lib.safe(path)
     except ValueError as exc:
@@ -335,6 +403,13 @@ def api_thumb(path: str, size: int = 0):
         raise HTTPException(404, "no such photo")
     size = max(64, min(size or THUMB_SIZE, 1600))
     st = source.stat()
+
+    shared = _gallery_thumb(path, st.st_mtime)
+    if shared is not None:
+        return FileResponse(shared, media_type="image/jpeg",
+                            headers={"Cache-Control": "public, max-age=86400",
+                                     "X-Thumb-Source": "gallery"})
+
     token = "%s|%s|%s|%s" % (path, st.st_mtime_ns, st.st_size, size)
     cached = CACHE_DIR / (hashlib.sha1(token.encode("utf-8")).hexdigest() + ".jpg")
     if not cached.is_file():
@@ -353,7 +428,99 @@ def api_thumb(path: str, size: int = 0):
         tmp.write_bytes(buf.getvalue())
         tmp.replace(cached)
     return FileResponse(cached, media_type="image/jpeg",
-                        headers={"Cache-Control": "public, max-age=86400"})
+                        headers={"Cache-Control": "public, max-age=86400",
+                                 "X-Thumb-Source": "generated"})
+
+
+# ----- per-image metadata and tags --------------------------------------
+@app.get("/api/image")
+def api_image(path: str):
+    """One photo: its read-only EXIF summary and its editable tags."""
+    try:
+        source = lib.safe(path)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if not source.is_file() or not is_image(source.name):
+        raise HTTPException(404, "no such photo")
+    rel = path.replace("\\", "/").strip().strip("/")
+    return {
+        "rel": rel,
+        "name": source.name,
+        "album": rel.rsplit("/", 1)[0] if "/" in rel else "",
+        "meta": imagemeta.read(source),
+        "tags": lib.read_tags(rel),
+        "has_sidecar": lib.tags_path(rel).is_file(),
+    }
+
+
+@app.get("/api/tags")
+def api_tags():
+    """Every tag in use, with its photo count -- the vocabulary the tag input
+    autocompletes against, so the same idea does not end up spelled three
+    ways across an album."""
+    counts = lib.all_tags()
+    return {
+        "tags": [{"name": name, "count": count}
+                 for name, count in sorted(counts.items(),
+                                           key=lambda kv: (-kv[1], kv[0].lower()))],
+        "total": len(counts),
+    }
+
+
+@app.put("/api/tags")
+async def api_tags_write(request: Request):
+    """Apply a tag change to one or many photos.
+
+    `set` replaces each photo's tags outright; `add` and `remove` edit them in
+    place, which is what bulk tagging needs -- selecting forty photos should
+    add a tag without flattening whatever else each one already carries.
+    """
+    _guard_write()
+    body = await _json_body(request)
+    rels = body.get("photos")
+    if not isinstance(rels, list) or not rels:
+        raise HTTPException(400, "expected a non-empty `photos` list")
+    if len(rels) > 5000:
+        raise HTTPException(413, "too many photos in one call")
+
+    def clean(field: str) -> list[str]:
+        raw = body.get(field)
+        if raw is None:
+            return []
+        if not isinstance(raw, list):
+            raise HTTPException(400, "`%s` must be a list" % field)
+        return [str(t).strip() for t in raw if str(t).strip()]
+
+    replace = body.get("set")
+    add, remove = clean("add"), clean("remove")
+    lowered_remove = {t.lower() for t in remove}
+
+    results: dict[str, list[str]] = {}
+    for raw_rel in rels:
+        rel = str(raw_rel).replace("\\", "/").strip().strip("/")
+        try:
+            source = lib.safe(rel)
+        except ValueError:
+            raise HTTPException(400, "bad photo path: %r" % raw_rel)
+        if not source.is_file() or not is_image(source.name):
+            raise HTTPException(404, "no such photo: %r" % rel)
+
+        if replace is not None:
+            if not isinstance(replace, list):
+                raise HTTPException(400, "`set` must be a list")
+            wanted = [str(t).strip() for t in replace if str(t).strip()]
+        else:
+            wanted = lib.read_tags(rel)
+            have = {t.lower() for t in wanted}
+            wanted = [t for t in wanted if t.lower() not in lowered_remove]
+            for tag in add:
+                if tag.lower() not in have:
+                    wanted.append(tag)
+                    have.add(tag.lower())
+        _backup(lib.tags_path(rel), "tags")
+        results[rel] = lib.write_tags(rel, wanted)
+
+    return {"ok": True, "changed": len(results), "tags": results}
 
 
 # ----- .album assets ----------------------------------------------------
@@ -431,7 +598,9 @@ def api_validate():
 
 @app.get("/api/health")
 def api_health():
-    return {"ok": PHOTOS_DIR.is_dir(), "photos_dir": PHOTOS_DIR.as_posix(),
+    return {"ok": PHOTOS_DIR.is_dir(), "version": APP_VERSION,
+            "photos_dir": PHOTOS_DIR.as_posix(),
+            "shared_thumbs": THUMBS_DIR.is_dir(),
             "read_only": READ_ONLY}
 
 

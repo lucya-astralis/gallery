@@ -16,11 +16,18 @@ services:
     volumes:
       # Point PHOTOS_PATH at the same folder or share the gallery serves.
       - ${PHOTOS_PATH:-../photos}:/photos
+      # The gallery's thumbnail tree, read-only. Optional, but with it the
+      # photo grids reuse thumbnails the gallery already rendered instead of
+      # decoding the full-size originals. Same value as the gallery's
+      # THUMBS_PATH.
+      - ${THUMBS_PATH:-../thumbnails}:/thumbnails:ro
       - ${DATA_PATH:-./data}:/data
     environment:
       - PHOTOS_DIR=/photos
+      - THUMBS_DIR=/thumbnails
       - DATA_DIR=/data
-      # Preview size for the photo pickers. Bigger = sharper, slower first load.
+      # Fallback preview size, used only for photos the gallery has not
+      # thumbnailed yet. Bigger = sharper, slower first load.
       - THUMB_SIZE=${THUMB_SIZE:-320}
       # How many old versions of each edited file to keep under /data/backups.
       - BACKUPS=${BACKUPS:-20}

@@ -1,4 +1,4 @@
-# Gallery Configurator
+# Gallery Configurator 1.0
 
 A standalone web GUI for the gallery's config files — `photos/gallery.cfg` and
 every `<album>/.album/album.cfg`, plus the per-language `album_*.md`
@@ -26,8 +26,52 @@ Then open <http://localhost:8090>.
 | `album.cfg` | `<album>/.album/` | every documented key as a real control — cover picker, drag-sortable `featured` / `order`, reel/sort/effect dropdowns, tags, custom attributes, icon & font pickers |
 | `album_en/de/jp.md` | `<album>/.album/` | a markdown editor per language; saving an empty one deletes the file |
 | `icon.svg`, `*.otf` … | `<album>/.album/` | upload, preview (the font is loaded and shown set in the album's name), delete |
+| `<photo>.tags` | next to each photo | per-photo tags, one photo or forty at a time |
 
 Every file also has a **Raw file** tab if you would rather just type.
+
+### Getting around
+
+The sidebar lists every album by its **cover**: whatever `album.cfg` pins, else
+the first photo in the folder, else the first photo of its first sub-album — so
+a folder that only holds sub-albums still shows a picture. The frame around it
+carries the status the old dot did: violet means the album has an `album.cfg`,
+red means that cfg has issues.
+
+Settings are laid out as tiles rather than one full-width row per key. Simple
+controls (a toggle, a dropdown, a filename) sit two or three across; only the
+list-shaped keys — `featured`, `order`, the welcome reels, `album_order`,
+`stat` — take the full width they actually need. A key written in the file
+gets a violet edge and a filled tile; one left at its default recedes to an
+outline, so what an album actually overrides is visible without reading.
+
+### Photos & tags
+
+The **Photos & tags** tab is a folder browser, not a flat wall: sub-folders
+come up as tiles with a cover and a count, and only the photos actually in the
+folder you are looking at are listed. A 391-photo trip is browsed the way it is
+stored. The same browser backs every photo picker, so choosing a cover out of
+`japan_2026/kansai/osaka` is a matter of clicking down to it. Typing in the
+picker's filter switches to searching the whole subtree below where you stand.
+
+Every ordered list — `featured`, `order`, `album_order`, the welcome reels —
+is drag-to-reorder, since file order *is* display order for all of them. Each
+row also has ↑/↓ buttons, so reordering never requires a mouse.
+
+Click a photo to select it; ctrl-click to add one, shift-click to take a run.
+Whatever is selected can be tagged in one go — add a tag, remove a tag, or
+clear them all. The tag field autocompletes against every tag already used
+anywhere in the gallery, so the same idea does not end up spelled three ways.
+
+Tags are written to a `<photo>.tags` sidecar, which is exactly what the
+gallery's scanner already reads; because it folds the sidecar's mtime into the
+photo's, the next scan picks the change up on its own.
+
+Clicking a photo also opens its metadata panel: dimensions, file size, camera,
+lens, exposure, aperture, ISO, focal length, capture date. That panel is
+**read-only** — the configurator never rewrites a photo file. This library is
+almost entirely PNG and BMP, where there is no dependable metadata container
+to write into, so tags in a sidecar are the honest way to attach anything.
 
 ### Custom attributes
 
@@ -111,11 +155,24 @@ All optional — see `.env.example`.
 | --- | --- | --- |
 | `CONFIGURATOR_PORT` | `8090` | host port |
 | `PHOTOS_PATH` | `../photos` | the photo folder to manage; point it at the same folder or share the gallery serves |
+| `THUMBS_PATH` | `../thumbnails` | the gallery's thumbnail tree, mounted read-only so grids reuse it. Optional |
 | `DATA_PATH` | `./data` | thumbnail cache + backups. Disposable |
-| `THUMB_SIZE` | `320` | preview size in the photo pickers |
+| `THUMB_SIZE` | `320` | fallback preview size, for photos the gallery has not thumbnailed |
 | `BACKUPS` | `20` | versions kept per edited file |
 | `MAX_UPLOAD_MB` | `8` | cap on icon/font uploads |
 | `READ_ONLY` | `0` | `1` = browse and validate only; every write endpoint returns 403 and the UI disables its controls |
+
+### Previews come from the gallery's thumbnails
+
+Photo grids never load originals. `/api/thumb` hands back the gallery's own
+thumbnail from `THUMBS_DIR` whenever that tree is mounted and the file is not
+older than the photo — the response says which, in an `X-Thumb-Source` header.
+Only a photo the gallery has not thumbnailed yet falls through to Pillow, and
+that result is cached under `DATA_PATH` so it happens once.
+
+Mount it read-only, pointing at the same folder as the gallery's
+`THUMBS_PATH`. Without it nothing breaks; the first view of a folder is just
+slower.
 
 ### Pointing at the same share as the gallery
 
@@ -145,10 +202,11 @@ folder next to the checkout, which is what the local gallery uses.
 ```
 configurator/
   app/
-    main.py       FastAPI routes: tree, cfg read/write, photos, thumbs, assets
+    main.py       FastAPI routes: tree, cfg read/write, photos, thumbs, tags, assets
     cfgio.py      the comment-preserving parser/writer
     schema.py     which keys exist, their allowed values and write style
-    library.py    the photo tree, straight off the filesystem
+    library.py    the photo tree and the .tags sidecars, off the filesystem
+    imagemeta.py  read-only EXIF for the metadata panel
     validate.py   the checks behind "Check all"
     static/       style.css, app.js, fonts/, logo/
     templates/    index.html

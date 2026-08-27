@@ -15,7 +15,7 @@ A lean, read-only web image gallery with folder-based albums, EXIF display, side
 - **Three languages (EN / DE / JP):** selector in the top-right corner, cookie-backed with an `Accept-Language` fallback. Album descriptions are per-language markdown files (`album_en.md` / `album_de.md` / `album_jp.md`); UI strings live in `app/i18n.py`. See [Languages](#languages--i18n).
 - **Mobile-friendly:** responsive grid, large touch targets, keyboard navigation (← → ESC) on desktop.
 - **Read-only:** no write endpoints, no uploads. The `photos/` mount is `:ro`. No attack surface for upload/tag-injection exploits.
-- **Operations CLI:** `python -m app.debug` — run or pause the indexer, check index/config/derivative drift with `doctor`, and inspect exactly how a photo, an `album.cfg` or a trip resolves. See [Debug / operations CLI](#debug--operations-cli).
+- **Operations CLI:** `python -m app.cli` — run or pause the indexer, check index/config/derivative drift with `doctor`, audit tags and GPS, and inspect exactly how a photo, an album, the welcome hero or a trip resolves. See [Operations CLI](#operations-cli).
 - **Security headers:** CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy — all set by built-in middleware.
 - **Custom 404 page** with megacorp-terminal aesthetic.
 
@@ -550,12 +550,12 @@ The scanner reads the file on the next indexing pass and links the tags. Empty o
 | `STRIP_GPS`     | `1`           | Strip GPS from the original file on import (in-place)      |
 | `PUBLIC_BASE_URL`| (auto)       | Absolute base URL used in OG tags + `/api/showcase` URLs   |
 
-## Debug / operations CLI
+## Operations CLI
 
 Everything operational is one command:
 
 ```bash
-python -m app.debug
+python -m app.cli
 ```
 
 Without arguments it draws the dashboard — masthead, what the server is
@@ -605,13 +605,13 @@ values fold under their own column instead of being cut off.
 Or go straight at a single command:
 
 ```bash
-python -m app.debug <command> [options]
+python -m app.cli <command> [options]
 ```
 
 In Docker, run it inside the container:
 
 ```bash
-docker compose exec gallery python -m app.debug status
+docker compose exec gallery python -m app.cli status
 ```
 
 | Command | What it does |
@@ -630,7 +630,13 @@ docker compose exec gallery python -m app.debug status
 | `featured [album]` | Which `album.cfg` entry featured which photo, which entries match nothing, and whether the `is_showcase` flags in the DB still agree. `--recompute` rewrites the flags |
 | `cfg <album>` / `cfg --gallery` | An `album.cfg` / `gallery.cfg` exactly as the app parses it, plus what it resolves to (cover, reel, description languages) and everything wrong with it |
 | `photo <rel_path>` | Everything the app knows about one photo: row, mtime drift, tags, why it is (not) featured, derivative state, URLs, prettified EXIF (`--exif` for the raw block) |
+| `album [name]` | One album in full: photo count and size, capture span, flags, cover, featured count, tags, icon/font/effect, which `album_*.md` exist, sub-albums, and any cfg issues. Without a name: every album with its counts and flags |
 | `trip [album]` | The resolved trip dashboard — stops, dates, which sub-album each leg links to, photo counts. Without an album: which trips are configured and whether their album exists |
+| `welcome [--desktop] [--mobile]` | What the welcome hero actually resolves to per device class: which `gallery.cfg` key won, the mode (manual / showcase / random), and which entries were skipped because they are not indexed. **Exits 1** when something was skipped |
+| `tags [tag] [--album X]` | The tag vocabulary with photo counts, and drift between the `.tags` sidecars on disk and the index. With a tag name: the photos carrying it. **Exits 1** on drift or on a sidecar whose photo is gone |
+| `search <query> [--album X]` | The same query the `/search` page runs — album name, file name and tag — from the terminal |
+| `gps [album] [--strip]` | Which originals still carry GPS coordinates, alongside the effective `HIDE_GPS` / `STRIP_GPS` settings. **Exits 1** when any do. `--strip` **rewrites those originals in place** to remove the block |
+| `export [--out F] [--list]` | Archive `gallery.cfg` and every `.album/` folder — config, descriptions, icons, title fonts — to a `.tar.gz`. Photos are left out; they are already the backup. `--list` shows what would go in without writing |
 | `i18n` | EN/DE/JP completeness in `app/i18n.py`, keys used but undefined (they render as the key), and whether the `UI_STRINGS` mirror in `app.js` has the same keys in every language |
 
 Every command also takes `--json` for a machine-readable dump, `--no-color`
@@ -665,7 +671,7 @@ single line below 50 columns.
 When something looks wrong, ask:
 
 ```bash
-python -m app.debug term
+python -m app.cli term
 ```
 
 It prints what was detected (`stdout.isatty`, mintty, `/dev/tty`, `TERM`,
@@ -703,12 +709,12 @@ transparency is preserved in every mode: the logo sits on your terminal
 background, not in a white box.
 
 ```bash
-python -m app.debug --logo kitty
+python -m app.cli --logo kitty
 ```
 
 ### How `pause` and `scan` reach the running server
 
-The HTTP surface stays **read-only** — there is no debug endpoint that makes
+The HTTP surface stays **read-only** — there is no control endpoint that makes
 the server do something, and no token to leak. The CLI and the server talk
 through three small files in `data/control/` instead:
 
@@ -762,24 +768,36 @@ everywhere else in this project.
 
 ```bash
 # is anything running, and what did the last scan do?
-python -m app.debug status
+python -m app.cli status
 
 # freshly dropped an album on the share and do not want to wait 5 minutes
-python -m app.debug scan japan_2026/kansai
+python -m app.cli scan japan_2026/kansai
 
 # reorganising folders — stop the indexer from reacting to every move
-python -m app.debug pause "resorting kansai"
-python -m app.debug resume --scan
+python -m app.cli pause "resorting kansai"
+python -m app.cli resume --scan
 
 # why is this photo not in the reel?
-python -m app.debug photo japan_2026/kansai/osaka/IMG_4853.png
-python -m app.debug featured japan_2026
+python -m app.cli photo japan_2026/kansai/osaka/IMG_4853.png
+python -m app.cli featured japan_2026
 
 # after changing THUMB_SIZE
-python -m app.debug thumbs --rebuild --all
+python -m app.cli thumbs --rebuild --all
 
 # nightly health check (exits 1 when it finds something)
-python -m app.debug doctor --json
+python -m app.cli doctor --json
+
+# what the front page will actually show, and what it skipped
+python -m app.cli welcome
+
+# tag vocabulary, and whether the sidecars and the index still agree
+python -m app.cli tags
+
+# privacy audit: which originals still carry coordinates
+python -m app.cli gps
+
+# snapshot every hand-written file (config, text, icons, fonts)
+python -m app.cli export --out backups/config.tar.gz
 ```
 
 ## Security / hosting
@@ -843,4 +861,4 @@ uvicorn app.main:app --reload
 - Delete an image: remove it from `photos/` — watcher/scan clean up DB entry, thumbnail, and preview.
 - Rename a tag: edit the `.tags` file.
 - Thumbnails, previews, and DB can be wiped any time — they are regenerated on the next scan.
-- Something looks off? `python -m app.debug doctor` compares index, files, derivatives and config in one pass.
+- Something looks off? `python -m app.cli doctor` compares index, files, derivatives and config in one pass.
