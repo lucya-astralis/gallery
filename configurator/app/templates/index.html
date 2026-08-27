@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en" data-read-only="{{ 1 if read_only else 0 }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Configurator — lucya.systems</title>
+  <link rel="icon" type="image/svg+xml" href="/static/logo/lucya_logo.svg">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="site-bg" aria-hidden="true"></div>
+
+  <nav class="nav">
+    <div class="nav__inner">
+      <span class="nav__brand">
+        <img src="/static/logo/lucya_logo.svg" alt="">
+        <span class="brand-text">
+          <span class="brand-name">lucya.systems</span>
+          <span class="brand-sub">configurator</span>
+        </span>
+        <span class="brand-jp">画像庫</span>
+      </span>
+      <div class="nav__path" title="mounted photo folder">{{ photos_dir }}</div>
+      <div class="nav__actions">
+        <div class="nav__status{% if read_only %} is-ro{% endif %}">
+          <span class="dot"></span>
+          <span>{{ 'READONLY' if read_only else 'READWRITE' }}</span>
+        </div>
+        <button type="button" class="btn" id="btn-check">Check all</button>
+        <button type="button" class="btn" id="btn-reload">Reload</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="layout">
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar__search">
+        <input type="search" id="tree-filter" placeholder="Filter albums&hellip;" autocomplete="off">
+      </div>
+      <ul class="tree" id="tree"><li class="tree__empty">Loading&hellip;</li></ul>
+    </nav>
+
+    <section class="pane" id="pane">
+      <div class="pane__empty">Pick the gallery or an album</div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="foot__brand">
+      <img src="/static/logo/lucya_logo.svg" alt="">
+      <span>lucya.systems</span>
+    </div>
+    <div class="foot__meta">
+      <b>SIG</b> / LUCYA.CONFIGURATOR &nbsp;·&nbsp;
+      <b>TARGET</b> / {{ photos_dir }}
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <div class="modal" id="modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__box" role="dialog" aria-modal="true">
+      <header class="modal__head">
+        <h2 id="modal-title">Pick photos</h2>
+        <input type="search" id="modal-filter" placeholder="Filter by name or folder&hellip;" autocomplete="off">
+        <button type="button" class="btn btn--ghost btn--icon" data-close>&times;</button>
+      </header>
+      <div class="modal__body" id="modal-body"></div>
+      <footer class="modal__foot">
+        <span class="modal__count" id="modal-count"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="button" class="btn btn--primary" id="modal-ok">Apply</button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+# Gallery Configurator — runs on its own, next to the gallery but not with it.
+#
+# The only thing it shares with the gallery is the photo folder, and it needs
+# that read-write because editing the cfg files *is* the job. Its own /data
+# volume holds nothing precious: a thumbnail cache and rolling backups of every
+# file it overwrites.
+#
+#   cd configurator && docker compose up -d --build   ->  http://localhost:8090
+
+services:
+  configurator:
+    build: .
+    container_name: gallery-configurator
+    ports:
+      - "${CONFIGURATOR_PORT:-8090}:8000"
+    volumes:
+      # Point PHOTOS_PATH at the same folder or share the gallery serves.
+      - ${PHOTOS_PATH:-../photos}:/photos
+      - ${DATA_PATH:-./data}:/data
+    environment:
+      - PHOTOS_DIR=/photos
+      - DATA_DIR=/data
+      # Preview size for the photo pickers. Bigger = sharper, slower first load.
+      - THUMB_SIZE=${THUMB_SIZE:-320}
+      # How many old versions of each edited file to keep under /data/backups.
+      - BACKUPS=${BACKUPS:-20}
+      # Cap on icon/font uploads into an album's .album/ folder.
+      - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-8}
+      # Set to 1 to browse and validate without being able to write anything.
+      - READ_ONLY=${READ_ONLY:-0}
+    restart: unless-stopped

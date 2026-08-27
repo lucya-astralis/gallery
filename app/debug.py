@@ -271,6 +271,10 @@ def _featured_map() -> tuple[dict[str, list[tuple[str, str]]], list[dict]]:
 ALBUM_CFG_KEYS = {
     "collection", "cover", "showcase", "featured", "reel", "order", "sort",
     "tags", "effect", "icon", "font", "font_scale",
+    # Editorial stats block (_album_stats): `loc` is one line whose comma-split
+    # parts get rejoined, `stat` is the freeform custom "Label: Value" line
+    # (repeat the key for more), `stats = off` hides the block entirely.
+    "loc", "stat", "stats",
 }
 GALLERY_CFG_KEYS = {"welcome", "welcome_desktop", "welcome_mobile", "album_order", "album_sort"}
 REEL_VALUES = {"featured", "random", "shuffle", "off", "false", "0", "no", "none"}
@@ -334,6 +338,18 @@ def _check_album_cfg(album: str) -> list[dict]:
         if gallery._album_font_scale(album) is None:
             lo, hi = gallery.ALBUM_FONT_SCALE_RANGE
             add("warn", "font_scale", f"ignored — not a number in {lo}–{hi}, or no `font` set")
+    # A custom stat renders as KEY / VALUE, so it needs the colon to split on;
+    # without one _album_stats drops the line silently.
+    for item in cfg.get("stat", []):
+        label, sep, val = item.partition(":")
+        if not sep:
+            add("warn", "stat", f"{item!r} has no `Label: Value` colon — the line is dropped")
+        elif not val.strip():
+            add("warn", "stat", f"{item!r} has an empty value — the line is dropped")
+    if "stats" in cfg:
+        val = (gallery._cfg_first(cfg, "stats") or "").strip().lower()
+        if val and val not in gallery._FALSE:
+            add("warn", "stats", f"{val!r} does nothing — only an off/false/no value hides the block")
     return issues
 
 
