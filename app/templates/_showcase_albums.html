@@ -21,7 +21,7 @@
             <span class="feat-card__meta">
               {{ a.count }} {% if a.count == 1 %}{{ t('unit.image') }}{% else %}{{ t('unit.images') }}{% endif %}{% if a.sub_count %} · {{ a.sub_count }} {% if a.sub_count != 1 %}{{ t('unit.dirs') }}{% else %}{{ t('unit.dir') }}{% endif %}{% endif %}{% if month_label(a.latest) %} · {{ month_label(a.latest) }}{% endif %}
             </span>
-            <span class="feat-card__cta" aria-hidden="true">{{ t('card.view_album') }}</span>
+            <span class="feat-card__cta" aria-hidden="true">{{ t('card.view_album') }}<i class="fa fa-arrow-right" aria-hidden="true"></i></span>
           </div>
         </div>
       </a>

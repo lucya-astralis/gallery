@@ -11,8 +11,8 @@
         <div class="album-card__cover-empty">{{ t('card.no_cover') }}</div>
       {% endif %}
       <span class="album-card__idx" aria-hidden="true">{{ '%02d' | format(card_idx) }}</span>
-      {% if a.sub_count %}<span class="album-card__badge album-card__badge--folder">▸ {{ a.sub_count }}</span>{% endif %}
-      <div class="album-card__hover" aria-hidden="true"><span>{{ t('card.enter') }}</span></div>
+      {% if a.sub_count %}<span class="album-card__badge album-card__badge--folder"><i class="fa fa-folder" aria-hidden="true"></i>{{ a.sub_count }}</span>{% endif %}
+      <div class="album-card__hover" aria-hidden="true"><span>{{ t('card.enter') }}<i class="fa fa-arrow-right" aria-hidden="true"></i></span></div>
     </div>
     <div class="album-card__cap">
       <span class="album-card__name">{% if a.icon %}<img class="album-ico" src="{{ a.icon }}" alt="" aria-hidden="true" width="16" height="16" loading="lazy">{% endif %}{{ a.name }}</span>

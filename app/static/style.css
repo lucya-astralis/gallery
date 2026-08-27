@@ -279,19 +279,10 @@ code{
 }
 .nav__brand .brand-name{
   font-family:"Ethnocentric","Space Grotesk", sans-serif;
-  font-size:13px;
+  font-size:15px;
   letter-spacing:.14em;
   text-transform:uppercase;
   color:var(--text);
-}
-.nav__brand .brand-sub{
-  font-family:"JetBrains Mono", monospace;
-  font-size:10px;
-  letter-spacing:.22em;
-  text-transform:uppercase;
-  color:var(--acc-cy);
-  margin-top:2px;
-  transition:color .2s;
 }
 .nav__brand .jp{
   font-family:"Noto Sans JP", sans-serif;
@@ -302,7 +293,6 @@ code{
   border-left:1px solid var(--line);
   padding-left:12px;
 }
-.nav__brand:hover .brand-sub{ color:var(--acc-mag); }
 
 /* capped + auto-margined: the field sits centered in the leftover space
    between brand and controls instead of stretching wall-to-wall, so the
@@ -323,14 +313,9 @@ code{
   background:rgba(91,138,255,.05);
   box-shadow:0 0 0 1px rgba(91,138,255,.18), 0 0 18px -8px rgba(91,138,255,.5);
 }
-.nav__search::before{
-  content:"❯";
-  font-family:"JetBrains Mono", monospace;
-  color:var(--acc-cy);
-  font-size:11px;
-  letter-spacing:.18em;
-  margin-right:10px;
-}
+/* the "❯" prompt that used to sit here was replaced by the magnifying-glass
+   icon in the markup — a prompt caret AND a search icon in the same box read
+   as two competing affordances. Cyan on focus keeps the terminal feel. */
 .nav__search input{
   flex:1; min-width:0;
   background:transparent;
@@ -2212,9 +2197,13 @@ section{
   color:var(--text-ghost);
   border-bottom:1px dashed var(--line);
   padding-bottom:8px;
-  display:flex; align-items:center; justify-content:space-between;
+  /* flex-start, not space-between: the leading icon is a flex item of its
+     own, and space-between would fling it to one edge and strand the label
+     in the middle. The stamp still pins right, via its own auto margin. */
+  display:flex; align-items:center; justify-content:flex-start;
 }
 .panel h2 .stamp{
+  margin-left:auto;
   color:var(--acc-cy);
   border:1px solid rgba(91,138,255,.4);
   padding:1px 6px;
@@ -2340,8 +2329,7 @@ details[open] > summary::before{ content:"▾ "; }
   :root{ --nav-h:56px; }
   .nav__inner{ gap:12px; }
   .nav__brand .jp{ display:none; }
-  .nav__brand .brand-name{ font-size:12px; }
-  .nav__brand .brand-sub{ font-size:9px; }
+  .nav__brand .brand-name{ font-size:13px; }
   .nav__brand img{ height:24px; }
   .nav__status{ display:none; }
   /* search field and language selector share one height so the two controls
@@ -2487,7 +2475,7 @@ details[open] > summary::before{ content:"▾ "; }
 }
 @media (max-width:480px){
   .nav__brand .brand-text{ display:none; }
-  .nav__search::before{ content:"❯"; margin-right:6px; font-size:10px; }
+  .nav__search-ico{ margin-right:6px; font-size:11px; }
   /* stay at 16px to prevent iOS focus-zoom (see 760px block); just tighten padding */
   .nav__search input{ padding:8px 0; }
   .image-grid{ grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:6px; }
@@ -3099,12 +3087,11 @@ body.page-welcome{ --page-max: 2400px; }
   line-height:1.06;
   letter-spacing:.04em;
   color:var(--text);
-  text-shadow:
-    0 2px 26px rgba(0,0,0,.7),
-    0 0 30px rgba(91,138,255,.25);
-  /* no word-break here: the space between LUCYA and GALLERY is the ONLY
-     soft break point, so whenever the title wraps it wraps there — never
-     mid-word ("GALLER/Y"). Mobile stacks it there unconditionally. */
+  /* black drop only — no accent glow; the blue halo read as a smudge over
+     the live-view photo and fought the HUD's flat, printed look */
+  text-shadow:0 2px 26px rgba(0,0,0,.7);
+  /* one word, no break points: it scales down rather than ever splitting
+     mid-word ("GALLER/Y") */
 }
 .vf__lead{
   margin:0;
@@ -3396,7 +3383,6 @@ body.page-welcome{ --page-max: 2400px; }
   /* stacked title: always break between the words on small screens — two
      short lines allow much larger type than one squeezed line */
   .vf__title{ letter-spacing:.02em; font-size:clamp(30px, 9.5vw, 52px); }
-  .vf__title-tail{ display:block; }
   .vf__lead{ font-size:13.5px; }
   .vf__deck{ gap:8px; padding:10px 14px 12px; }
   .vf__nav{ padding:5px 12px; }
@@ -3678,10 +3664,14 @@ body.page-welcome{ --page-max: 2400px; }
   color:var(--text-ghost);
 }
 /* hover reads on the whole card (border + halo), so the frame answers the
-   pointer even though the link is the inner box */
-.trip__stop:has(a.trip__stop-link:hover){
-  border-color:rgba(91,138,255,.55);
-  box-shadow:0 0 0 1px rgba(91,138,255,.16), 0 0 30px -16px var(--acc-cy);
+   pointer even though the link is the inner box. Gated on a real hovering
+   pointer: re-styling an ANCESTOR of the tapped link is what makes touch
+   browsers spend the first tap on hover instead of following the link. */
+@media (hover: hover){
+  .trip__stop:has(a.trip__stop-link:hover){
+    border-color:rgba(91,138,255,.55);
+    box-shadow:0 0 0 1px rgba(91,138,255,.16), 0 0 30px -16px var(--acc-cy);
+  }
 }
 
 .trip__stop-link{
@@ -3700,9 +3690,11 @@ body.page-welcome{ --page-max: 2400px; }
   filter:saturate(.8) brightness(.72) contrast(1.05);
   transition:filter .25s ease, transform .6s ease;
 }
-a.trip__stop-link:hover .trip__stop-media img{
-  filter:saturate(.95) brightness(.85) contrast(1.05);
-  transform:scale(1.04);
+@media (hover: hover){
+  a.trip__stop-link:hover .trip__stop-media img{
+    filter:saturate(.95) brightness(.85) contrast(1.05);
+    transform:scale(1.04);
+  }
 }
 .trip__stop-shade{
   position:absolute; inset:0; z-index:1;
@@ -4314,4 +4306,160 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__img{
   .album-font .album-hero__title{
     font-size:calc(clamp(27px, 8.6vw, 38px) * var(--album-title-scale, 1));
   }
+}
+
+/* ================================================================
+   TOUCH: NO HOVER STATES
+   ================================================================
+   On a touch device the first tap on anything whose :hover changes the
+   layout (a card that lifts, an overlay/CTA that appears) is spent
+   applying that hover state — the tap has to be repeated to actually
+   follow the link, and on Android the hover then stays stuck on the card
+   until something else is tapped. Neutralising the hover-only visuals
+   where the pointer cannot hover means the very first tap is a click.
+
+   Only hovers that MOVE or REVEAL are reverted here; :focus-within and
+   :focus-visible are untouched, so keyboard users keep the same
+   affordances and the brackets still frame a focused card. */
+@media (hover: none){
+
+  /* --- cards: no lift, no bracket blink, no cover zoom --- */
+  .feat-card:hover,
+  .image-tile:hover{ transform:none; }
+  .album-card:hover{ background:var(--surface); transform:none; }
+
+  .feat-card:hover::before,
+  .feat-card:hover::after,
+  .album-card:hover::before,
+  .album-card:hover::after,
+  .image-tile:hover::before,
+  .image-tile:hover::after{ opacity:0; }
+
+  .feat-card:hover .feat-card__img > img{
+    transform:none;
+    filter:saturate(.94) brightness(.88);
+  }
+  .album-card:hover .album-card__img img,
+  .image-tile a:hover img{
+    transform:none;
+    filter:saturate(.85) brightness(.9);
+  }
+
+  /* --- reveal-on-hover captions: never shown, never tapped for --- */
+  .album-card:hover .album-card__hover{ opacity:0; }
+  .album-card:hover .album-card__hover span{ transform:translateY(6px); }
+  .image-tile a:hover .image-tile__overlay{ opacity:0; }
+  .feat-card:hover .feat-card__cta{
+    opacity:0;
+    max-height:0;
+    transform:translateY(4px);
+  }
+
+  /* (the trip-stop hovers are gated at their own definition instead —
+     they sit on top of .is-active/.is-done, which a blanket revert here
+     would flatten) */
+
+  /* --- micro-interactions that shift a control under the finger --- */
+  .tag:hover,
+  .btn-link:hover{ transform:none; }
+  .nav-arrow.prev:hover,
+  .nav-arrow.next:hover{ transform:translateY(-50%); }
+  .pathbar__back:hover .pathbar__back-ico{ transform:none; }
+}
+
+/* ================================================================
+   ICON PLACEMENT  (Font Awesome subset — see tools/build_fa_subset.py)
+   ================================================================
+   fa-icons.css supplies the @font-face and the per-icon codepoints and
+   nothing else; how an icon sits next to its label is this sheet's job.
+
+   Every icon here is decorative: it rides alongside a real text label or
+   an aria-label and carries aria-hidden, so nothing is lost with the font
+   blocked. Sizing is in `em` throughout — an icon inherits the tracked-out
+   mono type around it and must scale with it, never fight it. */
+
+/* leading icon: sized a touch under the cap height of the label so it
+   reads as a marker, not a second word */
+.fa{ font-size:.92em; }
+
+/* --- generic label pairings -------------------------------------------- */
+.btn-link > .fa,
+.loader-btn > .fa,
+.loader-link > .fa,
+.lightbox__btn > .fa,
+.foot__links a > .fa,
+.panel h2 > .fa,
+.vf-band__caption > .fa,
+.album-card__badge--folder > .fa{ margin-right:.6em; }
+
+/* the mono labels are tracked out hard; a leading icon needs a little more
+   air or it collides with the first letter's side bearing */
+.panel h2 > .fa,
+.vf-band__caption > .fa{ margin-right:.75em; color:var(--text-dim); }
+
+/* trailing icons: chevron = "more of the same further on", open-out arrow
+   = "this leaves the page you are on". Both sit a size down from the label
+   so they read as punctuation rather than a second glyph. */
+.showcase__more > .fa,
+.fhero__file-open > .fa,
+.btn-link--about > .fa,
+.foot__op-ext{ margin-left:.55em; font-size:.8em; }
+
+/* --- nav search: the magnifier is a flex sibling of the input ---------- */
+.nav__search-ico{
+  color:var(--text-ghost);
+  font-size:12px;
+  margin-right:9px;
+  flex:none;
+  transition:color .15s;
+}
+.nav__search:focus-within .nav__search-ico{ color:var(--acc-cy); }
+
+/* --- chevrons that replaced ‹ › ---------------------------------------- */
+/* these buttons were sized around a 13-22px punctuation glyph; a chevron
+   at the same px reads much heavier, so it is dialled back per control */
+.pathbar__back-ico > .fa{ font-size:11px; }
+.nav-arrow > .fa{ font-size:15px; }
+.lightbox__nav > .fa{ font-size:20px; }
+.lightbox__close > .fa{ font-size:17px; }
+.vf__nav > .fa,
+.fhero__nav > .fa{ font-size:11px; }
+.vf__tune > .fa{ margin-right:.6em; }
+
+/* --- sort control: leading sort mark + trailing caret ------------------ */
+.sort__btn > .fa{ font-size:11px; }
+.sort__btn-caret{ margin-left:.2em; color:var(--text-ghost); }
+.sort__btn[aria-expanded="true"] .sort__btn-caret{ transform:rotate(180deg); }
+@media (prefers-reduced-motion: no-preference){
+  .sort__btn-caret{ transition:transform .18s ease; }
+}
+
+/* --- album tree: the up-arrow to the parent album ---------------------- */
+.section__parent-ico > .fa{ font-size:11px; }
+
+/* --- featured hero chip: star / shuffle -------------------------------- */
+.fhero__chip--star > .fa{ font-size:10px; }
+
+/* --- featured / showcase markers --------------------------------------- */
+/* these labels used to carry a literal "★ " inside the translated string,
+   which meant the mark was baked into EN/DE/JP separately and inherited the
+   label's .24em tracking. It is markup now, so the gap is set once here. */
+.feat__label > .fa,
+.showcase__label > .fa,
+.album-hero__kicker > .fa,
+.stamp > .fa{ margin-right:.65em; }
+.image-tile__star > .fa{ font-size:11px; }
+.image-tile__overlay .fa{ margin-left:.5em; font-size:.8em; }
+.album-desc__label > .fa,
+.sub-albums__label > .fa,
+.archive-head__label > .fa,
+.trip__tag > .fa{ margin-right:.65em; }
+
+/* card call-to-action: the arrow trails the label and leans out on hover,
+   which is where the old literal "→" in the translated string sat */
+.album-card__hover span > .fa,
+.feat-card__cta > .fa{ margin-left:.7em; font-size:.85em; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference){
+  .album-card__hover span > .fa{ transition:transform .25s ease; }
+  .album-card:hover .album-card__hover span > .fa{ transform:translateX(3px); }
 }

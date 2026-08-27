@@ -308,9 +308,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // scramble on view: section headers, hero stats, welcome title
   const onViewEls = [
     ...document.querySelectorAll('.section__slug .name'),
-    // head + tail separately: scrambling flattens innerHTML, which would
-    // destroy the title's head/tail spans if the whole <h1> were the target
-    ...document.querySelectorAll('.vf__title-head, .vf__title-tail'),
+    // the inner span, not the <h1>: scrambling flattens its target's innerHTML
+    ...document.querySelectorAll('.vf__title-word'),
     ...document.querySelectorAll('.section__doc b'),
     ...document.querySelectorAll('.notfound__title'),
     ...document.querySelectorAll('.crumb b'),

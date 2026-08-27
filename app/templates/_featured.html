@@ -32,18 +32,18 @@
       {% endfor %}
       <div class="fhero__shade" aria-hidden="true"></div>
     </div>
-    <span class="fhero__chip fhero__chip--star" aria-hidden="true">{% if reel_random %}⟳{% else %}★{% endif %}</span>
+    <span class="fhero__chip fhero__chip--star" aria-hidden="true"><i class="fa {% if reel_random %}fa-shuffle{% else %}fa-star{% endif %}"></i></span>
     <span class="fhero__chip fhero__chip--frm">FRM <b id="fhero-idx">01</b><span>/{{ '%02d' | format(featured | length) }}</span></span>
     <a class="fhero__file" id="fhero-file" href="/image/{{ featured[0].rel_path }}">
       <span class="fhero__file-name" id="fhero-name" data-scramble>{{ feat_label(featured[0]) }}</span>
-      <span class="fhero__file-open" aria-hidden="true">{{ t('reel.open') }}</span>
+      <span class="fhero__file-open" aria-hidden="true">{{ t('reel.open') }}<i class="fa fa-arrow-up-right-from-square"></i></span>
     </a>
     {# album identity overlay, lower-left above the control bar; non-
        interactive so clicks fall through to the slide link behind it #}
     <div class="fhero__ov">{{ hero_info() }}</div>
     <div class="fhero__bar">
-      <button type="button" class="fhero__nav" id="fhero-prev" aria-label="{{ t('aria.prev_photo') }}">‹</button>
-      <button type="button" class="fhero__nav" id="fhero-next" aria-label="{{ t('aria.next_photo') }}">›</button>
+      <button type="button" class="fhero__nav" id="fhero-prev" aria-label="{{ t('aria.prev_photo') }}"><i class="fa fa-chevron-left" aria-hidden="true"></i></button>
+      <button type="button" class="fhero__nav" id="fhero-next" aria-label="{{ t('aria.next_photo') }}"><i class="fa fa-chevron-right" aria-hidden="true"></i></button>
       <div class="fhero__track" id="fhero-track" aria-label="{{ t('aria.photo_selector') }}">
         {% for img in featured %}
           <button type="button" class="fhero__seg{% if loop.first %} is-on{% endif %}" data-goto="{{ loop.index0 }}" aria-label="{{ loop.index }}: {{ feat_label(img) }}"></button>

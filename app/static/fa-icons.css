@@ -1,0 +1,66 @@
+/* ==================================================================
+   FONT AWESOME ICONS  —  GENERATED FILE, DO NOT EDIT BY HAND
+   ==================================================================
+   Rebuild with:  python tools/build_fa_subset.py
+   The font is a glyph subset cut down to exactly the icons listed
+   below; adding a class to a template without re-running the script
+   renders a blank box.
+
+   Font Awesome Free 7.3.1 (https://fontawesome.com)
+   icons CC BY 4.0 · fonts SIL OFL 1.1 · code MIT
+   ================================================================== */
+@font-face{
+  font-family:'Font Awesome Solid';
+  src:url('/static/fonts/fa-solid-subset.woff2') format('woff2');
+  font-weight:900;
+  font-style:normal;
+  /* block, not swap: there is no sensible fallback glyph for an icon font,
+     and swap would flash the raw private-use codepoint as tofu first */
+  font-display:block;
+}
+.fa{
+  font-family:'Font Awesome Solid';
+  font-weight:900;
+  font-style:normal;
+  font-variant:normal;
+  line-height:1;
+  display:inline-block;
+  text-rendering:auto;
+  -webkit-font-smoothing:antialiased;
+  /* icons sit beside mono labels that are tracked out; the glyph must not
+     inherit that letter-spacing or it drifts off its own box */
+  letter-spacing:0;
+}
+.fa::before{ content:var(--fa); }
+/* fixed-width variant: keeps icons in a column (kv lists, menus) aligned
+   however wide the individual glyph is */
+.fa-fw{ width:1.25em; text-align:center; }
+
+.fa-align-left{ --fa:"\f036"; }
+.fa-arrow-down-wide-short{ --fa:"\f160"; }
+.fa-arrow-right{ --fa:"\f061"; }
+.fa-arrow-turn-up{ --fa:"\f148"; }
+.fa-arrow-up-right-from-square{ --fa:"\f08e"; }
+.fa-camera{ --fa:"\f030"; }
+.fa-chevron-down{ --fa:"\f078"; }
+.fa-chevron-left{ --fa:"\f053"; }
+.fa-chevron-right{ --fa:"\f054"; }
+.fa-circle-info{ --fa:"\f05a"; }
+.fa-download{ --fa:"\f019"; }
+.fa-expand{ --fa:"\f065"; }
+.fa-folder{ --fa:"\f07b"; }
+.fa-folder-open{ --fa:"\f07c"; }
+.fa-folder-tree{ --fa:"\f802"; }
+.fa-house{ --fa:"\f015"; }
+.fa-image{ --fa:"\f03e"; }
+.fa-images{ --fa:"\f302"; }
+.fa-layer-group{ --fa:"\f5fd"; }
+.fa-magnifying-glass{ --fa:"\f002"; }
+.fa-route{ --fa:"\f4d7"; }
+.fa-scale-balanced{ --fa:"\f24e"; }
+.fa-shield-halved{ --fa:"\f3ed"; }
+.fa-shuffle{ --fa:"\f074"; }
+.fa-star{ --fa:"\f005"; }
+.fa-table-cells{ --fa:"\f00a"; }
+.fa-tags{ --fa:"\f02c"; }
+.fa-xmark{ --fa:"\f00d"; }

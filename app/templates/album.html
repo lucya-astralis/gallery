@@ -49,7 +49,7 @@
   {% set up_name = breadcrumbs[-2].name if breadcrumbs | length > 1 else t('back.albums') %}
   <nav class="pathbar" aria-label="Breadcrumb">
     <a class="pathbar__back" href="{{ up_url }}">
-      <span class="pathbar__back-ico" aria-hidden="true">‹</span>
+      <span class="pathbar__back-ico" aria-hidden="true"><i class="fa fa-chevron-left"></i></span>
       <span class="pathbar__back-lbl">{{ t('back.label') }}</span>
       <span class="pathbar__back-txt">{{ up_name }}</span>
     </a>
@@ -83,9 +83,9 @@
   {% set hero_jp = trip.jp if trip and trip.jp else None %}
   {% macro hero_info() %}
     <span class="album-hero__kicker">
-      {%- if trip %}{{ t('trip.tag') }}
-      {%- elif breadcrumbs | length > 1 %}{{ t('stamp.sub_album') }}
-      {%- elif album_is_showcase %}{{ t('stamp.showcase_album') }}
+      {%- if trip %}<i class="fa fa-route" aria-hidden="true"></i>{{ t('trip.tag') }}
+      {%- elif breadcrumbs | length > 1 %}<i class="fa fa-folder-tree" aria-hidden="true"></i>{{ t('stamp.sub_album') }}
+      {%- elif album_is_showcase %}<i class="fa fa-star" aria-hidden="true"></i>{{ t('stamp.showcase_album') }}
       {%- else %}ALBUM{% endif -%}{# HUD token — stays English like FILE / #}
     </span>
     {# the album's own mark (album.cfg `icon =`), leading its title — sized
@@ -135,7 +135,7 @@
   {% macro desc_card() %}
     <div class="album-desc">
       <div class="album-desc__head">
-        <span class="album-desc__label">{{ t('album.about') }}</span>
+        <span class="album-desc__label"><i class="fa fa-align-left" aria-hidden="true"></i>{{ t('album.about') }}</span>
         <span class="album-desc__file">{{ (breadcrumbs[-1].name if breadcrumbs else album) | upper }}</span>
       </div>
       {% if album_description %}<div class="album-desc__body">{{ album_description | safe }}</div>{% endif %}
@@ -155,9 +155,9 @@
     {% if breadcrumbs | length > 1 %}<span>IN / <b>{{ breadcrumbs[-2].name }}</b></span>{% endif %}
     {% if images or not sub_albums %}<span>COUNT / <b>{{ images | length }}</b></span>{% endif %}
     {% if sub_albums %}<span>ALBUMS / <b>{{ sub_albums | length }}</b></span>{% endif %}
-    {% if breadcrumbs | length > 1 %}<span class="stamp stamp--cy">{{ t('stamp.sub_album') }}</span>{% endif %}
-    {% if album_is_showcase %}<span class="stamp stamp--cy">{{ t('stamp.showcase_album') }}</span>{% endif %}
-    {% if collection %}<span class="stamp stamp--cy">{{ t('stamp.collection') }}</span>{% endif %}
+    {% if breadcrumbs | length > 1 %}<span class="stamp stamp--cy"><i class="fa fa-folder-tree" aria-hidden="true"></i>{{ t('stamp.sub_album') }}</span>{% endif %}
+    {% if album_is_showcase %}<span class="stamp stamp--cy"><i class="fa fa-star" aria-hidden="true"></i>{{ t('stamp.showcase_album') }}</span>{% endif %}
+    {% if collection %}<span class="stamp stamp--cy"><i class="fa fa-layer-group" aria-hidden="true"></i>{{ t('stamp.collection') }}</span>{% endif %}
     {% if active_tag %}<span class="stamp stamp--cy">FILTER / #{{ active_tag | upper }}</span>{% endif %}
     <span class="stamp stamp--ok doc-min-hide">OK</span>
   </div>
@@ -189,7 +189,7 @@
       <span class="ix">02</span>
       {% if breadcrumbs | length > 1 %}
         <a class="section__parent" href="/album/{{ breadcrumbs[-2].path }}" aria-label="{{ t('aria.up_to', name=breadcrumbs[-2].name) }}">
-          <span class="section__parent-ico" aria-hidden="true">↑</span><span class="section__parent-name">{{ breadcrumbs[-2].name }}</span><span class="section__parent-slash" aria-hidden="true">/</span>
+          <span class="section__parent-ico" aria-hidden="true"><i class="fa fa-arrow-turn-up"></i></span><span class="section__parent-name">{{ breadcrumbs[-2].name }}</span><span class="section__parent-slash" aria-hidden="true">/</span>
         </a>
       {% endif %}
       <span class="name">{{ breadcrumbs[-1].name if breadcrumbs else album }}</span>
@@ -214,7 +214,7 @@
   {% if sub_albums %}
     <section class="sub-albums" aria-label="{{ t('aria.folders') }}">
       <header class="sub-albums__head">
-        <span class="sub-albums__label">{{ t('album.folders') }}</span>
+        <span class="sub-albums__label"><i class="fa fa-folder-open" aria-hidden="true"></i>{{ t('album.folders') }}</span>
         <span class="sub-albums__count">{{ sub_albums | length }} {% if sub_albums | length == 1 %}{{ t('unit.album_one') }}{% else %}{{ t('unit.album_many') }}{% endif %}</span>
       </header>
       <ul class="album-grid">
@@ -228,8 +228,8 @@
                   <div class="album-card__cover-empty">{{ t('card.no_cover') }}</div>
                 {% endif %}
                 <span class="album-card__idx" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span>
-                <span class="album-card__badge album-card__badge--folder">{{ t('unit.folder') }}</span>
-                <div class="album-card__hover" aria-hidden="true"><span>{{ t('card.enter') }}</span></div>
+                <span class="album-card__badge album-card__badge--folder"><i class="fa fa-folder" aria-hidden="true"></i>{{ t('unit.folder') }}</span>
+                <div class="album-card__hover" aria-hidden="true"><span>{{ t('card.enter') }}<i class="fa fa-arrow-right" aria-hidden="true"></i></span></div>
               </div>
               <div class="album-card__cap">
                 <span class="album-card__name">{% if a.icon %}<img class="album-ico" src="{{ a.icon }}" alt="" aria-hidden="true" width="16" height="16" loading="lazy">{% endif %}{{ a.name }}</span>
@@ -267,8 +267,10 @@
 
     <div class="sort" data-sort>
       <button type="button" class="sort__btn" aria-haspopup="true" aria-expanded="false">
+        <i class="fa fa-arrow-down-wide-short" aria-hidden="true"></i>
         <span class="sort__btn-label">{{ t('sort.btn') }}</span>
         <b>{{ sort_label }}</b>
+        <i class="fa fa-chevron-down sort__btn-caret" aria-hidden="true"></i>
       </button>
       <div class="sort__menu" hidden role="menu">
         <div class="sort__head">{{ t('sort.by') }}</div>
@@ -287,7 +289,7 @@
   {% if images %}
     {% if sub_albums %}
       <header class="sub-albums__head sub-albums__head--photos">
-        <span class="sub-albums__label">{{ t('album.photos') }}</span>
+        <span class="sub-albums__label"><i class="fa fa-images" aria-hidden="true"></i>{{ t('album.photos') }}</span>
         <span class="sub-albums__count">{{ images | length }} {% if images | length == 1 %}{{ t('unit.image_one') }}{% else %}{{ t('unit.image_many') }}{% endif %}</span>
       </header>
     {% endif %}
@@ -297,8 +299,8 @@
           <li class="image-tile{% if img.is_showcase %} image-tile--showcase{% endif %}">
             <a href="/image/{{ img.rel_path }}{{ img_qs }}">
               <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
-              {% if img.is_showcase %}<span class="image-tile__star" aria-label="Featured">★</span>{% endif %}
-              <div class="image-tile__overlay"><span>OPEN ↗</span></div>
+              {% if img.is_showcase %}<span class="image-tile__star" aria-label="Featured"><i class="fa fa-star"></i></span>{% endif %}
+              <div class="image-tile__overlay"><span>OPEN<i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i></span></div>
             </a>
           </li>
         {% endfor %}

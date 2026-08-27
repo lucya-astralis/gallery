@@ -52,7 +52,7 @@
 {% endmacro %}
 <section class="trip" data-trip data-trip-key="{{ trip.key }}" data-depart="{{ trip.depart }}" aria-label="{{ t('trip.status_aria', title=trip.title) }}">
   <div class="trip__bar">
-    <span class="trip__tag">{{ t('trip.tag') }}</span>
+    <span class="trip__tag"><i class="fa fa-route" aria-hidden="true"></i>{{ t('trip.tag') }}</span>
     <span class="trip__name">{{ trip.title }}</span>
     {% if trip.jp %}<span class="trip__jp" aria-hidden="true">{{ trip.jp }}</span>{% endif %}
     <span class="trip__status stamp" data-trip-status>···</span>

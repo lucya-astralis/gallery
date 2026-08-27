@@ -39,7 +39,7 @@
   {% endif %}
   <nav class="pathbar" aria-label="Breadcrumb">
     <a class="pathbar__back" href="{{ up_url }}">
-      <span class="pathbar__back-ico" aria-hidden="true">‹</span>
+      <span class="pathbar__back-ico" aria-hidden="true"><i class="fa fa-chevron-left"></i></span>
       <span class="pathbar__back-lbl">{{ t('back.label') }}</span>
       <span class="pathbar__back-txt">{{ up_name }}</span>
     </a>
@@ -80,47 +80,47 @@
       <div class="stage">
         <span class="stage__corner stage__corner--tl">FRAME / 01</span>
         <span class="stage__corner stage__corner--tr">{% if image.width and image.height %}{{ image.width }}×{{ image.height }}{% else %}IMG{% endif %}</span>
-        {% if prev_rel %}<a class="nav-arrow prev" href="/image/{{ prev_rel }}{{ img_qs }}" aria-label="{{ t('aria.previous') }}">‹</a>{% endif %}
+        {% if prev_rel %}<a class="nav-arrow prev" href="/image/{{ prev_rel }}{{ img_qs }}" aria-label="{{ t('aria.previous') }}"><i class="fa fa-chevron-left" aria-hidden="true"></i></a>{% endif %}
         <img id="stage-img"
              class="is-preview"
              src="/preview/{{ image.rel_path }}"
              data-full="/full/{{ image.rel_path }}"
              alt="{{ image.filename }}">
-        {% if next_rel %}<a class="nav-arrow next" href="/image/{{ next_rel }}{{ img_qs }}" aria-label="{{ t('aria.next') }}">›</a>{% endif %}
+        {% if next_rel %}<a class="nav-arrow next" href="/image/{{ next_rel }}{{ img_qs }}" aria-label="{{ t('aria.next') }}"><i class="fa fa-chevron-right" aria-hidden="true"></i></a>{% endif %}
         <span class="stage__corner stage__corner--br">{{ image.filename }}</span>
       </div>
 
       <div class="stage__loader" id="stage-loader">
-        <button type="button" id="load-full-btn" class="loader-btn">{{ t('btn.load_original') }}</button>
+        <button type="button" id="load-full-btn" class="loader-btn"><i class="fa fa-image" aria-hidden="true"></i>{{ t('btn.load_original') }}</button>
         <span class="sep"></span>
-        <button type="button" id="open-fullscreen-btn" class="loader-btn">{{ t('btn.fullscreen') }}</button>
+        <button type="button" id="open-fullscreen-btn" class="loader-btn"><i class="fa fa-expand" aria-hidden="true"></i>{{ t('btn.fullscreen') }}</button>
         <span class="sep"></span>
-        <a href="/full/{{ image.rel_path }}" download="{{ image.filename }}" class="loader-link">{{ t('btn.download') }}</a>
+        <a href="/full/{{ image.rel_path }}" download="{{ image.filename }}" class="loader-link"><i class="fa fa-download" aria-hidden="true"></i>{{ t('btn.download') }}</a>
       </div>
     </div>
 
     <aside class="sidebar">
       <section class="panel">
-        <h2>FILE <span class="stamp">META</span></h2>
+        <h2><i class="fa fa-circle-info" aria-hidden="true"></i>FILE <span class="stamp">META</span></h2>
         <dl class="kv">
           <dt>{{ t('kv.album') }}</dt><dd><a href="/album/{{ image.album }}">{{ image.album }}</a></dd>
           <dt>{{ t('kv.filename') }}</dt><dd>{{ image.filename }}</dd>
           {% if image.width and image.height %}<dt>{{ t('kv.dimensions') }}</dt><dd>{{ image.width }} × {{ image.height }} px</dd>{% endif %}
           {% if image.size %}<dt>{{ t('kv.size') }}</dt><dd>{{ (image.size / 1024 / 1024) | round(2) }} MB</dd>{% endif %}
-          <dt>{{ t('kv.original') }}</dt><dd><a href="/full/{{ image.rel_path }}" download="{{ image.filename }}">{{ t('kv.download') }}</a></dd>
+          <dt>{{ t('kv.original') }}</dt><dd><a href="/full/{{ image.rel_path }}" download="{{ image.filename }}"><i class="fa fa-download" aria-hidden="true"></i>{{ t('kv.download') }}</a></dd>
         </dl>
       </section>
 
       {% if description %}
       <section class="panel">
-        <h2>{{ t('panel.description') }}</h2>
+        <h2><i class="fa fa-align-left" aria-hidden="true"></i>{{ t('panel.description') }}</h2>
         <p class="description">{{ description }}</p>
       </section>
       {% endif %}
 
       {% if tags %}
       <section class="panel">
-        <h2>{{ t('panel.tags') }}</h2>
+        <h2><i class="fa fa-tags" aria-hidden="true"></i>{{ t('panel.tags') }}</h2>
         <div class="tag-list">
           {% for t in tags %}
             <a href="/album/{{ image.album }}?tag={{ t }}" class="tag">#{{ t }}</a>
@@ -130,7 +130,7 @@
       {% endif %}
 
       <section class="panel">
-        <h2>EXIF</h2>
+        <h2><i class="fa fa-camera" aria-hidden="true"></i>EXIF</h2>
         {% if exif %}
           <dl class="kv">
             {% for label, value in exif %}
@@ -159,9 +159,9 @@
 </script>
 
 <div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="{{ t('aria.lightbox') }}">
-  <button type="button" class="lightbox__close" id="lb-close" aria-label="{{ t('aria.close') }}">✕</button>
-  <button type="button" class="lightbox__nav lightbox__nav--prev" id="lb-prev" aria-label="{{ t('aria.previous') }}">‹</button>
-  <button type="button" class="lightbox__nav lightbox__nav--next" id="lb-next" aria-label="{{ t('aria.next') }}">›</button>
+  <button type="button" class="lightbox__close" id="lb-close" aria-label="{{ t('aria.close') }}"><i class="fa fa-xmark" aria-hidden="true"></i></button>
+  <button type="button" class="lightbox__nav lightbox__nav--prev" id="lb-prev" aria-label="{{ t('aria.previous') }}"><i class="fa fa-chevron-left" aria-hidden="true"></i></button>
+  <button type="button" class="lightbox__nav lightbox__nav--next" id="lb-next" aria-label="{{ t('aria.next') }}"><i class="fa fa-chevron-right" aria-hidden="true"></i></button>
   <div class="lightbox__stage" id="lb-stage">
     <img class="lightbox__img" id="lb-img" alt="">
     <div class="lightbox__spinner" id="lb-spinner" aria-hidden="true"></div>
@@ -169,8 +169,8 @@
   <div class="lightbox__bar">
     <span class="lightbox__count" id="lb-count">01 / 01</span>
     <span class="lightbox__title" id="lb-title"></span>
-    <button type="button" class="lightbox__btn" id="lb-full">{{ t('btn.load_original') }}</button>
-    <a class="lightbox__btn" id="lb-dl" href="" download="">{{ t('btn.download') }}</a>
+    <button type="button" class="lightbox__btn" id="lb-full"><i class="fa fa-image" aria-hidden="true"></i>{{ t('btn.load_original') }}</button>
+    <a class="lightbox__btn" id="lb-dl" href="" download=""><i class="fa fa-download" aria-hidden="true"></i>{{ t('btn.download') }}</a>
   </div>
 </div>
 {% endblock %}
