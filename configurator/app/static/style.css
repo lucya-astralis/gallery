@@ -1159,11 +1159,42 @@ select option { background: var(--surface); color: var(--text); }
 
 .browser { min-height: 120px; }
 
+/* ----- photos tab layout ------------------------------------------------ */
+/* Grid on the left, metadata on the right. The detail panel used to be a
+   sticky sheet across the bottom of the grid: selecting one photo hid most of
+   the others behind it, which made picking a second one impossible. */
+.photos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+  align-items: start;
+  padding-bottom: 36px;
+}
+
+.photos__main { min-width: 0; }
+
+.photos__aside { min-width: 0; }
+
+.browser__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.browser__count {
+  flex: 1 1 auto;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+}
+
 /* ----- photo detail panel ----------------------------------------------- */
 .detail {
   position: sticky;
-  bottom: 0;
-  margin-top: 18px;
+  top: 0;
   background: var(--bg-2);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
@@ -1189,16 +1220,14 @@ select option { background: var(--surface); color: var(--text); }
 
 .detail__body {
   padding: 12px 14px;
-  display: grid;
-  grid-template-columns: 132px 1fr;
-  gap: 6px 16px;
-  align-items: start;
-  max-height: 30vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 340px);
   overflow-y: auto;
 }
 
 .detail__thumb {
-  grid-row: span 5;
   width: 100%;
   border-radius: var(--radius);
   border: 1px solid var(--line);
@@ -1206,8 +1235,7 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 .detail__sub {
-  grid-column: 2;
-  margin: 10px 0 0;
+  margin: 2px 0 0;
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 600;
@@ -1216,24 +1244,13 @@ select option { background: var(--surface); color: var(--text); }
   color: var(--text-ghost);
 }
 
-.detail__body > .field__help,
-.detail__body > .chips,
-.detail__body > .empty-note,
-.detail__body > input,
-.detail__body > .facts { grid-column: 2; }
-
 /* ----- fact list -------------------------------------------------------- */
 .facts {
-  grid-column: 2;
   margin: 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 3px 14px;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 12px;
   font-size: 12px;
-}
-
-@media (max-width: 1100px) {
-  .facts { grid-template-columns: auto minmax(0, 1fr); }
 }
 
 .facts dt {
@@ -1275,8 +1292,6 @@ select option { background: var(--surface); color: var(--text); }
 
 .chip__x:hover { color: var(--acc-red); }
 
-.tagbar__input { max-width: 220px; }
-
 .cell__tags {
   position: absolute;
   top: 6px;
@@ -1299,6 +1314,63 @@ select option { background: var(--surface); color: var(--text); }
 .cover-preview__side { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
 
 img.is-broken { opacity: .2; }
+
+/* Modifier-free way to extend the selection. Always visible once a photo is
+   picked, and on hover otherwise, so the affordance is discoverable without
+   being noise across a full grid. */
+.cell__pick {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: rgba(7, 7, 11, .72);
+  color: transparent;
+  font: 700 11px/1 var(--mono);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+
+.cell:hover .cell__pick,
+.cell__pick:focus-visible { opacity: 1; }
+
+.cell__pick.is-on {
+  opacity: 1;
+  background: var(--acc-cy);
+  border-color: var(--acc-cy);
+  color: #05070f;
+}
+
+/* the role badge moves aside to make room for the tick */
+.cell__order { left: 32px; }
+
+/* Two stacked cards in the side column: the selection, then the photo. */
+.photos__aside {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+}
+
+.photos__aside .detail { position: static; }
+
+.bulk { border-left: 2px solid var(--acc-cy); }
+
+.bulk .detail__body { max-height: 46vh; }
+
+.aside-empty {
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--text-ghost);
+  font-size: 12px;
+  line-height: 1.5;
+}
 
 /* ----- small utilities -------------------------------------------------- */
 .u-mb  { margin-bottom: 14px; }
@@ -1331,6 +1403,7 @@ img.is-broken { opacity: .2; }
   .layout { grid-template-columns: 1fr; }
   .sidebar { max-height: 38vh; border-right: 0; border-bottom: 1px solid var(--line); }
   .fields { grid-template-columns: 1fr; }
+  .photos { grid-template-columns: 1fr; }
   .nav__path { display: none; }
   .brand-jp { display: none; }
 }

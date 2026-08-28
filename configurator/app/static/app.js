@@ -932,13 +932,25 @@ function renderPhotosTab() {
 
   const panel = el('div', { class: 'tabpanel' });
   panel.append(el('div', { class: 'field__help u-mb' },
-    'Browse folder by folder. Click to select, ctrl/shift-click to extend — ' +
-    'then tag everything selected in one go. Photo files are never modified: ' +
-    'tags go into a .tags sidecar next to each photo, which is what the gallery reads.'));
-  panel.append(crumbs(album, b.path, (path) => { b.path = path; b.detail = null; renderPane(); }));
+    'Browse folder by folder. Click a photo to select it and see its metadata; ' +
+    'use its corner tick — or ctrl-click — to add more, shift-click for a run. ' +
+    'Photo files are never modified: tags go into a .tags sidecar next to each ' +
+    'photo, which is what the gallery reads.'));
+
+  /* The grid and the detail panel are laid out side by side, never stacked.
+   * The detail used to be a sticky sheet over the bottom of the grid, which
+   * covered most of the photos the moment one was selected — so picking a
+   * second one was impossible without scrolling it out of the way. */
+  const main = el('div', { class: 'photos__main' });
+  const aside = el('div', { class: 'photos__aside' });
+  panel.append(el('div', { class: 'photos' }, main, aside));
+
+  main.append(crumbs(album, b.path, (path) => {
+    b.path = path; b.detail = null; renderPane();
+  }));
 
   const body = el('div', { class: 'browser' });
-  panel.append(body);
+  main.append(body);
   body.append(el('div', { class: 'empty-note', text: 'Loading…' }));
 
   loadFolder(b.path, true).then((payload) => {
@@ -959,10 +971,31 @@ function renderPhotosTab() {
       return;
     }
 
+    const rels = payload.photos.map((p) => p.rel);
+    const allPicked = rels.every((r) => b.selected.has(r));
+    body.append(el('div', { class: 'browser__bar' },
+      el('span', { class: 'browser__count',
+                   text: payload.photos.length + ' photo' +
+                         (payload.photos.length === 1 ? '' : 's') + ' here' }),
+      READ_ONLY ? null : el('button', {
+        class: 'btn btn--sm', type: 'button',
+        text: allPicked ? 'Deselect all here' : 'Select all here',
+        onclick: () => {
+          if (allPicked) rels.forEach((r) => b.selected.delete(r));
+          else rels.forEach((r) => b.selected.add(r));
+          renderPane();
+        },
+      })));
+
     const cover = value('cover');
     const featured = (value('featured') || []).map(strip);
     const order = (value('order') || []).map(strip);
     const subOf = (rel) => album ? rel.slice(album.length + 1) : rel;
+
+    const toggle = (rel) => {
+      if (b.selected.has(rel)) b.selected.delete(rel);
+      else b.selected.add(rel);
+    };
 
     const grid = el('div', { class: 'grid' });
     payload.photos.forEach((photo, index) => {
@@ -971,9 +1004,10 @@ function renderPhotosTab() {
       if (cover && strip(cover) === sub) roles.push('cover');
       if (featured.includes(sub)) roles.push('featured');
       if (order.includes(sub)) roles.push('#' + (order.indexOf(sub) + 1));
+      const picked = b.selected.has(photo.rel);
 
       grid.append(el('div', {
-        class: 'cell' + (b.selected.has(photo.rel) ? ' is-picked' : '') +
+        class: 'cell' + (picked ? ' is-picked' : '') +
                (b.detail === photo.rel ? ' is-detail' : ''),
         title: photo.rel,
         onclick: (ev) => {
@@ -981,8 +1015,7 @@ function renderPhotosTab() {
             const [from, to] = [Math.min(b.lastIndex, index), Math.max(b.lastIndex, index)];
             for (let i = from; i <= to; i++) b.selected.add(payload.photos[i].rel);
           } else if (ev.ctrlKey || ev.metaKey) {
-            if (b.selected.has(photo.rel)) b.selected.delete(photo.rel);
-            else b.selected.add(photo.rel);
+            toggle(photo.rel);
           } else {
             b.selected.clear();
             b.selected.add(photo.rel);
@@ -993,6 +1026,20 @@ function renderPhotosTab() {
         },
       },
         el('img', { src: thumbUrl(photo.rel, 220), alt: '', loading: 'lazy' }),
+        // A plain-click way to extend the selection: not everyone reaches for
+        // a modifier, and on some setups ctrl-click never arrives at all.
+        el('button', {
+          class: 'cell__pick' + (picked ? ' is-on' : ''),
+          type: 'button',
+          text: picked ? '✓' : '',
+          title: picked ? 'remove from the selection' : 'add to the selection',
+          onclick: (ev) => {
+            ev.stopPropagation();
+            toggle(photo.rel);
+            b.lastIndex = index;
+            renderPane();
+          },
+        }),
         roles.length ? el('span', { class: 'cell__order', text: roles.join(' · ') }) : null,
         (photo.tags || []).length
           ? el('span', { class: 'cell__tags', text: photo.tags.join(' · '),
@@ -1006,8 +1053,13 @@ function renderPhotosTab() {
     body.append(el('div', { class: 'empty-note', text: err.message }));
   });
 
-  if (b.detail) panel.append(renderDetail(b.detail));
-  if (b.selected.size) panel.append(renderTagBar(b));
+  if (b.selected.size) aside.append(renderTagBar(b));
+  if (b.detail) aside.append(renderDetail(b.detail));
+  if (!b.selected.size && !b.detail) {
+    aside.append(el('div', { class: 'aside-empty' },
+      'Click a photo to see its metadata. Tick its corner — or ctrl-click — ' +
+      'to add it to a selection you can tag all at once.'));
+  }
   return panel;
 }
 
@@ -1058,46 +1110,88 @@ function renderDetail(rel) {
   return box;
 }
 
-/* The bulk bar: whatever is selected gets tagged together. */
+/* The bulk panel: whatever is selected gets tagged together. It lives in the
+ * side column rather than as a bar across the bottom — a sticky bar covered
+ * the photos it existed to tag. */
 function renderTagBar(b) {
   const count = b.selected.size;
-  const bar = el('div', { class: 'savebar is-dirty' });
-  bar.append(el('span', { class: 'savebar__note',
-    text: count + ' photo' + (count > 1 ? 's' : '') + ' selected' }));
+  const picked = [...b.selected];
+  const box = el('aside', { class: 'detail bulk' });
+  box.append(el('div', { class: 'detail__head' },
+    el('span', { class: 'detail__name',
+                 text: count + ' photo' + (count === 1 ? '' : 's') + ' selected' }),
+    el('button', {
+      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', text: '✕',
+      title: 'deselect all',
+      onclick: () => { b.selected.clear(); renderPane(); },
+    })));
+
+  const body = el('div', { class: 'detail__body' });
+  box.append(body);
+
+  // What the selection already carries, so removing a tag is a click and not
+  // a guess typed into a prompt.
+  const common = new Map();
+  for (const rel of picked) {
+    for (const tag of (tagsOf(rel) || [])) {
+      common.set(tag, (common.get(tag) || 0) + 1);
+    }
+  }
+  if (common.size) {
+    body.append(el('h3', { class: 'detail__sub', text: 'Tags in the selection' }));
+    body.append(el('div', { class: 'chips' }, [...common.entries()]
+      .sort((a, c) => c[1] - a[1] || a[0].localeCompare(c[0]))
+      .map(([tag, n]) => el('span', { class: 'chip' },
+        tag + (n < count ? ' (' + n + '/' + count + ')' : ''),
+        READ_ONLY ? null : el('button', {
+          class: 'chip__x', type: 'button', text: '✕',
+          title: 'remove from all ' + count,
+          onclick: () => applyTags({ photos: picked, remove: [tag] }),
+        })))));
+  }
 
   if (!READ_ONLY) {
-    bar.append(tagInput('Tag all selected…', (tag) =>
-      applyTags({ photos: [...b.selected], add: [tag] }), 'tagbar__input'));
-    bar.append(el('button', {
-      class: 'btn btn--sm', type: 'button', text: 'Remove a tag…',
-      onclick: () => {
-        const tag = prompt('Remove which tag from the ' + count + ' selected photos?');
-        if (tag && tag.trim()) applyTags({ photos: [...b.selected], remove: [tag.trim()] });
-      },
-    }));
-    bar.append(el('button', {
-      class: 'btn btn--sm btn--ghost btn--danger', type: 'button', text: 'Clear tags',
+    body.append(el('h3', { class: 'detail__sub', text: 'Add to all' }));
+    body.append(tagInput('Type a tag, press ↵', (tag) =>
+      applyTags({ photos: picked, add: [tag] })));
+    body.append(el('button', {
+      class: 'btn btn--sm btn--ghost btn--danger', type: 'button', text: 'Clear every tag',
       onclick: () => {
         if (confirm('Remove every tag from the ' + count + ' selected photos?')) {
-          applyTags({ photos: [...b.selected], set: [] });
+          applyTags({ photos: picked, set: [] });
         }
       },
     }));
   }
-  bar.append(el('button', {
-    class: 'btn btn--sm btn--ghost', type: 'button', text: 'Deselect',
-    onclick: () => { b.selected.clear(); renderPane(); },
-  }));
-  return bar;
+  return box;
+}
+
+/* Tags of one photo out of the folder payload already in the cache — the
+ * bulk panel needs them without a request per selected photo. */
+function tagsOf(rel) {
+  const payload = photoCache.get((state.browse.path || '::root') + '|t');
+  if (!payload) return [];
+  const photo = payload.photos.find((p) => p.rel === rel);
+  return photo ? (photo.tags || []) : [];
 }
 
 async function applyTags(payload) {
   try {
     const res = await api('/api/tags', { method: 'PUT', body: JSON.stringify(payload) });
+    // The response carries each photo's new tag list, so the cached folder is
+    // patched in place rather than thrown away: a refetch would land after the
+    // re-render, leaving the panel briefly showing no tags at all.
+    const cached = photoCache.get((state.browse.path || '::root') + '|t');
+    if (cached) {
+      for (const photo of cached.photos) {
+        if (photo.rel in res.tags) photo.tags = res.tags[photo.rel];
+      }
+    }
     invalidateFolder(state.browse ? state.browse.path : '');
+    if (cached) photoCache.set((state.browse.path || '::root') + '|t', cached);
     await loadVocab();
     renderPane();
-    toast('Tags updated on ' + res.changed + ' photo' + (res.changed > 1 ? 's' : ''));
+    toast('Tags updated on ' + res.changed + ' photo' + (res.changed === 1 ? '' : 's'));
   } catch (err) {
     toast('Tagging failed: ' + err.message, 'err');
   }

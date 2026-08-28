@@ -58,10 +58,21 @@ Every ordered list — `featured`, `order`, `album_order`, the welcome reels —
 is drag-to-reorder, since file order *is* display order for all of them. Each
 row also has ↑/↓ buttons, so reordering never requires a mouse.
 
-Click a photo to select it; ctrl-click to add one, shift-click to take a run.
-Whatever is selected can be tagged in one go — add a tag, remove a tag, or
-clear them all. The tag field autocompletes against every tag already used
-anywhere in the gallery, so the same idea does not end up spelled three ways.
+Click a photo to select it and open its metadata. To build a selection there
+is a tick in each tile's corner — no modifier needed — plus ctrl-click to
+toggle, shift-click to take a run, and **Select all here** for the whole
+folder.
+
+The selection panel and the metadata panel sit in a **column beside the grid**,
+never on top of it. That is deliberate: as a sticky bar across the bottom, the
+tagging controls covered most of the photos they existed to tag, which made
+picking a second photo impossible without scrolling them out of the way.
+
+Whatever is selected can be tagged in one go. The panel lists the tags already
+in the selection — with a `4/6` count when only some of them carry it — so
+removing one is a click rather than a guess. The add field autocompletes
+against every tag used anywhere in the gallery, so the same idea does not end
+up spelled three ways.
 
 Tags are written to a `<photo>.tags` sidecar, which is exactly what the
 gallery's scanner already reads; because it folds the sidecar's mtime into the
