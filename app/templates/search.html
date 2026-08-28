@@ -17,7 +17,7 @@
     </div>
   </nav>
 
-  <div class="section__doc">
+  <div class="section__doc" data-live="doc">
     <span class="doc-min-hide">QUERY / <b>{{ query }}</b></span>
     <span>HITS / <b>{{ images | length }}</b></span>
     {% if images %}
@@ -42,6 +42,7 @@
       <p class="note">{{ t('search.hint') }}</p>
     </div>
   {% else %}
+    <div data-live="body">
     <div class="toolbar">
       <span class="toolbar__spacer"></span>
       <div class="sort" data-sort>
@@ -72,6 +73,7 @@
         </li>
       {% endfor %}
     </ul>
+    </div>
   {% endif %}
 </section>
 {% endblock %}

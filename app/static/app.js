@@ -623,7 +623,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // NOT wired to DOMContentLoaded — see the FIRST-FRAME STATE block below:
 // .rv is what hides the content, so it has to be on the elements before the
 // browser's first rendering opportunity.
-function scrollReveal() {
+// `root` lets liveNav() replay the cascade on just the markup it swapped in
+// instead of re-observing the whole page.
+function scrollReveal(root = document) {
   if (!document.documentElement.classList.contains('fx-anim')) return;
 
   // Stepping back OUT of a photo must not rebuild the album around the
@@ -633,7 +635,7 @@ function scrollReveal() {
   // entirely and coming back later included — keeps the full entrance.
   if (document.documentElement.classList.contains('fx-return')) return;
 
-  const targets = document.querySelectorAll([
+  const targets = root.querySelectorAll([
     '.section__doc',
     '.section__head',
     '.trip',
@@ -681,9 +683,9 @@ function scrollReveal() {
 // after the fade so the cards' own hover transitions take back over.
 // Synchronous like scrollReveal() — .img-fade hides the image, so a late
 // wiring would let one frame through with the images already visible.
-function thumbFadeIn() {
+function thumbFadeIn(root = document) {
   if (!document.documentElement.classList.contains('fx-anim')) return;
-  document.querySelectorAll(
+  root.querySelectorAll(
     '.album-card__img img, .image-tile img, .feat-card__img img'
   ).forEach((img) => {
     if (img.complete) return;
@@ -845,6 +847,12 @@ window.__stagePixelIn = () => {
 // whether scrollReveal() replays the entrance cascade at all.
 scrollReveal();
 thumbFadeIn();
+// html.fx-return described THIS load — a step back out of one of the page's
+// own photos — and scrollReveal() has now acted on it. Clearing it keeps the
+// flag from also suppressing later replays: liveNav() swaps a fresh grid in
+// on a tag or sort change, and that one SHOULD build up, because the user
+// asked for new content rather than returning to content they had already.
+document.documentElement.classList.remove('fx-return');
 
 // ---------- PREVIEW PRE-WARM (tile hover) ----------------------
 // Aiming at a tile warms the /preview/ file its photo page will need, so
@@ -1045,55 +1053,66 @@ window.__initImagePage = initImagePage;
 initImagePage();
 
 // ---------- SORT DROPDOWN --------------------------------------
-document.addEventListener('DOMContentLoaded', () => {
-  const sorts = document.querySelectorAll('[data-sort]');
-  if (!sorts.length) return;
+// ---------- SORT DROPDOWN --------------------------------------
+// Per-menu wiring lives in initSortMenus() so it can be re-run on the markup
+// that liveNav() swaps in; the document-level listeners below are registered
+// once, because re-registering them per swap would pile up.
+let sortBackdrop = null;
 
-  const isMobile = () => window.matchMedia('(max-width: 760px)').matches;
-  let backdrop = null;
-  function ensureBackdrop(){
-    if (backdrop) return backdrop;
-    backdrop = document.createElement('div');
-    backdrop.className = 'sort__backdrop';
-    document.body.appendChild(backdrop);
-    return backdrop;
+function sortIsMobile() {
+  return window.matchMedia('(max-width: 760px)').matches;
+}
+
+function sortEnsureBackdrop() {
+  if (sortBackdrop) return sortBackdrop;
+  sortBackdrop = document.createElement('div');
+  sortBackdrop.className = 'sort__backdrop';
+  document.body.appendChild(sortBackdrop);
+  return sortBackdrop;
+}
+
+function sortCloseMenu(sort) {
+  const btn = sort.querySelector('.sort__btn');
+  const menu = sort.querySelector('.sort__menu') ||
+               (sort._menu && sort._menu.parentNode === document.body ? sort._menu : null);
+  if (!menu) return;
+  menu.hidden = true;
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+  if (sortBackdrop) sortBackdrop.classList.remove('is-open');
+  document.body.classList.remove('sort-open');
+  // restore the menu to its original parent if we lifted it
+  if (menu._origParent && menu.parentNode === document.body) {
+    if (menu._origNext && menu._origNext.parentNode === menu._origParent) {
+      menu._origParent.insertBefore(menu, menu._origNext);
+    } else {
+      menu._origParent.appendChild(menu);
+    }
+    menu._origParent = null;
+    menu._origNext = null;
   }
+}
 
-  sorts.forEach(sort => {
+function sortCloseAll(except) {
+  document.querySelectorAll('[data-sort]').forEach((s) => {
+    if (s !== except) sortCloseMenu(s);
+  });
+}
+
+function initSortMenus(root = document) {
+  root.querySelectorAll('[data-sort]').forEach((sort) => {
+    if (sort._sortWired) return;   // a swap only ever wires the new markup
     const btn = sort.querySelector('.sort__btn');
     const menu = sort.querySelector('.sort__menu');
     if (!btn || !menu) return;
+    sort._sortWired = true;
+    sort._menu = menu;
 
-    function close(){
-      menu.hidden = true;
-      btn.setAttribute('aria-expanded', 'false');
-      if (backdrop) backdrop.classList.remove('is-open');
-      document.body.classList.remove('sort-open');
-      // restore menu to its original parent if we lifted it
-      if (menu._origParent && menu.parentNode === document.body) {
-        if (menu._origNext && menu._origNext.parentNode === menu._origParent) {
-          menu._origParent.insertBefore(menu, menu._origNext);
-        } else {
-          menu._origParent.appendChild(menu);
-        }
-        menu._origParent = null;
-        menu._origNext = null;
-      }
-    }
-    function open(){
-      // close any other open menu
-      sorts.forEach(s => {
-        if (s !== sort) {
-          const m = s.querySelector('.sort__menu');
-          const b = s.querySelector('.sort__btn');
-          if (m) m.hidden = true;
-          if (b) b.setAttribute('aria-expanded', 'false');
-        }
-      });
+    function open() {
+      sortCloseAll(sort);
       menu.hidden = false;
       btn.setAttribute('aria-expanded', 'true');
-      if (isMobile()) {
-        ensureBackdrop().classList.add('is-open');
+      if (sortIsMobile()) {
+        sortEnsureBackdrop().classList.add('is-open');
         // Lift the menu out of <main>'s stacking context (z-index:10),
         // otherwise the backdrop at body level (z:200) sits *above* it
         // and intercepts every tap.
@@ -1108,39 +1127,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (menu.hidden) open(); else close();
+      if (menu.hidden) open(); else sortCloseMenu(sort);
     });
-
-    // outside click closes
-    document.addEventListener('click', (e) => {
-      if (menu.hidden) return;
-      if (!sort.contains(e.target) && (!backdrop || e.target === backdrop || !backdrop.contains(e.target))) {
-        close();
-      }
-    });
-
-    if (backdrop || true) {
-      // backdrop click also closes (once it exists)
-      document.addEventListener('click', (e) => {
-        if (backdrop && e.target === backdrop) close();
-      });
-    }
   });
+}
 
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    sorts.forEach(s => {
-      const m = s.querySelector('.sort__menu');
-      const b = s.querySelector('.sort__btn');
-      if (m && !m.hidden) {
-        m.hidden = true;
-        if (b) b.setAttribute('aria-expanded', 'false');
-        if (backdrop) backdrop.classList.remove('is-open');
-        document.body.classList.remove('sort-open');
-      }
-    });
+// outside click / backdrop click closes whatever is open
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('[data-sort]').forEach((sort) => {
+    const menu = sort._menu;
+    if (!menu || menu.hidden) return;
+    if (sort.contains(e.target) || menu.contains(e.target)) return;
+    sortCloseMenu(sort);
   });
 });
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') sortCloseAll();
+});
+
+document.addEventListener('DOMContentLoaded', () => initSortMenus());
 
 // ---------- BACK-BUTTON GUARD (image view → album) -------------
 // On any /image/ page, ensure the browser back button takes the user
@@ -1692,3 +1698,117 @@ document.addEventListener('DOMContentLoaded', () => {
   for (let i = 0; i < 6; i++) setTimeout(spawn, i * 350);
   setInterval(spawn, 900);
 })();
+
+// ---------- LIVE FILTER NAVIGATION -----------------------------
+// The tag bar and the sort menu are ordinary links, so they keep working
+// without JS and for crawlers. With JS, following one to the SAME page with a
+// different query swaps only the regions marked `data-live` instead of
+// reloading the document — the nav, the hero, the ambient video, the fonts
+// and the scroll position all stay put. Anything that changes the page
+// itself (another album, a photo, the language) still navigates normally.
+const LIVE_NAV_TIMEOUT_MS = 8000;
+let liveNavToken = 0;
+
+function liveRegions(doc) {
+  const out = new Map();
+  doc.querySelectorAll('[data-live]').forEach((el) => {
+    // first one wins; a duplicate name would make the swap ambiguous
+    if (!out.has(el.dataset.live)) out.set(el.dataset.live, el);
+  });
+  return out;
+}
+
+/* Is this a link we can satisfy by swapping rather than navigating? */
+function isLiveLink(a) {
+  if (!a || !a.href || a.target || a.hasAttribute('download')) return false;
+  if (a.dataset.noLive !== undefined) return false;
+  let url;
+  try { url = new URL(a.href, location.href); } catch (_) { return false; }
+  if (url.origin !== location.origin) return false;
+  // Same page, different query: a filter or a sort, not a real destination.
+  if (url.pathname !== location.pathname) return false;
+  if (url.search === location.search) return false;
+  return !!a.closest('[data-live]');
+}
+
+async function liveGo(url, { push = true } = {}) {
+  const token = ++liveNavToken;
+  const root = document.documentElement;
+  root.classList.add('is-live-loading');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LIVE_NAV_TIMEOUT_MS);
+  let doc;
+  try {
+    const res = await fetch(url, {
+      credentials: 'same-origin',
+      headers: { 'X-Live-Nav': '1' },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(String(res.status));
+    doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+  } catch (_) {
+    // Anything at all goes wrong — offline, a redirect, a 500 — and we hand
+    // the click back to the browser rather than leaving a half-updated page.
+    clearTimeout(timer);
+    if (token === liveNavToken) location.href = url;
+    return;
+  }
+  clearTimeout(timer);
+  if (token !== liveNavToken) return;   // a newer click already won
+
+  const incoming = liveRegions(doc);
+  const current = liveRegions(document);
+  const names = [...current.keys()].filter((n) => incoming.has(n));
+  if (!names.length) {           // not the shape we expected — navigate for real
+    location.href = url;
+    return;
+  }
+
+  const swapped = [];
+  for (const name of names) {
+    const next = document.importNode(incoming.get(name), true);
+    current.get(name).replaceWith(next);
+    swapped.push(next);
+  }
+
+  if (doc.title) document.title = doc.title;
+  if (push) {
+    // Mark the entry we are leaving too, so pressing Back into the
+    // unfiltered view reaches the popstate handler instead of silently
+    // leaving the URL and the DOM disagreeing.
+    if (!history.state || !history.state.live) {
+      history.replaceState({ live: true }, '', location.href);
+    }
+    history.pushState({ live: true }, '', url);
+  }
+
+  // Re-wire the behaviours that live inside the swapped markup. Everything
+  // else on the page was never touched, so it needs nothing.
+  root.classList.remove('is-live-loading');
+  swapped.forEach((el) => {
+    initSortMenus(el);
+    // Order matters: scrollReveal() hides the tiles behind .rv before
+    // thumbFadeIn() wires the image load, so nothing flashes in between.
+    scrollReveal(el);
+    thumbFadeIn(el);
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (e.defaultPrevented || e.button !== 0) return;
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;   // open-in-new-tab etc.
+  const a = e.target.closest('a[href]');
+  if (!isLiveLink(a)) return;
+  e.preventDefault();
+  // A sort option lives in a dropdown that must not stay open behind the swap.
+  sortCloseAll();
+  liveGo(a.href);
+});
+
+window.addEventListener('popstate', (e) => {
+  // Only handle entries this mechanism pushed; everything else is a real
+  // document the browser should restore itself.
+  if (!e.state || !e.state.live) return;
+  liveGo(location.href, { push: false });
+});

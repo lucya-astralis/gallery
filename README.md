@@ -714,6 +714,30 @@ python -m app.cli --logo kitty
 
 ### How `pause` and `scan` reach the running server
 
+### Filtering without a reload
+
+The tag bar and the sort menu are plain links: they carry a real `href`, work
+with JavaScript off, and are followed by crawlers. With JavaScript on, a click
+that leads to the *same* page with a different query is intercepted — the new
+HTML is fetched and only the regions marked `data-live` are swapped in.
+
+The nav, the hero, the ambient background video, the fonts and the scroll
+position are never touched, so filtering by tag or changing the sort no longer
+rebuilds the whole document. `history.pushState` keeps the URL honest and Back
+/ Forward work normally.
+
+The swapped-in grid runs the same entrance cascade a fresh page load does:
+tiles already on screen stagger in at 45 ms apart, the rest reveal as they
+scroll into view. It is literally the same `scrollReveal()` — which means it
+also inherits the motion gating, so `prefers-reduced-motion`, data-saver and
+low-end devices get the new grid instantly and statically instead.
+
+The rule is deliberately narrow: same pathname, different query, and the link
+must sit inside a `data-live` region. Opening another album, a photo, or
+switching language is a different page and still navigates for real — as does
+a middle-click, a ctrl-click, or any fetch that fails, which falls straight
+back to an ordinary navigation.
+
 The HTTP surface stays **read-only** — there is no control endpoint that makes
 the server do something, and no token to leak. The CLI and the server talk
 through three small files in `data/control/` instead:

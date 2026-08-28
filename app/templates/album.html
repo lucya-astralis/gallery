@@ -150,7 +150,10 @@
 
   {# status bar first — it reads as the module's system line, docked right
      above whichever hero block follows (reel, trip module or static cover) #}
-  <div class="section__doc">
+  {# data-live: swapped in place by liveNav() when a tag/sort link is
+     followed, so the count and the FILTER stamp stay in step without
+     reloading the document. #}
+  <div class="section__doc" data-live="doc">
     <span class="doc-min-hide">FILE / {{ (breadcrumbs[-1].name if breadcrumbs else album) | upper }}</span>
     {% if breadcrumbs | length > 1 %}<span>IN / <b>{{ breadcrumbs[-2].name }}</b></span>{% endif %}
     {% if images or not sub_albums %}<span>COUNT / <b>{{ images | length }}</b></span>{% endif %}
@@ -209,7 +212,7 @@
       {% if trip %}{% include "_trip_map.html" %}{% endif %}
     </aside>
     {% endif %}
-    <div class="album-body__main">
+    <div class="album-body__main" data-live="body">
 
   {% if sub_albums %}
     <section class="sub-albums" aria-label="{{ t('aria.folders') }}">

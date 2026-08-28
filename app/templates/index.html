@@ -16,7 +16,7 @@
     </div>
   </nav>
 
-  <div class="section__doc">
+  <div class="section__doc" data-live="doc">
     <span class="doc-min-hide">FILE / LUCYA.GALLERY</span>
     <span class="doc-min-hide">CLASS / <b>PUBLIC</b></span>
     <span>ALBUMS / <b>{{ albums | length }}</b></span>
@@ -59,6 +59,9 @@
     {% endif %}
 
     {# ---- archive: every non-featured album, sortable ---- #}
+    {# data-live: the sort header and the grid it sorts are swapped together
+       by liveNav(), so changing the sort does not reload the page. #}
+    <div data-live="body">
     {% if archive_albums %}
       <header class="archive-head">
         <span class="archive-head__label"><i class="fa fa-table-cells" aria-hidden="true"></i>{{ t('archive.label') }}</span>
@@ -124,6 +127,7 @@
         </ul>
       {% endif %}
     {% endif %}
+    </div>
   {% endif %}
 </section>
 {% endblock %}

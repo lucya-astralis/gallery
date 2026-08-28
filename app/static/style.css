@@ -202,6 +202,18 @@ body > .foot{ flex-shrink:0; }
   }
 }
 
+/* liveNav(): a tag or sort click swaps the marked regions instead of
+   reloading. The only visible cue is the swapped area dimming while the
+   fetch is in flight — anything louder would be worse than the reload. */
+.is-live-loading [data-live]{
+  opacity:.55;
+  transition:opacity .12s ease;
+  pointer-events:none;
+}
+@media (prefers-reduced-motion: reduce){
+  .is-live-loading [data-live]{ transition:none; }
+}
+
 a{ color:inherit; text-decoration:none; }
 a:hover{ color:var(--acc-cy); }
 
