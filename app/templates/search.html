@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}SEARCH: {{ query | upper }} // LUCYA.SYSTEMS GALLERY{% endblock %}
+{% block title %}{{ t('search.slug') }}: {{ query }} — lucya.systems gallery{% endblock %}
+{% block body_class %}page-search{% endblock %}
 {% block content %}
 <section>
   <nav class="pathbar" aria-label="Breadcrumb">
@@ -13,31 +14,22 @@
       <span class="sep">/</span>
       <a href="/albums">{{ t('crumb.albums') }}</a>
       <span class="sep">/</span>
-      <b aria-current="page">{{ t('search.crumb') }} / {{ query | upper }}</b>
+      <b aria-current="page">{{ t('search.crumb') }} / {{ query }}</b>
     </div>
   </nav>
 
-  <div class="section__doc" data-live="doc">
-    <span class="doc-min-hide">QUERY / <b>{{ query }}</b></span>
-    <span>HITS / <b>{{ images | length }}</b></span>
-    {% if images %}
-      <span class="stamp stamp--ok">{{ images | length }} MATCH{% if images | length != 1 %}ES{% endif %}</span>
-    {% else %}
-      <span class="stamp stamp--red">NO MATCH</span>
-    {% endif %}
-  </div>
-
   <header class="section__head">
-    <div class="section__slug">
-      <span class="ix">??</span>
-      <span class="name">{{ t('search.slug') }}</span>
-      <span class="jp">{{ t('search.slug_deco') }}</span>
-    </div>
+    <h1 class="section__slug"><span class="name">{{ t('search.slug') }}</span></h1>
+    <p class="section__stat" data-live="doc">
+      <b>{{ images | length }}</b>
+      {{ t('search.hits_one') if images | length == 1 else t('search.hits_many') }}
+      <span class="section__stat-sep" aria-hidden="true">·</span>
+      <span class="section__stat-q">{{ query }}</span>
+    </p>
   </header>
 
   {% if not images %}
     <div class="empty">
-      <span class="stamp">NO MATCH</span>
       <p>{{ t('search.no_match_prefix') }}<code>{{ query }}</code>{{ t('search.no_match_suffix') }}</p>
       <p class="note">{{ t('search.hint') }}</p>
     </div>

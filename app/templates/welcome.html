@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}WELCOME // LUCYA.SYSTEMS GALLERY{% endblock %}
+{% block title %}lucya.systems gallery{% endblock %}
 {% block body_class %}page-welcome{% endblock %}
 {% block meta %}
   {% set og_desc = t('welcome.og_desc', images=image_count, albums=album_count) %}
@@ -24,7 +24,9 @@
 {% block content %}
 {# ---- LIVE VIEW hero: the feed fills the viewport like a camera's live
        view; HUD chrome (REC, frame counter, thirds, reticle) is layered on
-       top and the intro text sits in the shaded lower-left quadrant. ---- #}
+       top and the intro text sits in the shaded lower-left quadrant. This
+       is the ONE place the camera voice is deliberate — see the note on
+       .vf__hudtop in style.css before copying it anywhere else. ---- #}
 <section class="vf{% if not shuffle %} vf--empty{% endif %}" id="vf" data-count="{{ shuffle | length }}">
   {% if shuffle %}
     <div class="vf__stage" id="vf-stage">
@@ -52,7 +54,6 @@
     <div class="vf__hudtop">
       <span class="vf__rec"><i aria-hidden="true"></i>REC</span>
       <span class="vf__hudchip">LIVE VIEW / <b>{{ feed_label }}</b></span>
-      <span class="vf__hudchip vf__hudchip--ghost doc-min-hide">SIG / LUCYA.GALLERY</span>
       <span class="vf__hudright">
         <span class="vf__frm">FRM <b id="vf-idx">01</b><span class="vf__frm-of">/{{ '%02d' | format(shuffle | length) }}</span></span>
         <span class="vf__af doc-min-hide"><i aria-hidden="true"></i>AF·LOCK</span>
@@ -61,14 +62,7 @@
 
     <div class="vf__body">
       <div class="vf__intro">
-        <div class="vf__slug">
-          <span class="ix">00</span>
-          <span class="jp">画像庫</span>
-          <span class="jp vf__slug-sub">ギャラリー</span>
-        </div>
-        {# the word sits in its own span: the scrambler flattens its target's
-           innerHTML, so it needs a leaf element to chew on, not the <h1> #}
-        <h1 class="vf__title"><span class="vf__title-word">GALLERY</span></h1>
+        <h1 class="vf__title"><span class="vf__title-word">Gallery</span></h1>
         <p class="vf__lead">{{ t('welcome.lead') }}</p>
         <div class="vf__actions">
           <a href="/albums" class="btn-link btn-link--primary"><i class="fa fa-images" aria-hidden="true"></i>{{ t('welcome.browse') }}<i class="fa fa-arrow-right btn-link__go" aria-hidden="true"></i></a>
@@ -78,10 +72,10 @@
           </a>
         </div>
       </div>
+      {# which photo you are looking at, and a way into it #}
       <a class="vf__meta" id="vf-meta" href="/image/{{ shuffle[0].rel_path }}">
         <span class="vf__meta-key">FILE</span>
-        <span class="vf__meta-file" id="vf-file" data-scramble>{{ shuffle[0].album }} / {{ shuffle[0].filename }}</span>
-        <span class="vf__meta-sub">SRC / PREVIEW · 1600PX · READONLY</span>
+        <span class="vf__meta-file" id="vf-file">{{ shuffle[0].album }} / {{ shuffle[0].filename }}</span>
       </a>
     </div>
 
@@ -94,7 +88,7 @@
         {% endfor %}
       </div>
       {% if feed_mode != 'manual' %}
-        <button type="button" class="vf__tune" id="vf-tune" aria-label="{{ t('aria.reshuffle') }}"><i class="fa fa-shuffle" aria-hidden="true"></i>TUNE</button>
+        <button type="button" class="vf__tune" id="vf-tune" aria-label="{{ t('aria.reshuffle') }}"><i class="fa fa-shuffle" aria-hidden="true"></i>{{ t('welcome.reshuffle') }}</button>
       {% endif %}
       <span class="vf__auto" id="vf-auto">AUTO · 6.0S</span>
     </div>
@@ -107,9 +101,8 @@
     </div>
     <div class="vf__empty">
       <span class="vf__rec vf__rec--off"><i aria-hidden="true"></i>NO SIGNAL</span>
-      <h1 class="vf__title"><span class="vf__title-word">GALLERY</span></h1>
+      <h1 class="vf__title"><span class="vf__title-word">Gallery</span></h1>
       <div class="empty">
-        <span class="stamp">NO INDEX</span>
         <p>{{ t('welcome.no_images') }}</p>
         <p class="note">Drop subfolders into <code>photos/</code> — each subfolder becomes an album, and albums can nest (e.g. <code>japan/tokyo</code>).</p>
       </div>
@@ -117,13 +110,9 @@
   {% endif %}
 </section>
 
-{# ---- readout band: archive stats + status tokens, capped to hero width ---- #}
+{# ---- stats band: what the archive holds, capped to hero width ---- #}
 <section class="vf-band" aria-label="Archive readout">
   <div class="vf-band__inner">
-    <div class="vf-band__id doc-min-hide">
-      <span class="vf-band__sig">SIG / LUCYA.GALLERY</span>
-      <span class="vf-band__build">BUILD / READONLY</span>
-    </div>
     <div class="vf-band__cells">
       <div class="vf-band__cell">
         <span class="vf-band__digits" data-count-to="{{ image_count }}">{{ image_count }}</span>
@@ -141,8 +130,8 @@
           <span class="vf-band__caption"><i class="fa fa-star" aria-hidden="true"></i>{{ t('band.featured') }}</span>
         </div>
       {% endif %}
-      {# the archive's own last update — a date, not a count, so it gets the
-         mono readout treatment instead of the big glowing digits #}
+      {# the archive's own last update — a date, not a count, so it is set
+         as a date instead of the big counting digits #}
       {% if date_label(updated_at) %}
         <span class="vf-band__divider" aria-hidden="true"></span>
         <div class="vf-band__cell vf-band__cell--stamp">
@@ -158,7 +147,7 @@
   <section class="showcase-page" aria-label="Showcase albums">
     <div class="showcase">
       <header class="showcase__head">
-        <span class="showcase__label"><i class="fa fa-star" aria-hidden="true"></i>{{ t('showcase.head') }}</span>
+        <h2 class="showcase__label">{{ t('showcase.head') }}</h2>
         <a class="showcase__more" href="/albums">{{ t('showcase.all') }}<i class="fa fa-chevron-right" aria-hidden="true"></i></a>
       </header>
       {% include "_showcase_albums.html" %}

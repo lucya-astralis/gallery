@@ -69,7 +69,9 @@ def check_album(lib: Library, album: str,
             out.append(_issue("error", "effect", "%r is not whitelisted (%s)"
                               % (val, ", ".join(schema.EFFECTS))))
 
-    for key, exts in (("icon", schema.ICON_EXTS), ("font", schema.FONT_EXTS)):
+    for key, exts in (("icon", schema.ICON_EXTS), ("font", schema.FONT_EXTS),
+                      ("wallpaper", schema.WALLPAPER_EXTS),
+                      ("wallpaper_mobile", schema.WALLPAPER_IMAGE_EXTS)):
         if key not in cfg:
             continue
         raw = (cfgio.first(cfg, key) or "").strip()

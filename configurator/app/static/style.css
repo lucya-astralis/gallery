@@ -1387,6 +1387,20 @@ img.is-broken { opacity: .2; }
   border-radius: var(--radius);
   padding: 7px;
 }
+/* the album's page backdrop, previewed at the shape it is actually seen in:
+   wide and cropped, not a contained thumbnail — a wallpaper that reads fine
+   letterboxed can still be wrong once it fills a screen */
+.wallpreview {
+  display: block;
+  width: 100%;
+  max-width: 340px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-top: 8px;
+}
 
 /* ----- scrollbars ------------------------------------------------------ */
 ::-webkit-scrollbar { width: 10px; height: 10px; }

@@ -35,11 +35,7 @@ STRINGS: dict[str, tuple[str, str, str]] = {
         "Persönliches Fotoarchiv.",
         "個人写真アーカイブ。",
     ),
-    "nav.search_ph": (
-        "Search / album, file, tag",
-        "Suche / Album, Datei, Tag",
-        "検索 / アルバム・ファイル・タグ",
-    ),
+    "nav.search_ph": ("Search albums, files and tags", "Alben, Dateien und Tags durchsuchen", "検索 / アルバム・ファイル・タグ"),
     # short form swapped in on phones (app.js), where the full hint is too long
     # for the narrow field — see the data-ph-short attribute in base.html
     "nav.search_ph_short": ("Search", "Suchen", "検索"),
@@ -51,8 +47,8 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "foot.imprint": ("Imprint", "Impressum", "運営者情報"),
 
     # ---- breadcrumbs / pathbar ---------------------------------------
-    "crumb.home": ("HOME", "START", "ホーム"),
-    "crumb.albums": ("ALBUMS", "ALBEN", "アルバム"),
+    "crumb.home": ("Home", "Start", "ホーム"),
+    "crumb.albums": ("Albums", "Alben", "アルバム"),
     "back.label": ("Back to", "Zurück zu", "戻る:"),
     "back.home": ("Home", "Start", "ホーム"),
     "back.albums": ("Albums", "Alben", "アルバム"),
@@ -68,9 +64,9 @@ STRINGS: dict[str, tuple[str, str, str]] = {
         "Ein Read-only-Fenster in ein persönliches Fotoarchiv.",
         "個人写真アーカイブをのぞく読み取り専用の窓。",
     ),
-    "welcome.browse": ("BROWSE ALBUMS", "ALBEN DURCHSTÖBERN", "アルバムを見る"),
-    "welcome.open_frame": ("OPEN FRAME", "FRAME ÖFFNEN", "フレームを開く"),
-    "welcome.about_me": ("ABOUT ME", "ÜBER MICH", "私について"),
+    "welcome.browse": ("Browse albums", "Alben durchstöbern", "アルバムを見る"),
+    "welcome.open_frame": ("Open photo", "Foto öffnen", "フレームを開く"),
+    "welcome.about_me": ("About me", "Über mich", "私について"),
     "welcome.no_images": (
         "No images indexed yet.",
         "Noch keine Bilder indexiert.",
@@ -80,36 +76,42 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "band.albums": ("Albums", "Alben", "アルバム"),
     "band.featured": ("Featured", "Ausgewählt", "特集"),
     "band.updated": ("Last update", "Letztes Update", "最終更新"),
-    "showcase.head": ("SHOWCASE ALBUMS", "AUSGEWÄHLTE ALBEN", "特集アルバム"),
-    "showcase.all": ("ALL ALBUMS", "ALLE ALBEN", "すべてのアルバム"),
+    "showcase.head": ("Featured albums", "Ausgewählte Alben", "特集アルバム"),
+    "showcase.all": ("All albums", "Alle Alben", "すべてのアルバム"),
     "aria.prev_frame": ("Previous frame", "Vorheriger Frame", "前のフレーム"),
     "aria.next_frame": ("Next frame", "Nächster Frame", "次のフレーム"),
     "aria.frame_selector": ("Frame selector", "Frame-Auswahl", "フレーム選択"),
+    "welcome.reshuffle": ("Shuffle", "Mischen", "シャッフル"),
     "aria.reshuffle": ("Reshuffle feed", "Feed neu mischen", "フィードをシャッフル"),
 
     # ---- album index (/albums) ----------------------------------------
-    "index.slug": ("ALBUMS", "ALBEN", "アルバム"),
+    "index.slug": ("Albums", "Alben", "アルバム"),
     # decorative counterpart next to the slug: JP shows Japanese on the
     # EN/DE pages, and flips to English on the JP page so it stays a
     # bilingual ornament instead of repeating the slug.
-    "index.slug_deco": ("アルバム", "アルバム", "ALBUMS"),
-    "stat.albums": ("ALBUMS", "ALBEN", "アルバム"),
-    "stat.images": ("IMAGES", "BILDER", "枚"),
-    "feat.label": ("FEATURED", "AUSGEWÄHLT", "特集"),
-    "feat.hint": ("CURATED SETS", "KURATIERTE SETS", "キュレーション"),
-    "archive.label": ("ARCHIVE", "ARCHIV", "アーカイブ"),
-    "unit.directory": ("DIRECTORY", "VERZEICHNIS", "ディレクトリ"),
-    "unit.directories": ("DIRECTORIES", "VERZEICHNISSE", "ディレクトリ"),
-    "sort.btn": ("SORT", "SORTIEREN", "並び替え"),
-    "sort.by": ("SORT BY", "SORTIEREN NACH", "並び替え順"),
-    "card.no_cover": ("NO COVER", "KEIN COVER", "カバーなし"),
-    "card.enter": ("ENTER", "ÖFFNEN", "開く"),
-    "card.view_album": ("VIEW ALBUM", "ALBUM ANSEHEN", "アルバムを見る"),
-    "unit.image": ("IMAGE", "BILD", "枚"),
-    "unit.images": ("IMAGES", "BILDER", "枚"),
-    "unit.dir": ("DIR", "ORDNER", "フォルダ"),
-    "unit.dirs": ("DIRS", "ORDNER", "フォルダ"),
-    "unit.folder": ("FOLDER", "ORDNER", "フォルダ"),
+    "stat.albums": ("albums", "Alben", "アルバム"),
+    # keys of the album description card's stat rows (main._album_stats)
+    "stat.location": ("Location", "Ort", "場所"),
+    "stat.span": ("Dates", "Zeitraum", "期間"),
+    "stat.device": ("Camera", "Kamera", "カメラ"),
+    "stat.focal": ("Focal length", "Brennweite", "焦点距離"),
+    "stat.aperture": ("Aperture", "Blende", "絞り"),
+    "stat.data": ("Size", "Größe", "サイズ"),
+    "stat.images": ("photos", "Fotos", "枚"),
+    "feat.label": ("Featured", "Ausgewählt", "特集"),
+    "archive.label": ("Archive", "Archiv", "アーカイブ"),
+    "unit.directory": ("folder", "Ordner", "ディレクトリ"),
+    "unit.directories": ("folders", "Ordner", "ディレクトリ"),
+    "sort.btn": ("Sort", "Sortieren", "並び替え"),
+    "sort.by": ("Sort by", "Sortieren nach", "並び替え順"),
+    "card.no_cover": ("No cover", "Kein Cover", "カバーなし"),
+    "card.enter": ("Open", "Öffnen", "開く"),
+    "card.view_album": ("View album", "Album ansehen", "アルバムを見る"),
+    "unit.image": ("photo", "Foto", "枚"),
+    "unit.images": ("photos", "Fotos", "枚"),
+    "unit.dir": ("folder", "Ordner", "フォルダ"),
+    "unit.dirs": ("folders", "Ordner", "フォルダ"),
+    "unit.folder": ("folder", "Ordner", "フォルダ"),
 
     # ---- sort options (main.py) ----------------------------------------
     "sort.date_desc": ("Newest first", "Neueste zuerst", "新しい順"),
@@ -130,8 +132,8 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "sort.days": ("By day", "Nach Tagen", "日付ごと"),
 
     # ---- day sections (Sort → By day) -----------------------------------
-    "day.n": ("DAY {n}", "TAG {n}", "{n}日目"),
-    "day.undated": ("UNDATED", "OHNE DATUM", "日付なし"),
+    "day.n": ("Day {n}", "Tag {n}", "{n}日目"),
+    "day.undated": ("Undated", "Ohne Datum", "日付なし"),
 
     # ---- album page -----------------------------------------------------
     "album.og_desc": (
@@ -141,18 +143,17 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     ),
     "album.og_unit_one": ("image", "Bild", "枚"),
     "album.og_unit_many": ("images", "Bilder", "枚"),
-    "album.slug_deco": ("ギャラリー", "ギャラリー", "GALLERY"),
-    "stamp.sub_album": ("SUB-ALBUM", "UNTERALBUM", "サブアルバム"),
-    "stamp.showcase_album": ("SHOWCASE ALBUM", "AUSGEWÄHLTES ALBUM", "特集アルバム"),
-    "stamp.collection": ("COLLECTION", "SAMMLUNG", "コレクション"),
-    "album.about": ("ABOUT", "INFO", "概要"),
-    "album.folders": ("FOLDERS", "ORDNER", "フォルダ"),
-    "album.photos": ("PHOTOS", "FOTOS", "写真"),
+    "stamp.sub_album": ("Sub-album", "Unteralbum", "サブアルバム"),
+    "stamp.showcase_album": ("Featured album", "Ausgewähltes Album", "特集アルバム"),
+    "stamp.collection": ("Collection", "Sammlung", "コレクション"),
+    "album.about": ("About", "Info", "概要"),
+    "album.folders": ("Folders", "Ordner", "フォルダ"),
+    "album.photos": ("Photos", "Fotos", "写真"),
     "unit.album_one": ("album", "Album", "件"),
     "unit.album_many": ("albums", "Alben", "件"),
     "unit.image_one": ("image", "Bild", "枚"),
     "unit.image_many": ("images", "Bilder", "枚"),
-    "tag.all": ("ALL", "ALLE", "すべて"),
+    "tag.all": ("All", "Alle", "すべて"),
     "empty.tag_prefix": ("No images tagged ", "Keine Bilder mit Tag ", ""),
     "empty.tag_suffix": (".", ".", " のタグが付いた画像はありません。"),
     "empty.no_images": ("No images.", "Keine Bilder.", "画像がありません。"),
@@ -161,11 +162,11 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "aria.album_info": ("Album info", "Album-Info", "アルバム情報"),
 
     # ---- featured reel (_featured.html) ---------------------------------
-    "reel.random": ("RANDOM", "ZUFALL", "ランダム"),
-    "reel.featured": ("FEATURED", "AUSGEWÄHLT", "特集"),
-    "unit.photo": ("PHOTO", "FOTO", "枚"),
-    "unit.photos": ("PHOTOS", "FOTOS", "枚"),
-    "reel.open": ("OPEN", "ÖFFNEN", "開く"),
+    "reel.random": ("Random", "Zufall", "ランダム"),
+    "reel.featured": ("Featured", "Ausgewählt", "特集"),
+    "unit.photo": ("photo", "Foto", "枚"),
+    "unit.photos": ("photos", "Fotos", "枚"),
+    "reel.open": ("Open", "Öffnen", "開く"),
     "aria.random_photos": ("Random photos", "Zufällige Fotos", "ランダム写真"),
     "aria.featured_photos": ("Featured photos", "Ausgewählte Fotos", "特集写真"),
     "aria.prev_photo": ("Previous photo", "Vorheriges Foto", "前の写真"),
@@ -173,7 +174,7 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "aria.photo_selector": ("Photo selector", "Foto-Auswahl", "写真選択"),
 
     # ---- trip dashboard (_trip.html) ------------------------------------
-    "trip.tag": ("TRIP", "REISE", "旅"),
+    "trip.tag": ("Trip", "Reise", "旅"),
     "trip.status_aria": ("{title} — trip status", "{title} — Reisestatus", "{title} — 旅の状況"),
     "trip.jst_title": ("Local time in Japan", "Ortszeit in Japan", "日本の現地時間"),
     # visible prefix on the live clock, so "16:20 JST" reads as a place
@@ -186,11 +187,12 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "trip.flight": ("Flight", "Flug", "フライト"),
 
     # ---- search ----------------------------------------------------------
-    "search.slug": ("SEARCH", "SUCHE", "検索"),
-    "search.slug_deco": ("検索", "検索", "SEARCH"),
-    "search.crumb": ("SEARCH", "SUCHE", "検索"),
+    "search.slug": ("Search", "Suche", "検索"),
+    "search.crumb": ("Search", "Suche", "検索"),
     "search.no_match_prefix": ("No matches for ", "Keine Treffer für ", ""),
     "search.no_match_suffix": (".", ".", " に一致する結果はありません。"),
+    "search.hits_one": ("match", "Treffer", "件"),
+    "search.hits_many": ("matches", "Treffer", "件"),
     "search.hint": (
         "Searches album names, filenames and tags.",
         "Durchsucht Albumnamen, Dateinamen und Tags.",
@@ -198,7 +200,7 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     ),
 
     # ---- 404 --------------------------------------------------------------
-    "nf.title": ("NOT FOUND", "NICHT GEFUNDEN", "見つかりません"),
+    "nf.title": ("Not found", "Nicht gefunden", "見つかりません"),
     "nf.lead_prefix": ("The resource ", "Die Ressource ", "リソース "),
     "nf.lead_suffix": (
         " does not exist in this index.",
@@ -225,10 +227,15 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "kv.size": ("Size", "Größe", "サイズ"),
     "kv.original": ("Original", "Original", "オリジナル"),
     "kv.download": ("download", "herunterladen", "ダウンロード"),
-    "panel.description": ("DESCRIPTION", "BESCHREIBUNG", "説明"),
-    "panel.tags": ("TAGS", "TAGS", "タグ"),
+    "panel.file": ("File", "Datei", "ファイル"),
+    "panel.description": ("Description", "Beschreibung", "説明"),
+    "panel.tags": ("Tags", "Tags", "タグ"),
     "panel.raw_dump": ("raw dump", "Rohdaten", "生データ"),
     "panel.no_exif": ("No EXIF data.", "Keine EXIF-Daten.", "EXIFデータがありません。"),
+    # the stage starts on the downscaled preview and swaps to the original on
+    # demand; app.js flips this marker between the two
+    "quality.preview": ("Preview", "Vorschau", "プレビュー"),
+    "quality.original": ("Original", "Original", "オリジナル"),
     "btn.load_original": ("Load original", "Original laden", "オリジナルを読み込む"),
     "btn.fullscreen": ("Fullscreen", "Vollbild", "全画面"),
     "btn.download": ("Download", "Herunterladen", "ダウンロード"),
@@ -318,8 +325,8 @@ def weekday_label(lang: str, iso: str | None) -> str | None:
 
 
 def month_label(lang: str, iso: str | None) -> str | None:
-    """'2026-06-27T18:57:15' -> 'JUN 2026' / 'JUN 2026' / '2026年6月'
-    for the album-card date chips."""
+    """'2026-06-27T18:57:15' -> 'Jun 2026' / 'Jun 2026' / '2026年6月'
+    for the album-card dates."""
     if not iso:
         return None
     try:
@@ -331,24 +338,24 @@ def month_label(lang: str, iso: str | None) -> str | None:
     if lang == "jp":
         return f"{y}年{m}月"
     months = _MONTHS_DE if lang == "de" else _MONTHS_EN
-    return f"{months[m - 1]} {y}".upper()
+    return f"{months[m - 1]} {y}"
 
 
 def date_label(lang: str, iso: str | None) -> str | None:
-    """'2026-08-27T18:57:15' -> '27 AUG 2026' / '27. AUG 2026' / '2026年8月27日'.
-    The single-day case of date_span, for the archive's LAST UPDATE readout.
+    """'2026-08-27T18:57:15' -> '27 Aug 2026' / '27. Aug 2026' / '2026年8月27日'.
+    The single-day case of date_span, for the archive's last-update line.
     (Not to be confused with day_label above — that one counts trip days.)"""
     return date_span(lang, iso, iso)
 
 
 def date_span(lang: str, iso_min: str | None, iso_max: str | None) -> str | None:
     """Day-precise, collapsed date range for the album SPAN stat:
-        same day    -> '20 MAR 2026'      / '20. MÄR 2026'      / '2026年3月20日'
-        same month  -> '20–21 MAR 2026'    / '20.–21. MÄR 2026'  / '2026年3月20–21日'
-        same year   -> '20 MAR – 5 APR 2026'                     / '2026年3月20日 – 4月5日'
-        crosses year-> '28 DEC 2025 – 3 JAN 2026'
-    Uppercased for en/de like month_label (it reads as a HUD chip). Accepts a
-    single side (min or max may be None); None only when neither parses."""
+        same day    -> '20 Mar 2026'      / '20. Mär 2026'      / '2026年3月20日'
+        same month  -> '20–21 Mar 2026'    / '20.–21. Mär 2026'  / '2026年3月20–21日'
+        same year   -> '20 Mar – 5 Apr 2026'                     / '2026年3月20日 – 4月5日'
+        crosses year-> '28 Dec 2025 – 3 Jan 2026'
+    Accepts a single side (min or max may be None); None only when neither
+    parses."""
     def _parse(iso):
         try:
             return int(iso[:4]), int(iso[5:7]), int(iso[8:10])
@@ -373,7 +380,7 @@ def date_span(lang: str, iso_min: str | None, iso_max: str | None) -> str | None
     dot = "." if lang == "de" else ""
 
     def _mon(m):
-        return months[m - 1].upper()
+        return months[m - 1]
 
     if (y1, m1, d1) == (y2, m2, d2):
         return f"{d1}{dot} {_mon(m1)} {y1}"

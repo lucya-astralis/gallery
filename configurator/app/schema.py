@@ -13,6 +13,11 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff",
               ".tif", ".heic", ".heif"}
 ICON_EXTS = {".svg", ".png", ".webp"}
 FONT_EXTS = {".otf", ".ttf", ".woff2", ".woff"}
+# Per-album page backdrop. Desktop may be a clip; the mobile key is stills
+# only, because the gallery never loads a backdrop video on a phone.
+WALLPAPER_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
+WALLPAPER_VIDEO_EXTS = {".mp4", ".webm"}
+WALLPAPER_EXTS = WALLPAPER_IMAGE_EXTS | WALLPAPER_VIDEO_EXTS
 
 ALBUM_META_DIR = ".album"
 ALBUM_CFG_NAME = "album.cfg"
@@ -51,6 +56,8 @@ KEY_SPEC: dict[str, dict] = {
     "effect": {"type": "choice", "choices": EFFECTS},
     "icon": {"type": "asset", "exts": sorted(ICON_EXTS)},
     "font": {"type": "asset", "exts": sorted(FONT_EXTS)},
+    "wallpaper": {"type": "asset", "exts": sorted(WALLPAPER_EXTS)},
+    "wallpaper_mobile": {"type": "asset", "exts": sorted(WALLPAPER_IMAGE_EXTS)},
     "font_scale": {"type": "number"},
     # The gallery re-joins loc's comma-split parts with ", " (_album_stats),
     # so it reads as one line even though the parser sees a list.
@@ -68,8 +75,8 @@ KEY_SPEC: dict[str, dict] = {
 }
 
 ALBUM_KEYS = ["collection", "showcase", "cover", "featured", "order", "reel",
-              "sort", "tags", "effect", "icon", "font", "font_scale", "loc",
-              "stat", "stats"]
+              "sort", "tags", "effect", "icon", "font", "font_scale",
+              "wallpaper", "wallpaper_mobile", "loc", "stat", "stats"]
 GALLERY_KEYS = ["welcome", "welcome_desktop", "welcome_mobile", "album_order",
                 "album_sort"]
 
@@ -88,6 +95,8 @@ HELP: dict[str, str] = {
     "font": "Display face for the album's hero title. Lives in .album/.",
     "font_scale": "Size multiplier for that face (%s–%s). Only read when a font is set."
                   % FONT_SCALE_RANGE,
+    "wallpaper": "Page backdrop on desktop — a clip or a still. Sub-albums inherit it. Empty means the gallery's default video.",
+    "wallpaper_mobile": "Page backdrop on phones. Stills only; the gallery never loads a backdrop video there. Empty means the gallery's default still.",
     "loc": "Location, shown as the LOC line at the top of the stats block. Commas are fine here — the gallery rejoins them.",
     "stat": "Custom attributes for this album, one per line. They sit above the auto SPAN / DEVICE / FOCAL / APERTURE / DATA readouts the gallery derives from EXIF. No commas in a value — the cfg parser splits on them.",
     "stats": "Hide the whole stats block — both the custom attributes and the EXIF readouts.",

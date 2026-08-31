@@ -33,9 +33,9 @@
       <div class="fhero__shade" aria-hidden="true"></div>
     </div>
     <span class="fhero__chip fhero__chip--star" aria-hidden="true"><i class="fa {% if reel_random %}fa-shuffle{% else %}fa-star{% endif %}"></i></span>
-    <span class="fhero__chip fhero__chip--frm">FRM <b id="fhero-idx">01</b><span>/{{ '%02d' | format(featured | length) }}</span></span>
+    <span class="fhero__chip fhero__chip--frm"><b id="fhero-idx">01</b><span>/{{ '%02d' | format(featured | length) }}</span></span>
     <a class="fhero__file" id="fhero-file" href="/image/{{ featured[0].rel_path }}">
-      <span class="fhero__file-name" id="fhero-name" data-scramble>{{ feat_label(featured[0]) }}</span>
+      <span class="fhero__file-name" id="fhero-name">{{ feat_label(featured[0]) }}</span>
       <span class="fhero__file-open" aria-hidden="true">{{ t('reel.open') }}<i class="fa fa-arrow-up-right-from-square"></i></span>
     </a>
     {# album identity overlay, lower-left above the control bar; non-
@@ -49,7 +49,6 @@
           <button type="button" class="fhero__seg{% if loop.first %} is-on{% endif %}" data-goto="{{ loop.index0 }}" aria-label="{{ loop.index }}: {{ feat_label(img) }}"></button>
         {% endfor %}
       </div>
-      <span class="fhero__auto" id="fhero-auto">AUTO · 5.0S</span>
     </div>
   </div>
 </section>

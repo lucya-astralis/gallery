@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}ALBUMS // LUCYA.SYSTEMS GALLERY{% endblock %}
+{% block title %}{{ t('index.slug') }} — lucya.systems gallery{% endblock %}
 {% block body_class %}page-albums{% endblock %}
 {% block content %}
 <section>
@@ -16,30 +16,19 @@
     </div>
   </nav>
 
-  <div class="section__doc" data-live="doc">
-    <span class="doc-min-hide">FILE / LUCYA.GALLERY</span>
-    <span class="doc-min-hide">CLASS / <b>PUBLIC</b></span>
-    <span>ALBUMS / <b>{{ albums | length }}</b></span>
-    <span class="stamp stamp--ok doc-min-hide">RDY</span>
-  </div>
   <header class="section__head">
-    <div class="section__slug">
-      <span class="ix">01</span>
-      <span class="name">{{ t('index.slug') }}</span>
-      <span class="jp">{{ t('index.slug_deco') }}</span>
-    </div>
+    <h1 class="section__slug"><span class="name">{{ t('index.slug') }}</span></h1>
     {% if albums %}
-      <div class="section__stat">
+      <p class="section__stat">
         <b>{{ albums | length }}</b> {{ t('stat.albums') }}
-        <span class="section__stat-sep" aria-hidden="true">/</span>
+        <span class="section__stat-sep" aria-hidden="true">·</span>
         <b>{{ albums | sum(attribute='count') }}</b> {{ t('stat.images') }}
-      </div>
+      </p>
     {% endif %}
   </header>
 
   {% if not albums %}
     <div class="empty">
-      <span class="stamp">NO INDEX</span>
       <p>{{ t('welcome.no_images') }}</p>
       <p class="note">Drop subfolders into <code>photos/</code> — each subfolder is an album, and albums can nest.<br>Example: <code>photos/japan/tokyo/dsc_0001.jpg</code></p>
     </div>
@@ -49,8 +38,7 @@
     {% if showcase_albums %}
       <section class="feat" aria-label="Featured albums">
         <header class="feat__head">
-          <span class="feat__label"><i class="fa fa-star" aria-hidden="true"></i>{{ t('feat.label') }}</span>
-          <span class="feat__hint doc-min-hide">{{ t('feat.hint') }}</span>
+          <h2 class="feat__label">{{ t('feat.label') }}</h2>
           <span class="feat__count">{{ showcase_albums | length }} / {{ albums | length }}</span>
         </header>
         {% set feat_eager = 3 %}
@@ -64,7 +52,7 @@
     <div data-live="body">
     {% if archive_albums %}
       <header class="archive-head">
-        <span class="archive-head__label"><i class="fa fa-table-cells" aria-hidden="true"></i>{{ t('archive.label') }}</span>
+        <h2 class="archive-head__label">{{ t('archive.label') }}</h2>
         <span class="archive-head__count">{{ archive_albums | length }} {% if archive_albums | length == 1 %}{{ t('unit.directory') }}{% else %}{{ t('unit.directories') }}{% endif %}</span>
         <div class="sort" data-sort>
           <button type="button" class="sort__btn" aria-haspopup="true" aria-expanded="false">
@@ -95,7 +83,6 @@
             {% if sec.label %}
               <section class="album-group" aria-label="{{ sec.label }}">
                 <header class="album-group__head">
-                  <span class="album-group__tick" aria-hidden="true">#</span>
                   <span class="album-group__name">{{ sec.label }}</span>
                   <span class="album-group__count">{{ sec.cards | length }} {% if sec.cards | length == 1 %}{{ t('unit.directory') }}{% else %}{{ t('unit.directories') }}{% endif %}</span>
                 </header>

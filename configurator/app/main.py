@@ -22,10 +22,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import cfgio, imagemeta, schema, validate
-from .library import Library, is_image
+from .library import Library, asset_kinds, is_image
 
 # This tool's own release version, reported by /api/meta and shown in the UI.
-APP_VERSION = "1.0"
+APP_VERSION = "1.1"
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BASE_DIR.parent
@@ -217,6 +217,8 @@ def api_meta():
         "welcome_keywords": schema.WELCOME_KEYWORDS,
         "icon_exts": sorted(schema.ICON_EXTS),
         "font_exts": sorted(schema.FONT_EXTS),
+        "wallpaper_exts": sorted(schema.WALLPAPER_EXTS),
+        "wallpaper_image_exts": sorted(schema.WALLPAPER_IMAGE_EXTS),
         "font_scale_range": list(schema.FONT_SCALE_RANGE),
     }
 
@@ -524,10 +526,27 @@ async def api_tags_write(request: Request):
 
 
 # ----- .album assets ----------------------------------------------------
+# Content types for everything the .album/ folder can hold. Derived from the
+# schema whitelists rather than hand-listed: this map used to be its own
+# hardcoded set and silently fell behind when wallpapers were added, so a
+# .jpg backdrop answered 415 and never previewed.
+_ASSET_TYPES = {
+    ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp",
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+    ".avif": "image/avif",
+    ".mp4": "video/mp4", ".webm": "video/webm",
+    ".otf": "font/otf", ".ttf": "font/ttf", ".woff": "font/woff",
+    ".woff2": "font/woff2",
+}
+_MISSING_TYPES = (schema.ICON_EXTS | schema.FONT_EXTS | schema.WALLPAPER_EXTS
+                  ) - set(_ASSET_TYPES)
+assert not _MISSING_TYPES, "no content type for %s" % sorted(_MISSING_TYPES)
+
+
 @app.get("/api/asset")
 def api_asset(path: str, name: str):
-    """Serve one file out of an album's .album/ folder, for icon previews and
-    for loading a title font into the UI."""
+    """Serve one file out of an album's .album/ folder: icon and wallpaper
+    previews, and loading a title font into the UI."""
     album = _album_or_400(path)
     if Path(name).name != name:
         raise HTTPException(400, "asset names are bare filenames")
@@ -535,25 +554,27 @@ def api_asset(path: str, name: str):
     if not target.is_file():
         raise HTTPException(404, "no such asset")
     ext = target.suffix.lower()
-    types = {".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp",
-             ".otf": "font/otf", ".ttf": "font/ttf", ".woff": "font/woff",
-             ".woff2": "font/woff2"}
-    if ext not in types:
+    if ext not in _ASSET_TYPES:
         raise HTTPException(415, "not a servable asset type")
-    return FileResponse(target, media_type=types[ext],
+    return FileResponse(target, media_type=_ASSET_TYPES[ext],
                         headers={"Cache-Control": "no-cache"})
+
+
+# icons, title fonts and page wallpapers all live side by side in .album/
+_ASSET_EXTS = schema.ICON_EXTS | schema.FONT_EXTS | schema.WALLPAPER_EXTS
 
 
 @app.post("/api/asset")
 async def api_asset_upload(path: str = Form(...), file: UploadFile = File(...)):
-    """Drop an icon or a title font into an album's .album/ folder."""
+    """Drop an icon, a title font or a page wallpaper into an album's
+    .album/ folder."""
     _guard_write()
     album = _album_or_400(path)
     name = Path(file.filename or "").name
     ext = Path(name).suffix.lower()
-    if not name or ext not in (schema.ICON_EXTS | schema.FONT_EXTS):
+    if not name or ext not in _ASSET_EXTS:
         raise HTTPException(400, "only %s are accepted"
-                            % ", ".join(sorted(schema.ICON_EXTS | schema.FONT_EXTS)))
+                            % ", ".join(sorted(_ASSET_EXTS)))
     payload = await file.read(MAX_UPLOAD + 1)
     if len(payload) > MAX_UPLOAD:
         raise HTTPException(413, "file is larger than %d MB" % (MAX_UPLOAD // 1048576))
@@ -562,8 +583,9 @@ async def api_asset_upload(path: str = Form(...), file: UploadFile = File(...)):
     target = meta / name
     _backup(target, "asset")
     target.write_bytes(payload)
-    kind = "icon" if ext in schema.ICON_EXTS else "font"
-    return {"ok": True, "name": name, "kind": kind, "assets": lib.assets(album)}
+    kinds = asset_kinds(name)
+    return {"ok": True, "name": name, "kinds": kinds, "kind": kinds[0],
+            "assets": lib.assets(album)}
 
 
 @app.delete("/api/asset")
@@ -573,8 +595,8 @@ def api_asset_delete(path: str, name: str):
     if Path(name).name != name:
         raise HTTPException(400, "asset names are bare filenames")
     ext = Path(name).suffix.lower()
-    if ext not in (schema.ICON_EXTS | schema.FONT_EXTS):
-        raise HTTPException(400, "only icons and fonts can be deleted here")
+    if ext not in _ASSET_EXTS:
+        raise HTTPException(400, "only icons, fonts and wallpapers can be deleted here")
     target = lib.meta_dir(album) / name
     if not target.is_file():
         raise HTTPException(404, "no such asset")

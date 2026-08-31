@@ -1,14 +1,17 @@
 // ---------- UI LANGUAGE ----------------------------------------
 // The server renders <html lang="en|de|ja"> from the language cookie
 // (selector in the nav); client-side strings pick their translation here.
-// Keep the wording in sync with app/i18n.py. Decorative HUD stamps
-// (PREVIEW/ORIGINAL, IN TRANSIT, T-x DAYS, …) intentionally stay English.
+// Keep the wording in sync with app/i18n.py — including the quality marker
+// on the image stage, which used to be an English-only HUD stamp and is now
+// a translated label like everything else the reader is meant to read.
 // NB: new Japanese text may need a font-subset rebuild — see
 // tools/build_jp_subset.py.
 const UI_LANG = (document.documentElement.lang || 'en').toLowerCase().slice(0, 2);
 const UI_STRINGS = {
   en: {
     loadOriginal: 'Load original',
+    qualityPreview: 'Preview',
+    qualityOriginal: 'Original',
     loading: 'Loading…',
     errRetry: 'Error — retry?',
     departsIn: 'Departs in',
@@ -23,6 +26,8 @@ const UI_STRINGS = {
   },
   de: {
     loadOriginal: 'Original laden',
+    qualityPreview: 'Vorschau',
+    qualityOriginal: 'Original',
     loading: 'Lädt…',
     errRetry: 'Fehler — erneut?',
     departsIn: 'Abflug in',
@@ -37,6 +42,8 @@ const UI_STRINGS = {
   },
   ja: {
     loadOriginal: 'オリジナルを読み込む',
+    qualityPreview: 'プレビュー',
+    qualityOriginal: 'オリジナル',
     loading: '読み込み中…',
     errRetry: 'エラー — 再試行？',
     departsIn: '出発まで',
@@ -86,7 +93,7 @@ const TXT = UI_STRINGS[UI_LANG] || UI_STRINGS.en;
 
 // ---------- DEVICE CAPABILITY ----------------------------------
 // Single gate for the heavy, decorative effects (background video, animated
-// scanlines, text scramble, CRT auto-cycle). Small screens, data-saver,
+// scanlines, reel auto-advance). Small screens, data-saver,
 // reduced-motion and low-end hardware all opt out and get the lightweight
 // static experience instead.
 const __mqReduceData = window.matchMedia('(prefers-reduced-data: reduce)');
@@ -183,7 +190,6 @@ async function spaLoadImage(href) {
     try { history.pushState({ spa: true }, '', href); } catch (e) {}
     if (typeof window.__initImagePage === 'function') window.__initImagePage();
     if (typeof window.__lightboxReload === 'function') window.__lightboxReload();
-    if (typeof window.__scrambleSwapped === 'function') window.__scrambleSwapped();
     window.scrollTo(0, 0);
     success = true;
   } catch (e) {
@@ -199,124 +205,16 @@ async function spaLoadImage(href) {
 }
 window.__spaLoadImage = spaLoadImage;
 
-// ---------- TEXT SCRAMBLE --------------------------------------
-// decoder-style transition. Random glyphs flicker, then resolve to the
-// target text one char at a time.
-const SCRAMBLE_CHARS = '!<>-_\\/[]{}=+*^?#$&%01ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿ';
-const escScrambleChar = c => c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '&' ? '&amp;' : c;
-class TextScrambler {
-  constructor(el){ this.el = el; this.queue = []; this.frame = 0; }
-  setText(newText){
-    const oldText = this.el.textContent;
-    const len = Math.max(oldText.length, newText.length);
-    this.queue = [];
-    for (let i = 0; i < len; i++){
-      const start = Math.floor(Math.random() * 14);
-      const end = start + 12 + Math.floor(Math.random() * 22);
-      this.queue.push({ from: oldText[i] || '', to: newText[i] || '', start, end, char: '' });
-    }
-    cancelAnimationFrame(this.rafId);
-    this.frame = 0;
-    return new Promise(res => { this.resolve = res; this._tick(); });
-  }
-  _tick = () => {
-    let out = '';
-    let done = 0;
-    for (let i = 0; i < this.queue.length; i++){
-      const q = this.queue[i];
-      if (this.frame >= q.end){ done++; out += escScrambleChar(q.to); }
-      else if (this.frame >= q.start){
-        if (!q.char || Math.random() < 0.28){
-          q.char = SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
-        }
-        out += `<span class="scramble-char">${escScrambleChar(q.char)}</span>`;
-      } else {
-        out += escScrambleChar(q.from);
-      }
-    }
-    this.el.innerHTML = out;
-    if (done === this.queue.length){ this.resolve && this.resolve(); }
-    else { this.rafId = requestAnimationFrame(this._tick); this.frame++; }
-  };
-}
-const __scramblers = new WeakMap();
-window.__scrambleTo = (el, text) => {
-  if (!el) return;
-  // low-end / reduced-motion: skip the rAF decoder loop, set text instantly
-  if (!allowHeavyFx()) { el.textContent = String(text); return Promise.resolve(); }
-  let s = __scramblers.get(el);
-  if (!s){ s = new TextScrambler(el); __scramblers.set(el, s); }
-  return s.setText(String(text));
-};
-// re-scramble the changing texts in the image detail view after an SPA swap.
-// the elements are fresh DOM nodes (replaceWith), so they already display the
-// new target text — we blank them and scramble back in for the decoder effect.
-window.__scrambleSwapped = () => {
-  if (!window.__scrambleTo) return;
-  const els = new Set();
-  document.querySelectorAll('.crumb b, .stage__corner, .section__doc b').forEach(el => els.add(el));
-  document.querySelectorAll('.section__doc span').forEach(span => {
-    if (!span.querySelector('b') && !span.classList.contains('stamp')) els.add(span);
-  });
-  document.querySelectorAll('.sidebar .kv dd').forEach(dd => {
-    const a = dd.querySelector('a');
-    if (a && !a.querySelector('*')) els.add(a);
-    else if (!dd.querySelector('*')) els.add(dd);
-  });
-  document.querySelectorAll('.sidebar .tag-list .tag').forEach(t => {
-    if (!t.querySelector('*')) els.add(t);
-  });
-  const desc = document.querySelector('.sidebar .description');
-  if (desc && !desc.querySelector('*')) els.add(desc);
-  els.forEach(el => {
-    const target = el.textContent;
-    if (!target.trim()) return;
-    el.dataset.scrambleSetup = '1';
-    el.dataset.scrambleTarget = target;
-    el.textContent = '';
-    window.__scrambleTo(el, target);
-  });
-};
-
-window.__scrambleOnView = (els) => {
-  const list = els.filter(el => el && !el.dataset.scrambleSetup);
-  list.forEach(el => {
-    el.dataset.scrambleSetup = '1';
-    if (!el.dataset.scrambleTarget) el.dataset.scrambleTarget = el.textContent.trim();
-  });
-  if (!('IntersectionObserver' in window)){
-    list.forEach(el => window.__scrambleTo(el, el.dataset.scrambleTarget));
-    return;
-  }
-  const io = new IntersectionObserver((ents, obs) => {
-    ents.forEach(e => {
-      if (e.isIntersecting){
-        window.__scrambleTo(e.target, e.target.dataset.scrambleTarget);
-        obs.unobserve(e.target);
-      }
-    });
-  }, { threshold: 0.35, rootMargin: '0px 0px -10% 0px' });
-  list.forEach(el => io.observe(el));
+// ---------- LIVE TEXT ------------------------------------------
+// Slide changes rewrite a couple of labels in place (reel filename, frame
+// counter). That used to run through a decoder-style scrambler — random
+// glyphs flickering into the target one character at a time — which was the
+// loudest terminal cue on the site. The text just changes now.
+window.__setLiveText = (el, text) => {
+  if (el) el.textContent = String(text);
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-  // mark shuffle card names with their target text so we can re-scramble later
-  document.querySelectorAll('[data-scramble]').forEach(el => {
-    if (!el.dataset.scrambleTarget) el.dataset.scrambleTarget = el.textContent.trim();
-  });
-
-  // scramble on view: section headers, hero stats, welcome title
-  const onViewEls = [
-    ...document.querySelectorAll('.section__slug .name'),
-    // the inner span, not the <h1>: scrambling flattens its target's innerHTML
-    ...document.querySelectorAll('.vf__title-word'),
-    ...document.querySelectorAll('.section__doc b'),
-    ...document.querySelectorAll('.notfound__title'),
-    ...document.querySelectorAll('.crumb b'),
-    ...document.querySelectorAll('.trip__name'),
-  ];
-  window.__scrambleOnView(onViewEls);
-
   // ---------- WELCOME VIEWFINDER ---------------------------------
   // Full-bleed "live view" hero: crossfading frames, HUD readouts and a
   // segmented track. Auto-advance is driven by the CSS fill animation on
@@ -346,15 +244,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function syncFrame(idx) {
     const f = frames[idx];
     if (fileEl) {
-      const text = (f.dataset.album || '') + ' / ' + (f.dataset.filename || '');
-      fileEl.dataset.scrambleTarget = text;
-      if (window.__scrambleTo) window.__scrambleTo(fileEl, text);
-      else fileEl.textContent = text;
+      window.__setLiveText(fileEl, (f.dataset.album || '') + ' / ' + (f.dataset.filename || ''));
     }
     if (idxEl) {
-      const n = String(idx + 1).padStart(2, '0');
-      if (window.__scrambleTo) window.__scrambleTo(idxEl, n);
-      else idxEl.textContent = n;
+      window.__setLiveText(idxEl, String(idx + 1).padStart(2, '0'));
     }
     if (metaLink) metaLink.href = f.href;
     if (openLink) openLink.href = f.href;
@@ -507,7 +400,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const fileLink = document.getElementById('fhero-file');
   const nameEl = document.getElementById('fhero-name');
   const idxEl = document.getElementById('fhero-idx');
-  const autoLabel = document.getElementById('fhero-auto');
 
   const AUTO_MS = 5000;
   hero.style.setProperty('--fhero-auto-ms', AUTO_MS + 'ms');
@@ -518,10 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function sync(idx) {
     const s = slides[idx];
     if (nameEl) {
-      const text = s.dataset.filename || '';
-      nameEl.dataset.scrambleTarget = text;
-      if (window.__scrambleTo) window.__scrambleTo(nameEl, text);
-      else nameEl.textContent = text;
+      window.__setLiveText(nameEl, s.dataset.filename || '');
     }
     if (idxEl) idxEl.textContent = String(idx + 1).padStart(2, '0');
     if (fileLink) fileLink.href = s.href;
@@ -572,8 +461,6 @@ document.addEventListener('DOMContentLoaded', () => {
         hero.classList.toggle('fhero--idle', !entry.isIntersecting);
       }, { threshold: 0.15 }).observe(hero);
     }
-  } else if (autoLabel) {
-    autoLabel.textContent = slides.length > 1 ? 'MANUAL' : 'SINGLE';
   }
 
   const nextBtn = document.getElementById('fhero-next');
@@ -946,9 +833,8 @@ function initImagePage() {
   // click-to-open decode: the photo pixels in on load and after SPA swaps
   if (window.__stagePixelIn) window.__stagePixelIn();
   if (stamp) {
-    stamp.textContent = 'PREVIEW';
-    stamp.classList.add('stamp--cy');
-    stamp.classList.remove('stamp--ok');
+    stamp.textContent = TXT.qualityPreview;
+    stamp.classList.remove('is-original');
   }
 
   // load-original swaps preview → full quality inside the stage
@@ -963,9 +849,8 @@ function initImagePage() {
       img.classList.remove('is-preview');
       loader.classList.add('is-done');
       if (stamp) {
-        stamp.textContent = 'ORIGINAL';
-        stamp.classList.remove('stamp--cy');
-        stamp.classList.add('stamp--ok');
+        stamp.textContent = TXT.qualityOriginal;
+        stamp.classList.add('is-original');
       }
     };
     full.onerror = () => {

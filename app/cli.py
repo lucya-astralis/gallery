@@ -283,6 +283,9 @@ def _featured_map() -> tuple[dict[str, list[tuple[str, str]]], list[dict]]:
 ALBUM_CFG_KEYS = {
     "collection", "cover", "showcase", "featured", "reel", "order", "sort",
     "tags", "effect", "icon", "font", "font_scale",
+    # per-album page backdrop; `wallpaper` may be a clip, `wallpaper_mobile`
+    # is stills only (phones never load a backdrop video)
+    "wallpaper", "wallpaper_mobile",
     # Editorial stats block (_album_stats): `loc` is one line whose comma-split
     # parts get rejoined, `stat` is the freeform custom "Label: Value" line
     # (repeat the key for more), `stats = off` hides the block entirely.
@@ -290,6 +293,16 @@ ALBUM_CFG_KEYS = {
 }
 GALLERY_CFG_KEYS = {"welcome", "welcome_desktop", "welcome_mobile", "album_order", "album_sort"}
 REEL_VALUES = {"featured", "random", "shuffle", "off", "false", "0", "no", "none"}
+
+
+def _wallpaper_line(album: str, variant: str) -> str:
+    """`file.jpg` for an album's own backdrop, `file.jpg (from japan_2026)`
+    when it inherited one, `— (gallery default)` when nothing is set."""
+    src = gallery._album_wallpaper_source(album, variant)
+    if src is None:
+        return "— (gallery default)"
+    owner, path = src
+    return path.name if owner == album else f"{path.name} (from {owner})"
 
 
 def _check_album_cfg(album: str) -> list[dict]:
@@ -346,6 +359,13 @@ def _check_album_cfg(album: str) -> list[dict]:
         raw = gallery._cfg_first(cfg, "font")
         if gallery._album_font_file(album) is None:
             add("error", "font", f"{raw!r} not found in .album/ (or unsupported type)")
+    for key, variant in (("wallpaper", "desktop"), ("wallpaper_mobile", "mobile")):
+        if key in cfg:
+            raw = gallery._cfg_first(cfg, key)
+            if gallery._album_wallpaper_file(album, variant) is None:
+                hint = ("stills only" if variant == "mobile" else "video or still")
+                add("error", key,
+                    f"{raw!r} not found in .album/ (or unsupported type — {hint})")
     if "font_scale" in cfg:
         if gallery._album_font_scale(album) is None:
             lo, hi = gallery.ALBUM_FONT_SCALE_RANGE
@@ -930,10 +950,13 @@ def cmd_cfg(args) -> int:
         kv("parsed", "nothing (no file, or an empty one)")
         return 0
     head("parsed")
+    # the key column sizes itself: a fixed 12 ran `wallpaper_mobile` straight
+    # into its value with no gap
+    key_w = max((len(k) for k in cfg), default=0) + 2
     for key in sorted(cfg):
         values = cfg[key]
         shown = values[0] if len(values) == 1 else json.dumps(values, ensure_ascii=False)
-        out(f"  {key:<12}{shown}")
+        out(f"  {key:<{key_w}}{shown}")
     if not args.gallery:
         album = _norm_album(args.album)
         ui.head("resolved")
@@ -947,6 +970,9 @@ def cmd_cfg(args) -> int:
             ("reel", f"{mode} ({len(reel)} photo(s))"),
             ("tags", ", ".join(gallery._album_tags(album, cfg)) or "—"),
             ("descriptions", ", ".join(f"album_{l}.md" for l in langs) or "—"),
+            # resolved, so an inherited backdrop names the album it came from
+            ("wallpaper", _wallpaper_line(album, "desktop")),
+            ("wallpaper mobile", _wallpaper_line(album, "mobile")),
         ], key_tint=ui.C.gy)
     if issues:
         head(f"issues  ({len(issues)})")

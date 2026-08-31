@@ -119,7 +119,7 @@ templates.env.globals["static_url"] = _static_url
 
 # The gallery's own release version, shown in the nav and the footer.
 # Distinct from API_VERSION, which versions the JSON API contract.
-APP_VERSION = "4.0"
+APP_VERSION = "5.0"
 templates.env.globals["app_version"] = APP_VERSION
 
 
@@ -519,7 +519,14 @@ def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
 #                           per-album title font section further down).
 #   font_scale = 1.25    -> size multiplier for that face (see the same
 #                           section); only read when `font` is set.
-#   loc = Paris, France  -> LOC line in the stats block under the description.
+#   wallpaper = bg.mp4   -> the album's own page backdrop on desktop (video or
+#                           still); sub-albums inherit it (see the per-album
+#                           wallpaper section further down).
+#   wallpaper_mobile = bg.jpg -> the same for phones. Stills only — phones
+#                           never load a backdrop clip. Either key alone is
+#                           fine; the missing side falls back to the site
+#                           default (bg.mp4 / bg-poster.jpg).
+#   loc = Paris, France  -> Location line in the stats block under the description.
 #   stat = Label: Value  -> one freeform KEY / VALUE stat line (repeat the key
 #                           for more). Avoid commas in the value — the parser
 #                           comma-splits list values (see _parse_cfg). These
@@ -717,7 +724,7 @@ def _album_stats(images: list[dict], cfg: dict[str, list[str]], lang: str) -> di
     context: list[dict] = []
     loc = ", ".join(v.strip() for v in (cfg.get("loc") or []) if v.strip())
     if loc:
-        context.append({"key": "LOC", "val": loc})
+        context.append({"key": i18n.t(lang, "stat.location"), "val": loc})
     # freeform `stat = Label: Value` (one fact per line; avoid commas in the
     # value — the cfg parser comma-splits list values, see _parse_cfg).
     for raw in cfg.get("stat") or []:
@@ -726,7 +733,7 @@ def _album_stats(images: list[dict], cfg: dict[str, list[str]], lang: str) -> di
             continue
         if ":" in raw:
             k, _, v = raw.partition(":")
-            entry = {"key": k.strip().upper(), "val": v.strip()}
+            entry = {"key": k.strip(), "val": v.strip()}
         else:
             entry = {"key": "", "val": raw}
         if entry["val"]:
@@ -761,23 +768,24 @@ def _album_stats(images: list[dict], cfg: dict[str, list[str]], lang: str) -> di
     capture: list[dict] = []
     span = i18n.date_span(lang, tmin, tmax)
     if span:
-        capture.append({"key": "SPAN", "val": span})
+        capture.append({"key": i18n.t(lang, "stat.span"), "val": span})
     if devices:
         dev = devices.most_common(1)[0][0]
         # a couple of stray cameras shouldn't hide the dominant one, but note them
         if len(devices) > 1:
             dev = f"{dev} +{len(devices) - 1}"
-        capture.append({"key": "DEVICE", "val": dev})
+        capture.append({"key": i18n.t(lang, "stat.device"), "val": dev})
     if focals:
         lo, hi = min(focals), max(focals)
-        capture.append({"key": "FOCAL", "val": f"{lo} MM" if lo == hi else f"{lo}–{hi} MM"})
+        capture.append({"key": i18n.t(lang, "stat.focal"),
+                        "val": f"{lo} mm" if lo == hi else f"{lo}–{hi} mm"})
     if fnums:
         lo, hi = min(fnums), max(fnums)
         val = f"ƒ{_fmt_num(lo)}" if lo == hi else f"ƒ{_fmt_num(lo)}–{_fmt_num(hi)}"
-        capture.append({"key": "APERTURE", "val": val})
+        capture.append({"key": i18n.t(lang, "stat.aperture"), "val": val})
     data = _humanize_bytes(total)
     if data:
-        capture.append({"key": "DATA", "val": data})
+        capture.append({"key": i18n.t(lang, "stat.data"), "val": data})
 
     return {"context": context, "capture": capture, "has": bool(context or capture)}
 
@@ -975,6 +983,119 @@ def _album_icon_url(album: str | None) -> str | None:
         except OSError:
             pass
     return f"/album-icon/{quote(album)}?v={max(stamps, default=0)}"
+
+
+# ----- per-album wallpaper (album.cfg owns it) --------------------------
+# Same shape as the icon and the title font: drop the file into the album's
+# `.album/` folder and name it in album.cfg
+#   wallpaper        = kyoto-night.mp4     -> desktop backdrop
+#   wallpaper_mobile = kyoto-night.jpg     -> phones
+# Two keys, because the two are genuinely different assets: desktop can carry
+# a video, phones must not (app.js never loads one there, and a 6 MB clip on
+# a phone plan is the reason it doesn't). Either key on its own is fine; the
+# missing side falls back to the site default (bg.mp4 / bg-poster.jpg).
+#
+# A sub-album with no wallpaper of its own inherits the nearest ancestor's,
+# so `japan_2026` dresses `japan_2026/kansai/osaka` too — otherwise every
+# nested folder would drop back to the site default mid-browse.
+ALBUM_WALLPAPER_VIDEO_TYPES = {
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+}
+ALBUM_WALLPAPER_IMAGE_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".avif": "image/avif",
+}
+ALBUM_WALLPAPER_TYPES = {**ALBUM_WALLPAPER_VIDEO_TYPES, **ALBUM_WALLPAPER_IMAGE_TYPES}
+# phones get a still frame, never a clip — see the note above
+ALBUM_WALLPAPER_KEYS = {"desktop": ("wallpaper", ALBUM_WALLPAPER_TYPES),
+                        "mobile": ("wallpaper_mobile", ALBUM_WALLPAPER_IMAGE_TYPES)}
+
+
+def _album_wallpaper_file(album: str, variant: str) -> Path | None:
+    """The album's own configured wallpaper as a real file, or None. Mirrors
+    _album_icon_file exactly: the cfg value is a bare filename resolved inside
+    the album's `.album/` folder, and anything with a path separator or an
+    extension outside the whitelist is rejected — so this can only ever
+    resolve to a file sitting next to the album.cfg that named it. No
+    inheritance here; _album_wallpaper_source walks the tree."""
+    key, allowed = ALBUM_WALLPAPER_KEYS[variant]
+    meta = _album_meta_dir(album)
+    if meta is None:
+        return None
+    name = (_cfg_first(_album_config(album), key) or "").strip()
+    if not name or Path(name).name != name:
+        return None
+    if Path(name).suffix.lower() not in allowed:
+        return None
+    path = meta / name
+    return path if path.is_file() else None
+
+
+def _album_wallpaper_source(album: str | None, variant: str) -> tuple[str, Path] | None:
+    """(owning album, file) for the wallpaper an album shows — its own, else
+    the nearest ancestor's. None when nothing up the tree configures one."""
+    if not album:
+        return None
+    parts = album.replace("\\", "/").strip("/").split("/")
+    for depth in range(len(parts), 0, -1):
+        owner = "/".join(parts[:depth])
+        found = _album_wallpaper_file(owner, variant)
+        if found is not None:
+            return owner, found
+    return None
+
+
+def _album_wallpaper_url(album: str | None, variant: str) -> str | None:
+    """Cache-busting URL, or None when neither the album nor any ancestor
+    configures this variant. Version stamp is the newest mtime of the file
+    AND of the cfg naming it — repointing the key at a different file does
+    not change the path, since the filename never travels in the URL."""
+    src = _album_wallpaper_source(album, variant)
+    if src is None:
+        return None
+    owner, path = src
+    meta = _album_meta_dir(owner)
+    stamps = []
+    for p in (path, (meta / "album.cfg") if meta else None):
+        if p is None:
+            continue
+        try:
+            stamps.append(int(p.stat().st_mtime))
+        except OSError:
+            pass
+    return f"/album-wallpaper/{variant}/{quote(owner)}?v={max(stamps, default=0)}"
+
+
+def _site_bg(album: str | None = None) -> dict:
+    """What base.html paints behind the page. Three slots so the template
+    stays dumb and CSP-safe (no inline styles anywhere):
+      still_mobile / still_desktop — <picture> sources; the browser fetches
+        exactly one, and the desktop still doubles as the poster frame behind
+        a loading video
+      video — desktop clip, or None when the album's desktop wallpaper is a
+        still image and there is nothing to play
+    An album that configures nothing lands on the site defaults, which is the
+    same backdrop every non-album page shows."""
+    desktop = _album_wallpaper_url(album, "desktop")
+    mobile = _album_wallpaper_url(album, "mobile")
+    src = _album_wallpaper_source(album, "desktop")
+    desktop_is_video = (src is not None
+                        and src[1].suffix.lower() in ALBUM_WALLPAPER_VIDEO_TYPES)
+    default_still = _static_url("bg-poster.jpg")
+    return {
+        "still_mobile": mobile or default_still,
+        # a desktop video still wants a poster behind it while it buffers
+        "still_desktop": (default_still if desktop_is_video or not desktop else desktop),
+        "video": (desktop if desktop_is_video else
+                  (None if desktop else _static_url("bg.mp4"))),
+    }
+
+
+templates.env.globals["site_bg"] = _site_bg
 
 
 # ----- showcase / featured (album.cfg owns it) --------------------------
@@ -2701,6 +2822,9 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
         {
             "request": request,
             "album": album,
+            # base.html paints the backdrop from this; a sub-album with no
+            # wallpaper of its own inherits its nearest ancestor's
+            "bg_album": album,
             "breadcrumbs": _album_breadcrumbs(album),
             "album_description": _album_description(album, lang),
             # cover photo for the mobile hero header (see .album-hero)
@@ -2807,6 +2931,7 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
         {
             "request": request,
             "image": dict(row),
+            "bg_album": row["album"],
             "breadcrumbs": _album_breadcrumbs(row["album"]),
             "exif": pretty_exif,
             "exif_raw": exif,
@@ -2951,6 +3076,24 @@ def serve_album_icon(album: str):
     if icon is None:
         raise HTTPException(404, "not found")
     return FileResponse(str(icon), media_type=ALBUM_ICON_TYPES[icon.suffix.lower()],
+                        headers={"Cache-Control": "public, max-age=31536000"})
+
+
+@app.get("/album-wallpaper/{variant}/{album:path}")
+def serve_album_wallpaper(variant: str, album: str):
+    """The backdrop an album's cfg names in `wallpaper =` / `wallpaper_mobile =`.
+    Like the icon and font routes the filename never comes from the URL — it is
+    read back out of the album.cfg — so this cannot be used to pull anything
+    else out of an album's `.album/` folder. The album in the path is the
+    OWNING album (the one that set the key), which _album_wallpaper_url has
+    already resolved, so a sub-album never serves through its parent's URL."""
+    if variant not in ALBUM_WALLPAPER_KEYS:
+        raise HTTPException(404, "not found")
+    path = _album_wallpaper_file(album, variant)
+    if path is None:
+        raise HTTPException(404, "not found")
+    return FileResponse(str(path),
+                        media_type=ALBUM_WALLPAPER_TYPES[path.suffix.lower()],
                         headers={"Cache-Control": "public, max-age=31536000"})
 
 

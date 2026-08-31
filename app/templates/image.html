@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ image.filename | upper }} // {{ image.album | upper }} // LUCYA.SYSTEMS GALLERY{% endblock %}
+{% block title %}{{ image.filename }} — {{ image.album }} — lucya.systems gallery{% endblock %}
 {% block body_class %}page-image{% endblock %}
 {% block meta %}
   {% set og_title = image.filename ~ ' — ' ~ image.album %}
@@ -50,12 +50,10 @@
       {% for c in breadcrumbs %}
         <span class="sep">/</span>
         {# same as the album page: the album's own mark (album.cfg `icon =`)
-           sits NEXT TO its label, never inside it — the crumb's current
-           segment is a text-scramble target and scrambling flattens the
-           element's innerHTML (see __scrambleSwapped in app.js). #}
+           and its label share one .crumb__seg so they wrap as a unit. #}
         <span class="crumb__seg">
           {%- if c.icon %}<img class="album-ico crumb__ico" src="{{ c.icon }}" alt="" aria-hidden="true" width="14" height="14">{% endif -%}
-          <a href="/album/{{ c.path }}">{{ c.name | upper }}</a>
+          <a href="/album/{{ c.path }}">{{ c.name }}</a>
         </span>
       {% endfor %}
       <span class="sep">/</span>
@@ -63,13 +61,13 @@
     </div>
   </nav>
 
-  <div class="section__doc">
-    <span class="doc-min-hide">FILE / {{ image.filename | upper }}</span>
-    <span class="doc-min-hide">ALBUM / <b>{{ image.album }}</b></span>
-    {% if image.width and image.height %}<span>DIM / <b>{{ image.width }}×{{ image.height }}</b></span>{% endif %}
-    {% if image.size %}<span>SIZE / <b>{{ (image.size / 1024 / 1024) | round(2) }} MB</b></span>{% endif %}
-    <span class="stamp stamp--cy" id="quality-stamp">PREVIEW</span>
-  </div>
+  {# real file facts, not a register dump — the quality marker is the only
+     part that changes at runtime (app.js flips it when the original loads) #}
+  <p class="section__doc">
+    {% if image.width and image.height %}<span><b>{{ image.width }}×{{ image.height }}</b></span>{% endif %}
+    {% if image.size %}<span><b>{{ (image.size / 1024 / 1024) | round(2) }}</b> MB</span>{% endif %}
+    <span class="section__doc-mark" id="quality-stamp">{{ t('quality.preview') }}</span>
+  </p>
 
   {% set _sort_qs = ('sort=' ~ current_sort) if current_sort != default_sort else '' %}
   {% set _col_qs = ('col=' ~ (collection_root | urlencode)) if collection_root else '' %}
@@ -78,8 +76,6 @@
   <div class="detail">
     <div class="stage-wrap">
       <div class="stage">
-        <span class="stage__corner stage__corner--tl">FRAME / 01</span>
-        <span class="stage__corner stage__corner--tr">{% if image.width and image.height %}{{ image.width }}×{{ image.height }}{% else %}IMG{% endif %}</span>
         {% if prev_rel %}<a class="nav-arrow prev" href="/image/{{ prev_rel }}{{ img_qs }}" aria-label="{{ t('aria.previous') }}"><i class="fa fa-chevron-left" aria-hidden="true"></i></a>{% endif %}
         <img id="stage-img"
              class="is-preview"
@@ -101,7 +97,7 @@
 
     <aside class="sidebar">
       <section class="panel">
-        <h2><i class="fa fa-circle-info" aria-hidden="true"></i>FILE <span class="stamp">META</span></h2>
+        <h2><i class="fa fa-circle-info" aria-hidden="true"></i>{{ t('panel.file') }}</h2>
         <dl class="kv">
           <dt>{{ t('kv.album') }}</dt><dd><a href="/album/{{ image.album }}">{{ image.album }}</a></dd>
           <dt>{{ t('kv.filename') }}</dt><dd>{{ image.filename }}</dd>

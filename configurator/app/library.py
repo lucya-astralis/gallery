@@ -18,6 +18,32 @@ _SKIP_DIRS = {schema.ALBUM_META_DIR, "@eaDir", "#recycle", "__pycache__"}
 _SKIP_FILES = {".DS_Store", "Thumbs.db", "desktop.ini"}
 
 
+def asset_kinds(name: str) -> list[str]:
+    """Every role a file in an album's .album/ folder could fill.
+
+    A LIST, not a single kind: the extension whitelists overlap — a .png is a
+    valid icon AND a valid wallpaper, a .webp likewise — so labelling each file
+    with one winning kind hid PNG backdrops from the wallpaper pickers. The UI
+    asks "could this be a wallpaper?" and gets an honest answer.
+
+    The two structural files are exclusive: album.cfg and album_<lang>.md are
+    never anything else, whatever their extension suggests.
+    """
+    ext = Path(name).suffix.lower()
+    if name == schema.ALBUM_CFG_NAME:
+        return ["cfg"]
+    if name.startswith("album_") and ext == ".md":
+        return ["description"]
+    kinds = []
+    if ext in schema.ICON_EXTS:
+        kinds.append("icon")
+    if ext in schema.FONT_EXTS:
+        kinds.append("font")
+    if ext in schema.WALLPAPER_EXTS:
+        kinds.append("wallpaper")
+    return kinds or ["other"]
+
+
 def is_image(name: str) -> bool:
     return Path(name).suffix.lower() in schema.IMAGE_EXTS
 
@@ -258,20 +284,12 @@ class Library:
         for entry in sorted(os.scandir(meta), key=lambda e: e.name.lower()):
             if not entry.is_file() or entry.name in _SKIP_FILES:
                 continue
-            ext = Path(entry.name).suffix.lower()
-            if ext in schema.ICON_EXTS:
-                kind = "icon"
-            elif ext in schema.FONT_EXTS:
-                kind = "font"
-            elif entry.name == schema.ALBUM_CFG_NAME:
-                kind = "cfg"
-            elif entry.name.startswith("album_") and ext == ".md":
-                kind = "description"
-            else:
-                kind = "other"
+            kinds = asset_kinds(entry.name)
             out.append({
                 "name": entry.name,
-                "kind": kind,
+                "kinds": kinds,
+                # primary role, for anything that just wants one word
+                "kind": kinds[0],
                 "size": entry.stat().st_size,
             })
         return out

@@ -111,6 +111,14 @@
   --text:       #eef0ff;
   --text-dim:   #9ea0bc;
   --text-ghost: #5c5e7a;
+  /* Section headings used to sit at full --text alongside the page title, the
+     card names and every bold number, so a screen was a field of identical
+     white with no way in. This is one step down: still clearly a heading,
+     but it stops competing with the title above it and the photos below. */
+  --text-head:  #c6cae6;
+  /* the two ends of the display-title gradient (see .section__slug .name) */
+  --title-a:    #f4f5ff;
+  --title-b:    #9aa6e8;
 
   --acc-cy:     #5b8aff;
   --acc-mag:    #a594ff;
@@ -118,7 +126,34 @@
   --acc-ok:     #3dffa5;
   --acc-red:    #ff6767;
 
-  --radius:     2px;
+  /* ---- translucent surfaces ------------------------------------------
+     Every box here floats over the ambient wallpaper or straight over a
+     photo. Legibility comes from BLUR, not from painting the box darker:
+     a lightly tinted pane over a blurred backdrop stays bright and keeps
+     the wallpaper readable through it, where an opaque slab just turns
+     the page into a stack of dark rectangles. Four values are the whole
+     scale, so a legibility change is one edit instead of sixty:
+       --glass / --glass-hi   panes over the page background: bars, fields,
+                              buttons, menus, cards
+       --scrim / --scrim-hi   chips laid ON a photo, where the backdrop is
+                              whatever the picture happens to be there
+     Where blur is unavailable — phones and html.fx-lite, both of which
+     switch backdrop-filter off for the GPU cost — the same tokens are
+     redefined more opaque, because there the backdrop is not softened and
+     opacity is the only thing left doing the work.
+     Gradient shades that fade INTO a photo (card captions, hero overlays)
+     stay hand-tuned — being see-through at one end is their whole job. */
+  --glass:      rgba(26,29,44,.42);
+  --glass-hi:   rgba(38,42,62,.58);
+  --scrim:      rgba(10,11,18,.52);
+  --scrim-hi:   rgba(14,16,26,.70);
+  --glass-blur: blur(18px) saturate(140%);
+  --scrim-blur: blur(14px) saturate(130%);
+
+  /* square, everywhere: the one shape rule the whole surface language is
+     built on. Kept as a token so the handful of pills that are genuinely
+     round (status dot, lightbox buttons) have to opt out on purpose. */
+  --radius:     0;
   --nav-h:      60px;
   --page-pad:   clamp(20px, 2.6vw, 56px);
   --page-max:   2000px;
@@ -165,7 +200,13 @@ body > .foot{ flex-shrink:0; }
   pointer-events:none;
   background:var(--bg);
 }
-/* ambient video fills the backdrop on capable large screens (opt-in via app.js) */
+/* The still always paints; the ambient clip lays over it on capable large
+   screens (opt-in via app.js) and hides it once it plays. Both fill the
+   backdrop the same way, so swapping one for the other doesn't move
+   anything. An album's own wallpaper arrives through exactly these two
+   elements — see _site_bg in main.py — so nothing here has to know whether
+   the picture is the site default or the album's. */
+.bg-still,
 .bg-video{
   position:absolute; inset:0;
   width:100%; height:100%;
@@ -180,7 +221,7 @@ body > .foot{ flex-shrink:0; }
     linear-gradient(to bottom, rgba(255,255,255,.03) 1px, transparent 1px),
     radial-gradient(ellipse at 22% 32%, rgba(40,90,220,0.18) 0%, transparent 45%),
     radial-gradient(ellipse at 80% 70%, rgba(120,60,220,0.10) 0%, transparent 50%),
-    linear-gradient(rgba(6,8,14,0.72), rgba(4,5,10,0.86));
+    linear-gradient(rgba(6,8,14,0.60), rgba(4,5,10,0.76));
   background-size: 32px 32px, 32px 32px, auto, auto, auto;
   background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
 }
@@ -192,15 +233,23 @@ body > .foot{ flex-shrink:0; }
 @media (prefers-reduced-motion: reduce){
   .bg-video{ display:none; }
 }
-
-/* Phones never load the ambient clip (app.js only wires it up at ≥761px), and
-   most are flagged fx-lite anyway — so paint a single still frame of the video
-   as the backdrop instead of the bare gradient. */
-@media (max-width:760px){
-  .site-bg{
-    background:var(--bg) url("/static/bg-poster.jpg") center center / cover no-repeat;
-  }
+/* No blur on weak hardware, so the panes lose the one thing that was making
+   them readable — pay for it in opacity instead. Redefining the tokens once
+   retunes every surface that uses them; nothing else has to know. */
+.fx-lite{
+  --glass:      rgba(22,25,38,.80);
+  --glass-hi:   rgba(34,38,56,.90);
+  --scrim:      rgba(10,11,18,.76);
+  --scrim-hi:   rgba(14,16,26,.88);
+  --glass-blur: none;
+  --scrim-blur: none;
 }
+
+/* Phones never load the ambient clip (app.js only wires it up at ≥761px) and
+   most are flagged fx-lite anyway, so what they see is the <picture>'s mobile
+   source — the album's `wallpaper_mobile` if it set one, else the site's
+   poster frame. That used to be a hard-coded CSS background here, which an
+   album could not override without an inline style the CSP would drop. */
 
 /* liveNav(): a tag or sort click swaps the marked regions instead of
    reloading. The only visible cue is the swapped area dimming while the
@@ -233,11 +282,6 @@ code{
   color:var(--text);
 }
 
-.scramble-char{
-  color: var(--acc-mag);
-  opacity: .85;
-  text-shadow: 0 0 6px currentColor;
-}
 
 /* ================================================================
    NAV
@@ -245,7 +289,7 @@ code{
 .nav{
   position:sticky; top:0; z-index:100;
   height:var(--nav-h);
-  background: rgba(7,7,11,0.72);
+  background: rgba(7,7,11,.86);
   backdrop-filter: blur(10px) saturate(120%);
   -webkit-backdrop-filter: blur(10px) saturate(120%);
   border-bottom:1px solid var(--line);
@@ -301,7 +345,7 @@ code{
 .nav__brand .brand-sub{
   font-family:"JetBrains Mono", ui-monospace, monospace;
   font-size:9.5px;
-  letter-spacing:.28em;
+  letter-spacing:.12em;
   text-transform:uppercase;
   color:var(--acc-mag);
 }
@@ -325,7 +369,9 @@ code{
   display:flex; align-items:center;
   border:1px solid var(--line);
   border-radius:var(--radius);
-  background:rgba(255,255,255,.02);
+  background:var(--glass);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
   padding:0 12px;
   transition: border-color .15s, background .15s, box-shadow .15s;
 }
@@ -342,12 +388,12 @@ code{
   background:transparent;
   border:0; outline:0;
   color:var(--text);
-  font-family:"JetBrains Mono", monospace;
+  font-family:inherit;
   font-size:12px;
   letter-spacing:.08em;
   padding:9px 0;
 }
-.nav__search input::placeholder{ color:var(--text-ghost); letter-spacing:.14em; text-transform:uppercase; font-size:11px; }
+.nav__search input::placeholder{ color:var(--text-ghost); letter-spacing:.01em; font-size:12px; }
 
 .nav__status{
   display:flex; align-items:center; gap:8px;
@@ -374,13 +420,15 @@ code{
    instead of loose text links hanging off a divider. */
 .nav__lang{
   display:flex; align-items:center; gap:2px;
-  font-family:"JetBrains Mono", monospace;
-  font-size:11px;
-  letter-spacing:.12em;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
   padding:3px;
   border:1px solid var(--line);
   border-radius:var(--radius);
-  background:rgba(255,255,255,.02);
+  background:var(--glass);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
   white-space:nowrap;
 }
 .nav__lang-opt{
@@ -411,17 +459,21 @@ section{
 }
 
 /* ================================================================
-   SECTION HEADER (doc bar + slug)
+   PAGE HEADER (meta line + title)
+   ----------------------------------------------------------------
+   This used to be a machine console: a segmented FILE / CLASS / RDY
+   readout bar, a cyan index number, the title, and a bilingual ornament,
+   each in monospace caps at .2em tracking. Four bands of chrome saying
+   what one heading says. What is left is a heading and, under it, the
+   facts the page actually knows — set in the page's own sans at normal
+   tracking so it reads as a sentence rather than a register dump.
    ================================================================ */
 .section__doc{
   display:flex;
   flex-wrap:wrap;
-  align-items:center;
-  gap:0;
-  margin-bottom:14px;
-  border:1px solid var(--line);
-  border-left:2px solid var(--acc-cy);
-  background:linear-gradient(180deg, rgba(255,255,255,.018), transparent);
+  align-items:baseline;
+  gap:5px 18px;
+  margin:0 0 18px;
   font-family:"JetBrains Mono", monospace;
   font-size:10.5px;
   letter-spacing:.18em;
@@ -429,77 +481,66 @@ section{
   color:var(--text-dim);
 }
 .section__doc > span{
-  padding:7px 12px;
-  border-right:1px solid var(--line);
-  display:inline-flex; align-items:center; gap:6px;
-  /* let an overlong value (long file/album name) wrap inside its own chip
-     instead of forcing the whole bar to overflow and clip — the bar wraps
-     whole chips first, so short chips still stay on one line. Mobile re-asserts
-     nowrap below and ellipsizes long <b> values instead. */
+  display:inline-flex; align-items:baseline; gap:6px;
   min-width:0;
   overflow-wrap:anywhere;
 }
-/* the last chip is always a status stamp (its own full border). push it to
-   the right as a status badge, but keep a gap from the bar's right wall so it
-   isn't jammed into the corner — and keep its full border (no longer dropped,
-   so it isn't cut off on the right). */
-.section__doc > span:last-child{ margin-left:auto; margin-right:12px; }
-.section__doc b{
-  color:var(--text);
-  font-weight:400;
-  letter-spacing:.14em;
-}
-/* status/context stamps read as clean rounded chips (same look as mobile):
-   dashed outline, roomy padding and their own margin so they sit apart from
-   the flush segmented cells rather than butting against the dividers. */
-.section__doc .stamp{
-  color:var(--acc-amb);
-  border:1px dashed rgba(255,181,71,.45);
-  border-radius:var(--radius);
-  padding:4px 9px;
-  margin:0 8px;
+.section__doc b{ color:var(--text); font-weight:400; letter-spacing:.14em; }
+/* the qualifiers — sub-album, featured, collection, active tag filter — are
+   marks on the line, not stamps: a hairline outline and the accent colour,
+   no dashed "sticker" border and no shouting */
+.section__doc-mark{
+  color:var(--acc-cy);
+  border:1px solid rgba(91,138,255,.35);
+  padding:3px 8px;
   font-size:9.5px;
-  letter-spacing:.22em;
+  letter-spacing:.2em;
 }
-.section__doc .stamp--ok{ color:var(--acc-ok); border-color:rgba(61,255,165,.4); }
-.section__doc .stamp--red{ color:var(--acc-red); border-color:rgba(255,103,103,.5); }
-.section__doc .stamp--cy{ color:var(--acc-cy); border-color:rgba(91,138,255,.45); border-style:dashed; }
+.section__doc-mark.is-original{ color:var(--acc-ok); border-color:rgba(61,255,165,.4); }
+.section__doc-in{ color:var(--text-ghost); }
 
 .section__head{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-end;
-  margin-bottom:22px;
-  padding-bottom:10px;
-  border-bottom:1px solid var(--line);
-  gap:24px;
-  flex-wrap:wrap;
+  margin-bottom:24px;
 }
 .section__slug{
-  display:flex; align-items:baseline; gap:18px;
+  display:flex; align-items:baseline; gap:14px;
   flex-wrap:wrap;
   min-width:0;
-}
-.section__slug .ix{
-  font-family:"JetBrains Mono", monospace;
-  color:var(--acc-cy);
-  font-size:13px; letter-spacing:.14em;
+  margin:0;
 }
 .section__slug .name{
   font-family:"Space Grotesk", sans-serif;
-  font-size:clamp(20px, 2.4vw, 30px);
+  /* the page's one display size — big enough to carry the page on its own
+     now that nothing else is competing for the top of the screen */
+  /* the old cut: 700 at the smaller size with positive tracking. Blown up to
+     46px on negative tracking it stopped matching the mono/tracked chrome
+     under it and read as a different site's headline. */
+  font-size:clamp(22px, 2.7vw, 33px);
   font-weight:700;
-  letter-spacing:.02em;
-  line-height:1;
-  color:var(--text);
+  letter-spacing:.03em;
+  line-height:1.06;
   word-break:break-word;
+  /* Colour instead of brightness: the title fades from near-white at the cap
+     line into the site's periwinkle at the baseline. It is not "purple text"
+     — the top of every letter still reads white — it just stops the headline
+     being the same flat #eef0ff as the six things under it. background-clip
+     needs a painted background, so the flat colour below is the fallback for
+     engines without it. .album-font only ever restyles .album-hero__title, so
+     it never lands on this element. */
+  color:var(--title-a);
+  background:linear-gradient(175deg, var(--title-a) 18%, var(--title-b) 96%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+  /* the transparent fill would swallow a selection highlight otherwise */
+  padding-bottom:.04em;
 }
-.section__slug .jp{
-  font-family:"Noto Sans JP", sans-serif;
-  color:var(--text-ghost);
-  font-size:12px;
-  letter-spacing:.2em;
-}
+.section__slug .name::selection{ -webkit-text-fill-color:var(--text); }
+/* Uppercase ONLY where the title is a fixed UI word ("Albums", "Search").
+   Album pages put the album's real folder name in this element, and casing
+   that would be restyling data — `Pride_MUC_26` is not `PRIDE_MUC_26`. */
+.page-albums .section__slug .name,
+.page-search .section__slug .name{ text-transform:uppercase; }
 /* parent-album link before the title (e.g. "↑ japan / tokyo"). Hidden on every
    viewport now that the pathbar "‹ Back to <parent>" button is always shown —
    the inline link would just duplicate it. */
@@ -523,11 +564,9 @@ section{
 .section__parent-slash{ color:var(--text-ghost); }
 
 .crumb{
-  font-family:"JetBrains Mono", monospace;
-  font-size:11px; letter-spacing:.16em;
-  text-transform:uppercase;
+  font-size:13px;
   color:var(--text-ghost);
-  display:flex; align-items:center; gap:8px;
+  display:flex; align-items:center; gap:7px;
   /* wrap to a new line instead of overflowing when the trail is long */
   flex-wrap:wrap;
   margin-bottom:18px;
@@ -543,8 +582,10 @@ section{
   transition:color .15s, text-decoration-color .15s;
 }
 .crumb a:hover{ color:var(--acc-cy); text-decoration-color:var(--acc-cy); }
-.crumb b{ color:var(--text); font-weight:400; letter-spacing:.14em; }
-.crumb .sep{ color:var(--text-ghost); }
+.crumb b{ color:var(--text); font-weight:500; }
+/* the slashes are what makes the trail read as a path — ghosted they
+   disappeared and the segments ran together */
+.crumb .sep{ color:var(--text); }
 /* album names and filenames are often single unbreakable tokens (underscores
    aren't break points) — let them break so a long name can't overflow the
    viewport and clip / force horizontal scroll, esp. on mobile. */
@@ -566,67 +607,107 @@ section{
 }
 /* the showcase rail sets its captions bigger; keep the mark in proportion */
 .album-ico--lg{ width:1.15em; height:1.15em; }
-/* the trail is mono caps at 11px — a 1em mark disappears in it. Mark and
-   label are one flex item (.crumb__seg) so they stay glued together while
-   the trail's own 8px gap keeps its distance to the `/` separators. */
+/* mark and label are one flex item (.crumb__seg) so they stay glued
+   together while the trail's own gap keeps its distance to the `/`. */
 .crumb__seg{ display:inline-flex; align-items:center; gap:5px; min-width:0; }
 .crumb__ico{ flex:0 0 auto; width:1.35em; height:1.35em; margin-right:0; }
 
-/* ---- path bar: the page's route line, one bar claiming the full content
-   width instead of a small block squeezed into the left corner. Desktop:
-   back chip, the trail DIRECTLY beside it, then a rule fading out to the
-   right edge. Phones (≤760px overrides below): chip + rule on the first
-   row, the trail always on its own full-width line underneath. The rule is
-   pure decoration (empty content, no text — screen readers skip it). */
+/* ---- route line: back link, then the trail beside it. It used to be a
+   filled cyan chip in monospace caps followed by a decorative rule fading
+   off to the right edge — a console prompt with a trailing wire. Now the
+   back link is a link: an arrow, a word, an underline on hover. It keeps a
+   40px hit area so it stays thumb-sized on a phone without needing to look
+   like a button to do it. */
 .pathbar{
   display:flex; flex-flow:row wrap; align-items:center;
-  gap:10px 16px; margin-bottom:18px; min-width:0;
+  gap:6px 14px; margin-bottom:20px; min-width:0;
 }
-.pathbar::after{
-  content:"";
-  flex:1 1 40px;
-  min-width:40px;
-  height:1px;
-  background:linear-gradient(90deg, var(--line-strong), transparent 92%);
-}
+/* the trail's own pane. `fit-content` (not `100%`) is what makes it hug the
+   path: the row is a flex line, so once the trail wraps onto a line of its
+   own the pane would otherwise stretch the full width and float a two-word
+   breadcrumb inside an empty bar. */
 .pathbar .crumb{
   margin-bottom:0;
   flex:0 1 auto;
+  width:fit-content;
   max-width:100%;
   min-width:0;
+  padding:6px 12px;
+  border:1px solid var(--line);
+  background:var(--glass);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
 }
 .pathbar__back{
   display:inline-flex;
   align-items:center;
-  gap:9px;
+  gap:8px;
   flex:0 0 auto;
   max-width:100%;
-  padding:10px 16px;
   min-height:40px;
-  border:1px solid rgba(91,138,255,.32);
-  border-radius:var(--radius);
-  background:linear-gradient(180deg, rgba(91,138,255,.15), rgba(91,138,255,.06));
+  padding:8px 0;
   color:var(--acc-cy);
-  font-family:"JetBrains Mono", monospace;
-  font-size:11px;
-  letter-spacing:.16em;
-  text-transform:uppercase;
+  font-size:13.5px;
+  font-weight:500;
   line-height:1;
-  transition:background .15s, border-color .15s, box-shadow .15s;
+  transition:color .15s;
 }
 .pathbar__back:hover{
-  background:linear-gradient(180deg, rgba(91,138,255,.24), rgba(91,138,255,.11));
-  border-color:var(--acc-cy);
-  box-shadow:0 0 16px -6px rgba(91,138,255,.5);
+  color:var(--text);
+  border-color:rgba(91,138,255,.55);
+  background:var(--glass-hi);
 }
-.pathbar__back:active{ background:rgba(91,138,255,.24); }
-.pathbar__back-ico{ font-size:18px; line-height:1; margin-top:-1px; }
-.pathbar__back-lbl{ color:var(--text-dim); }
+/* On a wide screen it sits next to a trail that starts at the same place, so
+   it stays narrow and quiet: the arrow plus the parent's name, no "Back to"
+   scaffolding, a hairline box rather than a filled chip. It is a shortcut you
+   reach for, not the headline of the row. Phones get the full label back (see
+   the ≤760px block) — there it is the thumb-sized target and the trail below
+   it is small text. */
+@media (min-width:761px){
+  .pathbar__back{
+    /* Matched to the trail pane beside it, but by STRETCHING rather than by
+       copying its padding: the pane grows when a crumb carries an album mark
+       (the 14px icon makes its line taller), so a hard-coded box would drift
+       out of step page by page. align-self:stretch tracks whatever the row
+       ends up being. */
+    align-self:stretch;
+    min-height:0;
+    padding:6px 12px;
+    gap:7px;
+    font-size:12.5px;
+    line-height:1.5;
+    border:1px solid var(--line);
+    background:var(--glass);
+    backdrop-filter:var(--glass-blur);
+    -webkit-backdrop-filter:var(--glass-blur);
+    transition:color .15s, border-color .15s, background .15s;
+  }
+  /* the parent's name alone carries it; "Back to" would double the width */
+  .pathbar__back .pathbar__back-lbl{ display:none; }
+  .pathbar__back .pathbar__back-txt{ font-weight:500; max-width:22ch; }
+  .pathbar__back:hover .pathbar__back-txt{ text-decoration:none; }
+}
+.pathbar__back:hover .pathbar__back-txt{ text-decoration:underline; text-underline-offset:3px; }
+/* a square flex box, so the chevron is centred by layout rather than by the
+   glyph's bearing inside its em box — that left it visibly high on phones,
+   where the button is tall enough for a pixel or two to show */
+.pathbar__back-ico{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:1.15em; height:1.15em;
+  font-size:13px;
+  line-height:1;
+  flex:0 0 auto;
+}
+/* "Back to" is scaffolding for the album name that follows it; the name is
+   the part worth reading, so only the name gets full contrast */
+.pathbar__back-lbl{ color:inherit; opacity:.75; }
 .pathbar__back-txt{
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-  color:var(--text);
+  font-weight:600;
 }
 
 /* ================================================================
@@ -647,9 +728,11 @@ section{
   align-self:flex-start;
   padding:3px 8px;
   border:1px solid var(--line-strong);
-  background:rgba(7,7,11,.72);
-  font-family:"JetBrains Mono", monospace;
-  font-size:9.5px; letter-spacing:.24em; text-transform:uppercase;
+  background:var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
+  font-family:inherit;
+  font-size:12px; letter-spacing:.01em;
   color:var(--acc-cy);
 }
 .album-hero__title{
@@ -683,8 +766,8 @@ section{
 }
 .album-hero__facts{
   display:flex; flex-wrap:wrap; gap:3px 14px;
-  font-family:"JetBrains Mono", monospace;
-  font-size:10px; letter-spacing:.16em; text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px; letter-spacing:.01em;
   font-variant-numeric:tabular-nums;
   color:var(--text-dim);
 }
@@ -698,9 +781,11 @@ section{
 .album-hero__tag{
   padding:2px 7px;
   border:1px solid var(--line-strong);
-  background:rgba(7,7,11,.72);
-  font-family:"JetBrains Mono", monospace;
-  font-size:9.5px; letter-spacing:.14em;
+  background:var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
+  font-family:inherit;
+  font-size:12px; letter-spacing:.01em;
   /* --text, not --text-dim: dim only clears ~2.4:1 against the brightest
      slides even through the chip, where --text lands ~4.7:1 */
   color:var(--text);
@@ -769,17 +854,19 @@ section{
   font-family:"JetBrains Mono", monospace;
   font-size:10.5px;
   letter-spacing:.16em;
+  text-transform:uppercase;
   color:var(--text-dim);
   padding:5px 10px;
   border:1px solid var(--line);
-  background:rgba(255,255,255,.02);
-  text-transform:uppercase;
+  background:var(--glass);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
   transition: border-color .15s, color .15s, background .15s;
 }
 .tag:hover{
   color:var(--text);
   border-color:var(--line-strong);
-  background:rgba(255,255,255,.05);
+  background:var(--glass-hi);
 }
 .tag.active{
   color:var(--bg);
@@ -862,12 +949,13 @@ section{
 }
 .fhero__chip{
   position:absolute; top:12px; z-index:4;
-  font-family:"JetBrains Mono", monospace;
-  font-size:9.5px;
+  font-family:inherit;
+  font-size:12px;
   letter-spacing:.2em;
-  text-transform:uppercase;
   color:var(--text);
-  background:rgba(7,7,11,.72);
+  background:var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
   border:1px solid var(--line-strong);
   padding:3px 8px;
   pointer-events:none;
@@ -886,16 +974,18 @@ section{
   position:absolute; left:14px; bottom:52px; z-index:4;
   display:inline-flex; align-items:baseline; gap:10px;
   max-width:calc(100% - 28px);
-  font-family:"JetBrains Mono", monospace;
+  font-family:inherit;
   color:var(--text);
-  background:rgba(7,7,11,.55);
+  background:var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
   border:1px solid var(--line);
   padding:6px 10px;
   transition:border-color .15s, background .15s;
 }
 .fhero__file:hover{
   border-color:var(--acc-cy);
-  background:rgba(7,7,11,.78);
+  background:var(--scrim-hi);
   color:var(--text);
 }
 .fhero__file-name{
@@ -905,9 +995,8 @@ section{
   min-width:0;
 }
 .fhero__file-open{
-  font-size:8.5px;
-  letter-spacing:.22em;
-  text-transform:uppercase;
+  font-size:12px;
+  letter-spacing:.01em;
   color:var(--acc-cy);
   white-space:nowrap;
 }
@@ -922,7 +1011,7 @@ section{
   -webkit-backdrop-filter:blur(8px) saturate(120%);
 }
 .fhero__nav{
-  font-family:"JetBrains Mono", monospace;
+  font-family:inherit;
   font-size:13px;
   line-height:1.2;
   padding:3px 10px;
@@ -986,14 +1075,6 @@ section{
   from{ transform:translateY(-50%) scaleX(0); }
   to  { transform:translateY(-50%) scaleX(1); }
 }
-.fhero__auto{
-  font-family:"JetBrains Mono", monospace;
-  font-size:9px;
-  letter-spacing:.2em;
-  text-transform:uppercase;
-  color:var(--text-ghost);
-  white-space:nowrap;
-}
 /* single featured photo: static hero, no slideshow chrome */
 .fhero--single .fhero__bar,
 .fhero--single .fhero__chip--frm{ display:none; }
@@ -1004,11 +1085,10 @@ section{
   .fhero__frame{ aspect-ratio:3/2; min-height:220px; max-height:60vh; }
   .fhero__bar{ padding:8px 10px 9px; gap:8px; }
   .fhero__file{ left:10px; bottom:46px; padding:5px 8px; gap:8px; }
-  .fhero__file-name{ font-size:10px; }
-  .fhero__chip{ font-size:8.5px; padding:2px 6px; }
+  .fhero__file-name{ font-size:12px; }
+  .fhero__chip{ font-size:12px; padding:2px 6px; }
   .fhero__chip--star{ left:10px; }
   .fhero__chip--frm{ right:10px; }
-  .fhero__auto{ display:none; }
 }
 
 /* ---- hero reel (.fhero--hero) — the reel doubling as the album hero ----
@@ -1088,7 +1168,9 @@ section{
   letter-spacing:.22em;
   text-transform:uppercase;
   color:var(--acc-cy);
-  background: rgba(7,7,11,.78);
+  background: var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
   border:1px solid var(--acc-cy);
   padding:3px 7px;
   pointer-events:none;
@@ -1107,13 +1189,12 @@ section{
   margin-bottom:14px;
   padding-bottom:8px;
   border-bottom:1px dashed var(--line);
-  font-family:"JetBrains Mono", monospace;
-  font-size:10.5px;
-  letter-spacing:.22em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
   color:var(--text-ghost);
 }
-.showcase__label{ color:var(--acc-cy); letter-spacing:.24em; }
+.showcase__label{ color:var(--acc-cy); letter-spacing:.01em; }
 .showcase__count{ margin-left:auto; }
 .showcase__more{
   margin-left:auto;
@@ -1147,9 +1228,11 @@ section{
   font-size:12px;
   line-height:1;
   color:var(--acc-cy);
-  background: rgba(7,7,11,.78);
+  background: var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
   border:1px solid var(--acc-cy);
-  border-radius:2px;
+  border-radius:var(--radius);
   pointer-events:none;
   text-shadow: 0 0 6px rgba(91,138,255,.6);
 }
@@ -1181,7 +1264,9 @@ section{
 }
 .sort__btn{
   appearance:none;
-  background:rgba(255,255,255,.02);
+  background:var(--glass);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
   border:1px solid var(--line);
   color:var(--text-dim);
   font-family:"JetBrains Mono", monospace;
@@ -1208,9 +1293,7 @@ section{
 }
 .sort__btn[aria-expanded="true"]::after{ transform: rotate(180deg); }
 .sort__btn:hover{ color:var(--text); border-color:var(--acc-cy); }
-.sort__btn-label{
-  color:var(--acc-cy);
-}
+.sort__btn-label{ color:var(--acc-cy); }
 
 .sort__menu{
   position:absolute;
@@ -1233,7 +1316,7 @@ section{
   letter-spacing:.24em;
   text-transform:uppercase;
   color:var(--text-ghost);
-  border-bottom:1px dashed var(--line);
+  border-bottom:1px solid var(--line);
   margin-bottom:4px;
 }
 .sort__option{
@@ -1260,12 +1343,7 @@ section{
   background:rgba(91,138,255,.08);
   border-left-color:var(--acc-cy);
 }
-.sort__option.is-active::before{
-  content:"▸";
-  color:var(--acc-cy);
-  font-size:10px;
-  margin-right:-2px;
-}
+.sort__option.is-active{ font-weight:600; }
 
 /* Mobile: bottom-sheet variant */
 .sort__backdrop{
@@ -1313,7 +1391,7 @@ section{
   .sort__option{
     padding:14px 18px;
     font-size:12px;
-    letter-spacing:.16em;
+    letter-spacing:.12em;
   }
   @keyframes sort-sheet-in {
     from { transform: translateY(100%); }
@@ -1324,34 +1402,63 @@ section{
 /* ================================================================
    ALBUMS OVERVIEW  (page header stats + featured rail + archive head)
    ================================================================ */
+/* ---- albums index header rhythm --------------------------------------
+   This page stacks four full-width bands before any album is visible
+   (pathbar, doc bar, title row, featured bar). Each carried margins meant
+   for pages where it is the only header, so the stack ate the top third of
+   the viewport. Tightened here only — every other page keeps the default. */
+.page-albums .pathbar{ margin-bottom:13px; }
+.page-albums .section__doc{ margin-bottom:10px; }
+.page-albums .section__head{ margin-bottom:18px; }
+
 /* totals readout on the right of the page title */
+/* The counts sit UNDER the title as its subline (they used to be flung to the
+   opposite end of a space-between row, where they read as an orphan) — but in
+   the same mono/tracked face as the section labels below them, so the header
+   hands off to the chrome instead of switching typeface halfway down. */
 .section__stat{
+  margin:9px 0 0;
   font-family:"JetBrains Mono", monospace;
   font-size:10.5px;
   letter-spacing:.2em;
   text-transform:uppercase;
   color:var(--text-ghost);
-  white-space:nowrap;
 }
 .section__stat b{ color:var(--acc-cy); font-weight:400; }
-.section__stat-sep{ margin:0 4px; opacity:.6; }
+.section__stat-sep{ margin:0 6px; opacity:.6; }
+/* the search query is the user's own text, not a label — the subline's
+   uppercase must not restyle it (same rule as the album name in the title) */
+.section__stat-q{ color:var(--text); text-transform:none; letter-spacing:.06em; }
 
 /* ---- featured rail: showcase albums as large poster cards. Nested
    <section>: cancel the global section padding/centring (same trick
    as .showcase on the welcome screen). ---- */
 .feat{ margin:0 0 36px; padding:0; }
+/* Section headings mark where the chrome ends and the photographs begin, so
+   they keep the mono/tracked voice the rest of the page gave up: a label in
+   that face next to a wall of photos reads as an index card, and a label in
+   the same sans as everything else just dissolves into the grid. The bars
+   they used to sit in are still gone — this is type on a hairline, not a
+   filled strip. */
 .feat__head{
-  display:flex; align-items:center; gap:14px;
-  margin-bottom:14px;
+  display:flex; align-items:baseline; gap:14px;
+  margin-bottom:13px;
   padding-bottom:8px;
-  border-bottom:1px dashed var(--line);
+  border-bottom:1px solid var(--line);
   font-family:"JetBrains Mono", monospace;
   font-size:10.5px;
   letter-spacing:.22em;
   text-transform:uppercase;
   color:var(--text-ghost);
 }
-.feat__label{ color:var(--acc-cy); letter-spacing:.24em; }
+.feat__label{
+  margin:0;
+  font-family:inherit;
+  font-size:11px;
+  font-weight:400;
+  letter-spacing:.24em;
+  color:var(--acc-cy);
+}
 .feat__count{ margin-left:auto; }
 .feat__rail{
   list-style:none; padding:0; margin:0;
@@ -1428,7 +1535,9 @@ section{
   font-size:9px;
   letter-spacing:.2em;
   color:var(--text);
-  background:rgba(7,7,11,.7);
+  background:var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
   border:1px solid var(--line-strong);
   padding:2px 6px;
   pointer-events:none;
@@ -1505,18 +1614,25 @@ section{
 
 /* ---- archive header: list label + count + sort control ---- */
 .archive-head{
-  display:flex; align-items:center; gap:12px 14px;
+  display:flex; align-items:center; gap:10px 14px;
   flex-wrap:wrap;
-  margin-bottom:14px;
+  margin-bottom:13px;
   padding-bottom:8px;
-  border-bottom:1px dashed var(--line);
+  border-bottom:1px solid var(--line);
   font-family:"JetBrains Mono", monospace;
   font-size:10.5px;
   letter-spacing:.22em;
   text-transform:uppercase;
   color:var(--text-ghost);
 }
-.archive-head__label{ color:var(--acc-cy); letter-spacing:.24em; }
+.archive-head__label{
+  margin:0;
+  font-family:inherit;
+  font-size:11px;
+  font-weight:400;
+  letter-spacing:.24em;
+  color:var(--acc-cy);
+}
 .archive-head .sort{ margin-left:auto; }
 
 /* ================================================================
@@ -1597,7 +1713,9 @@ section{
   font-size:9px;
   letter-spacing:.18em;
   color:var(--text-dim);
-  background: rgba(7,7,11,.7);
+  background: var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
   border:1px solid var(--line);
   padding:2px 6px;
   pointer-events:none;
@@ -1619,11 +1737,12 @@ section{
   text-transform:uppercase;
   color:var(--acc-cy);
   border:1px solid var(--acc-cy);
-  background: rgba(7,7,11,.62);
-  padding:7px 14px;
+  background: var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
+  padding:8px 16px;
   transform:translateY(6px);
   transition: transform .25s ease;
-  text-shadow: 0 0 6px rgba(91,138,255,.4);
 }
 .album-card:hover .album-card__hover,
 .album-card:focus-within .album-card__hover{ opacity:1; }
@@ -1676,8 +1795,10 @@ section{
 .album-card__badge--folder{
   color:var(--text-dim);
   border-color:var(--line);
-  background:rgba(7,7,11,.78);
   letter-spacing:.16em;
+  background:var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
 }
 
 /* nested <section>: cancel the global section page-padding + max-width/auto-
@@ -1689,7 +1810,7 @@ section{
 .sub-albums__head{
   display:flex; align-items:baseline; gap:12px;
   margin-bottom:12px; padding-bottom:8px;
-  border-bottom:1px dashed var(--line);
+  border-bottom:1px solid var(--line);
   font-family:"JetBrains Mono", monospace;
   text-transform:uppercase;
 }
@@ -1711,14 +1832,18 @@ section{
 .album-group{
   position:relative;
   border:1px solid var(--line);
+  background:var(--glass);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
   padding:12px 12px 14px;
   /* it's a nested <section>: undo the page-container margin (auto margins
      would also stop the flex column from stretching it) and width cap */
   margin:0;
   max-width:none;
 }
-/* cyan corner ticks — same bracket language as the album-card hover state,
-   but always on: they mark the frame as a deliberate set */
+/* cyan corner ticks — the same bracket language as the album-card hover
+   state, but always on: without them a curated set was a heading with some
+   cards under it, indistinguishable from the ungrouped grid below. */
 .album-group::before,
 .album-group::after{
   content:"";
@@ -1734,11 +1859,10 @@ section{
   display:flex; align-items:baseline; gap:8px 10px; flex-wrap:wrap;
   margin-bottom:12px;
   padding-bottom:8px;
-  border-bottom:1px dashed var(--line);
+  border-bottom:1px solid var(--line);
   font-family:"JetBrains Mono", monospace;
   text-transform:uppercase;
 }
-.album-group__tick{ font-size:10px; color:var(--text-ghost); }
 .album-group__name{
   font-size:11px; letter-spacing:.24em;
   color:var(--acc-cy);
@@ -1762,6 +1886,8 @@ section{
   .album-card__idx{ font-size:8px; padding:2px 5px; }
 
   .album-groups{ gap:14px; }
+  /* the frame is back, so its inset has to come back down too — 12px of
+     padding on each side of a 2-up phone grid is a whole card column */
   .album-group{ padding:9px 8px 10px; }
   .album-group__head{ margin-bottom:9px; }
 
@@ -1863,12 +1989,11 @@ section{
   display:flex; align-items:center; justify-content:space-between; gap:10px;
   padding:10px 14px;
   border-bottom:1px dashed var(--line);
-  font-family:"JetBrains Mono", monospace;
-  font-size:10.5px;
-  letter-spacing:.22em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
 }
-.album-desc__label{ color:var(--acc-cy); letter-spacing:.24em; }
+.album-desc__label{ color:var(--acc-cy); letter-spacing:.01em; }
 .album-desc__file{
   color:var(--text-ghost);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
@@ -1897,10 +2022,9 @@ section{
 .album-desc__body h1{ font-size:19px; }
 .album-desc__body h2{ font-size:16px; }
 .album-desc__body h3{
-  font-family:"JetBrains Mono", monospace;
-  font-size:11px;
-  letter-spacing:.18em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
   color:var(--acc-cy);
   margin:1.2em 0 .5em;
 }
@@ -1958,19 +2082,19 @@ section{
 .album-stat{
   display:flex; align-items:baseline; justify-content:space-between; gap:14px;
   padding:4px 0;
-  font-family:"JetBrains Mono", monospace;
+  font-family:inherit;
 }
 .album-stat + .album-stat{ border-top:1px solid var(--line); }
 .album-stat__key{
   flex:0 0 auto;
-  color:var(--acc-cy);
-  font-size:9.5px; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--text-ghost);
+  font-size:13px;
   white-space:nowrap;
 }
 .album-stat__key:empty{ display:none; }
 .album-stat__val{
   color:var(--text);
-  font-size:12px; line-height:1.4;
+  font-size:13px; line-height:1.4;
   text-align:right;
   overflow-wrap:anywhere;
 }
@@ -2005,8 +2129,7 @@ section{
   margin-bottom:12px;
   padding-bottom:8px;
   border-bottom:1px dashed var(--line);
-  font-family:"JetBrains Mono", monospace;
-  text-transform:uppercase;
+  font-family:inherit;
 }
 .day-group__n{
   font-size:11px; letter-spacing:.24em;
@@ -2107,8 +2230,8 @@ section{
   font-family:"JetBrains Mono", monospace;
   font-size:9.5px;
   letter-spacing:.18em;
-  color:var(--acc-cy);
   text-transform:uppercase;
+  color:var(--acc-cy);
 }
 .image-tile a:hover .image-tile__overlay{ opacity:1; }
 
@@ -2152,21 +2275,20 @@ section{
   width:auto; height:auto;
   object-fit:contain;
 }
+/* the filename, bottom-right over the photo — the only corner label left of
+   the four; the other three repeated the meta line above the stage */
 .stage__corner{
   position:absolute;
   z-index:4;
-  font-family:"JetBrains Mono", monospace;
-  font-size:9.5px;
-  letter-spacing:.18em;
-  text-transform:uppercase;
+  font-size:12px;
   color:var(--text-ghost);
-  background:rgba(7,7,11,.72);
+  background:var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
   padding:3px 7px;
   border:1px solid var(--line);
   pointer-events:none;
 }
-.stage__corner--tl{ top:8px; left:8px; }
-.stage__corner--tr{ top:8px; right:8px; color:var(--acc-cy); border-color:rgba(91,138,255,.35); }
 .stage__corner--bl{ bottom:8px; left:8px; }
 .stage__corner--br{ bottom:8px; right:8px; }
 
@@ -2176,9 +2298,11 @@ section{
   transform:translateY(-50%);
   width:44px; height:64px;
   display:flex; align-items:center; justify-content:center;
-  font-family:"JetBrains Mono", monospace;
+  font-family:inherit;
   font-size:22px;
-  background:rgba(7,7,11,.55);
+  background:var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
   color:var(--text);
   border:1px solid var(--line-strong);
   transition: all .15s;
@@ -2187,7 +2311,7 @@ section{
 .nav-arrow:hover{
   color:var(--acc-cy);
   border-color:var(--acc-cy);
-  background:rgba(7,7,11,.8);
+  background:var(--scrim-hi);
 }
 .nav-arrow.prev{ left:8px; }
 .nav-arrow.next{ right:8px; }
@@ -2210,26 +2334,17 @@ section{
 }
 .panel h2{
   margin:0 0 12px;
-  font-family:"JetBrains Mono", monospace;
-  font-size:10.5px;
-  font-weight:500;
-  letter-spacing:.22em;
-  text-transform:uppercase;
-  color:var(--text-ghost);
-  border-bottom:1px dashed var(--line);
-  padding-bottom:8px;
+  font-family:inherit;
+  font-size:15px;
+  font-weight:600;
+  letter-spacing:-.005em;
+  color:var(--text-head);
+  border-bottom:1px solid var(--line);
+  padding-bottom:9px;
   /* flex-start, not space-between: the leading icon is a flex item of its
      own, and space-between would fling it to one edge and strand the label
-     in the middle. The stamp still pins right, via its own auto margin. */
+     in the middle. */
   display:flex; align-items:center; justify-content:flex-start;
-}
-.panel h2 .stamp{
-  margin-left:auto;
-  color:var(--acc-cy);
-  border:1px solid rgba(91,138,255,.4);
-  padding:1px 6px;
-  font-size:9px;
-  letter-spacing:.2em;
 }
 .kv{
   display:grid;
@@ -2241,10 +2356,9 @@ section{
   overflow-wrap:anywhere;
 }
 .kv dt{
-  font-family:"JetBrains Mono", monospace;
-  font-size:10.5px;
-  letter-spacing:.14em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
   color:var(--text-ghost);
   align-self:center;
   /* .kv sets overflow-wrap:anywhere so long VALUES (lens strings, paths)
@@ -2267,7 +2381,7 @@ section{
 .kv dd{
   margin:0;
   color:var(--text);
-  font-family:"JetBrains Mono", monospace;
+  font-family:inherit;
   font-size:12px;
 }
 /* German label column. Measured against the longest label the EXIF panel
@@ -2281,10 +2395,9 @@ html[lang="de"] .kv dt{ letter-spacing:.1em; }
 
 details > summary{
   cursor:pointer;
-  font-family:"JetBrains Mono", monospace;
-  font-size:10.5px;
-  letter-spacing:.18em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
   color:var(--text-dim);
   padding:8px 0 0;
   list-style:none;
@@ -2344,10 +2457,9 @@ details[open] > summary::before{ content:"▾ "; }
 }
 .empty .stamp{
   display:inline-block;
-  font-family:"JetBrains Mono", monospace;
-  font-size:10.5px;
-  letter-spacing:.22em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
   color:var(--acc-amb);
   border:1px dashed rgba(255,181,71,.5);
   padding:3px 10px;
@@ -2356,10 +2468,9 @@ details[open] > summary::before{ content:"▾ "; }
 .empty p{ margin:.5em 0; }
 
 .note{
-  font-family:"JetBrains Mono", monospace;
-  font-size:11px;
-  letter-spacing:.14em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
   color:var(--text-ghost);
   margin-top:12px;
 }
@@ -2379,7 +2490,7 @@ details[open] > summary::before{ content:"▾ "; }
      read as a matched pair; the option pills stretch to fill the taller box,
      which also gives them bigger tap targets */
   .nav__search, .nav__lang{ height:38px; }
-  .nav__lang{ padding:3px; gap:1px; font-size:10px; align-items:stretch; }
+  .nav__lang{ padding:3px; gap:1px; font-size:12px; align-items:stretch; }
   .nav__lang-opt{ display:flex; align-items:center; padding:0 7px; }
   /* iOS Safari auto-zooms when a focused input's font-size is < 16px. Keep the
      typed text at 16px so tapping search never zooms the page; the placeholder
@@ -2390,6 +2501,18 @@ details[open] > summary::before{ content:"▾ "; }
      backdrop blurs — use slightly more opaque solids instead so text over them
      stays legible. */
   .bg-video{ display:none; }
+  /* phones pay for backdrop-filter in scroll jank, so the whole surface scale
+     switches to the unblurred, more opaque variant here — same reasoning as
+     .fx-lite above, and one redefinition covers every pane instead of the
+     rule-by-rule overrides that follow. */
+  :root{
+    --glass:      rgba(22,25,38,.80);
+    --glass-hi:   rgba(34,38,56,.90);
+    --scrim:      rgba(10,11,18,.76);
+    --scrim-hi:   rgba(14,16,26,.88);
+    --glass-blur: none;
+    --scrim-blur: none;
+  }
   .nav{ background:rgba(7,7,11,0.92); backdrop-filter:none; -webkit-backdrop-filter:none; }
   .stage__loader{ backdrop-filter:none; -webkit-backdrop-filter:none; background:rgba(7,7,11,.94); }
   .lightbox__bar{ backdrop-filter:none; -webkit-backdrop-filter:none; }
@@ -2402,102 +2525,65 @@ details[open] > summary::before{ content:"▾ "; }
   .showcase{ margin-bottom:24px; }
   .foot{ margin-top:32px; }
 
-  /* Doc bar = a quiet metadata READOUT, not a row of buttons. Previously each
-     token was a bordered, rounded, filled pill — which read as tappable and
-     made people unsure what does something. Now the container keeps its cyber
-     "panel" look (border + cyan edge) but the items inside are flat text, so
-     nothing here looks clickable. Only status stamps keep a distinct dashed
-     "sticker" outline. Decorative/redundant tokens stay hidden (.doc-min-hide). */
+  /* the meta line just gets smaller here; a long album or file name still
+     ellipsises rather than pushing the line off the screen */
   .section__doc{
-    display:flex;
-    flex-wrap:wrap;
-    align-items:center;
-    gap:4px 0;
-    padding:9px 12px;
-    font-size:10px;
+    gap:3px 13px;
+    font-size:9.5px;
     letter-spacing:.13em;
-    border-left-width:2px;
   }
-  .section__doc > span{
-    border:0;
-    background:transparent;
-    border-radius:0;
-    padding:2px 0;
-    margin-right:16px;
-    gap:5px;
-    white-space:nowrap;
-    min-width:0;
-    flex:0 0 auto;
-  }
-  .section__doc > span:last-child{ margin-left:0; margin-right:0; }
-  /* status stamps read as a stamp/label (dashed outline), never a button */
-  .section__doc > span.stamp{
-    padding:4px 9px;
-    margin-right:8px;
-    border:1px dashed rgba(255,181,71,.45);
-    border-radius:var(--radius);
-  }
-  .section__doc .stamp--ok{ border-color:rgba(61,255,165,.4); }
-  .section__doc .stamp--red{ border-color:rgba(255,103,103,.5); }
-  .section__doc .stamp--cy{ border-color:rgba(91,138,255,.45); border-style:dashed; }
-  /* only genuinely long values shrink with an ellipsis; labels stay readable */
   .section__doc b{
     overflow:hidden;
     text-overflow:ellipsis;
     min-width:0;
-    max-width:52vw;
+    max-width:60vw;
   }
   /* hide decorative / redundant tokens on small screens */
   .section__doc .doc-min-hide{ display:none; }
+  /* On a phone this is THE way up — the trail underneath it is 12px text with
+     tap targets to match — so it reads as a button and is sized like one:
+     filled, bordered, 44px of thumb. */
+  .pathbar__back{
+    display:inline-flex;
+    min-height:36px;
+    padding:0 14px;
+    gap:8px;
+    border:1px solid rgba(91,138,255,.38);
+    background:linear-gradient(180deg, rgba(91,138,255,.20), rgba(91,138,255,.08));
+    color:var(--acc-cy);
+    font-weight:600;
+    transition:background .15s, border-color .15s, box-shadow .15s;
+  }
+  .pathbar__back:hover,
+  .pathbar__back:active{
+    background:linear-gradient(180deg, rgba(91,138,255,.30), rgba(91,138,255,.14));
+    border-color:var(--acc-cy);
+    color:var(--acc-cy);
+  }
+  /* a button label does not underline on press */
+  .pathbar__back:hover .pathbar__back-txt{ text-decoration:none; }
+  .pathbar__back-ico{ font-size:14px; }
   .section__head{ margin-bottom:16px; }
 
-  /* pathbar on phones: chip + rule share the first row, the trail always
-     sits on its own full-width line underneath the button (order swaps the
-     rule between them visually; DOM/focus order stays back → crumb). */
+  /* pathbar on phones: the button takes the first row on its own, the trail
+     always breaks onto the next one. `flex-basis:auto` (not 100%) so the
+     pane still hugs the path — a forced full-width basis would float
+     "Start / Alben" inside a bar the width of the screen. It reaches the
+     content edge only when the path is genuinely that long. */
   .pathbar{ margin-bottom:16px; }
-  .pathbar::after{ order:1; }
-  .pathbar .crumb{ order:2; flex:0 0 100%; }
+  .pathbar .crumb{ flex:0 1 auto; }
 
-  /* ---- albums view header (phones): one composed title block instead of
-     the stacked doc-bar / slug / stat rows. The doc bar's only visible
-     mobile token (ALBUMS / n) duplicates the stat line, so it folds away;
-     ix + jp become a HUD overline (01 ——— アルバム) above a full-size
-     title, with the counts as the system line underneath. Deliberate
-     exception to the compact mobile type scale — this is the index page's
-     one big headline. */
-  .page-albums .section__doc{ display:none; }
-  .page-albums .section__head{
-    display:grid;
-    grid-template-columns:auto 1fr auto;
-    grid-template-areas:
-      "ix   rule jp"
-      "name name name"
-      "stat stat stat";
-    align-items:center;
-    gap:0 12px;
-    margin-bottom:20px;
-    padding-bottom:0;
-    border-bottom:0;
-  }
-  .page-albums .section__slug{ display:contents; }
-  .page-albums .section__head::before{
-    content:"";
-    grid-area:rule;
-    height:1px;
-    background:linear-gradient(90deg, var(--line-strong), transparent 92%);
-  }
-  .page-albums .section__slug .ix{ grid-area:ix; }
-  .page-albums .section__slug .jp{ grid-area:jp; font-size:11px; }
+  /* the albums index is title-first on a phone: nothing above it but the
+     route line, and the title gets the full width. The index number and the
+     kanji ornament it used to share that row with are gone. */
+  .page-albums .pathbar{ margin-bottom:12px; }
+  .page-albums .section__head{ margin-bottom:18px; }
   .page-albums .section__slug .name{
-    grid-area:name;
-    margin-top:9px;
-    font-size:clamp(28px, 9vw, 36px);
+    font-size:clamp(30px, 9vw, 38px);
     line-height:1.04;
   }
-  .page-albums .section__stat{
-    grid-area:stat;
-    margin-top:7px;
-  }
+  .page-albums .feat__head{ margin-bottom:11px; }
+  .page-albums .archive-head{ margin-bottom:11px; }
   .detail{ gap:14px; }
   .stage{ min-height:240px; }
   .stage img{ max-height:62vh; }
@@ -2511,12 +2597,12 @@ details[open] > summary::before{ content:"▾ "; }
   .panel h2{ font-size:10px; margin-bottom:10px; padding-bottom:7px; }
   .kv{ grid-template-columns: 86px minmax(0, 1fr); gap:5px 10px; font-size:12px; }
   html[lang="de"] .kv{ grid-template-columns: 122px minmax(0, 1fr); }
-  .kv dt{ font-size:9.5px; letter-spacing:.12em; }
+  .kv dt{ font-size:12px; }
   .kv dd{ font-size:11.5px; }
   .raw-exif{ font-size:10px; max-height:240px; padding:8px 10px; }
   /* breadcrumb link styling is shared with the base now; on small screens just
      shrink the type and tighten the gaps. */
-  .crumb{ font-size:10px; gap:6px 8px; flex-wrap:wrap; }
+  .crumb{ font-size:12.5px; gap:5px 7px; flex-wrap:wrap; }
 }
 @media (max-width:480px){
   .nav__brand .brand-text{ display:none; }
@@ -2525,16 +2611,14 @@ details[open] > summary::before{ content:"▾ "; }
   .nav__search input{ padding:8px 0; }
   .image-grid{ grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:6px; }
   .nav-arrow{ width:34px; height:48px; font-size:18px; }
-  .section__doc{ font-size:9px; letter-spacing:.11em; }
-  .section__doc > span{ margin-right:13px; gap:4px; }
-  .section__doc > span.stamp{ padding:4px 8px; margin-right:7px; }
+  .section__doc{ font-size:9px; gap:3px 11px; letter-spacing:.11em; }
   .stage{ min-height:200px; }
   .stage img{ max-height:55vh; }
   .panel{ padding:11px 12px; }
   .kv{ grid-template-columns: 74px minmax(0, 1fr); gap:4px 8px; }
-  .kv dt{ font-size:9px; }
-  .kv dd{ font-size:11px; }
-  .crumb{ font-size:9.5px; }
+  .kv dt{ font-size:12px; }
+  .kv dd{ font-size:12.5px; }
+  .crumb{ font-size:12px; }
 }
 
 /* ================================================================
@@ -2553,10 +2637,9 @@ details[open] > summary::before{ content:"▾ "; }
   /* must beat .stage (z:1500), otherwise this sibling loader gets hidden
      behind the stage. */
   z-index:1600;
-  font-family:"JetBrains Mono", monospace;
-  font-size:11px;
-  letter-spacing:.18em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
   max-width: calc(100% - 16px);
 }
 .stage__loader button,
@@ -2720,10 +2803,12 @@ body.lightbox-open{ overflow:hidden; }
   z-index:5;
   width:42px; height:42px;
   display:flex; align-items:center; justify-content:center;
-  background:rgba(7,7,11,.55);
+  background:var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
   border:1px solid var(--line-strong);
   color:var(--text);
-  font-family:"JetBrains Mono", monospace;
+  font-family:inherit;
   font-size:16px;
   cursor:pointer;
   transition: color .15s, border-color .15s, background .15s;
@@ -2731,7 +2816,7 @@ body.lightbox-open{ overflow:hidden; }
 .lightbox__close:hover{
   color:var(--acc-red);
   border-color:var(--acc-red);
-  background:rgba(7,7,11,.85);
+  background:var(--scrim-hi);
 }
 
 .lightbox__nav{
@@ -2741,10 +2826,12 @@ body.lightbox-open{ overflow:hidden; }
   z-index:4;
   width:54px; height:88px;
   display:flex; align-items:center; justify-content:center;
-  background:rgba(7,7,11,.5);
+  background:var(--scrim);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
   border:1px solid var(--line-strong);
   color:var(--text);
-  font-family:"JetBrains Mono", monospace;
+  font-family:inherit;
   font-size:30px;
   cursor:pointer;
   transition: color .15s, border-color .15s, background .15s;
@@ -2752,7 +2839,7 @@ body.lightbox-open{ overflow:hidden; }
 .lightbox__nav:hover{
   color:var(--acc-cy);
   border-color:var(--acc-cy);
-  background:rgba(7,7,11,.85);
+  background:var(--scrim-hi);
 }
 .lightbox__nav[disabled]{
   opacity:.25;
@@ -2766,12 +2853,11 @@ body.lightbox-open{ overflow:hidden; }
   bottom:14px; left:50%;
   transform:translateX(-50%);
   display:flex; align-items:stretch; gap:0;
-  background:rgba(7,7,11,.85);
+  background:var(--scrim-hi);
   border:1px solid var(--line-strong);
-  font-family:"JetBrains Mono", monospace;
-  font-size:11px;
-  letter-spacing:.16em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
   color:var(--text);
   z-index:5;
   max-width: calc(100% - 28px);
@@ -2824,8 +2910,8 @@ body.lightbox-open{ overflow:hidden; }
   .lightbox__bar{
     bottom:8px;
     flex-wrap:wrap;
-    font-size:9.5px;
-    letter-spacing:.12em;
+    font-size:12px;
+    letter-spacing:.01em;
     max-width: calc(100% - 16px);
   }
   .lightbox__title{ max-width:62vw; padding:7px 10px; }
@@ -2852,10 +2938,9 @@ body.lightbox-open{ overflow:hidden; }
   display:flex; align-items:center; justify-content:space-between;
   gap:24px;
   flex-wrap:wrap;
-  font-family:"JetBrains Mono", monospace;
-  font-size:10.5px;
-  letter-spacing:.18em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
   color:var(--text-ghost);
 }
 .foot__brand{ display:flex; align-items:center; gap:10px; color:var(--text-dim); }
@@ -2886,7 +2971,9 @@ body.lightbox-open{ overflow:hidden; }
   display:flex; align-items:center; gap:10px;
   padding:5px 14px 5px 6px;
   border:1px solid var(--line);
-  background:rgba(255,255,255,.02);
+  background:var(--glass);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
   transition: border-color .15s, background .15s;
 }
 .foot__op:hover{ border-color:var(--acc-cy); background:rgba(91,138,255,.06); }
@@ -2991,7 +3078,12 @@ body.page-welcome{ --page-max: 2400px; }
     radial-gradient(120% 95% at 16% 92%, rgba(4,5,10,.72) 0%, transparent 55%);
 }
 
-/* ---- HUD chrome (decorative layer) ---- */
+/* ---- HUD chrome (decorative layer) ---------------------------------
+   Scoped to the welcome hero and nowhere else. The rest of the site dropped
+   its instrument costume in the 2026-08-31 redesign; here the page IS a
+   camera live view, so monospace, capitals and wide tracking are the
+   subject rather than a coat of paint on a text page. Don't lift these
+   patterns into the album/image/search chrome. */
 /* ends above the deck strip so corners + thirds don't run under it */
 .vf__hud{ position:absolute; inset:0 0 48px 0; z-index:4; pointer-events:none; }
 .vf--empty .vf__hud{ inset:0; }
@@ -3006,7 +3098,7 @@ body.page-welcome{ --page-max: 2400px; }
 .vf__corner--bl{ bottom:14px; left:14px; border-right:0; border-top:0; }
 .vf__corner--br{ bottom:14px; right:14px; border-left:0; border-top:0; }
 
-/* rule-of-thirds hairlines (desktop only) */
+/* rule-of-thirds hairlines */
 .vf__thirds{
   position:absolute; inset:0;
   background-image:
@@ -3047,9 +3139,9 @@ body.page-welcome{ --page-max: 2400px; }
   margin:0 auto;
   padding:20px var(--page-pad) 0;
   display:flex; align-items:center; gap:16px;
-  font-family:"Chakra Petch","JetBrains Mono", monospace;
-  font-size:11px;
-  letter-spacing:.24em;
+  font-family:"JetBrains Mono", monospace;
+  font-size:10px;
+  letter-spacing:.2em;
   text-transform:uppercase;
   color:var(--text-dim);
   pointer-events:none;
@@ -3071,7 +3163,6 @@ body.page-welcome{ --page-max: 2400px; }
 .vf__rec--off{ color:var(--text-ghost); text-shadow:none; }
 .vf__rec--off i{ background:var(--text-ghost); box-shadow:none; animation:none; }
 .vf__hudchip b{ color:var(--acc-cy); font-weight:400; }
-.vf__hudchip--ghost{ color:var(--text-ghost); }
 .vf__hudright{
   margin-left:auto;
   display:inline-flex; align-items:center; gap:16px;
@@ -3110,21 +3201,6 @@ body.page-welcome{ --page-max: 2400px; }
   min-width:0;
   pointer-events:auto;
 }
-.vf__slug{
-  display:flex; align-items:center; gap:14px;
-  font-family:"JetBrains Mono", monospace;
-  font-size:11px;
-  letter-spacing:.2em;
-  text-transform:uppercase;
-}
-.vf__slug .ix{ color:var(--acc-cy); }
-.vf__slug .jp{
-  color:var(--text-dim);
-  font-family:"Noto Sans JP", sans-serif;
-  font-size:11px;
-  letter-spacing:.3em;
-}
-.vf__slug-sub{ opacity:.55; }
 .vf__title{
   margin:0;
   font-family:"Ethnocentric","Space Grotesk", sans-serif;
@@ -3154,7 +3230,7 @@ body.page-welcome{ --page-max: 2400px; }
    vertically centered even next to the taller about-me button */
 .vf__actions .btn-link{ display:inline-flex; align-items:center; }
 .vf .btn-link{
-  background:rgba(7,7,11,.5);
+  background:var(--glass);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
 }
@@ -3206,12 +3282,11 @@ body.page-welcome{ --page-max: 2400px; }
   pointer-events:auto;
   display:flex; flex-direction:column; align-items:flex-end; gap:5px;
   text-align:right;
-  font-family:"Chakra Petch","JetBrains Mono", monospace;
-  text-transform:uppercase;
+  font-family:inherit;
   padding:12px 14px;
   border:1px solid rgba(255,255,255,.14);
   border-right:2px solid var(--acc-cy);
-  background:rgba(5,6,10,.42);
+  background:var(--glass);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   max-width:min(44ch, 40vw);
@@ -3220,27 +3295,30 @@ body.page-welcome{ --page-max: 2400px; }
 .vf__meta:hover{
   color:inherit;
   border-color:rgba(91,138,255,.55);
-  background:rgba(9,12,22,.6);
+  background:var(--glass-hi);
 }
 .vf__meta-key{
+  font-family:"JetBrains Mono", monospace;
   font-size:9px;
   letter-spacing:.3em;
+  text-transform:uppercase;
   color:var(--text-ghost);
 }
 .vf__meta-file{
-  font-family:"JetBrains Mono", monospace;
-  font-size:12px;
-  letter-spacing:.08em;
+  font-family:inherit;
+  font-size:13px;
   color:var(--text);
-  text-shadow:0 0 6px rgba(91,138,255,.35);
   word-break:break-word;
 }
-.vf__meta-sub{
-  font-size:9px;
-  letter-spacing:.22em;
-  color:var(--text-dim);
+
+.vf__auto{
+  font-family:"JetBrains Mono", monospace;
+  font-size:9.5px;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  color:var(--text-ghost);
+  white-space:nowrap;
 }
-.vf__meta:hover .vf__meta-sub{ color:var(--acc-cy); }
 
 /* ---- deck: prev/next + segmented frame track + tune ---- */
 .vf__deck{
@@ -3255,10 +3333,9 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .vf__nav,
 .vf__tune{
-  font-family:"JetBrains Mono", monospace;
-  font-size:11px;
-  letter-spacing:.16em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
   background:transparent;
   border:1px solid var(--line-strong);
   color:var(--text-dim);
@@ -3327,10 +3404,9 @@ body.page-welcome{ --page-max: 2400px; }
   to  { transform:translateY(-50%) scaleX(1); }
 }
 .vf__auto{
-  font-family:"JetBrains Mono", monospace;
-  font-size:9.5px;
+  font-family:inherit;
+  font-size:12px;
   letter-spacing:.2em;
-  text-transform:uppercase;
   color:var(--text-ghost);
   white-space:nowrap;
 }
@@ -3349,10 +3425,9 @@ body.page-welcome{ --page-max: 2400px; }
   display:flex; flex-direction:column; align-items:center; gap:20px;
   text-align:center;
   padding:64px var(--page-pad);
-  font-family:"Chakra Petch","JetBrains Mono", monospace;
-  font-size:11px;
-  letter-spacing:.24em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
 }
 .vf__empty .empty{ margin:0; }
 
@@ -3376,17 +3451,6 @@ body.page-welcome{ --page-max: 2400px; }
   display:flex; align-items:center; gap:26px;
   min-height:96px;
 }
-.vf-band__id{
-  display:flex; flex-direction:column; gap:5px;
-  font-family:"JetBrains Mono", monospace;
-  font-size:10px;
-  letter-spacing:.22em;
-  text-transform:uppercase;
-  color:var(--text-ghost);
-  border-left:2px solid var(--acc-cy);
-  padding-left:14px;
-}
-.vf-band__sig{ color:var(--text-dim); }
 .vf-band__cells{
   /* flex-END, not center: the LAST UPDATE cell is shorter than the three
      digit cells, and centring it would float its caption above theirs.
@@ -3424,17 +3488,16 @@ body.page-welcome{ --page-max: 2400px; }
     0 0 2px rgba(255,181,71,.7);
 }
 .vf-band__caption{
-  font-family:"JetBrains Mono", monospace;
-  font-size:9.5px;
+  font-family:inherit;
+  font-size:12px;
   letter-spacing:.3em;
-  text-transform:uppercase;
   color:var(--text-ghost);
 }
 /* the archive's last-update stamp. Deliberately NOT the glowing Ethnocentric
    digits: it is a date, so it stays in the readout mono at half the size and
    in plain --text, leaving the three counts as the row's coloured anchors. */
 .vf-band__stamp{
-  font-family:"JetBrains Mono", monospace;
+  font-family:inherit;
   font-size:clamp(14px, 1.6vw, 19px);
   line-height:1;
   letter-spacing:.06em;
@@ -3471,7 +3534,8 @@ body.page-welcome{ --page-max: 2400px; }
   .vf__corner--tr{ top:10px; right:10px; }
   .vf__corner--bl{ bottom:10px; left:10px; }
   .vf__corner--br{ bottom:10px; right:10px; }
-  .vf__hudtop{ padding-top:14px; gap:10px; font-size:9.5px; letter-spacing:.18em; }
+  .vf__hudtop{ padding-top:14px; gap:10px; font-size:9px; letter-spacing:.16em; }
+  .vf__auto{ display:none; }
   .vf .doc-min-hide,
   .vf-band .doc-min-hide{ display:none; }
   .vf__body{ bottom:50px; padding-bottom:20px; }
@@ -3506,7 +3570,7 @@ body.page-welcome{ --page-max: 2400px; }
   /* .3em tracking is a lot of width for an 11-character caption: on a phone
      "LAST UPDATE" broke to two lines while its three neighbours stayed on
      one, which tilted the whole row. Tightened just enough to hold. */
-  .vf-band__caption{ letter-spacing:.16em; white-space:nowrap; }
+  .vf-band__caption{ white-space:nowrap; }
   .vf-band__caption > .fa{ margin-right:.5em; }
   .vf-band__stamp{ font-size:13px; letter-spacing:.03em; }
   .showcase-page{ padding-top:26px; }
@@ -3571,7 +3635,7 @@ body.page-welcome{ --page-max: 2400px; }
 .notfound__title{
   font-family:"Ethnocentric","Space Grotesk", sans-serif;
   font-size:clamp(22px, 2.6vw, 32px);
-  letter-spacing:.18em;
+  letter-spacing:.04em;
   margin:0 0 14px;
   color:var(--text);
 }
@@ -3584,14 +3648,15 @@ body.page-welcome{ --page-max: 2400px; }
 .notfound__actions{ margin-top:22px; }
 .btn-link{
   display:inline-block;
-  font-family:"JetBrains Mono", monospace;
-  font-size:11px;
-  letter-spacing:.22em;
-  text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:.01em;
   padding:9px 16px;
   border:1px solid var(--line-strong);
   color:var(--text);
-  background:rgba(255,255,255,.02);
+  background:var(--glass);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
   transition: border-color .15s, color .15s, background .15s;
 }
 .btn-link:hover{
@@ -3633,21 +3698,21 @@ body.page-welcome{ --page-max: 2400px; }
 
 /* ---- top bar ---- */
 .trip__bar{
-  display:flex; align-items:center; gap:9px;
-  padding:7px 13px;
-  border-bottom:1px dashed var(--line);
-  font-family:"JetBrains Mono", monospace;
-  font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+  display:flex; align-items:center; gap:10px;
+  padding:8px 13px;
+  border-bottom:1px solid var(--line);
+  font-family:inherit;
+  font-size:12.5px;
 }
-.trip__tag{ color:var(--acc-cy); letter-spacing:.24em; }
+.trip__tag{ color:var(--acc-cy); letter-spacing:.01em; }
 .trip--active .trip__tag{ color:var(--acc-mag); }
 .trip--done .trip__tag{ color:var(--acc-ok); }
-.trip__name{ color:var(--text); letter-spacing:.14em; }
+.trip__name{ color:var(--text); letter-spacing:.01em; }
 .trip__jp{ font-family:"Noto Sans JP", sans-serif; color:var(--text-ghost); letter-spacing:.08em; }
 .trip__status{
   margin-left:auto; padding:2px 9px;
-  border:1px dashed rgba(91,138,255,.5); color:var(--acc-cy);
-  font-size:9.5px; letter-spacing:.2em; white-space:nowrap;
+  border:1px solid rgba(91,138,255,.35); color:var(--acc-cy);
+  font-size:12px; white-space:nowrap;
 }
 .trip--transit .trip__status,
 .trip--active .trip__status{ color:var(--acc-mag); border-color:rgba(165,148,255,.5); }
@@ -3657,12 +3722,12 @@ body.page-welcome{ --page-max: 2400px; }
    unambiguous: "JAPAN TIME 16:20:16 JST". */
 .trip__clock{
   display:inline-flex; align-items:baseline; gap:6px;
-  color:var(--text-dim); letter-spacing:.12em;
+  color:var(--text-dim);
   font-variant-numeric:tabular-nums; white-space:nowrap;
 }
-.trip__clock i{ font-style:normal; color:var(--text-ghost); letter-spacing:.2em; }
-.trip__clock-loc{ text-transform:uppercase; }
-.trip__clock b{ font-weight:400; color:var(--text); letter-spacing:.1em; }
+.trip__clock i{ font-style:normal; color:var(--text-ghost); }
+/* the digits keep tabular figures so the seconds don't shuffle the line */
+.trip__clock b{ font-weight:600; color:var(--text); }
 
 /* ---- body layout ---- */
 .trip__main{
@@ -3682,8 +3747,8 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip__cd-label{
   display:flex; align-items:center; gap:7px;
-  font-family:"JetBrains Mono", monospace;
-  font-size:10.5px; letter-spacing:.26em; text-transform:uppercase; color:var(--text-dim);
+  font-family:inherit;
+  font-size:12px; letter-spacing:.01em; color:var(--text-dim);
 }
 /* leading state marker — picks up the module's phase colour */
 .trip__cd-label::before{
@@ -3734,7 +3799,7 @@ body.page-welcome{ --page-max: 2400px; }
 .trip--active .trip__cd-unit b{ color:var(--acc-mag); text-shadow:0 0 18px rgba(165,148,255,.35); }
 .trip--done .trip__cd-unit b{ color:var(--acc-ok); text-shadow:0 0 18px rgba(61,255,165,.3); }
 .trip__cd-unit i{
-  font-style:normal; font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--text-ghost);
+  font-style:normal; font-size:12px; color:var(--text-ghost);
 }
 .trip__cd-sep{ display:none; }
 .trip__cd-target{
@@ -3742,8 +3807,8 @@ body.page-welcome{ --page-max: 2400px; }
   padding:3px 9px;
   border:1px dashed var(--line-strong);
   background:rgba(4,7,16,.3);
-  font-family:"JetBrains Mono", monospace;
-  font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--text-ghost);
+  font-family:inherit;
+  font-size:12px; letter-spacing:.01em; color:var(--text-ghost);
 }
 .trip__cd-target b{ color:var(--text); font-weight:400; letter-spacing:.1em; }
 
@@ -3837,8 +3902,8 @@ body.page-welcome{ --page-max: 2400px; }
   filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));
 }
 .trip__stop-city{
-  font-family:"JetBrains Mono", monospace; font-weight:600;
-  font-size:14px; letter-spacing:.08em; text-transform:uppercase; color:var(--text);
+  font-family:inherit; font-weight:600;
+  font-size:14px; letter-spacing:.08em; color:var(--text);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .trip__stop.is-active .trip__stop-city{ color:var(--acc-mag); }
@@ -3859,8 +3924,8 @@ body.page-welcome{ --page-max: 2400px; }
   animation:trip-pulse 1.8s ease-out infinite;
 }
 .trip__stop-dates{
-  font-family:"JetBrains Mono", monospace;
-  font-size:10px; letter-spacing:.04em; color:var(--text-dim);
+  font-family:inherit;
+  font-size:12px; letter-spacing:.04em; color:var(--text-dim);
   font-variant-numeric:tabular-nums;
 }
 /* each range half is an unbreakable block, so a narrow tile wraps exactly
@@ -3906,8 +3971,8 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip__stop-wx-sub{
   display:flex; align-items:baseline; min-width:0;
-  font-family:"JetBrains Mono", monospace;
-  font-size:8.5px; letter-spacing:.18em; text-transform:uppercase;
+  font-family:inherit;
+  font-size:12px; letter-spacing:.01em;
   color:var(--text-ghost);
 }
 .trip__stop-wx-cond{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -3919,8 +3984,8 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__stop-meta{
   padding:2px 6px;
   border:1px dashed var(--line-strong); background:rgba(4,7,16,.35);
-  font-family:"JetBrains Mono", monospace;
-  font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); white-space:nowrap;
+  font-family:inherit;
+  font-size:12px; letter-spacing:.1em; color:var(--text-dim); white-space:nowrap;
 }
 .trip__stop.is-active .trip__stop-meta{ color:var(--acc-mag); border-color:rgba(165,148,255,.45); }
 .trip__stop.is-done .trip__stop-meta{ color:var(--acc-ok); border-color:rgba(61,255,165,.35); }
@@ -3968,7 +4033,7 @@ body.page-welcome{ --page-max: 2400px; }
   content:"日本 / ROUTE";
   position:absolute; right:9px; bottom:7px;
   font-family:"Noto Sans JP", "JetBrains Mono", monospace;
-  font-size:8.5px; letter-spacing:.22em; color:var(--text-ghost);
+  font-size:11.5px; color:var(--text-ghost);
   pointer-events:none;
 }
 .trip-map svg{ display:block; width:100%; height:auto; }
@@ -4010,8 +4075,8 @@ body.page-welcome{ --page-max: 2400px; }
 .trip-map__city.is-active .trip-map__ring{ opacity:.75; animation:trip-map-spin 16s linear infinite; }
 
 .trip-map__lbl{
-  font-family:"JetBrains Mono", monospace; font-size:13px;
-  letter-spacing:.12em; fill:var(--text-dim);
+  font-family:inherit; font-size:13px;
+  letter-spacing:.01em; fill:var(--text-dim);
 }
 .trip-map__city.is-active .trip-map__lbl{ fill:var(--acc-mag); }
 .trip-map__city.is-done   .trip-map__lbl{ fill:rgba(61,255,165,.7); }
@@ -4093,7 +4158,7 @@ body.page-welcome{ --page-max: 2400px; }
   .trip__main{ padding:11px; gap:12px; }
   /* stamp + JST clock overflow one line on narrow phones: wrap into a tidy
      second row instead of squeezing the title into mid-word breaks */
-  .trip__bar{ padding:7px 11px; font-size:9px; gap:7px; flex-wrap:wrap; row-gap:4px; }
+  .trip__bar{ padding:7px 11px; font-size:11.5px; gap:8px; flex-wrap:wrap; row-gap:4px; }
   .trip__tag, .trip__name, .trip__jp{ white-space:nowrap; }
 }
 
@@ -4240,9 +4305,8 @@ html.fx-anim img.px-wait{ opacity:0; }
    (the .detail node is replaced wholesale, so the animation re-runs) ---- */
 html.fx-anim .detail{ animation: rv-fade .32s ease; }
 
-/* ---- welcome hero build-up (one-shot on load; scramble runs on top) ---- */
+/* ---- welcome hero build-up (one-shot on load) ---- */
 html.fx-anim .vf__hudtop { animation: rv-fade .7s ease .35s backwards; }
-html.fx-anim .vf__slug   { animation: rv-rise .5s cubic-bezier(.19,.66,.28,.99) .08s backwards; }
 html.fx-anim .vf__title  { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .16s backwards; }
 html.fx-anim .vf__lead   { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .26s backwards; }
 html.fx-anim .vf__actions{ animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .36s backwards; }
@@ -4264,7 +4328,7 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__img{
 /* ---- sticky nav: deepen once the page scrolls (class from app.js) ---- */
 .nav{ transition: background .25s ease, box-shadow .25s ease; }
 .nav--scrolled{
-  background:rgba(7,7,11,.88);
+  background:rgba(7,7,11,.94);
   box-shadow:0 12px 32px -18px rgba(0,0,0,.85);
 }
 

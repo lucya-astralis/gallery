@@ -253,6 +253,8 @@ const ALBUM_GROUPS = [
   ['The album', 'What this folder is to the gallery.', ['collection', 'showcase', 'cover']],
   ['Photos it leans on', 'Which photos get pulled out of the grid.', ['featured', 'order', 'reel', 'sort']],
   ['Look', 'Its own mark, title face and page effect.', ['icon', 'font', 'font_scale', 'effect']],
+  ['Backdrop', 'What sits behind this album’s pages. Sub-albums inherit it; leave both empty for the gallery’s default.',
+    ['wallpaper', 'wallpaper_mobile']],
   ['Text & stats', 'What is written under the hero.', ['tags', 'loc', 'stat', 'stats']],
 ];
 
@@ -274,7 +276,7 @@ function renderPane() {
   const tabs = isGallery
     ? [['settings', 'Settings'], ['raw', 'Raw file']]
     : [['settings', 'Settings'], ['photos', 'Photos & tags'], ['text', 'Description'],
-       ['assets', 'Icon & font'], ['raw', 'Raw file']];
+       ['assets', 'Files'], ['raw', 'Raw file']];
   if (!tabs.some(([id]) => id === state.tab)) state.tab = 'settings';
 
   pane.append(renderHead(isGallery));
@@ -752,11 +754,37 @@ function albumOrderControl(key) {
   return box;
 }
 
-/* ----- icon / font ------------------------------------------------------ */
+/* ----- icon / font / wallpaper ------------------------------------------ */
+/* Every one of these picks a file out of the album's .album/ folder, so they
+ * share one control. `kind` decides which files are offered and what the
+ * preview under the picker looks like — a swatch, a type sample, or the
+ * backdrop itself. The mobile wallpaper additionally refuses clips: the
+ * gallery never loads a backdrop video on a phone, so offering one here
+ * would let you configure something that silently does nothing. */
+const ASSET_KIND = {
+  icon: 'icon',
+  font: 'font',
+  wallpaper: 'wallpaper',
+  wallpaper_mobile: 'wallpaper',
+};
+/* every cfg key that can point at a file in .album/ — "in use" means one of
+ * these names it, and a .png could be named by any of them */
+const ASSET_CFG_KEYS = Object.keys(ASSET_KIND);
+const VIDEO_RE = /\.(mp4|webm)$/i;
+
+/* one asset can fill several roles — see asset_kinds() in library.py. Falls
+ * back to the single `kind` so an older server response still works. */
+function assetIs(asset, role) {
+  return asset.kinds ? asset.kinds.includes(role) : asset.kind === role;
+}
+
 function assetControl(key, spec) {
   const current = value(key);
-  const kind = key === 'icon' ? 'icon' : 'font';
-  const files = (state.data.assets || []).filter((a) => a.kind === kind);
+  const kind = ASSET_KIND[key] || 'font';
+  /* `kinds`, not `kind`: the extension whitelists overlap, so a .png is both a
+   * possible icon and a possible wallpaper and has to show up in both pickers. */
+  let files = (state.data.assets || []).filter((a) => assetIs(a, kind));
+  if (key === 'wallpaper_mobile') files = files.filter((f) => !VIDEO_RE.test(f.name));
   const box = el('div', { class: 'field__control' });
 
   box.append(el('select', {
@@ -771,16 +799,29 @@ function assetControl(key, spec) {
 
   if (!files.length) {
     box.append(el('div', { class: 'field__help', text:
-      'No ' + kind + ' in this album’s .album/ yet — add one on the “Icon & font” tab. Accepted: ' +
+      'No ' + kind + ' in this album’s .album/ yet — add one on the “Files” tab. Accepted: ' +
       spec.exts.join(', ') }));
   }
   if (current && files.some((f) => f.name === current)) {
     const url = '/api/asset?name=' + encodeURIComponent(current) +
                 '&path=' + encodeURIComponent(state.sel.album);
     if (kind === 'icon') box.append(el('img', { class: 'iconpreview', src: url, alt: '' }));
+    else if (kind === 'wallpaper') box.append(wallpaperPreview(current, url));
     else box.append(fontSample(current, url));
   }
   return box;
+}
+
+/* the backdrop, at the shape it will be seen in — a clip plays muted and
+ * looping the way the gallery plays it, a still just sits there */
+function wallpaperPreview(name, url) {
+  if (VIDEO_RE.test(name)) {
+    return el('video', {
+      class: 'wallpreview', src: url,
+      autoplay: true, muted: true, loop: true, playsinline: true,
+    });
+  }
+  return el('img', { class: 'wallpreview', src: url, alt: '' });
 }
 
 function fontSample(name, url) {
@@ -1275,7 +1316,8 @@ function renderDescriptions() {
 
 /* ----- assets tab ------------------------------------------------------- */
 function renderAssets() {
-  const usable = (state.data.assets || []).filter((a) => a.kind === 'icon' || a.kind === 'font');
+  const usable = (state.data.assets || []).filter(
+    (a) => ['icon', 'font', 'wallpaper'].some((k) => assetIs(a, k)));
   const list = el('div', { class: 'assets' }, usable.length
     ? usable.map(renderAssetRow)
     : el('div', { class: 'empty-note', text: 'Nothing in this album’s .album/ folder yet.' }));
@@ -1318,8 +1360,15 @@ function renderAssets() {
   return el('div', { class: 'tabpanel' },
     el('div', { class: 'field__help u-mb' },
       'Files here live in ' + state.sel.album + '/.album/ next to the album.cfg. ' +
-      'Uploading one does not select it — set `icon` or `font` on the Settings tab.'),
+      'Uploading one does not select it — point `icon`, `font` or one of the ' +
+      'wallpaper keys at it on the Settings tab.'),
     list, el('div', { class: 'u-gap' }), drop, input);
+}
+
+/* "in use" means: some cfg key points at this file. A wallpaper can be
+ * claimed by either of the two keys, so kind alone doesn't answer it. */
+function assetInUse(asset) {
+  return ASSET_CFG_KEYS.some((k) => value(k) === asset.name);
 }
 
 function renderAssetRow(asset) {
@@ -1327,9 +1376,12 @@ function renderAssetRow(asset) {
               '&path=' + encodeURIComponent(state.sel.album);
   return el('div', { class: 'asset' },
     el('div', { class: 'asset__icon' },
-      asset.kind === 'icon' ? el('img', { src: url, alt: '' }) : 'Aa'),
+      VIDEO_RE.test(asset.name) ? '▶'
+        : (assetIs(asset, 'icon') || assetIs(asset, 'wallpaper'))
+          ? el('img', { src: url, alt: '' })
+          : 'Aa'),
     el('span', { class: 'asset__name', text: asset.name }),
-    value(asset.kind) === asset.name ? el('span', { class: 'pill pill--ok', text: 'in use' }) : null,
+    assetInUse(asset) ? el('span', { class: 'pill pill--ok', text: 'in use' }) : null,
     el('span', { class: 'asset__meta', text: bytes(asset.size) }),
     READ_ONLY ? null : el('button', {
       class: 'btn btn--sm btn--ghost btn--danger', type: 'button', text: 'Delete',

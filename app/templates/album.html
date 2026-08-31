@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ album | upper }} // LUCYA.SYSTEMS GALLERY{% endblock %}
+{% block title %}{{ album }} — lucya.systems gallery{% endblock %}
 {% block body_class %}page-album{% if trip %} trip-{{ trip.key }}{% endif %}{% if album_font_css %} album-font{% endif %}{% endblock %}
 {% block head_extra %}
   {# The album's own title face (album.cfg `font = ...`): a generated sheet
@@ -59,10 +59,9 @@
       <a href="/albums">{{ t('crumb.albums') }}</a>
       {% for c in breadcrumbs %}
         <span class="sep">/</span>
-        {# each segment may carry its album's own mark (album.cfg `icon =`).
-           The mark sits NEXT TO the label, never inside it: the current
-           segment is a text-scramble target (`.crumb b` in app.js) and
-           scrambling flattens the element's innerHTML, which would eat it. #}
+        {# each segment may carry its album's own mark (album.cfg `icon =`),
+           wrapped with its label in one .crumb__seg so the two stay glued
+           together while the trail's gap keeps its distance to the `/`. #}
         <span class="crumb__seg">
           {%- if c.icon %}<img class="album-ico crumb__ico" src="{{ c.icon }}" alt="" aria-hidden="true" width="14" height="14">{% endif -%}
           {%- if loop.last %}<b aria-current="page">{{ c.name }}</b>{% else %}<a href="/album/{{ c.path }}">{{ c.name }}</a>{% endif -%}
@@ -91,7 +90,7 @@
     {# the album's own mark (album.cfg `icon =`), leading its title — sized
        in em so it scales with the hero type (and with a custom face's
        font_scale) instead of drifting off it #}
-    <h1 class="album-hero__title">{% if album_icon %}<img class="album-hero__ico" src="{{ album_icon }}" alt="" aria-hidden="true">{% endif %}{{ hero_title }}<span class="album-hero__jp{% if not hero_jp %} album-hero__jp--deco{% endif %}" aria-hidden="true">{{ hero_jp or t('album.slug_deco') }}</span></h1>
+    <h1 class="album-hero__title">{% if album_icon %}<img class="album-hero__ico" src="{{ album_icon }}" alt="" aria-hidden="true">{% endif %}{{ hero_title }}{% if hero_jp %}<span class="album-hero__jp" aria-hidden="true">{{ hero_jp }}</span>{% endif %}</h1>
     {# album.cfg `tags = ...`, the line under the title. Display only — the
        overlay is pointer-events:none, so these are labels, not filter links
        (the ?tag= filter runs on per-image sidecar tags, a separate thing).
@@ -136,7 +135,7 @@
     <div class="album-desc">
       <div class="album-desc__head">
         <span class="album-desc__label"><i class="fa fa-align-left" aria-hidden="true"></i>{{ t('album.about') }}</span>
-        <span class="album-desc__file">{{ (breadcrumbs[-1].name if breadcrumbs else album) | upper }}</span>
+        <span class="album-desc__file">{{ breadcrumbs[-1].name if breadcrumbs else album }}</span>
       </div>
       {% if album_description %}<div class="album-desc__body">{{ album_description | safe }}</div>{% endif %}
       {% if album_stats and album_stats.has %}
@@ -148,22 +147,18 @@
     </div>
   {% endmacro %}
 
-  {# status bar first — it reads as the module's system line, docked right
-     above whichever hero block follows (reel, trip module or static cover) #}
-  {# data-live: swapped in place by liveNav() when a tag/sort link is
-     followed, so the count and the FILTER stamp stay in step without
-     reloading the document. #}
-  <div class="section__doc" data-live="doc">
-    <span class="doc-min-hide">FILE / {{ (breadcrumbs[-1].name if breadcrumbs else album) | upper }}</span>
-    {% if breadcrumbs | length > 1 %}<span>IN / <b>{{ breadcrumbs[-2].name }}</b></span>{% endif %}
-    {% if images or not sub_albums %}<span>COUNT / <b>{{ images | length }}</b></span>{% endif %}
-    {% if sub_albums %}<span>ALBUMS / <b>{{ sub_albums | length }}</b></span>{% endif %}
-    {% if breadcrumbs | length > 1 %}<span class="stamp stamp--cy"><i class="fa fa-folder-tree" aria-hidden="true"></i>{{ t('stamp.sub_album') }}</span>{% endif %}
-    {% if album_is_showcase %}<span class="stamp stamp--cy"><i class="fa fa-star" aria-hidden="true"></i>{{ t('stamp.showcase_album') }}</span>{% endif %}
-    {% if collection %}<span class="stamp stamp--cy"><i class="fa fa-layer-group" aria-hidden="true"></i>{{ t('stamp.collection') }}</span>{% endif %}
-    {% if active_tag %}<span class="stamp stamp--cy">FILTER / #{{ active_tag | upper }}</span>{% endif %}
-    <span class="stamp stamp--ok doc-min-hide">OK</span>
-  </div>
+  {# What this album holds, plus whatever makes it special (sub-album,
+     featured, collection, an active tag filter) — one quiet line above the
+     hero. data-live: swapped in place by liveNav() when a tag/sort link is
+     followed, so the counts stay in step without reloading the document. #}
+  <p class="section__doc" data-live="doc">
+    {% if images or not sub_albums %}<span><b>{{ images | length }}</b> {{ t('unit.image') if images | length == 1 else t('unit.images') }}</span>{% endif %}
+    {% if sub_albums %}<span><b>{{ sub_albums | length }}</b> {{ t('unit.directory') if sub_albums | length == 1 else t('unit.directories') }}</span>{% endif %}
+    {% if breadcrumbs | length > 1 %}<span class="section__doc-in">{{ t('stamp.sub_album') }} · <b>{{ breadcrumbs[-2].name }}</b></span>{% endif %}
+    {% if album_is_showcase %}<span class="section__doc-mark"><i class="fa fa-star" aria-hidden="true"></i>{{ t('stamp.showcase_album') }}</span>{% endif %}
+    {% if collection %}<span class="section__doc-mark"><i class="fa fa-layer-group" aria-hidden="true"></i>{{ t('stamp.collection') }}</span>{% endif %}
+    {% if active_tag %}<span class="section__doc-mark">#{{ active_tag }}</span>{% endif %}
+  </p>
 
   {% if trip %}
     {# trip albums: the whole trip module is the hero — header bar on top,
@@ -189,14 +184,13 @@
 
   <header class="section__head">
     <div class="section__slug">
-      <span class="ix">02</span>
+
       {% if breadcrumbs | length > 1 %}
         <a class="section__parent" href="/album/{{ breadcrumbs[-2].path }}" aria-label="{{ t('aria.up_to', name=breadcrumbs[-2].name) }}">
           <span class="section__parent-ico" aria-hidden="true"><i class="fa fa-arrow-turn-up"></i></span><span class="section__parent-name">{{ breadcrumbs[-2].name }}</span><span class="section__parent-slash" aria-hidden="true">/</span>
         </a>
       {% endif %}
       <span class="name">{{ breadcrumbs[-1].name if breadcrumbs else album }}</span>
-      <span class="jp">{{ t('album.slug_deco') }}</span>
     </div>
   </header>
 
@@ -335,12 +329,10 @@
     {% endif %}
   {% elif active_tag %}
     <div class="empty">
-      <span class="stamp">EMPTY</span>
       <p>{{ t('empty.tag_prefix') }}<code>#{{ active_tag }}</code>{{ t('empty.tag_suffix') }}</p>
     </div>
   {% elif not sub_albums %}
     <div class="empty">
-      <span class="stamp">EMPTY</span>
       <p>{{ t('empty.no_images') }}</p>
     </div>
   {% endif %}
