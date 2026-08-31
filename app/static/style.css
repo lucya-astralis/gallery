@@ -345,7 +345,7 @@ code{
 .nav__brand .brand-sub{
   font-family:"JetBrains Mono", ui-monospace, monospace;
   font-size:9.5px;
-  letter-spacing:.12em;
+  letter-spacing:.28em;
   text-transform:uppercase;
   color:var(--acc-mag);
 }
@@ -388,12 +388,12 @@ code{
   background:transparent;
   border:0; outline:0;
   color:var(--text);
-  font-family:inherit;
+  font-family:"JetBrains Mono", monospace;
   font-size:12px;
   letter-spacing:.08em;
   padding:9px 0;
 }
-.nav__search input::placeholder{ color:var(--text-ghost); letter-spacing:.01em; font-size:12px; }
+.nav__search input::placeholder{ color:var(--text-ghost); letter-spacing:.14em; text-transform:uppercase; font-size:11px; }
 
 .nav__status{
   display:flex; align-items:center; gap:8px;
@@ -420,9 +420,9 @@ code{
    instead of loose text links hanging off a divider. */
 .nav__lang{
   display:flex; align-items:center; gap:2px;
-  font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-family:"JetBrains Mono", monospace;
+  font-size:11px;
+  letter-spacing:.12em;
   padding:3px;
   border:1px solid var(--line);
   border-radius:var(--radius);
@@ -2490,7 +2490,7 @@ details[open] > summary::before{ content:"▾ "; }
      read as a matched pair; the option pills stretch to fill the taller box,
      which also gives them bigger tap targets */
   .nav__search, .nav__lang{ height:38px; }
-  .nav__lang{ padding:3px; gap:1px; font-size:12px; align-items:stretch; }
+  .nav__lang{ padding:3px; gap:1px; font-size:10px; align-items:stretch; }
   .nav__lang-opt{ display:flex; align-items:center; padding:0 7px; }
   /* iOS Safari auto-zooms when a focused input's font-size is < 16px. Keep the
      typed text at 16px so tapping search never zooms the page; the placeholder
