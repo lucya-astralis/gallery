@@ -1601,6 +1601,23 @@ function liveRegions(doc) {
   return out;
 }
 
+/* Which live region does this node belong to? On phones an open sort menu is
+   lifted out to <body> so the backdrop cannot swallow its taps (see open()),
+   which leaves its options with no [data-live] ancestor at all — asking the
+   DOM alone would answer "none" and every sort pick would reload the page.
+   Follow the lift back to where the menu came from. */
+function liveHost(node) {
+  let el = node;
+  while (el) {
+    const region = el.closest('[data-live]');
+    if (region) return region;
+    const menu = el.closest('.sort__menu');
+    if (!menu || !menu._origParent) return null;
+    el = menu._origParent;
+  }
+  return null;
+}
+
 /* Is this a link we can satisfy by swapping rather than navigating? */
 function isLiveLink(a) {
   if (!a || !a.href || a.target || a.hasAttribute('download')) return false;
@@ -1611,7 +1628,7 @@ function isLiveLink(a) {
   // Same page, different query: a filter or a sort, not a real destination.
   if (url.pathname !== location.pathname) return false;
   if (url.search === location.search) return false;
-  return !!a.closest('[data-live]');
+  return !!liveHost(a);
 }
 
 async function liveGo(url, { push = true } = {}) {

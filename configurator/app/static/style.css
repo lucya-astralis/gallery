@@ -715,7 +715,8 @@ select option { background: var(--surface); color: var(--text); }
 /* ----- photo grid ------------------------------------------------------ */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  /* 124px left no room for a role chip and a tag line under it */
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
   gap: 10px;
 }
 
@@ -735,28 +736,57 @@ select option { background: var(--surface); color: var(--text); }
 
 .cell.is-picked { border-color: var(--acc-cy); box-shadow: 0 0 0 1px var(--acc-cy); }
 
-.cell__order {
+/* Role chips along the top, clear of the tick in the corner. One line each
+   and ellipsised: "cover · featured · #3" as a single badge wrapped into
+   three lines across the photo on a tile this narrow. */
+.cell__roles {
   position: absolute;
   top: 6px;
-  left: 6px;
-  padding: 3px 7px;
+  left: 32px;
+  right: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.cell__roles.is-off { display: none; }
+
+.cell__role {
+  max-width: 100%;
+  padding: 2px 5px;
   border-radius: var(--radius);
   background: rgba(91, 138, 255, .92);
   color: #05070f;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: .1em;
+  line-height: 1.4;
+  letter-spacing: .06em;
   text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tags and file name stack in one footer over a single gradient, so neither
+   can land on the other or on the role chips. */
+.cell__foot {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 16px 7px 5px;
+  background: linear-gradient(transparent, rgba(4, 5, 10, .94) 45%);
+  pointer-events: none;
 }
 
 .cell__name {
-  position: absolute;
-  inset: auto 0 0 0;
-  padding: 14px 7px 5px;
   font-family: var(--mono);
   font-size: 9.5px;
-  background: linear-gradient(transparent, rgba(4, 5, 10, .92));
   color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1293,17 +1323,11 @@ select option { background: var(--surface); color: var(--text); }
 .chip__x:hover { color: var(--acc-red); }
 
 .cell__tags {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  max-width: 70%;
-  padding: 2px 6px;
-  border-radius: var(--radius);
-  background: rgba(61, 255, 165, .82);
-  color: #04140c;
+  color: var(--acc-cy);
   font-family: var(--mono);
   font-size: 9px;
   font-weight: 700;
+  letter-spacing: .02em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1344,9 +1368,6 @@ img.is-broken { opacity: .2; }
   border-color: var(--acc-cy);
   color: #05070f;
 }
-
-/* the role badge moves aside to make room for the tick */
-.cell__order { left: 32px; }
 
 /* Two stacked cards in the side column: the selection, then the photo. */
 .photos__aside {

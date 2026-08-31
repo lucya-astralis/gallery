@@ -263,6 +263,22 @@ const GALLERY_GROUPS = [
   ['Album list', 'The order and default sort on /albums.', ['album_order', 'album_sort']],
 ];
 
+/* Where the pane was before the last re-render, and where it actually landed
+ * afterwards — a scrollport too short for the old position silently clamps. */
+let paneScroll = 0;
+let paneScrollLanded = 0;
+
+/* Markup that arrives after renderPane() has already returned (the photo grid
+ * of a folder that still has to be fetched) calls this once it has height, so
+ * the clamped scroll position can be restored. Left alone if the pane moved
+ * in the meantime — that movement is the user scrolling. */
+function keepPaneScroll() {
+  const pane = $('#pane');
+  if (!pane || pane.scrollTop !== paneScrollLanded) return;
+  pane.scrollTop = paneScroll;
+  paneScrollLanded = pane.scrollTop;
+}
+
 function renderPane() {
   const pane = $('#pane');
   const isGallery = state.sel.kind === 'gallery';
@@ -270,7 +286,7 @@ function renderPane() {
   const fk = active && active.dataset ? active.dataset.fk : null;
   const selStart = fk && active.selectionStart !== undefined ? active.selectionStart : null;
   const selEnd = fk && active.selectionEnd !== undefined ? active.selectionEnd : null;
-  const scrollTop = pane.scrollTop;
+  paneScroll = pane.scrollTop;
   pane.innerHTML = '';
 
   const tabs = isGallery
@@ -302,7 +318,8 @@ function renderPane() {
   else if (state.tab === 'text') pane.append(renderDescriptions());
   else if (state.tab === 'assets') pane.append(renderAssets());
 
-  pane.scrollTop = scrollTop;
+  pane.scrollTop = paneScroll;
+  paneScrollLanded = pane.scrollTop;
   restoreFocus(fk, selStart, selEnd);
 }
 
@@ -931,6 +948,12 @@ async function loadFolder(path, withTags = false) {
   return payload;
 }
 
+/* The same lookup without the await: renderPhotosTab() needs to know whether
+ * it can fill the grid in this tick or has to wait for the network. */
+function cachedFolder(path, withTags = false) {
+  return photoCache.get((path || '::root') + (withTags ? '|t' : '')) || null;
+}
+
 function invalidateFolder(path) {
   photoCache.delete((path || '::root') + '|t');
   photoCache.delete(path || '::root');
@@ -998,107 +1021,27 @@ function renderPhotosTab() {
 
   const body = el('div', { class: 'browser' });
   main.append(body);
-  body.append(el('div', { class: 'empty-note', text: 'Loading…' }));
 
-  loadFolder(b.path, true).then((payload) => {
-    if (!state.browse || state.browse.path !== b.path) return;
-    body.innerHTML = '';
-
-    if (payload.folders.length) {
-      body.append(el('div', { class: 'folders' },
-        payload.folders.map((f) => folderTile(f, (path) => {
-          b.path = path; b.detail = null; renderPane();
-        }))));
-    }
-
-    if (!payload.photos.length) {
-      if (!payload.folders.length) {
-        body.append(el('div', { class: 'empty-note', text: 'Nothing in this folder.' }));
-      }
-      return;
-    }
-
-    const rels = payload.photos.map((p) => p.rel);
-    const allPicked = rels.every((r) => b.selected.has(r));
-    body.append(el('div', { class: 'browser__bar' },
-      el('span', { class: 'browser__count',
-                   text: payload.photos.length + ' photo' +
-                         (payload.photos.length === 1 ? '' : 's') + ' here' }),
-      READ_ONLY ? null : el('button', {
-        class: 'btn btn--sm', type: 'button',
-        text: allPicked ? 'Deselect all here' : 'Select all here',
-        onclick: () => {
-          if (allPicked) rels.forEach((r) => b.selected.delete(r));
-          else rels.forEach((r) => b.selected.add(r));
-          renderPane();
-        },
-      })));
-
-    const cover = value('cover');
-    const featured = (value('featured') || []).map(strip);
-    const order = (value('order') || []).map(strip);
-    const subOf = (rel) => album ? rel.slice(album.length + 1) : rel;
-
-    const toggle = (rel) => {
-      if (b.selected.has(rel)) b.selected.delete(rel);
-      else b.selected.add(rel);
-    };
-
-    const grid = el('div', { class: 'grid' });
-    payload.photos.forEach((photo, index) => {
-      const roles = [];
-      const sub = subOf(photo.rel);
-      if (cover && strip(cover) === sub) roles.push('cover');
-      if (featured.includes(sub)) roles.push('featured');
-      if (order.includes(sub)) roles.push('#' + (order.indexOf(sub) + 1));
-      const picked = b.selected.has(photo.rel);
-
-      grid.append(el('div', {
-        class: 'cell' + (picked ? ' is-picked' : '') +
-               (b.detail === photo.rel ? ' is-detail' : ''),
-        title: photo.rel,
-        onclick: (ev) => {
-          if (ev.shiftKey && b.lastIndex !== undefined) {
-            const [from, to] = [Math.min(b.lastIndex, index), Math.max(b.lastIndex, index)];
-            for (let i = from; i <= to; i++) b.selected.add(payload.photos[i].rel);
-          } else if (ev.ctrlKey || ev.metaKey) {
-            toggle(photo.rel);
-          } else {
-            b.selected.clear();
-            b.selected.add(photo.rel);
-          }
-          b.lastIndex = index;
-          b.detail = photo.rel;
-          renderPane();
-        },
-      },
-        el('img', { src: thumbUrl(photo.rel, 220), alt: '', loading: 'lazy' }),
-        // A plain-click way to extend the selection: not everyone reaches for
-        // a modifier, and on some setups ctrl-click never arrives at all.
-        el('button', {
-          class: 'cell__pick' + (picked ? ' is-on' : ''),
-          type: 'button',
-          text: picked ? '✓' : '',
-          title: picked ? 'remove from the selection' : 'add to the selection',
-          onclick: (ev) => {
-            ev.stopPropagation();
-            toggle(photo.rel);
-            b.lastIndex = index;
-            renderPane();
-          },
-        }),
-        roles.length ? el('span', { class: 'cell__order', text: roles.join(' · ') }) : null,
-        (photo.tags || []).length
-          ? el('span', { class: 'cell__tags', text: photo.tags.join(' · '),
-                         title: photo.tags.join(', ') })
-          : null,
-        el('span', { class: 'cell__name', text: photo.name })));
+  /* A folder already in the cache is drawn in this same tick rather than a
+   * microtask later: renderPane() puts the pane's scroll position back the
+   * moment it returns, and against a body still holding nothing but
+   * "Loading…" that position does not exist yet — the scrollport is too
+   * short for it, the browser clamps it, and every click on a photo threw
+   * the page back towards the top. */
+  const cached = cachedFolder(b.path, true);
+  if (cached) {
+    fillBrowser(body, b, cached);
+  } else {
+    body.append(el('div', { class: 'empty-note', text: 'Loading…' }));
+    loadFolder(b.path, true).then((payload) => {
+      if (!state.browse || state.browse.path !== b.path) return;
+      fillBrowser(body, b, payload);
+      keepPaneScroll();
+    }).catch((err) => {
+      body.innerHTML = '';
+      body.append(el('div', { class: 'empty-note', text: err.message }));
     });
-    body.append(grid);
-  }).catch((err) => {
-    body.innerHTML = '';
-    body.append(el('div', { class: 'empty-note', text: err.message }));
-  });
+  }
 
   if (b.selected.size) aside.append(renderTagBar(b));
   if (b.detail) aside.append(renderDetail(b.detail));
@@ -1108,6 +1051,116 @@ function renderPhotosTab() {
       'to add it to a selection you can tag all at once.'));
   }
   return panel;
+}
+
+/* Draw one folder into the browser column: its sub-folders, the bar above
+ * the grid, then the tiles. Split out of renderPhotosTab so a folder that
+ * is already cached can be drawn without waiting for a microtask. */
+function fillBrowser(body, b, payload) {
+  const album = state.sel.album;
+  body.innerHTML = '';
+
+
+  if (payload.folders.length) {
+    body.append(el('div', { class: 'folders' },
+      payload.folders.map((f) => folderTile(f, (path) => {
+        b.path = path; b.detail = null; renderPane();
+      }))));
+  }
+
+  if (!payload.photos.length) {
+    if (!payload.folders.length) {
+      body.append(el('div', { class: 'empty-note', text: 'Nothing in this folder.' }));
+    }
+    return;
+  }
+
+  const rels = payload.photos.map((p) => p.rel);
+  const allPicked = rels.every((r) => b.selected.has(r));
+  body.append(el('div', { class: 'browser__bar' },
+    el('span', { class: 'browser__count',
+                 text: payload.photos.length + ' photo' +
+                       (payload.photos.length === 1 ? '' : 's') + ' here' }),
+    READ_ONLY ? null : el('button', {
+      class: 'btn btn--sm', type: 'button',
+      text: allPicked ? 'Deselect all here' : 'Select all here',
+      onclick: () => {
+        if (allPicked) rels.forEach((r) => b.selected.delete(r));
+        else rels.forEach((r) => b.selected.add(r));
+        renderPane();
+      },
+    })));
+
+  const cover = value('cover');
+  const featured = (value('featured') || []).map(strip);
+  const order = (value('order') || []).map(strip);
+  const subOf = (rel) => album ? rel.slice(album.length + 1) : rel;
+
+  const toggle = (rel) => {
+    if (b.selected.has(rel)) b.selected.delete(rel);
+    else b.selected.add(rel);
+  };
+
+  const grid = el('div', { class: 'grid' });
+  payload.photos.forEach((photo, index) => {
+    const roles = [];
+    const sub = subOf(photo.rel);
+    if (cover && strip(cover) === sub) roles.push('cover');
+    if (featured.includes(sub)) roles.push('featured');
+    if (order.includes(sub)) roles.push('#' + (order.indexOf(sub) + 1));
+    const picked = b.selected.has(photo.rel);
+
+    grid.append(el('div', {
+      class: 'cell' + (picked ? ' is-picked' : '') +
+             (b.detail === photo.rel ? ' is-detail' : ''),
+      title: photo.rel,
+      onclick: (ev) => {
+        if (ev.shiftKey && b.lastIndex !== undefined) {
+          const [from, to] = [Math.min(b.lastIndex, index), Math.max(b.lastIndex, index)];
+          for (let i = from; i <= to; i++) b.selected.add(payload.photos[i].rel);
+        } else if (ev.ctrlKey || ev.metaKey) {
+          toggle(photo.rel);
+        } else {
+          b.selected.clear();
+          b.selected.add(photo.rel);
+        }
+        b.lastIndex = index;
+        b.detail = photo.rel;
+        renderPane();
+      },
+    },
+      el('img', { src: thumbUrl(photo.rel, 220), alt: '', loading: 'lazy' }),
+      // A plain-click way to extend the selection: not everyone reaches for
+      // a modifier, and on some setups ctrl-click never arrives at all.
+      el('button', {
+        class: 'cell__pick' + (picked ? ' is-on' : ''),
+        type: 'button',
+        text: picked ? '✓' : '',
+        title: picked ? 'remove from the selection' : 'add to the selection',
+        onclick: (ev) => {
+          ev.stopPropagation();
+          toggle(photo.rel);
+          b.lastIndex = index;
+          renderPane();
+        },
+      }),
+      // Everything written over a tile has to survive being narrow: the roles
+      // are separate chips along the top, and the tags share the footer with
+      // the file name — one line each, ellipsised, with the whole text on the
+      // tooltip. As two wide badges they wrapped across the photo, and the
+      // tags landed on top of the roles.
+      roles.length
+        ? el('span', { class: 'cell__roles', title: roles.join(', ') },
+            roles.map((r) => el('span', { class: 'cell__role', text: r })))
+        : null,
+      el('span', { class: 'cell__foot' },
+        (photo.tags || []).length
+          ? el('span', { class: 'cell__tags', text: photo.tags.join(' · '),
+                         title: photo.tags.join(', ') })
+          : null,
+        el('span', { class: 'cell__name', text: photo.name }))));
+  });
+  body.append(grid);
 }
 
 /* Read-only EXIF for the photo last clicked, plus its own tags. */
@@ -1491,23 +1544,27 @@ function drawPicker() {
     const grid = el('div', { class: 'grid' });
     for (const photo of photos.slice(0, 600)) {
       const key = pickKey(photo.rel);
-      const at = picker.picked.indexOf(key);
-      grid.append(el('div', {
-        class: 'cell' + (at >= 0 ? ' is-picked' : ''),
+      const badge = el('span', { class: 'cell__roles' }, el('span', { class: 'cell__role' }));
+      const cell = el('div', {
+        class: 'cell',
         title: key,
         onclick: () => {
           const idx = picker.picked.indexOf(key);
           if (picker.single) picker.picked = idx >= 0 ? [] : [key];
           else if (idx >= 0) picker.picked.splice(idx, 1);
           else picker.picked.push(key);
-          drawPicker();
+          markPicks(grid);
         },
       },
         el('img', { src: thumbUrl(photo.rel, 220), alt: '', loading: 'lazy' }),
-        at >= 0 ? el('span', { class: 'cell__order',
-                               text: picker.single ? '✓' : String(at + 1) }) : null,
-        el('span', { class: 'cell__name', text: photo.name })));
+        badge,
+        el('span', { class: 'cell__foot' },
+          el('span', { class: 'cell__name', text: photo.name })));
+      cell._pickKey = key;
+      cell._badge = badge;
+      grid.append(cell);
     }
+    markPicks(grid);
     slot.append(grid);
     if (photos.length > 600) {
       slot.append(el('div', { class: 'empty-note',
@@ -1517,6 +1574,20 @@ function drawPicker() {
     slot.innerHTML = '';
     slot.append(el('div', { class: 'empty-note', text: err.message }));
   });
+}
+
+/* Repaint which tiles are picked, in place. Redrawing the whole grid on every
+ * click emptied the modal body first, which threw its scroll position back to
+ * the top — so picking the tenth photo of a folder meant scrolling down to it
+ * again — and re-attached up to 600 thumbnails to do it. */
+function markPicks(grid) {
+  grid.querySelectorAll('.cell').forEach((cell) => {
+    const at = picker.picked.indexOf(cell._pickKey);
+    cell.classList.toggle('is-picked', at >= 0);
+    cell._badge.classList.toggle('is-off', at < 0);
+    cell._badge.firstChild.textContent = picker.single ? '✓' : String(at + 1);
+  });
+  updateModalCount();
 }
 
 function updateModalCount() {

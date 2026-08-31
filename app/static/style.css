@@ -2254,6 +2254,10 @@ section{
   min-width:0;
   display:flex;
   flex-direction:column;
+  /* Never stretch to the sidebar's height: .stage__loader is absolutely
+     positioned against this box, so a grid item stretched by an expanded EXIF
+     dump would drag the buttons down away from the photo they belong to. */
+  align-self:start;
 }
 .stage{
   position:relative;
