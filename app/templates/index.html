@@ -38,7 +38,7 @@
     {% if showcase_albums %}
       <section class="feat" aria-label="Featured albums">
         <header class="feat__head">
-          <h2 class="feat__label">{{ t('feat.label') }}</h2>
+          <h2 class="feat__label"><i class="fa fa-star" aria-hidden="true"></i>{{ t('feat.label') }}</h2>
           <span class="feat__count">{{ showcase_albums | length }} / {{ albums | length }}</span>
         </header>
         {% set feat_eager = 3 %}
@@ -52,7 +52,7 @@
     <div data-live="body">
     {% if archive_albums %}
       <header class="archive-head">
-        <h2 class="archive-head__label">{{ t('archive.label') }}</h2>
+        <h2 class="archive-head__label"><i class="fa fa-table-cells" aria-hidden="true"></i>{{ t('archive.label') }}</h2>
         <span class="archive-head__count">{{ archive_albums | length }} {% if archive_albums | length == 1 %}{{ t('unit.directory') }}{% else %}{{ t('unit.directories') }}{% endif %}</span>
         <div class="sort" data-sort>
           <button type="button" class="sort__btn" aria-haspopup="true" aria-expanded="false">
