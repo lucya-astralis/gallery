@@ -25,7 +25,7 @@ from . import cfgio, imagemeta, schema, validate
 from .library import Library, asset_kinds, is_image
 
 # This tool's own release version, reported by /api/meta and shown in the UI.
-APP_VERSION = "1.1"
+APP_VERSION = "1.2"
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BASE_DIR.parent

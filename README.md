@@ -218,6 +218,7 @@ Optional file in the album's **`.album/` folder** (see above):
 
 | Key          | Values                          | Effect                                                                                     |
 |--------------|---------------------------------|--------------------------------------------------------------------------------------------|
+| `name`       | free text, e.g. `Japan 2026`    | The album's display name, used everywhere the album is named: cards, breadcrumbs, hero title, `/api`. The folder name stays the URL, so renaming here never breaks a link. Unset, the folder name is used with its underscores relaxed into spaces (`japan_2026` → `japan 2026`). Commas are fine — they are rejoined. |
 | `collection` | `true`                          | The album page shows every photo of its whole subtree (own + sub-folders) as one flat set. The [API](#api) scopes the album the same way. |
 | `showcase`   | `true` / `false`                | Featured album: ★ rail on `/albums` and the welcome screen. |
 | `featured`   | paths, or `*` / `all`           | Featured photos: welcome hero, `/api/showcase`, the album's reel. Paths are relative to the album (`osaka/IMG_4853.png`, a leading `/` is fine); bare filenames match anywhere in the subtree. Matching ignores casing, so `Osaka/…` also finds `osaka/…`. The album's reel shows them in exactly this order. |

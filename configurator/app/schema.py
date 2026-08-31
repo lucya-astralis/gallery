@@ -45,6 +45,9 @@ FONT_SCALE_RANGE = (0.5, 2.5)
 #            must not be re-split).
 KEY_SPEC: dict[str, dict] = {
     # album.cfg
+    # The album's display name. Like loc, the gallery rejoins the parser's
+    # comma-split parts with ", " (_album_display_name), so it stays one line.
+    "name": {"type": "text", "joined": True},
     "collection": {"type": "bool"},
     "showcase": {"type": "bool"},
     "cover": {"type": "photo"},
@@ -74,14 +77,15 @@ KEY_SPEC: dict[str, dict] = {
     "album_sort": {"type": "choice", "choices": GALLERY_ALBUM_SORTS},
 }
 
-ALBUM_KEYS = ["collection", "showcase", "cover", "featured", "order", "reel",
-              "sort", "tags", "effect", "icon", "font", "font_scale",
+ALBUM_KEYS = ["name", "collection", "showcase", "cover", "featured", "order",
+              "reel", "sort", "tags", "effect", "icon", "font", "font_scale",
               "wallpaper", "wallpaper_mobile", "loc", "stat", "stats"]
 GALLERY_KEYS = ["welcome", "welcome_desktop", "welcome_mobile", "album_order",
                 "album_sort"]
 
 # One-line help shown next to each field in the UI.
 HELP: dict[str, str] = {
+    "name": "Display name, used everywhere the album is named -- cards, breadcrumbs, hero title. The folder name stays the URL. Empty means the folder name with underscores as spaces. Commas are fine here -- the gallery rejoins them.",
     "collection": "Show every photo in the subtree (own + sub-folders) as one flat collection.",
     "showcase": "Showcase album -- gets the star rail on /albums and the welcome page.",
     "cover": "Pin the album cover instead of auto-picking the newest photo.",

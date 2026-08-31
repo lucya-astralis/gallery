@@ -119,7 +119,7 @@ templates.env.globals["static_url"] = _static_url
 
 # The gallery's own release version, shown in the nav and the footer.
 # Distinct from API_VERSION, which versions the JSON API contract.
-APP_VERSION = "5.0"
+APP_VERSION = "5.1"
 templates.env.globals["app_version"] = APP_VERSION
 
 
@@ -321,7 +321,8 @@ def _album_card(album: str, all_albums: list[str] | None = None) -> dict:
     cover_rel = _album_cover_rel(album)
     return {
         "album": album,
-        "name": album.rsplit("/", 1)[-1],
+        # album.cfg `name = …` when set, else the folder name (_album_display_name)
+        "name": _album_display_name(album),
         "count": agg["count"] if agg else 0,
         "latest": agg["latest"] if agg else None,
         "cover": cover_rel,
@@ -361,8 +362,15 @@ def _curated_album_positions() -> dict[str, int]:
 def _sorted_album_cards(cards: list[dict], sort_key: str) -> list[dict]:
     """Order album cards by one of the SORT_ALBUM keys or "curated"
     (gallery.cfg `album_order`). A leading stable name-ascending pass
-    provides the tie-break for every other key."""
-    cards = sorted(cards, key=lambda a: a["album"].lower())
+    provides the tie-break for every other key.
+
+    "By name" sorts on the name the reader SEES (album.cfg `name = …` via
+    _album_card), not the folder path — a grid of pretty names ordered by
+    hidden folder names just looks broken. The folder path stays the
+    tie-break so two albums sharing a display name keep a stable order."""
+    def shown(a: dict) -> tuple[str, str]:
+        return ((a.get("name") or a["album"]).lower(), a["album"].lower())
+    cards = sorted(cards, key=shown)
     if sort_key == "curated":
         # listed albums first, in their configured order; everything not
         # listed follows newest-first (stable sorts keep both groups tidy)
@@ -370,7 +378,7 @@ def _sorted_album_cards(cards: list[dict], sort_key: str) -> list[dict]:
         cards.sort(key=lambda a: a["latest"] or "", reverse=True)
         cards.sort(key=lambda a: pos.get(_album_order_key(a["album"]), len(pos)))
     elif sort_key == "name_desc":
-        cards.sort(key=lambda a: a["album"].lower(), reverse=True)
+        cards.sort(key=shown, reverse=True)
     elif sort_key == "count_desc":
         cards.sort(key=lambda a: a["count"], reverse=True)
     elif sort_key == "count_asc":
@@ -429,7 +437,7 @@ def _album_breadcrumbs(album: str) -> list[dict]:
             continue
         acc.append(seg)
         path = "/".join(acc)
-        out.append({"name": seg, "path": path,
+        out.append({"name": _album_display_name(path), "path": path,
                     "icon": _album_icon_url(path)})
     return out
 
@@ -495,6 +503,11 @@ def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
 # the gallery as a whole and stays at the root of PHOTOS_DIR.
 #
 # album.cfg keys (file sits in the album's `.album/` folder):
+#   name = Japan 2026    -> the album's display name, used everywhere the album
+#                           is named (cards, breadcrumbs, hero title, API).
+#                           The folder name stays the URL; this is only what
+#                           the reader sees. Unset = the folder name with its
+#                           underscores relaxed into spaces.
 #   collection = true    -> the album shows every photo in its subtree (its
 #                           own + all sub-folders) as one flat collection.
 #   cover = sub/pic.jpg  -> pin the album cover (path relative to the album)
@@ -610,6 +623,23 @@ def _album_config(album: str) -> dict[str, list[str]]:
     except OSError:
         return {}
     return _parse_cfg(text)
+
+
+def _album_display_name(album: str, cfg: dict[str, list[str]] | None = None) -> str:
+    """What an album is CALLED, as opposed to where it lives. album.cfg
+    `name = Japan 2026` wins; without one the folder's own last segment is
+    used with underscores relaxed into spaces (`japan_2026` -> `japan 2026`),
+    which is what the hero title always did on its own.
+
+    The folder name stays the identity everywhere it matters — URLs, cfg
+    lookups, the `album` column, cover paths — so renaming here is free and
+    never breaks a link. _parse_cfg comma-splits values, so the parts are
+    rejoined the way `loc` is (_album_stats): a name may contain commas."""
+    cfg = _album_config(album) if cfg is None else cfg
+    pretty = ", ".join(v.strip() for v in (cfg.get("name") or []) if v.strip())
+    if pretty:
+        return pretty
+    return (album or "").rsplit("/", 1)[-1].replace("_", " ")
 
 
 def _album_tags(album: str, cfg: dict[str, list[str]] | None = None) -> list[str]:

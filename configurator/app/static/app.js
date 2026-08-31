@@ -250,7 +250,7 @@ function restoreFocus(fk, start, end) {
  * what an album *is*, how it presents itself, which photos it leans on, and
  * the editorial text. Each group is the answer to one question. */
 const ALBUM_GROUPS = [
-  ['The album', 'What this folder is to the gallery.', ['collection', 'showcase', 'cover']],
+  ['The album', 'What it is called, and what this folder is to the gallery.', ['name', 'collection', 'showcase', 'cover']],
   ['Photos it leans on', 'Which photos get pulled out of the grid.', ['featured', 'order', 'reel', 'sort']],
   ['Look', 'Its own mark, title face and page effect.', ['icon', 'font', 'font_scale', 'effect']],
   ['Backdrop', 'What sits behind this album’s pages. Sub-albums inherit it; leave both empty for the gallery’s default.',
@@ -430,10 +430,16 @@ function numberControl(key) {
   });
 }
 
+const TEXT_PLACEHOLDER = {
+  loc: 'City, Country',
+  // the folder name is the fallback, so showing it is the honest hint
+  name: 'e.g. Japan 2026 — empty keeps the folder name',
+};
+
 function textControl(key) {
   return el('input', {
     type: 'text', value: value(key) || '', disabled: READ_ONLY,
-    'data-fk': key, placeholder: key === 'loc' ? 'City, Country' : '',
+    'data-fk': key, placeholder: TEXT_PLACEHOLDER[key] || '',
     oninput: (ev) => setValue(key, ev.target.value || null),
   });
 }

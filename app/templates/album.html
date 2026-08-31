@@ -1,5 +1,9 @@
 {% extends "base.html" %}
-{% block title %}{{ album }} — lucya.systems gallery{% endblock %}
+{# the album path is the URL; what a reader sees is its display name chain
+   (album.cfg `name = …` per level, else the folder name — see
+   _album_display_name). Same everywhere the album is named. #}
+{% set album_label = breadcrumbs | map(attribute='name') | join(' / ') if breadcrumbs else album %}
+{% block title %}{{ album_label }} — lucya.systems gallery{% endblock %}
 {% block body_class %}page-album{% if trip %} trip-{{ trip.key }}{% endif %}{% if album_font_css %} album-font{% endif %}{% endblock %}
 {% block head_extra %}
   {# The album's own title face (album.cfg `font = ...`): a generated sheet
@@ -14,9 +18,9 @@
   {% if album_font_css %}<link rel="stylesheet" href="{{ album_font_css }}">{% endif %}
 {% endblock %}
 {% block meta %}
-  {% set og_title = album ~ ' — lucya.systems gallery' %}
+  {% set og_title = album_label ~ ' — lucya.systems gallery' %}
   {% set img_count = images | length %}
-  {% set og_desc = t('album.og_desc', count=img_count, unit=t('album.og_unit_one' if img_count == 1 else 'album.og_unit_many'), album=album) %}
+  {% set og_desc = t('album.og_desc', count=img_count, unit=t('album.og_unit_one' if img_count == 1 else 'album.og_unit_many'), album=album_label) %}
   {% set cover_rel = images[0].rel_path if images else (sub_albums[0].cover if sub_albums else None) %}
   <meta property="og:site_name" content="lucya.systems gallery">
   <meta property="og:title" content="{{ og_title }}">
@@ -26,7 +30,7 @@
   {% if cover_rel %}
     {% set og_image = public_base_url(request) ~ '/preview/' ~ cover_rel %}
     <meta property="og:image" content="{{ og_image }}">
-    <meta property="og:image:alt" content="{{ album }}">
+    <meta property="og:image:alt" content="{{ album_label }}">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="{{ og_image }}">
   {% else %}
@@ -74,7 +78,11 @@
      onto whichever hero this album has: the reel slideshow when there is
      one (all viewports, see _featured.html), else the static cover hero
      (phones only). Defined before the include so _featured.html sees it. #}
-  {% set hero_title = trip.title if trip else (breadcrumbs[-1].name if breadcrumbs else album) | replace('_', ' ') %}
+  {# breadcrumb names are already display names — album.cfg `name = …` when the
+     album sets one, else its folder name with underscores relaxed into spaces
+     (_album_display_name). Don't re-`replace` here: a configured name is
+     verbatim, underscores and all. #}
+  {% set hero_title = trip.title if trip else (breadcrumbs[-1].name if breadcrumbs else album) %}
   {# a trip brings its own kanji (japan_2026 -> 日本), which is part of the
      album's identity; every other album falls back to the generic ギャラリー
      deco. They share a slot but not a purpose, so the fallback is marked —

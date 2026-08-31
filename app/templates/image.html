@@ -164,7 +164,10 @@
   </div>
   <div class="lightbox__bar">
     <span class="lightbox__count" id="lb-count">01 / 01</span>
-    <span class="lightbox__title" id="lb-title"></span>
+    {# just the file name: the album is already in the page behind the viewer,
+       and a full rel_path is what used to shove this bar off screen. The inner
+       span is what ellipsises — text-overflow does nothing on a flex box. #}
+    <span class="lightbox__title"><span class="lightbox__title-txt" id="lb-title"></span></span>
     <button type="button" class="lightbox__btn" id="lb-full"><i class="fa fa-image" aria-hidden="true"></i>{{ t('btn.load_original') }}</button>
     <a class="lightbox__btn" id="lb-dl" href="" download=""><i class="fa fa-download" aria-hidden="true"></i>{{ t('btn.download') }}</a>
   </div>

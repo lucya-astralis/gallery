@@ -1138,11 +1138,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const parts = rel.split('/');
     return parts[parts.length - 1];
   }
-  function relToTitle(rel){
-    const parts = rel.split('/');
-    if (parts.length >= 2) return parts[0] + ' / ' + parts.slice(1).join('/');
-    return rel;
-  }
 
   function preload(rel){
     if (!rel) return;
@@ -1155,7 +1150,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function render(){
     const rel = rels[index];
     const filename = relToFilename(rel);
-    titleEl.textContent = relToTitle(rel);
+    // file name only. The album is already named on the page behind the viewer,
+    // and the full rel_path pushed this bar past the edge of the screen.
+    titleEl.textContent = filename;
+    titleEl.title = filename;
     countEl.textContent = String(index + 1).padStart(2, '0') + ' / ' + String(total).padStart(2, '0');
     dlBtn.href = relToFull(rel);
     dlBtn.setAttribute('download', filename);

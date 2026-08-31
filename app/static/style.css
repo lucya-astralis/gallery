@@ -2870,19 +2870,34 @@ body.lightbox-open{ overflow:hidden; }
   color:var(--acc-cy);
   white-space:nowrap;
   display:inline-flex; align-items:center;
+  flex:none;
 }
+/* the file name is the ONE elastic cell of the bar: everything else keeps its
+   intrinsic width and this one gives way. `min-width:0` is what lets it shrink
+   below its text at all — a flex item's default `min-width:auto` is exactly
+   what used to push the bar past the edge of the screen. */
 .lightbox__title{
   padding:9px 14px;
   border-right:1px solid var(--line);
   color:var(--text-dim);
+  max-width:38vw;
+  min-width:0;
+  flex:0 1 auto;
+  overflow:hidden;
+  display:inline-flex; align-items:center;
+}
+/* ...and the ellipsis lives on the inner span: text-overflow has no effect on
+   a flex container's own anonymous text, so the clip needs a real block. */
+.lightbox__title-txt{
+  display:block;
+  min-width:0;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
-  max-width:38vw;
-  display:inline-flex; align-items:center;
 }
 .lightbox__btn{
   padding:9px 14px;
+  flex:none;
   border:0;
   border-right:1px solid var(--line);
   background:transparent;
@@ -2914,7 +2929,17 @@ body.lightbox-open{ overflow:hidden; }
     letter-spacing:.01em;
     max-width: calc(100% - 16px);
   }
-  .lightbox__title{ max-width:62vw; padding:7px 10px; }
+  /* phones: the bar wraps into two rows — the file name gets the top one to
+     itself (order:-1 lifts it above the counter), the counter and the two
+     buttons share the row below. Beats a 62vw sliver fighting the buttons. */
+  .lightbox__title{
+    order:-1;
+    flex:1 1 100%;
+    max-width:none;
+    padding:7px 10px;
+    border-right:0;
+    border-bottom:1px solid var(--line);
+  }
   .lightbox__count{ padding:7px 10px; }
   .lightbox__btn{ padding:7px 10px; }
 }
@@ -2988,8 +3013,74 @@ body.lightbox-open{ overflow:hidden; }
 .foot__op-val{ color:var(--text-dim); transition: color .15s; }
 .foot__op:hover .foot__op-val{ color:var(--acc-cy); }
 
-@media (max-width:600px){
-  .foot__inner{ flex-direction:column; align-items:flex-start; gap:12px; }
+/* Phones: the desktop row can't just be tipped on its side — one block per
+   line reads as five ragged fragments shoved into the left margin, and the
+   operator card stretched edge to edge stops looking like a card at all. So
+   the footer is built around the fact that three of its five blocks are
+   rectangles of almost the same height: the operator card and the two 88x31
+   web buttons line up as one row of tiles, and the running text goes below.
+
+     [ operator card ]   [EU] [pride]
+     ——————————————————————————————————————
+     lucya.systems        Datenschutz Impressum
+                          lucya.systems gallery · 5.1
+
+   (Desktop is untouched — it still runs as one flex row.)
+
+   `justify-self` on every cell is the other half of the fix: grid items
+   stretch to their track by default, which is exactly how the operator card
+   ended up as a long empty bar. The type steps down a notch here so the two
+   halves of each row fit side by side at all. */
+@media (max-width:760px){
+  .foot__inner{
+    display:grid;
+    grid-template-columns:auto auto;
+    justify-content:space-between;
+    align-items:center;
+    gap:0 12px;
+    padding:16px var(--page-pad) 18px;
+    font-size:11px;
+  }
+  /* DOM order is brand, operator, links, badges, meta; the tile row wants
+     operator + badges, so every cell is placed by hand. Row 2 is the rule
+     under them — a real grid item (::before is one on a grid container), so
+     it runs unbroken across the column gap instead of the two half-lines a
+     border-top on each cell would leave. */
+  .foot__inner::before{
+    content:"";
+    grid-area:2 / 1 / 3 / 3;
+    height:1px;
+    background:var(--line);
+    margin:15px 0 14px;
+  }
+  .foot__op    { grid-area:1 / 1; justify-self:start; }
+  .foot__badges{ grid-area:1 / 2; justify-self:stretch; justify-content:flex-end; }
+  .foot__brand { grid-area:3 / 1; align-self:start; }
+  .foot__links { grid-area:3 / 2; justify-self:end; }
+  .foot__meta  { grid-area:4 / 2; justify-self:end; text-align:right; padding-top:7px; }
+
+  /* the legal links and the version stamp share the lower right column, so
+     the links stay on one line and the stamp sits directly under them */
+  .foot__links{ flex-wrap:wrap; justify-content:flex-end; align-items:flex-start; gap:6px 14px; }
+
+  /* The card and the badges have to make one row together, and the three
+     tiles do not fit at their desktop sizes on any phone. The card is trimmed
+     as far as its own contents allow and the buttons take whatever is left:
+     `flex:0 1 88px` starts them at the canonical 88x31 and lets them shrink
+     evenly into their track — 75px wide at 375, 71 at 360, still side by side
+     on a 320px phone. `height:auto` keeps the art's own ratio, so they stay
+     unmistakably web buttons at every size, which stacking them would not. */
+  .foot__badges{ flex-wrap:nowrap; min-width:0; gap:7px; }
+  .foot__badges img{
+    box-sizing:border-box;   /* so the hairline is inside the flex basis */
+    flex:0 1 88px;
+    width:auto; height:auto;
+    min-width:0;
+  }
+  .foot__op{ padding:4px 10px 4px 4px; gap:8px; min-width:0; }
+  .foot__op-pfp{ width:28px; height:28px; }
+  .foot__op-txt{ min-width:0; gap:2px; }
+  .foot__op-val{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 }
 
 /* ================================================================
@@ -4305,13 +4396,66 @@ html.fx-anim img.px-wait{ opacity:0; }
    (the .detail node is replaced wholesale, so the animation re-runs) ---- */
 html.fx-anim .detail{ animation: rv-fade .32s ease; }
 
-/* ---- welcome hero build-up (one-shot on load) ---- */
-html.fx-anim .vf__hudtop { animation: rv-fade .7s ease .35s backwards; }
-html.fx-anim .vf__title  { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .16s backwards; }
-html.fx-anim .vf__lead   { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .26s backwards; }
-html.fx-anim .vf__actions{ animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .36s backwards; }
-html.fx-anim .vf__meta   { animation: rv-right .6s cubic-bezier(.19,.66,.28,.99) .45s backwards; }
-html.fx-anim .vf__deck   { animation: rv-fade .7s ease .5s backwards; }
+/* ---- welcome hero build-up (one-shot on load) -----------------------
+   The hero IS a camera live view, so it enters the way one wakes up: the
+   feed comes up out of black, the framing corners snap to their positions,
+   AF acquires on the reticle, and only then does the type settle in
+   underneath. One pass, ~1.4s, and every step is opacity/transform so the
+   whole thing composites.
+
+   Order of business, in delay order:
+     .00  stage exposes (black -> image, settling from a hair wide)
+     .22  framing corners snap in, one per corner
+     .38  thirds grid
+     .42  AF reticle acquires, flashes cyan, settles
+     .44  REC / LIVE VIEW / FRM row
+     .50  title, then lead / actions / meta / deck
+
+   `backwards` everywhere: the from-state holds through the delay, and once
+   a step is done the element goes back to its own resting styles — so the
+   reticle's .is-switching flash and the deck's hovers keep working. */
+@keyframes vf-expose{
+  from{ opacity:0; transform:scale(1.045); }
+  to  { opacity:1; transform:scale(1); }
+}
+/* the corner grows out of its own vertex — origin is set per corner below */
+@keyframes vf-corner{
+  from{ opacity:0; transform:scale(.25); }
+  to  { opacity:.9; transform:scale(1); }
+}
+/* AF: opens wide and dim, snaps to size on the cyan flash, relaxes to rest */
+@keyframes vf-af{
+  0%  { opacity:0; transform:translate(-50%,-50%) scale(2.2);
+        border-color:rgba(91,138,255,.9); box-shadow:0 0 26px rgba(91,138,255,.45); }
+  58% { opacity:1; transform:translate(-50%,-50%) scale(1);
+        border-color:var(--acc-cy); box-shadow:0 0 18px rgba(91,138,255,.35); }
+  100%{ opacity:.55; transform:translate(-50%,-50%) scale(1);
+        border-color:rgba(255,255,255,.22); box-shadow:0 0 0 rgba(91,138,255,0); }
+}
+/* the title is uncovered left to right, the way a name is set rather than
+   dropped in — the -12% end inset keeps the drop shadow out of the clip */
+@keyframes vf-wipe{
+  from{ opacity:0; clip-path:inset(0 100% 0 0); transform:translate3d(0, 10px, 0); }
+  to  { opacity:1; clip-path:inset(0 -12% 0 0); transform:translate3d(0, 0, 0); }
+}
+
+html.fx-anim .vf__stage{ animation: vf-expose 1s cubic-bezier(.19,.66,.28,.99) backwards; }
+
+html.fx-anim .vf__corner{ animation: vf-corner .45s cubic-bezier(.19,.66,.28,.99) backwards; }
+html.fx-anim .vf__corner--tl{ transform-origin:top left;     animation-delay:.22s; }
+html.fx-anim .vf__corner--tr{ transform-origin:top right;    animation-delay:.27s; }
+html.fx-anim .vf__corner--bl{ transform-origin:bottom left;  animation-delay:.32s; }
+html.fx-anim .vf__corner--br{ transform-origin:bottom right; animation-delay:.37s; }
+
+html.fx-anim .vf__thirds { animation: rv-fade .8s ease .38s backwards; }
+html.fx-anim .vf__reticle{ animation: vf-af .85s cubic-bezier(.19,.66,.28,.99) .42s backwards; }
+
+html.fx-anim .vf__hudtop { animation: rv-fade .7s ease .44s backwards; }
+html.fx-anim .vf__title  { animation: vf-wipe .72s cubic-bezier(.19,.66,.28,.99) .5s backwards; }
+html.fx-anim .vf__lead   { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .64s backwards; }
+html.fx-anim .vf__actions{ animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .74s backwards; }
+html.fx-anim .vf__meta   { animation: rv-right .6s cubic-bezier(.19,.66,.28,.99) .82s backwards; }
+html.fx-anim .vf__deck   { animation: rv-fade .7s ease .86s backwards; }
 
 /* ---- lightbox: fade the viewer in, image settles from a hair larger.
    display:none → flex restarts the animation on every open; navigating
