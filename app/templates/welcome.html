@@ -27,6 +27,22 @@
        top and the intro text sits in the shaded lower-left quadrant. This
        is the ONE place the camera voice is deliberate — see the note on
        .vf__hudtop in style.css before copying it anywhere else. ---- #}
+{# The hero title, one <span> per letter so the entrance can run character by
+   character (html.fx-anim .vf__title-ch, style.css). Split here rather than
+   in app.js: the markup is then complete at first paint, so a no-JS or
+   reduced-motion visitor gets the finished word with no reflow and nothing
+   to wait for — the spans simply never animate.
+   `aria-label` on the <h1> gives the accessible name as one word, so a
+   screen reader is never handed seven separate letters. "Gallery" is a
+   brand string, not UI copy, which is why it is not translated and why
+   splitting it per character is safe. #}
+{% macro hero_title() %}
+  <h1 class="vf__title" aria-label="Gallery">
+    {%- for ch in 'Gallery' -%}
+      <span class="vf__title-ch">{{ ch }}</span>
+    {%- endfor -%}
+  </h1>
+{% endmacro %}
 <section class="vf{% if not shuffle %} vf--empty{% endif %}" id="vf" data-count="{{ shuffle | length }}">
   {% if shuffle %}
     <div class="vf__stage" id="vf-stage">
@@ -62,7 +78,7 @@
 
     <div class="vf__body">
       <div class="vf__intro">
-        <h1 class="vf__title"><span class="vf__title-word">Gallery</span></h1>
+        {{ hero_title() }}
         <p class="vf__lead">{{ t('welcome.lead') }}</p>
         <div class="vf__actions">
           <a href="/albums" class="btn-link btn-link--primary"><i class="fa fa-images" aria-hidden="true"></i>{{ t('welcome.browse') }}<i class="fa fa-arrow-right btn-link__go" aria-hidden="true"></i></a>
@@ -101,7 +117,7 @@
     </div>
     <div class="vf__empty">
       <span class="vf__rec vf__rec--off"><i aria-hidden="true"></i>NO SIGNAL</span>
-      <h1 class="vf__title"><span class="vf__title-word">Gallery</span></h1>
+      {{ hero_title() }}
       <div class="empty">
         <p>{{ t('welcome.no_images') }}</p>
         <p class="note">Drop subfolders into <code>photos/</code> — each subfolder becomes an album, and albums can nest (e.g. <code>japan/tokyo</code>).</p>

@@ -121,7 +121,7 @@ templates.env.globals["static_url"] = _static_url
 
 # The gallery's own release version, shown in the nav and the footer.
 # Distinct from API_VERSION, which versions the JSON API contract.
-APP_VERSION = "5.1"
+APP_VERSION = "5.2"
 templates.env.globals["app_version"] = APP_VERSION
 
 

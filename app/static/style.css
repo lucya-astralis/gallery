@@ -3122,8 +3122,8 @@ body.lightbox-open{ overflow:hidden; }
 
      [ operator card ]   [EU] [pride]
      ——————————————————————————————————————
-     lucya.systems        Datenschutz Impressum
-                          lucya.systems gallery · 5.1
+     lucya.systems        lucya.systems gallery · 5.2
+             Statistiken  Datenschutz  Impressum
 
    (Desktop is untouched — it still runs as one flex row.)
 
@@ -3155,13 +3155,16 @@ body.lightbox-open{ overflow:hidden; }
   }
   .foot__op    { grid-area:1 / 1; justify-self:start; }
   .foot__badges{ grid-area:1 / 2; justify-self:stretch; justify-content:flex-end; }
-  .foot__brand { grid-area:3 / 1; align-self:start; }
-  .foot__links { grid-area:3 / 2; justify-self:end; }
-  .foot__meta  { grid-area:4 / 2; justify-self:end; text-align:right; padding-top:7px; }
-
-  /* the legal links and the version stamp share the lower right column, so
-     the links stay on one line and the stamp sits directly under them */
-  .foot__links{ flex-wrap:wrap; justify-content:flex-end; align-items:flex-start; gap:6px 14px; }
+  .foot__brand { grid-area:3 / 1; align-self:center; }
+  .foot__meta  { grid-area:3 / 2; justify-self:end; text-align:right; }
+  /* The links get a full-width row of their own rather than the lower right
+     column they used to share with the version stamp. That column fits
+     exactly two links on one line, and the moment a third arrived
+     ("Statistiken" / Datenschutz / Impressum) it wrapped, left "Impressum"
+     hanging alone and shoved the stamp down a line. Across both columns all
+     three sit on one line down to a 320px phone. */
+  .foot__links { grid-area:4 / 1 / 5 / 3; justify-self:end; padding-top:12px; }
+  .foot__links{ flex-wrap:wrap; justify-content:flex-end; align-items:baseline; gap:6px 14px; }
 
   /* The card and the badges have to make one row together, and the three
      tiles do not fit at their desktop sizes on any phone. The card is trimmed
@@ -3399,11 +3402,23 @@ body.page-welcome{ --page-max: 2400px; }
   line-height:1.06;
   letter-spacing:.04em;
   color:var(--text);
-  /* black drop only — no accent glow; the blue halo read as a smudge over
-     the live-view photo and fought the HUD's flat, printed look */
-  text-shadow:0 2px 26px rgba(0,0,0,.7);
+  /* No text-shadow. It used to carry `0 2px 26px rgba(0,0,0,.7)` — an
+     OFFSET drop, which is what made the word look extruded off the photo
+     like a plate floating above it. A shadow that sits below and behind
+     large type is read as depth, not as contrast, and this hero is meant to
+     be flat and printed (same reason the accent glow went before it).
+     Legibility is already handled where it belongs: .vf__shade lays a
+     radial black at 16%/92% — exactly the corner the title sits in — plus
+     a bottom gradient to 82%. The type is white on that, not on the photo. */
   /* one word, no break points: it scales down rather than ever splitting
      mid-word ("GALLER/Y") */
+}
+/* one letter per span (see the hero_title macro in welcome.html), so the
+   entrance can run character by character. inline-block is what makes the
+   per-letter transform possible at all — an inline box ignores translate. */
+.vf__title-ch{
+  display:inline-block;
+  white-space:pre;
 }
 .vf__lead{
   margin:0;
@@ -5021,9 +5036,19 @@ html.fx-anim .detail{ animation: rv-fade .32s ease; }
 }
 /* the title is uncovered left to right, the way a name is set rather than
    dropped in — the -12% end inset keeps the drop shadow out of the clip */
-@keyframes vf-wipe{
-  from{ opacity:0; clip-path:inset(0 100% 0 0); transform:translate3d(0, 10px, 0); }
-  to  { opacity:1; clip-path:inset(0 -12% 0 0); transform:translate3d(0, 0, 0); }
+/* Per-letter entrance for the hero title. Replaces a single left-to-right
+   clip wipe over the whole word: the wipe read as one plate sliding in,
+   which is precisely the flat-plate impression the drop shadow was also
+   giving. Letter by letter reads as a readout filling instead — the right
+   voice for a viewfinder.
+
+   The stagger is hard-coded per position rather than handed to each span as
+   a custom property: the word is a fixed seven characters, and an inline
+   `style="--i:3"` would be dropped by the CSP anyway (see the note at the
+   top of this sheet). :nth-child needs no attribute and no script. */
+@keyframes vf-char{
+  from{ opacity:0; transform:translate3d(0, .42em, 0); }
+  to  { opacity:1; transform:translate3d(0, 0, 0); }
 }
 
 html.fx-anim .vf__stage{ animation: vf-expose 1s cubic-bezier(.19,.66,.28,.99) backwards; }
@@ -5038,11 +5063,24 @@ html.fx-anim .vf__thirds { animation: rv-fade .8s ease .38s backwards; }
 html.fx-anim .vf__reticle{ animation: vf-af .85s cubic-bezier(.19,.66,.28,.99) .42s backwards; }
 
 html.fx-anim .vf__hudtop { animation: rv-fade .7s ease .44s backwards; }
-html.fx-anim .vf__title  { animation: vf-wipe .72s cubic-bezier(.19,.66,.28,.99) .5s backwards; }
-html.fx-anim .vf__lead   { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .64s backwards; }
-html.fx-anim .vf__actions{ animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .74s backwards; }
-html.fx-anim .vf__meta   { animation: rv-right .6s cubic-bezier(.19,.66,.28,.99) .82s backwards; }
-html.fx-anim .vf__deck   { animation: rv-fade .7s ease .86s backwards; }
+/* .48s + 38ms per letter: the seven characters land across 230ms, so the
+   word is complete at .71s and the lead can follow immediately after
+   without the two overlapping. */
+html.fx-anim .vf__title-ch{ animation: vf-char .5s cubic-bezier(.19,.66,.28,.99) backwards; }
+html.fx-anim .vf__title-ch:nth-child(1){ animation-delay:.480s; }
+html.fx-anim .vf__title-ch:nth-child(2){ animation-delay:.518s; }
+html.fx-anim .vf__title-ch:nth-child(3){ animation-delay:.556s; }
+html.fx-anim .vf__title-ch:nth-child(4){ animation-delay:.594s; }
+html.fx-anim .vf__title-ch:nth-child(5){ animation-delay:.632s; }
+html.fx-anim .vf__title-ch:nth-child(6){ animation-delay:.670s; }
+html.fx-anim .vf__title-ch:nth-child(7){ animation-delay:.708s; }
+/* anything past the seventh (a longer word later) keeps the last step
+   rather than appearing with no delay at all */
+html.fx-anim .vf__title-ch:nth-child(n+8){ animation-delay:.746s; }
+html.fx-anim .vf__lead   { animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .74s backwards; }
+html.fx-anim .vf__actions{ animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) .84s backwards; }
+html.fx-anim .vf__meta   { animation: rv-right .6s cubic-bezier(.19,.66,.28,.99) .90s backwards; }
+html.fx-anim .vf__deck   { animation: rv-fade .7s ease .94s backwards; }
 
 /* ---- lightbox: fade the viewer in, image settles from a hair larger.
    display:none → flex restarts the animation on every open; navigating
