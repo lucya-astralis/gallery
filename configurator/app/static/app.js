@@ -252,15 +252,18 @@ function restoreFocus(fk, start, end) {
 const ALBUM_GROUPS = [
   ['The album', 'What it is called, and what this folder is to the gallery.', ['name', 'collection', 'showcase', 'cover']],
   ['Photos it leans on', 'Which photos get pulled out of the grid.', ['featured', 'order', 'reel', 'sort']],
-  ['Look', 'Its own mark, title face and page effect.', ['icon', 'font', 'font_scale', 'effect']],
-  ['Backdrop', 'What sits behind this album’s pages. Sub-albums inherit it; leave both empty for the gallery’s default.',
-    ['wallpaper', 'wallpaper_mobile']],
+  ['Look', 'Its own mark, title face, accent colour and page effect.',
+    ['icon', 'font', 'font_scale', 'accent', 'effect']],
+  ['Backdrop', 'What sits behind this album’s pages, and how the gallery treats it. Sub-albums inherit all four; leave them empty for the gallery’s default.',
+    ['wallpaper', 'wallpaper_mobile', 'wallpaper_tint', 'wallpaper_dim']],
   ['Text & stats', 'What is written under the hero.', ['tags', 'loc', 'stat', 'stats']],
 ];
 
 const GALLERY_GROUPS = [
   ['Welcome hero', 'Which photos cycle on the front page.', ['welcome_desktop', 'welcome_mobile', 'welcome']],
   ['Album list', 'The order and default sort on /albums.', ['album_order', 'album_sort']],
+  ['Backdrop', 'How the gallery treats the wallpaper behind every page — its own default one, and any an album brings. An album that sets these itself still wins.',
+    ['wallpaper_tint', 'wallpaper_dim']],
 ];
 
 /* Where the pane was before the last re-render, and where it actually landed
@@ -390,7 +393,9 @@ function buildControl(key, spec) {
     case 'bool': return boolControl(key);
     case 'bool_off': return statsControl(key);
     case 'choice': return choiceControl(key, spec.choices || []);
-    case 'number': return numberControl(key);
+    case 'number': return numberControl(key, spec);
+    case 'ratio': return ratioControl(key, spec);
+    case 'color': return colorControl(key);
     case 'text': return textControl(key);
     case 'list': return listControl(key);
     case 'kv_list': return kvListControl(key);
@@ -438,13 +443,65 @@ function choiceControl(key, choices) {
   return node;
 }
 
-function numberControl(key) {
-  const [lo, hi] = state.meta.font_scale_range;
+function numberControl(key, spec) {
+  /* The range comes off the key's own spec — this used to read font_scale's
+   * for every numeric key, which was fine while font_scale was the only one
+   * and silently wrong the moment it wasn't. */
+  const [lo, hi] = spec.range || state.meta.font_scale_range;
   return el('input', {
-    type: 'number', step: '0.05', min: lo, max: hi, 'data-fk': key,
+    type: 'number', step: String(spec.step || 0.05), min: lo, max: hi, 'data-fk': key,
     value: value(key) || '', placeholder: 'e.g. 1.25', disabled: READ_ONLY,
     oninput: (ev) => setValue(key, ev.target.value.trim() || null),
   });
+}
+
+/* A 0–1 dial that also has a word for one end of it (`off`). The slider is
+ * the honest control for "how much" — but it cannot express "off", and it
+ * cannot express "not set" either, so the two words sit next to it as
+ * buttons and the slider only appears once a number is actually chosen. */
+function ratioControl(key, spec) {
+  const [lo, hi] = spec.range || [0, 1];
+  const raw = value(key);
+  const word = String(raw ?? '').trim().toLowerCase();
+  const isOff = ['off', 'none', 'no', 'false', '0'].includes(word);
+  const num = isOff || raw === null || raw === '' ? null : Number(raw);
+  const mid = Math.round(((lo + hi) / 2) * 100) / 100;
+
+  const slider = el('input', {
+    type: 'range', min: lo, max: hi, step: String(spec.step || 0.02),
+    value: num === null || Number.isNaN(num) ? mid : num,
+    disabled: READ_ONLY || num === null || Number.isNaN(num),
+    'data-fk': key,
+    oninput: (ev) => setValue(key, ev.target.value),
+  });
+  const state_ = num !== null && !Number.isNaN(num) ? 'num' : (isOff ? 'off' : '');
+  return el('div', { class: 'ratio' },
+    toggle([['', 'gallery default'], ['off', spec.off || 'off'], ['num', 'set…']], state_,
+      (val) => setValue(key, val === '' ? null : (val === 'off' ? 'off' : String(mid)))),
+    el('div', { class: 'ratio__dial' }, slider,
+      el('span', { class: 'ratio__val mono',
+        text: num !== null && !Number.isNaN(num) ? num.toFixed(2) : (isOff ? 'off' : '—') })));
+}
+
+/* Hex only, because that is all the gallery parses. The native swatch is the
+ * quick way in; the text field stays authoritative so an unset key reads as
+ * unset instead of silently becoming #000000, which is what a bare
+ * <input type=color> would show. */
+function colorControl(key) {
+  const raw = String(value(key) || '').trim();
+  const valid = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(raw);
+  return el('div', { class: 'colorpick' },
+    el('input', {
+      type: 'color', value: valid ? raw : '#a594ff', disabled: READ_ONLY,
+      title: 'pick a colour', class: 'colorpick__swatch',
+      oninput: (ev) => setValue(key, ev.target.value),
+    }),
+    el('input', {
+      type: 'text', value: raw, disabled: READ_ONLY, 'data-fk': key,
+      class: 'colorpick__hex mono', placeholder: '#a594ff — empty keeps the gallery accent',
+      oninput: (ev) => setValue(key, ev.target.value.trim() || null),
+    }),
+    raw && !valid ? el('span', { class: 'colorpick__bad', text: 'not a hex colour' }) : null);
 }
 
 const TEXT_PLACEHOLDER = {

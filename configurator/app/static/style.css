@@ -44,22 +44,35 @@
 }
 
 :root {
-  --bg:          #07070b;
-  --bg-2:        #0d0d14;
-  --surface:     #11111a;
-  --surface-2:   #15151f;
-  --line:        rgba(255, 255, 255, .08);
-  --line-strong: rgba(255, 255, 255, .18);
+  /* Mirrors the gallery's :root — the two apps deploy separately and can
+     never share a mount, so a palette change has to be made in both files.
+     Black ground, grey body, ONE purple accent; nothing in the grey ramp
+     carries a hue. See app/static/style.css for the reasoning. */
+  --bg:          #000000;
+  --bg-2:        #08080a;
+  --surface:     #0e0e10;
+  --surface-2:   #16161a;
+  --line:        rgba(255, 255, 255, .09);
+  --line-strong: rgba(255, 255, 255, .20);
 
-  --text:        #eef0ff;
-  --text-dim:    #9ea0bc;
-  --text-ghost:  #5c5e7a;
+  --text:        #f2f2f4;
+  --text-dim:    #a1a1a8;
+  --text-ghost:  #6b6b73;
 
-  --acc-cy:      #5b8aff;
-  --acc-mag:     #a594ff;
-  --acc-amb:     #ffb547;
-  --acc-ok:      #3dffa5;
-  --acc-red:     #ff6767;
+  /* Unlike the gallery this sheet has no "chrome" split to make: every
+     accent here already marks state (focus, active row, picked cell,
+     primary button), so both of the old accents collapse onto the one
+     purple, a step apart. */
+  --acc:           #5865f2;
+  --acc-rgb:       88, 101, 242;
+  --acc-soft:      #9ea6f7;
+  --acc-soft-rgb:  158, 166, 247;
+  --acc-amb:       #d9a24a;
+  --acc-amb-rgb:   217, 162, 74;
+  --acc-ok:        #58f298;
+  --acc-ok-rgb:    88, 242, 152;
+  --acc-red:       #e0625f;
+  --acc-red-rgb:   224, 98, 95;
 
   --radius:      2px;
   --nav-h:       60px;
@@ -105,9 +118,9 @@ body {
   background-image:
     linear-gradient(to right, rgba(255, 255, 255, .03) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, .03) 1px, transparent 1px),
-    radial-gradient(ellipse at 22% 32%, rgba(40, 90, 220, .18) 0%, transparent 45%),
-    radial-gradient(ellipse at 80% 70%, rgba(120, 60, 220, .10) 0%, transparent 50%),
-    linear-gradient(rgba(6, 8, 14, .72), rgba(4, 5, 10, .86));
+    radial-gradient(ellipse at 22% 32%, rgba(var(--acc-rgb), .07) 0%, transparent 45%),
+    radial-gradient(ellipse at 80% 70%, rgba(var(--acc-rgb), .05) 0%, transparent 50%),
+    linear-gradient(rgba(0, 0, 0, .72), rgba(0, 0, 0, .86));
   background-size: 32px 32px, 32px 32px, auto, auto, auto;
   background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
 }
@@ -118,7 +131,7 @@ body {
   z-index: 100;
   height: var(--nav-h);
   flex: 0 0 auto;
-  background: rgba(7, 7, 11, .72);
+  background: rgba(0, 0, 0, .72);
   backdrop-filter: blur(10px) saturate(120%);
   -webkit-backdrop-filter: blur(10px) saturate(120%);
   border-bottom: 1px solid var(--line);
@@ -132,8 +145,8 @@ body {
   height: 1px;
   pointer-events: none;
   background: linear-gradient(90deg,
-    transparent 2%, rgba(91, 138, 255, .5) 30%,
-    rgba(165, 148, 255, .45) 50%, rgba(91, 138, 255, .5) 70%, transparent 98%);
+    transparent 2%, rgba(var(--acc-rgb), .5) 30%,
+    rgba(var(--acc-soft-rgb), .45) 50%, rgba(var(--acc-rgb), .5) 70%, transparent 98%);
   opacity: .85;
 }
 
@@ -159,7 +172,7 @@ body {
   height: 28px;
   width: auto;
   display: block;
-  filter: drop-shadow(0 0 12px rgba(91, 138, 255, .35));
+  filter: drop-shadow(0 0 12px rgba(var(--acc-rgb), .35));
 }
 
 .brand-text {
@@ -182,7 +195,7 @@ body {
   font-size: 9.5px;
   letter-spacing: .28em;
   text-transform: uppercase;
-  color: var(--acc-mag);
+  color: var(--acc-soft);
 }
 
 .brand-jp {
@@ -225,10 +238,10 @@ body {
   height: 6px;
   border-radius: 50%;
   background: var(--acc-ok);
-  box-shadow: 0 0 8px rgba(61, 255, 165, .8);
+  box-shadow: 0 0 8px rgba(var(--acc-ok-rgb), .8);
 }
 
-.nav__status.is-ro .dot { background: var(--acc-amb); box-shadow: 0 0 8px rgba(255, 181, 71, .8); }
+.nav__status.is-ro .dot { background: var(--acc-amb); box-shadow: 0 0 8px rgba(var(--acc-amb-rgb), .8); }
 
 /* ----- layout ---------------------------------------------------------- */
 .layout {
@@ -240,7 +253,7 @@ body {
 
 .sidebar {
   border-right: 1px solid var(--line);
-  background: rgba(13, 13, 20, .72);
+  background: rgba(12, 12, 14, .72);
   backdrop-filter: blur(6px);
   display: flex;
   flex-direction: column;
@@ -307,8 +320,8 @@ body {
 }
 
 .tree__row.is-active {
-  background: linear-gradient(90deg, rgba(91, 138, 255, .18), transparent 85%);
-  border-left-color: var(--acc-cy);
+  background: linear-gradient(90deg, rgba(var(--acc-rgb), .18), transparent 85%);
+  border-left-color: var(--acc);
   color: var(--text);
 }
 
@@ -354,8 +367,8 @@ body {
 
 .tree__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-.tree__cover.has-cfg { box-shadow: inset 0 0 0 1px var(--acc-mag); }
-.tree__cover.has-err { box-shadow: inset 0 0 0 1px var(--acc-red), 0 0 6px rgba(255, 103, 103, .55); }
+.tree__cover.has-cfg { box-shadow: inset 0 0 0 1px var(--acc-soft); }
+.tree__cover.has-err { box-shadow: inset 0 0 0 1px var(--acc-red), 0 0 6px rgba(var(--acc-red-rgb), .55); }
 
 /* Bigger rows now that each carries a picture. */
 .tree__row { padding: 3px 12px 3px 0; }
@@ -442,7 +455,7 @@ body {
 }
 
 .tab:hover { color: var(--text-dim); }
-.tab.is-active { color: var(--text); border-bottom-color: var(--acc-cy); }
+.tab.is-active { color: var(--text); border-bottom-color: var(--acc); }
 
 .tabpanel { padding-bottom: 36px; }
 .tabpanel[hidden] { display: none; }
@@ -465,7 +478,7 @@ body {
   gap: 8px;
   padding: 11px 13px;
   border: 1px solid var(--line);
-  border-left: 2px solid var(--acc-mag);
+  border-left: 2px solid var(--acc-soft);
   border-radius: var(--radius);
   background: var(--surface);
   min-width: 0;
@@ -545,8 +558,8 @@ input::placeholder, textarea::placeholder { color: var(--text-ghost); }
 
 input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: var(--acc-cy);
-  box-shadow: 0 0 0 1px rgba(91, 138, 255, .35), 0 0 18px -6px rgba(91, 138, 255, .5);
+  border-color: var(--acc);
+  box-shadow: 0 0 0 1px rgba(var(--acc-rgb), .35), 0 0 18px -6px rgba(var(--acc-rgb), .5);
 }
 
 select { cursor: pointer; }
@@ -571,23 +584,23 @@ select option { background: var(--surface); color: var(--text); }
 
 .btn:hover:not(:disabled) {
   color: var(--text);
-  border-color: var(--acc-cy);
-  background: rgba(91, 138, 255, .1);
+  border-color: var(--acc);
+  background: rgba(var(--acc-rgb), .1);
 }
 
 .btn:disabled { opacity: .35; cursor: not-allowed; }
 
 .btn--primary {
-  background: rgba(91, 138, 255, .16);
-  border-color: var(--acc-cy);
-  color: var(--acc-cy);
+  background: rgba(var(--acc-rgb), .16);
+  border-color: var(--acc);
+  color: var(--acc);
   font-weight: 600;
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: rgba(91, 138, 255, .28);
+  background: rgba(var(--acc-rgb), .28);
   color: var(--text);
-  box-shadow: 0 0 20px -6px rgba(91, 138, 255, .7);
+  box-shadow: 0 0 20px -6px rgba(var(--acc-rgb), .7);
 }
 
 .btn--ghost { background: none; border-color: transparent; color: var(--text-ghost); }
@@ -596,7 +609,7 @@ select option { background: var(--surface); color: var(--text); }
 .btn--danger:hover:not(:disabled) {
   border-color: var(--acc-red);
   color: var(--acc-red);
-  background: rgba(255, 103, 103, .08);
+  background: rgba(var(--acc-red-rgb), .08);
 }
 
 .btn--sm { padding: 4px 9px; font-size: 9.5px; }
@@ -635,12 +648,82 @@ select option { background: var(--surface); color: var(--text); }
 .toggle button:hover:not(:disabled) { color: var(--text-dim); background: rgba(255, 255, 255, .03); }
 
 .toggle button.is-on {
-  background: rgba(91, 138, 255, .18);
-  color: var(--acc-cy);
-  box-shadow: inset 0 -2px 0 var(--acc-cy);
+  background: rgba(var(--acc-rgb), .18);
+  color: var(--acc);
+  box-shadow: inset 0 -2px 0 var(--acc);
 }
 
 .toggle button:disabled { cursor: not-allowed; opacity: .45; }
+
+/* ----- ratio dial (wallpaper_tint / wallpaper_dim) ---------------------- */
+/* Three states, not one: "gallery default", the word `off`, and an actual
+   number. The toggle picks which of the three, the slider only means
+   anything in the third — so it is visibly dead in the other two rather
+   than sitting there showing a value the file does not contain. */
+.ratio { display: flex; flex-direction: column; gap: 8px; }
+.ratio__dial { display: flex; align-items: center; gap: 12px; }
+
+.ratio__dial input[type="range"] {
+  appearance: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 2px;
+  background: var(--line-strong);
+  border-radius: 0;
+  cursor: pointer;
+}
+.ratio__dial input[type="range"]:disabled { cursor: not-allowed; opacity: .35; }
+.ratio__dial input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px; height: 16px;
+  background: var(--acc);
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.ratio__dial input[type="range"]::-moz-range-thumb {
+  width: 12px; height: 16px;
+  background: var(--acc);
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.ratio__val {
+  flex: 0 0 auto;
+  min-width: 4ch;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----- colour picker (accent) ------------------------------------------ */
+/* The hex field is the authoritative control: a bare <input type=color>
+   cannot say "unset", it would show #000000 and read as a real choice. */
+.colorpick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.colorpick__swatch {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 34px; height: 30px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.colorpick__swatch:disabled { cursor: not-allowed; opacity: .45; }
+.colorpick__swatch::-webkit-color-swatch-wrapper { padding: 2px; }
+.colorpick__swatch::-webkit-color-swatch { border: 0; border-radius: 0; }
+.colorpick__swatch::-moz-color-swatch { border: 0; border-radius: 0; }
+.colorpick__hex { flex: 1 1 14ch; min-width: 0; }
+.colorpick__bad {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--acc-red);
+}
 
 /* ----- ordered lists (featured / order / welcome / album_order) --------- */
 .picklist { display: flex; flex-direction: column; gap: 5px; }
@@ -657,10 +740,10 @@ select option { background: var(--surface); color: var(--text); }
   transition: border-color .15s ease;
 }
 
-.pickitem:hover { border-left-color: var(--acc-cy); }
+.pickitem:hover { border-left-color: var(--acc); }
 .pickitem[draggable="true"] { cursor: grab; }
 .pickitem.is-dragging { opacity: .35; }
-.pickitem.is-over { border-color: var(--acc-cy); border-left-color: var(--acc-cy); }
+.pickitem.is-over { border-color: var(--acc); border-left-color: var(--acc); }
 
 .pickitem__grip { color: var(--text-ghost); font-size: 13px; line-height: 1; }
 
@@ -689,7 +772,7 @@ select option { background: var(--surface); color: var(--text); }
 .pickitem--missing .pickitem__label b { color: var(--acc-red); }
 
 .pickitem--group {
-  background: rgba(255, 181, 71, .05);
+  background: rgba(var(--acc-amb-rgb), .05);
   border-left-color: var(--acc-amb);
   border-style: dashed;
 }
@@ -734,7 +817,7 @@ select option { background: var(--surface); color: var(--text); }
 .cell:hover { border-color: var(--line-strong); }
 .cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-.cell.is-picked { border-color: var(--acc-cy); box-shadow: 0 0 0 1px var(--acc-cy); }
+.cell.is-picked { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc); }
 
 /* Role chips along the top, clear of the tick in the corner. One line each
    and ellipsised: "cover · featured · #3" as a single badge wrapped into
@@ -757,8 +840,8 @@ select option { background: var(--surface); color: var(--text); }
   max-width: 100%;
   padding: 2px 5px;
   border-radius: var(--radius);
-  background: rgba(91, 138, 255, .92);
-  color: #05070f;
+  background: rgba(var(--acc-rgb), .92);
+  color: #050505;
   font-family: var(--mono);
   font-size: 9px;
   font-weight: 700;
@@ -780,7 +863,7 @@ select option { background: var(--surface); color: var(--text); }
   gap: 1px;
   min-width: 0;
   padding: 16px 7px 5px;
-  background: linear-gradient(transparent, rgba(4, 5, 10, .94) 45%);
+  background: linear-gradient(transparent, rgba(0, 0, 0, .94) 45%);
   pointer-events: none;
 }
 
@@ -822,7 +905,7 @@ select option { background: var(--surface); color: var(--text); }
 .issue__where {
   font-family: var(--mono);
   font-size: 10.5px;
-  color: var(--acc-cy);
+  color: var(--acc);
   flex: 0 0 auto;
   cursor: pointer;
 }
@@ -845,7 +928,7 @@ select option { background: var(--surface); color: var(--text); }
   bottom: 0;
   margin: 22px -28px 0;
   padding: 13px 28px;
-  background: rgba(13, 13, 20, .94);
+  background: rgba(12, 12, 14, .94);
   border-top: 1px solid var(--line);
   display: flex;
   gap: 11px;
@@ -860,8 +943,8 @@ select option { background: var(--surface); color: var(--text); }
   left: 0; right: 0; top: -1px;
   height: 1px;
   background: linear-gradient(90deg,
-    transparent 2%, rgba(91, 138, 255, .5) 30%,
-    rgba(165, 148, 255, .45) 50%, rgba(91, 138, 255, .5) 70%, transparent 98%);
+    transparent 2%, rgba(var(--acc-rgb), .5) 30%,
+    rgba(var(--acc-soft-rgb), .45) 50%, rgba(var(--acc-rgb), .5) 70%, transparent 98%);
   opacity: .5;
 }
 
@@ -928,13 +1011,13 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 .dropzone:hover { border-color: var(--line-strong); color: var(--text-dim); }
-.dropzone.is-over { border-color: var(--acc-cy); color: var(--acc-cy); background: rgba(91, 138, 255, .06); }
+.dropzone.is-over { border-color: var(--acc); color: var(--acc); background: rgba(var(--acc-rgb), .06); }
 
 .fontsample {
   margin-top: 4px;
   padding: 16px 18px;
   border: 1px solid var(--line);
-  border-left: 2px solid var(--acc-mag);
+  border-left: 2px solid var(--acc-soft);
   border-radius: var(--radius);
   background: var(--surface);
   font-size: 34px;
@@ -951,7 +1034,7 @@ select option { background: var(--surface); color: var(--text); }
 .modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; }
 .modal[hidden] { display: none; }
 
-.modal__backdrop { position: absolute; inset: 0; background: rgba(4, 5, 10, .78); }
+.modal__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .78); }
 
 .modal__box {
   position: relative;
@@ -1016,7 +1099,7 @@ select option { background: var(--surface); color: var(--text); }
   border-radius: var(--radius);
   background: var(--surface-2);
   border: 1px solid var(--line-strong);
-  border-left: 2px solid var(--acc-cy);
+  border-left: 2px solid var(--acc);
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: .1em;
@@ -1033,7 +1116,7 @@ select option { background: var(--surface); color: var(--text); }
 .foot {
   flex: 0 0 auto;
   border-top: 1px solid var(--line);
-  background: rgba(7, 7, 11, .72);
+  background: rgba(0, 0, 0, .72);
   backdrop-filter: blur(10px);
   padding: 0 20px;
   height: 38px;
@@ -1126,7 +1209,7 @@ select option { background: var(--surface); color: var(--text); }
   border: 0;
   padding: 2px 0;
   font: inherit;
-  color: var(--acc-cy);
+  color: var(--acc);
   cursor: pointer;
 }
 
@@ -1150,7 +1233,7 @@ select option { background: var(--surface); color: var(--text); }
   text-align: left;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-left: 2px solid var(--acc-mag);
+  border-left: 2px solid var(--acc-soft);
   border-radius: var(--radius);
   color: var(--text);
   font: inherit;
@@ -1159,7 +1242,7 @@ select option { background: var(--surface); color: var(--text); }
   transition: border-color .15s ease, background .15s ease;
 }
 
-.foldertile:hover { background: var(--surface-2); border-color: var(--acc-cy); }
+.foldertile:hover { background: var(--surface-2); border-color: var(--acc); }
 
 .foldertile img,
 .foldertile__blank {
@@ -1323,7 +1406,7 @@ select option { background: var(--surface); color: var(--text); }
 .chip__x:hover { color: var(--acc-red); }
 
 .cell__tags {
-  color: var(--acc-cy);
+  color: var(--acc);
   font-family: var(--mono);
   font-size: 9px;
   font-weight: 700;
@@ -1333,7 +1416,7 @@ select option { background: var(--surface); color: var(--text); }
   white-space: nowrap;
 }
 
-.cell.is-detail { box-shadow: 0 0 0 2px var(--acc-mag); border-color: var(--acc-mag); }
+.cell.is-detail { box-shadow: 0 0 0 2px var(--acc-soft); border-color: var(--acc-soft); }
 
 .cover-preview__side { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
 
@@ -1351,7 +1434,7 @@ img.is-broken { opacity: .2; }
   padding: 0;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  background: rgba(7, 7, 11, .72);
+  background: rgba(0, 0, 0, .72);
   color: transparent;
   font: 700 11px/1 var(--mono);
   cursor: pointer;
@@ -1364,9 +1447,9 @@ img.is-broken { opacity: .2; }
 
 .cell__pick.is-on {
   opacity: 1;
-  background: var(--acc-cy);
-  border-color: var(--acc-cy);
-  color: #05070f;
+  background: var(--acc);
+  border-color: var(--acc);
+  color: #050505;
 }
 
 /* Two stacked cards in the side column: the selection, then the photo. */
@@ -1380,7 +1463,7 @@ img.is-broken { opacity: .2; }
 
 .photos__aside .detail { position: static; }
 
-.bulk { border-left: 2px solid var(--acc-cy); }
+.bulk { border-left: 2px solid var(--acc); }
 
 .bulk .detail__body { max-height: 46vh; }
 
@@ -1431,7 +1514,7 @@ img.is-broken { opacity: .2; }
   border: 2px solid transparent;
   background-clip: content-box;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(91, 138, 255, .45); background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(var(--acc-rgb), .45); background-clip: content-box; }
 
 /* ----- narrow ---------------------------------------------------------- */
 @media (max-width: 900px) {

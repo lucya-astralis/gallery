@@ -38,6 +38,12 @@ GALLERY_ALBUM_SORTS = ["curated"] + ALBUM_SORTS
 WELCOME_KEYWORDS = ["showcase", "auto", "featured", "random", "shuffle"]
 
 FONT_SCALE_RANGE = (0.5, 2.5)
+# Per-album theme (album.cfg `accent` / `wallpaper_tint` / `wallpaper_dim`).
+# The gallery derives three faces from the accent and rejects anything that
+# isn't a hex colour; these two ranges are its guard rails on the backdrop
+# treatment. Keep in step with app/main.py.
+WALLPAPER_TINT_RANGE = (0.0, 1.0)
+WALLPAPER_DIM_RANGE = (0.25, 1.0)
 
 # ----- how each key is written back -------------------------------------
 # multiline: one entry per line under a bare `key =` header.
@@ -61,7 +67,15 @@ KEY_SPEC: dict[str, dict] = {
     "font": {"type": "asset", "exts": sorted(FONT_EXTS)},
     "wallpaper": {"type": "asset", "exts": sorted(WALLPAPER_EXTS)},
     "wallpaper_mobile": {"type": "asset", "exts": sorted(WALLPAPER_IMAGE_EXTS)},
-    "font_scale": {"type": "number"},
+    "font_scale": {"type": "number", "range": list(FONT_SCALE_RANGE), "step": 0.05},
+    # The album's own accent colour, and how the gallery treats the backdrop
+    # behind its pages. `off` is a real value for both wallpaper knobs, so
+    # they are text-with-a-slider rather than plain numbers.
+    "accent": {"type": "color"},
+    "wallpaper_tint": {"type": "ratio", "range": list(WALLPAPER_TINT_RANGE),
+                       "step": 0.02, "off": "off"},
+    "wallpaper_dim": {"type": "ratio", "range": list(WALLPAPER_DIM_RANGE),
+                      "step": 0.02, "off": "off"},
     # The gallery re-joins loc's comma-split parts with ", " (_album_stats),
     # so it reads as one line even though the parser sees a list.
     "loc": {"type": "text", "joined": True},
@@ -79,9 +93,10 @@ KEY_SPEC: dict[str, dict] = {
 
 ALBUM_KEYS = ["name", "collection", "showcase", "cover", "featured", "order",
               "reel", "sort", "tags", "effect", "icon", "font", "font_scale",
-              "wallpaper", "wallpaper_mobile", "loc", "stat", "stats"]
+              "accent", "wallpaper", "wallpaper_mobile", "wallpaper_tint",
+              "wallpaper_dim", "loc", "stat", "stats"]
 GALLERY_KEYS = ["welcome", "welcome_desktop", "welcome_mobile", "album_order",
-                "album_sort"]
+                "album_sort", "wallpaper_tint", "wallpaper_dim"]
 
 # One-line help shown next to each field in the UI.
 HELP: dict[str, str] = {
@@ -101,6 +116,9 @@ HELP: dict[str, str] = {
                   % FONT_SCALE_RANGE,
     "wallpaper": "Page backdrop on desktop — a clip or a still. Sub-albums inherit it. Empty means the gallery's default video.",
     "wallpaper_mobile": "Page backdrop on phones. Stills only; the gallery never loads a backdrop video there. Empty means the gallery's default still.",
+    "accent": "This album's accent colour -- links, focus, active state, the featured mark, the hero button. Sub-albums inherit it. Empty means the gallery's own accent. The gallery lightens a colour too dark to read on the black page.",
+    "wallpaper_tint": "How much colour the backdrop keeps. Empty = inherit (an album takes its parent's, then gallery.cfg; gallery.cfg takes the built-in near-greyscale treatment). “off” = the picture in full colour, a number = partial.",
+    "wallpaper_dim": "How bright that backdrop is -- 1 and “off” both leave it untouched. Empty = inherit, ending at the built-in 0.72. In gallery.cfg this dresses the site's own default wallpaper.",
     "loc": "Location, shown as the LOC line at the top of the stats block. Commas are fine here — the gallery rejoins them.",
     "stat": "Custom attributes for this album, one per line. They sit above the auto SPAN / DEVICE / FOCAL / APERTURE / DATA readouts the gallery derives from EXIF. No commas in a value — the cfg parser splits on them.",
     "stats": "Hide the whole stats block — both the custom attributes and the EXIF readouts.",

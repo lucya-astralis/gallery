@@ -8,6 +8,7 @@ gallery to be running.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from . import cfgio, schema
@@ -16,6 +17,30 @@ from .library import Library
 
 def _issue(level: str, key: str, detail: str) -> dict:
     return {"level": level, "key": key, "detail": detail}
+
+
+def _check_wallpaper_knobs(cfg: dict[str, list[str]]) -> list[dict]:
+    """`wallpaper_tint` / `wallpaper_dim`, which album.cfg and gallery.cfg both
+    carry under identical rules -- gallery.cfg sets the site default, an album
+    overrides it -- so the check is written once."""
+    out: list[dict] = []
+    for key, span in (("wallpaper_tint", schema.WALLPAPER_TINT_RANGE),
+                      ("wallpaper_dim", schema.WALLPAPER_DIM_RANGE)):
+        if key not in cfg:
+            continue
+        raw = (cfgio.first(cfg, key) or "").strip().lower()
+        if not raw or raw in ("off", "none", "no", "0", "false",
+                              "on", "yes", "true", "1"):
+            continue
+        try:
+            ok = span[0] <= float(raw.replace(",", ".")) <= span[1]
+        except ValueError:
+            ok = False
+        if not ok:
+            out.append(_issue("warn", key,
+                              "ignored -- not a number in %s-%s (or “off”)"
+                              % span))
+    return out
 
 
 def check_album(lib: Library, album: str,
@@ -99,6 +124,15 @@ def check_album(lib: Library, album: str,
         elif "font" not in cfg:
             out.append(_issue("warn", "font_scale", "ignored -- no `font` set"))
 
+    if "accent" in cfg:
+        raw = (cfgio.first(cfg, "accent") or "").strip()
+        if raw and not re.match(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$", raw):
+            out.append(_issue("error", "accent",
+                              "%r is not a hex colour (#abc or #aabbcc) -- "
+                              "the gallery ignores it" % raw))
+
+    out += _check_wallpaper_knobs(cfg)
+
     # _album_stats splits on the FIRST colon and skips an entry whose value is
     # empty, so both shapes vanish from the page without a word.
     for item in cfg.get("stat", []):
@@ -157,6 +191,8 @@ def check_gallery(lib: Library,
         elif val == "curated" and "album_order" not in cfg:
             out.append(_issue("warn", "album_sort",
                               "curated preset without an `album_order` list"))
+
+    out += _check_wallpaper_knobs(cfg)
 
     return out
 

@@ -286,12 +286,22 @@ ALBUM_CFG_KEYS = {
     # per-album page backdrop; `wallpaper` may be a clip, `wallpaper_mobile`
     # is stills only (phones never load a backdrop video)
     "wallpaper", "wallpaper_mobile",
+    # per-album theme: the accent colour of this album's pages, and how the
+    # backdrop behind them is treated (see _album_theme_css_url)
+    "accent", "wallpaper_tint", "wallpaper_dim",
     # Editorial stats block (_album_stats): `loc` is one line whose comma-split
     # parts get rejoined, `stat` is the freeform custom "Label: Value" line
     # (repeat the key for more), `stats = off` hides the block entirely.
     "loc", "stat", "stats",
 }
-GALLERY_CFG_KEYS = {"welcome", "welcome_desktop", "welcome_mobile", "album_order", "album_sort"}
+GALLERY_CFG_KEYS = {"welcome", "welcome_desktop", "welcome_mobile", "album_order", "album_sort",
+                    # the site backdrop's treatment: the same two knobs an
+                    # album.cfg has, one tier up (an album still overrides)
+                    "wallpaper_tint", "wallpaper_dim"}
+# Both files carry the knobs with identical rules, so the range check that
+# reads this lives in one place (_check_wallpaper_knobs).
+WALLPAPER_KNOBS = (("wallpaper_tint", (0.0, 1.0), "0–1 or off"),
+                   ("wallpaper_dim", (0.25, 1.0), "0.25–1 or off"))
 REEL_VALUES = {"featured", "random", "shuffle", "off", "false", "0", "no", "none"}
 
 
@@ -303,6 +313,29 @@ def _wallpaper_line(album: str, variant: str) -> str:
         return "— (gallery default)"
     owner, path = src
     return path.name if owner == album else f"{path.name} (from {owner})"
+
+
+def _check_wallpaper_knobs(cfg: dict) -> list[tuple]:
+    """(level, key, detail) for whatever is wrong with `wallpaper_tint` /
+    `wallpaper_dim`. Both album.cfg and gallery.cfg carry them under the same
+    rules — gallery.cfg sets the site default, an album overrides it — so the
+    check is written once."""
+    out = []
+    for key, span, unit in WALLPAPER_KNOBS:
+        if key not in cfg:
+            continue
+        raw = (gallery._cfg_first(cfg, key) or "").strip()
+        if raw.lower() in gallery._TRUE | gallery._FALSE:
+            continue
+        try:
+            num = float(raw.replace(",", "."))
+        except ValueError:
+            out.append(("error", key, f"{raw!r} is not a number ({unit}) — ignored"))
+            continue
+        if not span[0] <= num <= span[1]:
+            out.append(("warn", key,
+                        f"{raw!r} is outside {unit} — ignored, the gallery default stands"))
+    return out
 
 
 def _check_album_cfg(album: str) -> list[dict]:
@@ -370,6 +403,20 @@ def _check_album_cfg(album: str) -> list[dict]:
         if gallery._album_font_scale(album) is None:
             lo, hi = gallery.ALBUM_FONT_SCALE_RANGE
             add("warn", "font_scale", f"ignored — not a number in {lo}–{hi}, or no `font` set")
+    if "accent" in cfg:
+        raw = (gallery._cfg_first(cfg, "accent") or "").strip()
+        rgb = gallery._parse_hex_color(raw)
+        if rgb is None:
+            add("error", "accent", f"{raw!r} is not a hex colour (#abc or #aabbcc) — ignored")
+        elif gallery._accent_shades(rgb)["lifted"]:
+            # not an error: the gallery lightens it rather than shipping an
+            # unreadable page, but the colour on screen is then not the one
+            # in the file, and that is worth saying out loud.
+            add("warn", "accent",
+                f"{raw!r} is too dark to read on the black page — the gallery "
+                f"lightens it to {gallery._accent_shades(rgb)['acc']}")
+    for level, key, detail in _check_wallpaper_knobs(cfg):
+        add(level, key, detail)
     # A custom stat renders as KEY / VALUE, so it needs the colon to split on;
     # without one _album_stats drops the line silently.
     for item in cfg.get("stat", []):
@@ -416,6 +463,8 @@ def _check_gallery_cfg() -> list[dict]:
         allowed = set(gallery.SORT_ALBUM_SQL) | {gallery.SORT_CURATED}
         if val and val not in allowed:
             add("error", "album_sort", f"{val!r} is not one of {', '.join(sorted(allowed))}")
+    for level, key, detail in _check_wallpaper_knobs(cfg):
+        add(level, key, detail)
     return issues
 
 
