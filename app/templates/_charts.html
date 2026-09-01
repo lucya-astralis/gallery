@@ -1,0 +1,169 @@
+{# Chart primitives for /stats.
+
+   Two shapes cover every chart on the page: a ranked list of horizontal
+   bars, and a row of vertical columns. Both are HTML — the labels, values
+   and layout are real text in real boxes, so they inherit the site's type,
+   wrap properly, translate, and stay crisp at any width.
+
+   The only drawn part is the bar itself, and it is a one-rectangle SVG with
+   `preserveAspectRatio="none"`: the box stretches to whatever CSS gives it,
+   and the rect's `width`/`height` are SVG GEOMETRY ATTRIBUTES, not CSS. That
+   distinction is the whole trick — the strict CSP (style-src 'self') drops
+   inline style attributes, so `style="width:64%"` would silently render every
+   bar at zero, and sizing them from JS would leave a no-JS visitor with an
+   empty page. Attributes are neither. Nothing here needs a script.
+   Non-uniform scaling would distort strokes and text, so the rects are
+   fill-only and every label lives outside the SVG.
+
+   Rows arrive from app/stats.py already reduced to
+   {label, value, pct, peak, band}; `pct` is measured against the series
+   maximum and `band` is that magnitude quantised to three steps of the
+   accent ramp, with `peak` (the single highest row) taking the accent at
+   full strength. These macros do no arithmetic beyond flipping a column's
+   origin — the ramp is a class name, never a computed colour, because a
+   colour computed here would have to arrive as an inline style and the CSP
+   would drop it. #}
+
+{# ---- ranked horizontal bars: label / bar / value ------------------- #}
+{% macro bars(rows) %}
+  <ol class="ch-bars">
+    {% for r in rows %}
+      <li class="ch-bar{% if r.peak %} is-peak{% else %} is-b{{ r.band }}{% endif %}">
+        <span class="ch-bar__label" title="{{ r.label }}">{{ r.label }}</span>
+        <span class="ch-bar__meter" aria-hidden="true">
+          <svg viewBox="0 0 100 1" preserveAspectRatio="none" focusable="false"><rect class="ch-bar__fill" x="0" y="0" width="{{ r.pct }}" height="1"></rect></svg>
+        </span>
+        <span class="ch-bar__val">{{ r.value }}</span>
+      </li>
+    {% endfor %}
+  </ol>
+{% endmacro %}
+
+{# same, but each row links into the album it measures. The folded "+n more"
+   tail row has no album and stays plain text. #}
+{% macro album_bars(rows) %}
+  <ol class="ch-bars">
+    {% for r in rows %}
+      <li class="ch-bar{% if r.peak %} is-peak{% else %} is-b{{ r.band }}{% endif %}">
+        {% if r.album %}
+          <a class="ch-bar__label ch-bar__label--link" href="/album/{{ r.album }}" title="{{ r.label }}">{{ r.label }}</a>
+        {% else %}
+          <span class="ch-bar__label" title="{{ r.label }}">{{ r.label }}</span>
+        {% endif %}
+        <span class="ch-bar__meter" aria-hidden="true">
+          <svg viewBox="0 0 100 1" preserveAspectRatio="none" focusable="false"><rect class="ch-bar__fill" x="0" y="0" width="{{ r.pct }}" height="1"></rect></svg>
+        </span>
+        <span class="ch-bar__val">{{ r.value }}</span>
+      </li>
+    {% endfor %}
+  </ol>
+{% endmacro %}
+
+{# ---- columns: value on top, bar, label underneath -------------------
+   `dense` (the 24-hour axis) moves the numbers out of sight but keeps them
+   in the accessibility tree — .sr-only, not display:none, because a chart
+   whose figures are only available to sighted readers is not a chart, it is
+   a decoration. Every column also carries a title, so the exact figure is
+   one hover away on a pointer device.
+   `ticks` prints a second line under the label wherever it changes (the
+   timeline's year), which is what lets a two-year axis read without a
+   legend. #}
+{% macro cols(rows, dense=False, ticks=False, scroll=False) %}
+  {# `scroll` wraps a long axis in its own scroller: twenty-four month
+     columns on a 390px phone leave 13px per column, which cuts "SEP" to
+     "SE" and runs the values together. Swiping the axis keeps every label
+     and every figure legible at the density they were designed for, and on
+     a desktop the container simply never overflows. #}
+  {% if scroll %}<div class="ch-scroll">{% endif %}
+  <ol class="ch-cols{% if dense %} ch-cols--dense{% endif %}{% if scroll %} ch-cols--long{% endif %}">
+    {% set ns = namespace(tick='') %}
+    {% for r in rows %}
+      <li class="ch-col{% if r.peak %} is-peak{% else %} is-b{{ r.band }}{% endif %}{% if not r.value %} is-zero{% endif %}"
+          title="{{ r.label }}{% if ticks and r.year %} {{ r.year }}{% endif %} — {{ r.value }}">
+        <span class="ch-col__n{% if dense %} sr-only{% endif %}">{{ r.value }}</span>
+        <span class="ch-col__bar" aria-hidden="true">
+          <svg viewBox="0 0 1 100" preserveAspectRatio="none" focusable="false"><rect class="ch-col__fill" x="0" y="{{ 100 - r.pct }}" width="1" height="{{ r.pct }}"></rect></svg>
+        </span>
+        <span class="ch-col__label">{{ r.label }}</span>
+        {% if ticks %}
+          <span class="ch-col__tick">{% if r.year != ns.tick %}{{ r.year }}{% set ns.tick = r.year %}{% endif %}</span>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ol>
+  {% if scroll %}</div>{% endif %}
+{% endmacro %}
+
+{# ---- polar dial: a cyclical series on a clock face -------------------
+   The hours are the one series here where the ends meet, so they are drawn
+   round: 00:00 at the top, clockwise, spoke length proportional to the
+   peak. Unlike the bar charts this really is one SVG — a dial cannot be
+   assembled out of stretched rectangles — so it scales UNIFORMLY (no
+   preserveAspectRatio override) and its type is sized in user units, with
+   the rendered width capped in CSS so those units land near the size the
+   rest of the page uses.
+   The hub carries the reading the shape alone cannot give: which hour wins,
+   and by how much. Every hour's exact figure follows in a visually hidden
+   list, because a chart whose numbers only reach sighted readers is a
+   decoration. Geometry comes from stats.dial(). #}
+{% macro dial(d, unit) %}
+  <div class="ch-dial">
+    <svg viewBox="0 0 {{ d.box }} {{ d.box }}" focusable="false" role="img" aria-hidden="true">
+      <circle class="ch-dial__ring" cx="{{ d.cx }}" cy="{{ d.cy }}" r="{{ d.r_out }}"></circle>
+      <circle class="ch-dial__hub" cx="{{ d.cx }}" cy="{{ d.cy }}" r="{{ d.r_in }}"></circle>
+      {% for s in d.spokes %}
+        <line class="ch-dial__spoke{% if s.peak %} is-peak{% else %} is-b{{ s.band }}{% endif %}"
+              x1="{{ s.x1 }}" y1="{{ s.y1 }}" x2="{{ s.x2 }}" y2="{{ s.y2 }}"><title>{{ s.label }} — {{ s.value }}</title></line>
+      {% endfor %}
+      {% for l in d.labels %}
+        <text class="ch-dial__tick" x="{{ l.x }}" y="{{ l.y }}" text-anchor="middle" dominant-baseline="central">{{ l.text }}</text>
+      {% endfor %}
+      {% if d.peak %}
+        <text class="ch-dial__peak" x="{{ d.cx }}" y="{{ d.cy - 6 }}" text-anchor="middle" dominant-baseline="central">{{ d.peak.label }}</text>
+        <text class="ch-dial__peak-n" x="{{ d.cx }}" y="{{ d.cy + 16 }}" text-anchor="middle" dominant-baseline="central">{{ d.peak.value }}</text>
+      {% endif %}
+    </svg>
+    <ul class="sr-only">
+      {% for r in d.rows %}<li>{{ r.label }} — {{ r.value }} {{ unit }}</li>{% endfor %}
+    </ul>
+  </div>
+{% endmacro %}
+
+{# ---- stacked proportion bar ----------------------------------------
+   For the one series whose parts add up to every photo. The segments are
+   drawn in a stretched SVG like the bars (geometry attributes, no inline
+   CSS); the legend under it is real text, so the shares are readable
+   rather than guessed off the widths. Rows come from stats.stack(). #}
+{% macro stack(rows) %}
+  <div class="ch-stack">
+    <span class="ch-stack__bar" aria-hidden="true">
+      <svg viewBox="0 0 100 1" preserveAspectRatio="none" focusable="false">
+        {% for r in rows %}<rect class="ch-stack__seg is-s{{ r.seg }}" x="{{ r.x }}" y="0" width="{{ r.w }}" height="1"></rect>{% endfor %}
+      </svg>
+    </span>
+    <ul class="ch-stack__legend">
+      {% for r in rows %}
+        <li class="ch-stack__key">
+          <i class="ch-stack__swatch is-s{{ r.seg }}" aria-hidden="true"></i>
+          <span class="ch-stack__name">{{ r.label }}</span>
+          <b class="ch-stack__share">{{ r.share_h }}</b>
+          <span class="ch-stack__n">{{ r.value }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endmacro %}
+
+{# ---- card frame around one chart -----------------------------------
+   `caller()` is the chart itself. `note` is the small print that qualifies
+   the numbers (a rolling window, a unit, a caveat) — the charts that need
+   one always need it right there, not in a legend somewhere else. #}
+{% macro card(title, note='', wide=False) %}
+  <section class="st-card{% if wide %} st-card--wide{% endif %}">
+    <header class="st-card__head">
+      <h2 class="st-card__title">{{ title }}</h2>
+      {% if note %}<p class="st-card__note">{{ note }}</p>{% endif %}
+    </header>
+    <div class="st-card__body">{{ caller() }}</div>
+  </section>
+{% endmacro %}

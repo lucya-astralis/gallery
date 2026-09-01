@@ -41,12 +41,15 @@
 .fa-arrow-right{ --fa:"\f061"; }
 .fa-arrow-turn-up{ --fa:"\f148"; }
 .fa-arrow-up-right-from-square{ --fa:"\f08e"; }
+.fa-calendar-day{ --fa:"\f783"; }
 .fa-camera{ --fa:"\f030"; }
+.fa-chart-simple{ --fa:"\e473"; }
 .fa-chevron-down{ --fa:"\f078"; }
 .fa-chevron-left{ --fa:"\f053"; }
 .fa-chevron-right{ --fa:"\f054"; }
 .fa-circle-info{ --fa:"\f05a"; }
 .fa-clock-rotate-left{ --fa:"\f1da"; }
+.fa-database{ --fa:"\f1c0"; }
 .fa-download{ --fa:"\f019"; }
 .fa-expand{ --fa:"\f065"; }
 .fa-folder{ --fa:"\f07b"; }

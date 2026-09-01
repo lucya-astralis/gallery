@@ -538,7 +538,8 @@ function scrollReveal(root = document) {
     '.album-grid > li',
     '.feat__rail > li',
     '.image-grid > li',
-    '.vf-band__cell',
+    '.arc__cell',
+    '.st-card',
   ].join(','));
   if (!targets.length) return;
 

@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import control, db, i18n, scanner, watcher
+from . import control, db, i18n, scanner, stats, watcher
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 log = logging.getLogger("main")
@@ -2392,6 +2392,110 @@ def albums_index(request: Request, sort: str | None = None):
             "default_sort": default_sort,
             "sort_options": sort_options,
             "sort_label": _active_sort_label(sort_options),
+        },
+    )
+
+
+def _humanize_pixels(n: int | None) -> str | None:
+    """Total sensor area as something a person can read: 1_240_000_000 ->
+    '1.2 GP'. Megapixels below a billion, gigapixels above."""
+    if not n or n <= 0:
+        return None
+    if n >= 1_000_000_000:
+        v = n / 1_000_000_000
+        return f"{v:.0f} GP" if v >= 100 else f"{v:.1f} GP"
+    v = n / 1_000_000
+    return f"{v:.0f} MP"
+
+
+@app.get("/stats", response_class=HTMLResponse)
+def stats_page(request: Request):
+    """Public statistics: what the archive holds, charted.
+
+    Everything drawn comes out of app.stats.collect() — one pass over the
+    images table — plus the album/tag facts the rest of this module already
+    knows how to resolve. Nothing about the visitor is read or written, which
+    is what makes the page shareable; the lead paragraph says so.
+
+    The charts are server-rendered SVG geometry (see _charts.html), so this
+    route hands the template finished rows and the page needs no script.
+    """
+    lang = _request_lang(request)
+    c = db.conn()
+    data = stats.collect(
+        c,
+        month_name=partial(i18n.month_short, lang),
+        weekday_name=partial(i18n.weekday_index, lang),
+        # left unformatted on purpose — stats.collect() fills {n} once it
+        # knows how long the tail it folded away actually is
+        more_label=i18n.t(lang, "stats.more"),
+    )
+
+    # Album bars are rolled up to TOP-LEVEL albums, counting each one's whole
+    # folder tree — the same total the album cards and /albums already show,
+    # and the way a reader means the question. Charting the leaf folders
+    # instead put "sapporo" and "USJ" on the axis with nothing saying which
+    # trip they belong to. Each bar carries the album's display name
+    # (album.cfg `name =`, else the folder) and links into it, so the chart
+    # doubles as navigation the way the trip timeline does.
+    by_top: Counter = Counter()
+    for path, n in data["albums_raw"].items():
+        by_top[path.split("/", 1)[0]] += n
+    album_chart = stats.album_rows(
+        by_top,
+        label_of=_album_display_name,
+        other_label=i18n.t(lang, "stats.more"),
+    )
+    shapes = stats.stack(stats.shape_rows(
+        data["shapes_raw"],
+        label_of=lambda k: i18n.t(lang, f"stats.shape.{k}"),
+    ))
+
+    tag_rows = c.execute(
+        """SELECT t.name AS name, COUNT(*) AS n
+             FROM image_tags it JOIN tags t ON t.id = it.tag_id
+            GROUP BY t.id ORDER BY n DESC, t.name LIMIT 12"""
+    ).fetchall()
+    # one lonely tag is a fact, not a distribution — the chart only earns its
+    # card once there is something to compare
+    tags = stats.rows([(r["name"], r["n"]) for r in tag_rows]) if len(tag_rows) >= 3 else []
+    tag_total = c.execute("SELECT COUNT(*) AS n FROM tags").fetchone()["n"]
+
+    no_exif = data["total"] - sum(r["value"] for r in data["cameras"])
+    cover = _showcase_rows(limit=1, random_order=True)
+
+    return templates.TemplateResponse(
+        "stats.html",
+        {
+            "request": request,
+            "figs": {
+                "photos": data["total"],
+                "albums": len(_child_album_names(None)),
+                "folders": len(_all_album_nodes()),
+                "featured": data["featured"],
+                "tags": tag_total,
+                "days": data["active_days"],
+                "data": _humanize_bytes(data["bytes"]),
+                "pixels": _humanize_pixels(data["pixels"]),
+            },
+            "span_label": i18n.date_span(lang, data["first"], data["last"]),
+            "busiest_label": (
+                f"{i18n.fmt_date(lang, data['busiest_day'])} · {data['busiest_n']}"
+                if data["busiest_day"] else None
+            ),
+            "months": data["months"],
+            "months_window": stats.MONTHS_WINDOW,
+            "weekdays": data["weekdays"],
+            "hour_dial": stats.dial(data["hours"]),
+            "cameras": data["cameras"],
+            "focals": data["focals"],
+            "apertures": data["apertures"],
+            "isos": data["isos"],
+            "album_chart": album_chart,
+            "shapes": shapes,
+            "tags": tags,
+            "no_exif": no_exif if no_exif > 0 else 0,
+            "og_cover": cover[0]["rel_path"] if cover else None,
         },
     )
 

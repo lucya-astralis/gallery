@@ -168,7 +168,7 @@
     {% if images or not sub_albums %}<span><b>{{ images | length }}</b> {{ t('unit.image') if images | length == 1 else t('unit.images') }}</span>{% endif %}
     {% if sub_albums %}<span><b>{{ sub_albums | length }}</b> {{ t('unit.directory') if sub_albums | length == 1 else t('unit.directories') }}</span>{% endif %}
     {% if breadcrumbs | length > 1 %}<span class="section__doc-in">{{ t('stamp.sub_album') }} · <b>{{ breadcrumbs[-2].name }}</b></span>{% endif %}
-    {% if album_is_showcase %}<span class="section__doc-mark"><i class="fa fa-star" aria-hidden="true"></i>{{ t('stamp.showcase_album') }}</span>{% endif %}
+    {% if album_is_showcase %}<span class="section__doc-mark"><i class="fa fa-star" aria-hidden="true"></i>{{ t('stamp.showcase') }}</span>{% endif %}
     {% if collection %}<span class="section__doc-mark"><i class="fa fa-layer-group" aria-hidden="true"></i>{{ t('stamp.collection') }}</span>{% endif %}
     {% if active_tag %}<span class="section__doc-mark">#{{ active_tag }}</span>{% endif %}
   </p>

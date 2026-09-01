@@ -110,36 +110,45 @@
   {% endif %}
 </section>
 
-{# ---- stats band: what the archive holds, capped to hero width ---- #}
-<section class="vf-band" aria-label="Archive readout">
-  <div class="vf-band__inner">
-    <div class="vf-band__cells">
-      <div class="vf-band__cell">
-        <span class="vf-band__digits" data-count-to="{{ image_count }}">{{ image_count }}</span>
-        <span class="vf-band__caption"><i class="fa fa-image" aria-hidden="true"></i>{{ t('band.images') }}</span>
+{# ---- archive readout: what the collection holds, under the hero.
+       This used to be a right-aligned row of glowing Ethnocentric digits in
+       two colours — the loudest thing on the page for four numbers nobody
+       had asked about yet, and the last place still spending the accent (and
+       an amber second colour) on counts that carry no state. It now speaks
+       the page's own two voices: the mono of .section__doc for the labels,
+       the title's white→grey fall for the numbers. Colour appears exactly
+       once, on the link into /stats — the only element here that goes
+       anywhere. ---- #}
+<section class="arc" aria-labelledby="arc-head">
+  <div class="arc__inner">
+    <div class="arc__head">
+      <h2 class="arc__label" id="arc-head"><i class="fa fa-chart-simple" aria-hidden="true"></i>{{ t('band.head') }}</h2>
+      <a class="arc__more" href="/stats">{{ t('band.stats') }}<i class="fa fa-chevron-right" aria-hidden="true"></i></a>
+    </div>
+    <dl class="arc__cells">
+      <div class="arc__cell">
+        <dt class="arc__key"><i class="fa fa-image" aria-hidden="true"></i>{{ t('band.images') }}</dt>
+        <dd class="arc__val" data-count-to="{{ image_count }}">{{ image_count }}</dd>
       </div>
-      <span class="vf-band__divider" aria-hidden="true"></span>
-      <div class="vf-band__cell">
-        <span class="vf-band__digits" data-count-to="{{ album_count }}">{{ album_count }}</span>
-        <span class="vf-band__caption"><i class="fa fa-folder-open" aria-hidden="true"></i>{{ t('band.albums') }}</span>
+      <div class="arc__cell">
+        <dt class="arc__key"><i class="fa fa-folder-open" aria-hidden="true"></i>{{ t('band.albums') }}</dt>
+        <dd class="arc__val" data-count-to="{{ album_count }}">{{ album_count }}</dd>
       </div>
       {% if showcase_count %}
-        <span class="vf-band__divider" aria-hidden="true"></span>
-        <div class="vf-band__cell">
-          <span class="vf-band__digits vf-band__digits--accent" data-count-to="{{ showcase_count }}">{{ showcase_count }}</span>
-          <span class="vf-band__caption"><i class="fa fa-star" aria-hidden="true"></i>{{ t('band.featured') }}</span>
+        <div class="arc__cell">
+          <dt class="arc__key"><i class="fa fa-star" aria-hidden="true"></i>{{ t('band.featured') }}</dt>
+          <dd class="arc__val" data-count-to="{{ showcase_count }}">{{ showcase_count }}</dd>
         </div>
       {% endif %}
-      {# the archive's own last update — a date, not a count, so it is set
-         as a date instead of the big counting digits #}
+      {# the archive's own last update — a date, not a count, so it takes the
+         same grey fall one size down and never runs the count-up #}
       {% if date_label(updated_at) %}
-        <span class="vf-band__divider" aria-hidden="true"></span>
-        <div class="vf-band__cell vf-band__cell--stamp">
-          <time class="vf-band__stamp" datetime="{{ updated_at[:10] }}">{{ date_label(updated_at) }}</time>
-          <span class="vf-band__caption"><i class="fa fa-clock-rotate-left" aria-hidden="true"></i>{{ t('band.updated') }}</span>
+        <div class="arc__cell arc__cell--stamp">
+          <dt class="arc__key"><i class="fa fa-clock-rotate-left" aria-hidden="true"></i>{{ t('band.updated') }}</dt>
+          <dd class="arc__val arc__val--date"><time datetime="{{ updated_at[:10] }}">{{ date_label(updated_at) }}</time></dd>
         </div>
       {% endif %}
-    </div>
+    </dl>
   </div>
 </section>
 

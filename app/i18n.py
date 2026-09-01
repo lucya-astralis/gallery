@@ -72,10 +72,14 @@ STRINGS: dict[str, tuple[str, str, str]] = {
         "Noch keine Bilder indexiert.",
         "まだ画像がインデックスされていません。",
     ),
+    # ---- archive readout under the hero (welcome.html .arc) -------------
+    "band.head": ("Archive", "Archiv", "アーカイブ"),
     "band.images": ("Images", "Bilder", "写真"),
     "band.albums": ("Albums", "Alben", "アルバム"),
     "band.featured": ("Featured", "Ausgewählt", "特集"),
     "band.updated": ("Last update", "Letztes Update", "最終更新"),
+    # link out of the readout into the full /stats page
+    "band.stats": ("All statistics", "Alle Statistiken", "統計をすべて見る"),
     "showcase.head": ("Featured albums", "Ausgewählte Alben", "特集アルバム"),
     "showcase.all": ("All albums", "Alle Alben", "すべてのアルバム"),
     "aria.prev_frame": ("Previous frame", "Vorheriger Frame", "前のフレーム"),
@@ -145,6 +149,11 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "album.og_unit_many": ("images", "Bilder", "枚"),
     "stamp.sub_album": ("Sub-album", "Unteralbum", "サブアルバム"),
     "stamp.showcase_album": ("Featured album", "Ausgewähltes Album", "特集アルバム"),
+    # Short form for the doc line under the pathbar, where the mark sits
+    # among three or four other chips: "Ausgewähltes Album" ran that row
+    # off its own width in German. The hero kicker, which has a line to
+    # itself, keeps the full phrase above.
+    "stamp.showcase": ("Featured", "Ausgewählt", "特集"),
     "stamp.collection": ("Collection", "Sammlung", "コレクション"),
     "album.about": ("About", "Info", "概要"),
     "album.folders": ("Folders", "Ordner", "フォルダ"),
@@ -185,6 +194,87 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "trip.min": ("Min", "Min", "分"),
     "trip.sec": ("Sec", "Sek", "秒"),
     "trip.flight": ("Flight", "Flug", "フライト"),
+    # how many stops the itinerary has — the module's own fact, in the meta
+    # line where the trip's name used to be repeated
+    "trip.leg": ("leg", "Etappe", "区間"),
+    "trip.legs": ("legs", "Etappen", "区間"),
+
+    # ---- statistics page (/stats) ----------------------------------------
+    # Everything here describes the archive itself. No visitor is measured,
+    # nothing is logged — which is why the page is safe to hand to anyone,
+    # and why the lead says so out loud.
+    "stats.slug": ("Statistics", "Statistiken", "統計"),
+    "stats.crumb": ("Statistics", "Statistiken", "統計"),
+    "stats.title": ("Statistics — lucya.systems gallery",
+                    "Statistiken — lucya.systems gallery",
+                    "統計 — lucya.systems gallery"),
+    "stats.og_desc": (
+        "What the archive holds: {images} photos across {albums} albums, charted.",
+        "Was das Archiv enthält: {images} Fotos in {albums} Alben, als Diagramme.",
+        "アーカイブの中身：{albums}アルバム・{images}枚をグラフで。",
+    ),
+    "stats.lead": (
+        "Everything on this page is measured from the photos themselves — their "
+        "capture dates and their EXIF. No visitor is counted and nothing is logged.",
+        "Alles auf dieser Seite ist aus den Fotos selbst gemessen — aus ihren "
+        "Aufnahmedaten und ihren EXIF-Daten. Es werden keine Besucher gezählt und "
+        "nichts protokolliert.",
+        "このページの数値はすべて写真そのもの（撮影日時とEXIF）から算出しています。"
+        "訪問者の計測もログの記録もありません。",
+    ),
+    "stats.more": ("+{n} more", "+{n} weitere", "他{n}件"),
+    "stats.empty": (
+        "Nothing indexed yet — there is nothing to measure.",
+        "Noch nichts indexiert — es gibt nichts zu messen.",
+        "まだ何もインデックスされていません。"
+    ),
+    # headline figures
+    "stats.fig.photos": ("Photos", "Fotos", "写真"),
+    "stats.fig.albums": ("Albums", "Alben", "アルバム"),
+    "stats.fig.folders": ("Folders", "Ordner", "フォルダ"),
+    "stats.fig.featured": ("Featured", "Ausgewählt", "特集"),
+    "stats.fig.tags": ("Tags", "Tags", "タグ"),
+    "stats.fig.data": ("Data", "Daten", "データ"),
+    "stats.fig.pixels": ("Pixels", "Pixel", "ピクセル"),
+    "stats.fig.days": ("Days shot", "Fototage", "撮影日数"),
+    "stats.fig.busiest": ("Busiest day", "Stärkster Tag", "最多の日"),
+    # chart headings
+    "stats.timeline.head": ("Photos per month", "Fotos pro Monat", "月別の写真数"),
+    "stats.timeline.note": (
+        "Rolling {n}-month window ending with the newest photo.",
+        "Gleitendes Fenster über {n} Monate bis zum neuesten Foto.",
+        "最新の写真までの{n}か月間。",
+    ),
+    "stats.albums.head": ("Largest albums", "Größte Alben", "アルバム別"),
+    "stats.tags.head": ("Most used tags", "Häufigste Tags", "よく使うタグ"),
+    "stats.weekday.head": ("By weekday", "Nach Wochentag", "曜日別"),
+    "stats.hour.head": ("By hour of day", "Nach Tageszeit", "時間帯別"),
+    # A dial looks like a clock, so it has to say that it carries 24 hours
+    # and not 12 — the eight printed ticks show it, this says it.
+    "stats.hour.note": (
+        "24-hour dial, midnight at the top, running clockwise. Local time where the photo was taken.",
+        "24-Stunden-Zifferblatt, Mitternacht oben, im Uhrzeigersinn. Ortszeit am Aufnahmeort.",
+        "24時間の文字盤。0時が上、時計回り。撮影地の現地時間。",
+    ),
+    "stats.camera.head": ("Cameras", "Kameras", "カメラ"),
+    "stats.shape.head": ("Orientation", "Ausrichtung", "向き"),
+    "stats.focal.head": ("Focal length", "Brennweite", "焦点距離"),
+    "stats.focal.note": (
+        "35 mm equivalent.",
+        "Kleinbild-Äquivalent.",
+        "35mm換算。",
+    ),
+    "stats.aperture.head": ("Aperture", "Blende", "絞り"),
+    "stats.iso.head": ("ISO", "ISO", "ISO"),
+    "stats.shape.landscape": ("Landscape", "Querformat", "横"),
+    "stats.shape.portrait": ("Portrait", "Hochformat", "縦"),
+    "stats.shape.square": ("Square", "Quadratisch", "正方形"),
+    # the footnote under the capture charts — EXIF is not guaranteed
+    "stats.exif_note": (
+        "Capture figures come from EXIF; {n} of {total} photos carry none.",
+        "Aufnahmewerte stammen aus EXIF; {n} von {total} Fotos haben keine.",
+        "撮影データはEXIF由来です。{total}枚中{n}枚にはEXIFがありません。",
+    ),
 
     # ---- search ----------------------------------------------------------
     "search.slug": ("Search", "Suche", "検索"),
@@ -308,6 +398,23 @@ def day_label(lang: str, n: int) -> str:
     en/de are zero-padded so the mono headers line up in a long list; the
     Japanese counter reads wrong padded, so it stays bare."""
     return t(lang, "day.n", n=str(n) if lang == "jp" else f"{n:02d}")
+
+
+def weekday_index(lang: str, idx: int) -> str:
+    """Weekday by POSITION (0 = Monday) rather than by date — the /stats
+    rhythm chart plots a fixed Mon…Sun axis that has no date to read."""
+    table = _WEEKDAYS_JP if lang == "jp" else (_WEEKDAYS_DE if lang == "de" else _WEEKDAYS_EN)
+    return table[idx % 7]
+
+
+def month_short(lang: str, year: int, month: int) -> str:
+    """Axis tick for the /stats timeline: 'Aug' / 'Aug' / '8月'. The year is
+    printed separately (only where it changes), so it is left off here."""
+    if not 1 <= month <= 12:
+        return ""
+    if lang == "jp":
+        return f"{month}月"
+    return (_MONTHS_DE if lang == "de" else _MONTHS_EN)[month - 1]
 
 
 def weekday_label(lang: str, iso: str | None) -> str | None:

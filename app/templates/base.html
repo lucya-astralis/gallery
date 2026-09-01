@@ -112,6 +112,10 @@
         </span>
       </a>
       <div class="foot__links">
+        {# the one internal link down here: /stats is a page about the
+           archive rather than a part of it, so it belongs beside the
+           imprint and not in the nav's browse chrome #}
+        <a href="/stats"><i class="fa fa-chart-simple" aria-hidden="true"></i>{{ t('stats.slug') }}</a>
         <a href="https://lucya.sh/privacy" target="_blank" rel="noopener"><i class="fa fa-shield-halved" aria-hidden="true"></i>{{ t('foot.privacy') }}</a>
         <a href="https://lucya.sh/privacy" target="_blank" rel="noopener"><i class="fa fa-scale-balanced" aria-hidden="true"></i>{{ t('foot.imprint') }}</a>
       </div>
