@@ -842,10 +842,28 @@ window.__stagePixelIn = () => {
   // the scroll-reveal module skips the entrance cascade this one time
   // (replaying the page build-up around the user read as unnatural)
   document.documentElement.classList.add('fx-return');
-  // land mid-viewport: the user keeps their place in the grid
-  link.scrollIntoView({ block: 'center', behavior: 'instant' });
-  const tile = link.closest('.image-tile');
+  // Land mid-viewport: the user keeps their place in the grid. Computed
+  // and held rather than handed to scrollIntoView() — the tiles carry
+  // content-visibility:auto, so most of the grid has no laid-out contents
+  // at this point, and the document keeps growing underneath for a second
+  // or two afterwards. window.__scrollMemory (defined below) re-derives
+  // the offset from the tile itself on every frame until it sticks.
+  const tile = link.closest('.image-tile') || link;
+  const centre = () => {
+    const r = tile.getBoundingClientRect();
+    return Math.max(0, Math.round(
+      r.top + (window.scrollY || 0) - (window.innerHeight - r.height) / 2));
+  };
+  // `behavior:'instant'` is not optional: style.css sets
+  // `html{ scroll-behavior:smooth }`, so a plain scrollTo() ANIMATES, and
+  // the visitor watches the page glide to where it should already have
+  // been. The scrollIntoView() call this replaced passed the same flag.
+  window.scrollTo({ top: centre(), left: 0, behavior: 'instant' });
+  window.__scrollHoldTile = centre;   // handed to the scroll memory below
   if (tile) tile.classList.add('is-returned');
+  // this page has been placed; the scroll memory below must not also
+  // move it (centring the tile is the more precise answer of the two)
+  window.__scrollPlaced = true;
 })();
 
 // ---------- COVER ↔ HERO MORPH (cross-document View Transitions) -----
@@ -942,6 +960,315 @@ window.__stagePixelIn = () => {
   window.addEventListener('pageshow', (ev) => { if (ev.persisted) clear(); });
 })();
 
+// ---------- SCROLL MEMORY (back / forward) ---------------------
+// Browsers remember the scroll position of a history entry themselves —
+// but not usefully on this site. Every HTML response is Cache-Control:
+// no-store (see the security_headers middleware in main.py), so a back
+// navigation is a full reload rather than a bfcache restore, and Chrome
+// applies its remembered offset while the document is still streaming.
+// Measured on a throttled phone profile with a cold cache: /albums came
+// back at 0 and stayed there, an album page came back at 0, and a third
+// case landed at 722 and then drifted to 1722 instead of the 600 it left
+// from — the offset is applied against a document that is at that moment
+// a sixth of its final height.
+//
+// So the position is kept here instead, per HISTORY ENTRY (the key lives
+// in that entry's own history.state, so the same URL visited twice keeps
+// two independent positions) and re-applied from this script. This runs
+// inside the rel=expect render gate (see base.html) — the same pre-paint
+// moment photoAlbumContinuity() already relies on, by which point the
+// stylesheet is parsed and every card, tile and hero has its final box.
+// That is also what the reverse cover→hero morph needs: the card the
+// hero flies back into has to be where the visitor left it before the
+// transition takes its snapshot.
+const scrollMemory = (() => {
+  const PREFIX = 'sm:';         // keyed by history entry
+  const UPREFIX = 'smu:';       // keyed by URL, for the site's own back links
+  const INDEX = 'sm:index';
+  const RETURN = 'sm:return';   // "the next load of this URL is a return"
+  const RETURN_TTL = 10 * 60 * 1000;
+  const KEEP = 80;              // stored positions; older ones are dropped
+  const ss = {
+    get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} },
+    del(k) { try { sessionStorage.removeItem(k); } catch (e) {} },
+  };
+
+  // One id per history entry, carried in the entry's own state. Merging
+  // rather than replacing keeps the flags the other modules put there
+  // (liveGo's `live`, spaLoadImage's `spa`, the back guard's `albumGuard`).
+  function entryKey(create) {
+    const st = history.state || {};
+    if (st.sm) return st.sm;
+    if (!create) return null;
+    const sm = 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    try { history.replaceState(Object.assign({}, st, { sm }), ''); }
+    catch (e) { return null; }
+    return sm;
+  }
+
+  // A raw pixel offset is the wrong thing to remember on these pages. The
+  // document is still growing while it is being restored — covers, tiles
+  // and the hero all arrive after the offset has been applied — and every
+  // pixel that appears ABOVE the visitor pushes what they were looking at
+  // further down. So the position is stored as the CARD they were looking
+  // at plus how far into it they were, and the offset is recomputed from
+  // that element. Content arriving above it then moves the number without
+  // moving the page, which is the whole point.
+  const ANCHOR_SEL = '.image-tile, .album-card, .feat-card, .trip__stop, .arc__cell, .st-card';
+
+  // Boxes that scroll on their own, so their offset is NOT window.scrollY
+  // and is lost unless it is stored too: on phones the featured rail is an
+  // edge-to-edge horizontal snap carousel (see the ≤760px block in
+  // style.css), and the stats charts scroll sideways at any width. Kept as
+  // an explicit list rather than hunting the DOM for overflow, which on a
+  // 400-tile album would mean measuring every tile on every save.
+  const SCROLLER_SEL = '.feat__rail, .ch-scroll';
+
+  // first anchor whose box still reaches into the viewport, i.e. the one
+  // the top edge of the screen is cutting through (or the first below it)
+  function anchorNow() {
+    const els = document.querySelectorAll(ANCHOR_SEL);
+    for (let i = 0; i < els.length; i++) {
+      const r = els[i].getBoundingClientRect();
+      if (r.bottom > 0) return { i, off: Math.round(r.top) };
+    }
+    return null;
+  }
+
+  // where the page has to sit for anchor `i` to be `off` from the top
+  function anchorTarget(rec) {
+    if (!rec || rec.i == null) return null;
+    const els = document.querySelectorAll(ANCHOR_SEL);
+    const el = els[rec.i];
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return Math.max(0, Math.round(r.top + (window.scrollY || 0) - rec.off));
+  }
+
+  // The URL without its fragment. Two records are kept for every page: one
+  // against the history entry, which is exact and survives visiting the
+  // same URL twice, and one against the URL, which is what the site's OWN
+  // back button needs — see the return intent below.
+  function urlKey(href) {
+    try {
+      const u = new URL(href, location.href);
+      return u.pathname + u.search;
+    } catch (e) { return null; }
+  }
+
+  // [index, scrollLeft, scrollTop] for every inner scroller that is not at
+  // its origin; the index is its position among SCROLLER_SEL matches in
+  // document order, which is the same on every visit to this URL
+  function scrollersNow() {
+    const out = [];
+    document.querySelectorAll(SCROLLER_SEL).forEach((el, i) => {
+      const l = Math.round(el.scrollLeft);
+      const t = Math.round(el.scrollTop);
+      if (l > 0 || t > 0) out.push([i, l, t]);
+    });
+    return out;
+  }
+
+  // the same list resolved back to live elements, for restoring
+  function scrollerTargets(rec) {
+    if (!rec || !rec.s || !rec.s.length) return [];
+    const els = document.querySelectorAll(SCROLLER_SEL);
+    const out = [];
+    rec.s.forEach(([i, l, t]) => {
+      const el = els[i];
+      if (el) out.push({ el, left: l, top: t });
+    });
+    return out;
+  }
+
+  function remember() {
+    const k = entryKey(true);
+    const u = urlKey(location.href);
+    if (!k && !u) return;
+    const rec = { y: Math.round(window.scrollY || 0) };
+    const a = anchorNow();
+    if (a) { rec.i = a.i; rec.off = a.off; }
+    const sc = scrollersNow();
+    if (sc.length) rec.s = sc;
+    const json = JSON.stringify(rec);
+    const keys = [];
+    if (k) { ss.set(PREFIX + k, json); keys.push(PREFIX + k); }
+    if (u) { ss.set(UPREFIX + u, json); keys.push(UPREFIX + u); }
+    let list = [];
+    try { list = JSON.parse(ss.get(INDEX) || '[]'); } catch (e) { list = []; }
+    list = list.filter((x) => keys.indexOf(x) < 0).concat(keys);
+    while (list.length > KEEP) ss.del(list.shift());
+    ss.set(INDEX, JSON.stringify(list));
+  }
+
+  function parse(v) {
+    if (v == null) return null;
+    try {
+      const rec = JSON.parse(v);
+      return rec && isFinite(rec.y) ? rec : null;
+    } catch (e) { return null; }
+  }
+
+  function stored() {
+    const k = entryKey(false);
+    return k ? parse(ss.get(PREFIX + k)) : null;
+  }
+
+  // The pathbar's back button and the breadcrumb are ordinary links, so
+  // following one is a NEW navigation and not a history traversal — the
+  // entry it lands on has never been seen before and carries no position.
+  // They are still unmistakably "take me back up", though, and landing at
+  // the top of a list you had scrolled halfway through is exactly what
+  // this module exists to prevent. So such a click leaves a note naming
+  // where it is going, and the next load of that URL consumes it once.
+  function markReturn(href) {
+    const u = urlKey(href);
+    if (u) ss.set(RETURN, JSON.stringify({ u, t: Date.now() }));
+  }
+
+  function takeReturn() {
+    const raw = ss.get(RETURN);
+    ss.del(RETURN);
+    if (!raw) return null;
+    let note;
+    try { note = JSON.parse(raw); } catch (e) { return null; }
+    if (!note || note.u !== urlKey(location.href)) return null;
+    if (!(Date.now() - note.t < RETURN_TTL)) return null;
+    return parse(ss.get(UPREFIX + note.u));
+  }
+
+  // Put the page where `getY()` says and keep it there while the rest of
+  // the page arrives. One application is never enough on a cold cache:
+  // the document starts out a fraction of its final height, so the offset
+  // is CLAMPED to whatever fits and only becomes reachable as content
+  // lands. `getY` is re-asked every frame, so with an anchor the target
+  // follows the element rather than a stale number. Any real input from
+  // the visitor ends the hold at once — this must never fight someone who
+  // has started scrolling themselves.
+  const HOLD_CAP_MS = 4000;
+  const HOLD_STABLE_MS = 700;
+  // style.css sets `html{ scroll-behavior:smooth }`, which makes a bare
+  // scrollTo() animate — and an animated correction, re-issued every
+  // frame, is exactly the "it scrolls down there first" the restore is
+  // supposed to avoid. Restoring a position is not a scroll, so it says so.
+  const jump = (y) => window.scrollTo({ top: y, left: 0, behavior: 'instant' });
+  function hold(getY, inner) {
+    let done = false;
+    const release = () => { done = true; };
+    ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach((t) =>
+      window.addEventListener(t, release, { once: true, passive: true }));
+    const t0 = performance.now();
+    let since = 0;                       // when the offset last matched
+    // A carousel is re-asked for as well: a snap container can re-snap
+    // itself once its cards have their final width, so setting it once
+    // before paint is not always enough.
+    const putInner = () => {
+      let ok = true;
+      (inner || []).forEach((s) => {
+        if (!s.el.isConnected) return;
+        if (Math.abs(s.el.scrollLeft - s.left) > 2 ||
+            Math.abs(s.el.scrollTop - s.top) > 2) {
+          s.el.scrollTo({ left: s.left, top: s.top, behavior: 'instant' });
+          ok = false;
+        }
+      });
+      return ok;
+    };
+    const frame = () => {
+      if (done) return;
+      const now = performance.now();
+      const y = getY();
+      let settled = putInner();
+      if (y == null && !(inner || []).length) { release(); return; }
+      if (y != null && Math.abs((window.scrollY || 0) - y) > 2) {
+        jump(y);
+        settled = false;
+      }
+      if (!settled) since = 0;
+      else if (!since) since = now;
+      if ((since && now - since > HOLD_STABLE_MS) || now - t0 > HOLD_CAP_MS) {
+        release(); return;
+      }
+      requestAnimationFrame(frame);
+    };
+    const y0 = getY();
+    if (y0 != null) jump(y0);
+    putInner();
+    requestAnimationFrame(frame);
+  }
+
+  // put the page back where a stored record says, anchor first
+  function place(rec) {
+    if (!rec) return false;
+    const inner = scrollerTargets(rec);
+    if (rec.i != null && anchorTarget(rec) != null) {
+      hold(() => { const y = anchorTarget(rec); return y == null ? rec.y : y; }, inner);
+      return true;
+    }
+    // a page that was never scrolled vertically can still have a carousel
+    // parked somewhere, which is the whole of what there is to restore
+    if (!isFinite(rec.y) || rec.y <= 0) {
+      if (!inner.length) return false;
+      hold(() => null, inner);
+      return true;
+    }
+    hold(() => rec.y, inner);
+    return true;
+  }
+
+  function restore() {
+    return place(stored());
+  }
+
+  return { remember, restore, place, stored, hold, anchorNow, anchorTarget,
+           markReturn, takeReturn };
+})();
+window.__scrollMemory = scrollMemory;
+
+(function wireScrollMemory() {
+  // The browser's own attempt is what produces the drift described above,
+  // so it is turned off and this module owns the position outright.
+  try { history.scrollRestoration = 'manual'; } catch (e) {}
+
+  // Committing on pagehide alone is not enough: a same-document popstate
+  // (a sort or tag swap, see liveGo) never fires one, and mobile browsers
+  // are free to discard a page without it. A cheap timer keeps the current
+  // entry roughly up to date while scrolling, and the real exits commit
+  // straight away.
+  let timer = null;
+  // Capture phase, on the document: a scroll event fired at an ELEMENT
+  // (the featured carousel) does not bubble, so a listener on window sees
+  // only the page's own scrolling and a swiped carousel would never be
+  // committed. The capture phase reaches the document on the way down to
+  // any target, so this one hears both.
+  document.addEventListener('scroll', () => {
+    if (timer) return;
+    timer = setTimeout(() => { timer = null; scrollMemory.remember(); }, 500);
+  }, { capture: true, passive: true });
+  const commit = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    scrollMemory.remember();
+  };
+  window.addEventListener('pagehide', commit);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') commit();
+  });
+  // A click that is about to leave the page: commit before it does, and
+  // note it when the link is one of the ways back UP out of the page (the
+  // pathbar button, a breadcrumb) so the page it lands on can put itself
+  // back where the visitor left it.
+  const BACK_LINK = '.pathbar__back, .crumb a';
+  document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest('a[href]');
+    if (!a || a.target || a.hasAttribute('download')) return;
+    commit();
+    if (a.closest(BACK_LINK) || a.matches(BACK_LINK)) scrollMemory.markReturn(a.href);
+  }, true);
+})();
+
 // ---------- FIRST-FRAME STATE (must stay synchronous) ----------
 // Everything that decides what the FIRST rendered frame looks like runs
 // here, inside this script's own task — never on DOMContentLoaded.
@@ -957,6 +1284,25 @@ window.__stagePixelIn = () => {
 // glitch showed up on navigations and was independent of the cache.
 // Ordering: after photoAlbumContinuity(), whose html.fx-return decides
 // whether scrollReveal() replays the entrance cascade at all.
+//
+// A back/forward navigation lands here too: the visitor is returning to a
+// page they had already scrolled through, so it is put back exactly where
+// they left it and — like a step back out of a photo — the entrance
+// cascade is skipped. Replaying the build-up around someone who is
+// halfway down a grid reads as the page rebuilding itself, and on a phone
+// it also puts a screenful of animations on top of the back transition.
+(function restoreScrollPosition() {
+  const nav = (performance.getEntriesByType('navigation') || [])[0];
+  const traversal = !!nav && nav.type === 'back_forward';
+  // a back/forward step carries its own exact record; a click on the
+  // site's own way back up left a note naming this page instead
+  const noted = traversal ? null : scrollMemory.takeReturn();
+  if (!traversal && !noted) return;
+  document.documentElement.classList.add('fx-return');
+  if (window.__scrollPlaced) return;   // the tile hold below owns the page
+  if (noted) scrollMemory.place(noted);
+  else scrollMemory.restore();
+})();
 scrollReveal();
 thumbFadeIn();
 // html.fx-return described THIS load — a step back out of one of the page's
@@ -965,6 +1311,12 @@ thumbFadeIn();
 // on a tag or sort change, and that one SHOULD build up, because the user
 // asked for new content rather than returning to content they had already.
 document.documentElement.classList.remove('fx-return');
+
+// A step back out of a photo is a fresh navigation rather than a history
+// traversal (the back guard uses location.replace, see setupBackGuard), so
+// the block above does not fire for it. photoAlbumContinuity() has already
+// put the page on the tile; keep it there while the grid finishes arriving.
+if (window.__scrollHoldTile) scrollMemory.hold(window.__scrollHoldTile);
 
 // ---------- PREVIEW PRE-WARM (tile hover) ----------------------
 // Aiming at a tile warms the /preview/ file its photo page will need, so
@@ -1037,13 +1389,19 @@ document.addEventListener('keydown', (e) => {
   } else if (e.key === 'Escape') {
     // in a collection, Esc returns to the collection root (same target as the
     // "back" button); otherwise fall back to the last breadcrumb (the folder).
+    // Esc is the keyboard form of the back button, so it leaves the same
+    // note (the album then restores rather than opening at the top)
+    const mark = (href) => {
+      if (window.__scrollMemory) window.__scrollMemory.markReturn(href);
+      window.location.href = href;
+    };
     const data = readAlbumData();
     if (data && data.collection_root) {
-      window.location.href = '/album/' + data.collection_root;
+      mark('/album/' + data.collection_root);
       return;
     }
     const crumb = document.querySelector('.crumb a:last-of-type');
-    if (crumb) window.location.href = crumb.href;
+    if (crumb) mark(crumb.href);
   }
 });
 
@@ -2011,6 +2369,10 @@ async function liveGo(url, { push = true } = {}) {
   // else on the page was never touched, so it needs nothing.
   root.classList.remove('is-live-loading');
   navProgress.done();
+  // Stepping back into a previous filter/sort replaces the grid under the
+  // visitor; without this the new markup is shorter or taller than what it
+  // replaced and the page is left wherever that leaves it.
+  if (!push) scrollMemory.restore();
   swapped.forEach((el) => {
     initSortMenus(el);
     // Order matters: scrollReveal() hides the tiles behind .rv before

@@ -3088,7 +3088,7 @@ body.lightbox-open{ overflow:hidden; }
 .lightbox__close,
 .lightbox__nav,
 .lightbox__bar{
-  transition: opacity .35s ease, color .15s, border-color .15s, background .15s, transform .15s;
+  transition: opacity .35s ease, color .15s, border-color .15s, background .15s, transform .15s, scale .15s;
 }
 
 .lightbox__close{
@@ -5123,13 +5123,23 @@ html.fx-lite .album-fx{ display:none; }
    ================================================================ */
 
 /* ---- shared keyframes ---- */
+/* These move the element with the independent `translate` property rather
+   than with `transform`, because they are applied to whatever the reveal
+   observer tags plus a few fixed targets, and some of those carry a
+   transform of their own — anything centred by translateX(-50%), for one.
+   A keyframe animating `transform` REPLACES that centering for its whole
+   duration, which is how the lightbox's button bar used to leave the
+   screen sideways every time the viewer opened. `translate` composes with
+   the element's own transform instead, so a rule here can never take a
+   layout apart. Same reason the press feedback further down uses the
+   independent `scale`. */
 @keyframes rv-rise{
-  from{ opacity:0; transform:translate3d(0, 14px, 0); }
-  to  { opacity:1; transform:translate3d(0, 0, 0); }
+  from{ opacity:0; translate:0 14px; }
+  to  { opacity:1; translate:0 0; }
 }
 @keyframes rv-right{
-  from{ opacity:0; transform:translate3d(14px, 0, 0); }
-  to  { opacity:1; transform:translate3d(0, 0, 0); }
+  from{ opacity:0; translate:14px 0; }
+  to  { opacity:1; translate:0 0; }
 }
 @keyframes rv-fade{
   from{ opacity:0; }
@@ -5257,11 +5267,18 @@ html.fx-anim .stage.is-entering-prev{ animation: stage-in-prev .38s cubic-bezier
   from{ opacity:0; transform:translate3d(-32px, 0, 0); }
   to  { opacity:1; transform:translate3d(0, 0, 0); }
 }
-/* the loader is centred by its own translateX, so it gets its own keyframe
-   pair rather than rv-rise (which would replace that transform) */
+/* The loader bar gets its own keyframes, and they move it with the
+   independent `translate` property rather than with `transform`. The bar
+   carries a different transform per layout — centred by translateX(-50%)
+   against the stage on desktop, and `transform:none` in the ≤760px block,
+   where it is a static full-width row — so a keyframe that animated
+   `transform` had to name one of them and broke the other: the phone bar
+   was shifted half its own (full-screen) width to the left, on every
+   prev/next, because the swapped-in .detail re-runs this. `translate`
+   composes with whatever transform the element already has. */
 @keyframes loader-rise{
-  from{ opacity:0; transform:translateX(-50%) translateY(10px); }
-  to  { opacity:1; transform:translateX(-50%) translateY(0); }
+  from{ opacity:0; translate:0 10px; }
+  to  { opacity:1; translate:0 0; }
 }
 html.fx-anim .stage__loader{ animation: loader-rise .45s cubic-bezier(.19,.66,.28,.99) .12s backwards; }
 html.fx-anim .sidebar > .panel{ animation: rv-rise .5s cubic-bezier(.19,.66,.28,.99) backwards; }
@@ -5528,12 +5545,17 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
     transform:translateY(0) scale(.985);
     transition-duration:.08s;
   }
-  .nav-arrow:active{ transform:translateY(-50%) scale(.94); }
+  /* `scale`, not `transform: scale()`: every one of these is positioned
+     against an edge or a centre line and several hold a translate of
+     their own (.nav-arrow and .lightbox__nav are centred vertically by
+     translateY(-50%)), which a transform here would drop for as long as
+     the finger is down — the button jumped half its own height. */
+  .nav-arrow:active,
   .lightbox__nav:active,
   .lightbox__close:active,
   .fhero__nav:active,
   .loader-btn:active,
-  .lightbox__btn:active{ transform:scale(.94); }
+  .lightbox__btn:active{ scale:.94; }
 }
 
 /* ================================================================
