@@ -298,11 +298,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (track) track.addEventListener('animationend', (e) => {
       if (e.animationName === 'vf-seg-fill') advance();
     });
-    // pause while the user inspects the meta block or the deck controls
+    // Pause while the user inspects the meta block or the deck controls —
+    // for a pointer that can actually REST on them. A tap fires the same
+    // enter/leave pair, and a pointer-over handler that changes the page is
+    // exactly what makes a browser spend the first tap on the hover state
+    // and demand a second one before it dispatches the click. Everything a
+    // thumb aims at down here — prev, next, the segments, reshuffle — sits
+    // inside .vf__deck, so on a phone this cost every one of them a tap.
+    // pointerType (rather than a matchMedia snapshot) keeps the pause for a
+    // mouse plugged into a touchscreen machine, where both are true at once.
     [metaLink, vf.querySelector('.vf__deck')].forEach(el => {
       if (!el) return;
-      el.addEventListener('mouseenter', () => vf.classList.add('vf--paused'));
-      el.addEventListener('mouseleave', () => vf.classList.remove('vf--paused'));
+      el.addEventListener('pointerenter', (e) => {
+        if (e.pointerType === 'touch') return;
+        vf.classList.add('vf--paused');
+      });
+      el.addEventListener('pointerleave', (e) => {
+        if (e.pointerType === 'touch') return;
+        vf.classList.remove('vf--paused');
+      });
     });
   } else if (autoLabel) {
     autoLabel.textContent = frames.length > 1 ? 'MANUAL' : 'SINGLE FRAME';
@@ -454,10 +468,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (e.animationName === 'fhero-seg-fill') advance();
     });
     // pause while the pointer is over the hero (the user is aiming/reading)
+    // …a real pointer only — see the same guard on the viewfinder deck.
+    // .fhero__frame wraps the WHOLE reel, so on a phone the swallowed tap
+    // hit the arrows, the segments, the file link and the slide itself.
     const frame = hero.querySelector('.fhero__frame');
     if (frame) {
-      frame.addEventListener('mouseenter', () => hero.classList.add('fhero--paused'));
-      frame.addEventListener('mouseleave', () => hero.classList.remove('fhero--paused'));
+      frame.addEventListener('pointerenter', (e) => {
+        if (e.pointerType === 'touch') return;
+        hero.classList.add('fhero--paused');
+      });
+      frame.addEventListener('pointerleave', (e) => {
+        if (e.pointerType === 'touch') return;
+        hero.classList.remove('fhero--paused');
+      });
     }
     // and while scrolled out of view — no point cycling off-screen
     if ('IntersectionObserver' in window) {
