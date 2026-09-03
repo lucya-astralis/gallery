@@ -1420,20 +1420,24 @@ section{
   display:inline-flex; align-items:center; gap:8px;
   transition: color .15s, border-color .15s, background .15s;
 }
-.sort__btn b{ color:var(--text); font-weight:400; letter-spacing:.12em; }
-.sort__btn::after{
-  content:"▾";
-  color:var(--label);
-  font-size:9px;
-  margin-left:2px;
-  transition: transform .15s;
+/* the button reads as one sentence — MARK · "SORT BY" · the current order —
+   with the caret pushed to the far edge. Only the value may lose width, so
+   the label and the two glyphs never shrink and a long order name
+   ellipsizes instead of squeezing them. There used to be a second caret
+   here, a "▾" on ::after, which doubled up with the chevron the album
+   toolbar already carried; the markup one is the only one now. */
+.sort__btn > .fa,
+.sort__btn-label{ flex:0 0 auto; }
+.sort__btn b{
+  color:var(--text); font-weight:400; letter-spacing:.12em;
+  min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .sort__btn[aria-expanded="true"]{
   color:var(--text);
   border-color:var(--acc);
   background:rgba(var(--acc-rgb),.06);
 }
-.sort__btn[aria-expanded="true"]::after{ transform: rotate(180deg); }
 .sort__btn:hover{ color:var(--text); border-color:var(--chrome); }
 .sort__btn-label{ color:var(--label); }
 
@@ -1504,7 +1508,6 @@ section{
   .sort{ width:100%; }
   .sort__btn{
     width:100%;
-    justify-content:space-between;
     padding:10px 14px;
     font-size:11px;
   }
@@ -3820,6 +3823,13 @@ body.page-welcome{ --page-max: 2400px; }
   .vf__meta{ display:none; }
 }
 @media (max-width:760px){
+  /* the phone inset shared by the hero's control deck and the readout band
+     below it: the arrows of the reel and the edges of the archive box sit on
+     the same two vertical lines, so the hero and the strip under it read as
+     one column instead of two slightly different ones. Tighter than
+     --page-pad on purpose — a full-bleed control bar can afford less air
+     than a text column. */
+  :root{ --deck-pad:14px; }
   .vf{
     height: calc(100vh - var(--nav-h) - 36px);
     height: calc(100svh - var(--nav-h) - 36px);
@@ -3842,12 +3852,12 @@ body.page-welcome{ --page-max: 2400px; }
      short lines allow much larger type than one squeezed line */
   .vf__title{ letter-spacing:.02em; font-size:clamp(30px, 9.5vw, 52px); }
   .vf__lead{ font-size:13.5px; }
-  .vf__deck{ gap:8px; padding:10px 14px 12px; }
+  .vf__deck{ gap:8px; padding:10px var(--deck-pad) 12px; }
   .vf__nav{ padding:5px 12px; }
   .vf__tune{ padding:6px 9px; }
   .vf__auto{ display:none; }
   .vf__track{ gap:4px; }
-  .arc__inner{ padding:16px var(--page-pad) 18px; gap:11px; }
+  .arc__inner{ padding:16px var(--deck-pad) 18px; gap:11px; }
   .arc__cell{ padding:11px 12px 13px; gap:7px; }
   /* .18em tracking is a lot of width for an 11-character key: let it wrap
      rather than ellipsize away half of "LETZTES UPDATE" */
@@ -5442,7 +5452,11 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__img{
 
 /* --- sort control: leading sort mark + trailing caret ------------------ */
 .sort__btn > .fa{ font-size:11px; }
-.sort__btn-caret{ margin-left:.2em; color:var(--text-ghost); }
+/* margin-left:auto is inert on desktop (the button is shrink-to-fit, so
+   there is no free space to absorb) and pins the caret to the right edge on
+   the phone's full-width button, where the row would otherwise be spread
+   out by justify-content and read as four unrelated things. */
+.sort__btn-caret{ margin-left:auto; padding-left:.2em; color:var(--text-ghost); }
 .sort__btn[aria-expanded="true"] .sort__btn-caret{ transform:rotate(180deg); }
 @media (prefers-reduced-motion: no-preference){
   .sort__btn-caret{ transition:transform .18s ease; }

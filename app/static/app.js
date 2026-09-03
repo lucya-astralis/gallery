@@ -560,7 +560,13 @@ function scrollReveal(root = document) {
       el.classList.add('rv-in');
       obs.unobserve(el);
     });
-  }, { rootMargin: '0px 0px -6% 0px', threshold: 0.05 });
+    // A positive bottom margin arms a block just BEFORE it reaches the fold
+    // instead of after: the old -6% / 5%-visible pair meant an element had to
+    // be almost fully scrolled in before it was allowed to appear, which the
+    // archive readout under the welcome hero showed off worst — its head sat
+    // there with an empty box under it until you had scrolled past most of
+    // the box itself.
+  }, { rootMargin: '0px 0px 10% 0px', threshold: 0 });
 
   targets.forEach((el) => {
     el.classList.add('rv');
@@ -795,7 +801,11 @@ document.addEventListener('DOMContentLoaded', () => {
     ents.forEach(en => {
       if (en.isIntersecting) { run(en.target); obs.unobserve(en.target); }
     });
-  }, { threshold: 0.5 });
+    // low threshold on purpose: the digits are zeroed until this fires, so a
+    // half-visible gate left the readout showing 0 while its box was already
+    // on screen. It still starts in view — no rootMargin here — so the count
+    // is actually watched rather than finished off-screen.
+  }, { threshold: 0.15 });
   els.forEach(el => { el.textContent = '0'; io.observe(el); });
 });
 
