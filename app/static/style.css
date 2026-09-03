@@ -6,112 +6,227 @@
    the software under it do not. See app/brand.py.
    ================================================================ */
 
-@font-face {
-  font-family: 'Space Grotesk';
-  src: local('Space Grotesk'),
-       url('/static/fonts/SpaceGrotesk-VariableFont_wght.ttf') format('truetype-variations');
-  font-weight: 300 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  /* Glyph subset of the 8.8 MB variable TTF: full kana blocks + every kanji
-     the site (UI strings, album_jp.md, trip config) actually uses — ~120 KB
-     woff2. Japanese text ANYWHERE new? Re-run tools/build_jp_subset.py or
-     the new glyphs render as tofu. */
-  font-family: 'Noto Sans JP';
-  src: local('Noto Sans JP'),
-       url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
-}
-/* Same subset registered again under the two VARIABLE Latin family names,
-   gated to the JP unicode blocks: the browser then composes e.g. JetBrains
-   Mono (Latin) + Noto Sans JP (kana/kanji) per glyph, so the Japanese UI
-   translation renders in Noto without touching any font-family stack.
-   Deliberately NOT registered for the fixed-weight families (Ethnocentric,
-   Chakra Petch): with a single-weight original, Chrome resolves the weight
-   tie to this JP face and then skips to the NEXT family for Latin — the
-   hero title lost Ethnocentric that way. Their texts are HUD/brand chrome
-   (never Japanese), and any JP glyph in their stacks still resolves via
-   the Space Grotesk / JetBrains Mono fallbacks below.
+/* No local('…') anywhere in these faces, on purpose: every local() entry
+   makes the browser search the installed system fonts before it accepts the
+   file, once per face, and on a phone that search was the single largest
+   cost of a page's first layout (measured 2026-09-03: ~1.2 s vs ~0.2 s
+   CPU-throttled, with the album entrance animations waiting on it). Nobody
+   has these faces installed on a phone, and an installed desktop copy of a
+   different version would only make the site render differently anyway. */
+/* ---- text faces: STATIC per-weight woff2 instances ----------------
+   Space Grotesk, JetBrains Mono and the Noto Sans JP glyph subset are
+   variable fonts at source, but the pages load static instances built by
+   tools/build_font_instances.py. Instantiating a variable face is the
+   single most expensive thing in a page's first layout — on a phone it
+   put close to a second of main-thread work under the album entrance
+   animations (measured 2026-09-03; static faces cost nothing there). Each
+   weight is its own file, so a page fetches only the weights it draws.
 
-   The variable families are not immune to that either, which cost the site
-   its mono face for a while: this alias declared `font-weight: 100 900`
-   while the real JetBrains Mono face declares `100 800`. For any requested
-   weight both faces match, Chrome broke the tie towards the wider-ranged JP
-   one, found the Latin codepoints outside its unicode-range, and fell
-   through to the NEXT FAMILY instead of to the sibling face — so every
-   mono label on the site was drawn in Consolas and the .ttf was never even
-   fetched. The weight range of a JP alias must therefore be IDENTICAL to
-   the Latin face it shadows, not merely a superset. If a Latin face's range
-   ever changes, change its alias with it. */
+   Weight RANGES, not points: every face covers its neighbourhood
+   (400 -> 100-450, 500 -> 451-550, 600 -> 551-650, 700 -> 651-900), so a
+   requested weight always lands on exactly one file and never on a
+   synthesised bold. A new weight in the sheet means a new instance in the
+   build script AND a new face here, in every family it applies to.
+
+   The Japanese glyphs work the way they always did: the JP subset is
+   registered under its own name and ALSO aliased under both Latin family
+   names, gated to the JP unicode blocks, so JetBrains Mono (Latin) + Noto
+   Sans JP (kana/kanji) compose per glyph without touching a font stack.
+   The alias's weight range must be IDENTICAL to the Latin face it shadows
+   (Chrome breaks a same-weight tie towards the wider-ranged face and then
+   falls through to the next FAMILY for Latin — that is how the site once
+   lost its mono face), which the shared RANGES table guarantees. The
+   fixed-weight families (Ethnocentric, Chakra Petch) deliberately get no
+   alias: their texts are HUD/brand chrome and never Japanese. */
 @font-face {
   font-family: 'Space Grotesk';
-  src: local('Noto Sans JP'),
-       url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
-  /* Must match the Latin face's range above EXACTLY — see the note below. */
-  font-weight: 300 700;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: local('Noto Sans JP'),
-       url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
-  /* Must match the Latin face's range below EXACTLY — see the note below. */
-  font-weight: 100 800;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: local('JetBrains Mono'),
-       url('/static/fonts/JetBrainsMono-VariableFont_wght.ttf') format('truetype-variations');
-  font-weight: 100 800;
+  src: url('/static/fonts/SpaceGrotesk-400.woff2') format('woff2');
+  font-weight: 100 450;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/SpaceGrotesk-500.woff2') format('woff2');
+  font-weight: 451 550;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/SpaceGrotesk-600.woff2') format('woff2');
+  font-weight: 551 650;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/SpaceGrotesk-700.woff2') format('woff2');
+  font-weight: 651 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
   font-family: 'JetBrains Mono';
-  src: local('JetBrains Mono Italic'),
-       url('/static/fonts/JetBrainsMono-Italic-VariableFont_wght.ttf') format('truetype-variations');
+  src: url('/static/fonts/JetBrainsMono-400.woff2') format('woff2');
+  font-weight: 100 450;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono-500.woff2') format('woff2');
+  font-weight: 451 550;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono-600.woff2') format('woff2');
+  font-weight: 551 650;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono-700.woff2') format('woff2');
+  font-weight: 651 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  /* the one face left variable: italic mono is declared for completeness
+     and never requested by the sheet, so the file is never fetched */
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono-Italic-VariableFont_wght.ttf') format('truetype-variations');
   font-weight: 100 800;
   font-style: italic;
   font-display: swap;
 }
+/* Glyph subset of the 8.8 MB variable TTF: full kana blocks + every kanji
+   the site (UI strings, album_jp.md, trip config) actually uses. Japanese
+   text ANYWHERE new? Re-run tools/build_jp_subset.py (which rebuilds these
+   instances too) or the new glyphs render as tofu. */
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: url('/static/fonts/NotoSansJP-subset-400.woff2') format('woff2');
+  font-weight: 100 450;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: url('/static/fonts/NotoSansJP-subset-500.woff2') format('woff2');
+  font-weight: 451 550;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: url('/static/fonts/NotoSansJP-subset-600.woff2') format('woff2');
+  font-weight: 551 650;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: url('/static/fonts/NotoSansJP-subset-700.woff2') format('woff2');
+  font-weight: 651 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/NotoSansJP-subset-400.woff2') format('woff2');
+  font-weight: 100 450;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/NotoSansJP-subset-500.woff2') format('woff2');
+  font-weight: 451 550;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/NotoSansJP-subset-600.woff2') format('woff2');
+  font-weight: 551 650;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/NotoSansJP-subset-700.woff2') format('woff2');
+  font-weight: 651 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/NotoSansJP-subset-400.woff2') format('woff2');
+  font-weight: 100 450;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/NotoSansJP-subset-500.woff2') format('woff2');
+  font-weight: 451 550;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/NotoSansJP-subset-600.woff2') format('woff2');
+  font-weight: 551 650;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/NotoSansJP-subset-700.woff2') format('woff2');
+  font-weight: 651 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
 @font-face {
   font-family: 'Ethnocentric';
-  src: local('Ethnocentric'),
-       url('/static/fonts/Ethnocentric-Regular.otf') format('opentype');
+  src: url('/static/fonts/Ethnocentric-Regular.otf') format('opentype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Chakra Petch';
-  src: local('Chakra Petch'),
-       url('/static/fonts/ChakraPetch-Regular.ttf') format('truetype');
+  src: url('/static/fonts/ChakraPetch-Regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Chakra Petch';
-  src: local('Chakra Petch Medium'),
-       url('/static/fonts/ChakraPetch-Medium.ttf') format('truetype');
+  src: url('/static/fonts/ChakraPetch-Medium.ttf') format('truetype');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Chakra Petch';
-  src: local('Chakra Petch Bold'),
-       url('/static/fonts/ChakraPetch-Bold.ttf') format('truetype');
+  src: url('/static/fonts/ChakraPetch-Bold.ttf') format('truetype');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -2330,6 +2445,19 @@ section{
   border:1px solid var(--line);
   position:relative;
   transition: border-color .2s, transform .2s ease;
+  /* Off-screen tiles skip style, layout and paint entirely: a 400-photo
+     album laid out ~6700 boxes on every relayout (fonts arriving, an image
+     landing, a class flip), which on a phone blocked the main thread for
+     hundreds of ms right through the entrance animations. Size containment
+     needs the tile to know its own height without its children, so the
+     square ratio sits on the tile itself (content-box: the 1px border
+     stays outside it, exactly the box the link's aspect-ratio produced).
+     No contain-intrinsic-size: the ratio already gives the contained box
+     its height, and a fallback size would win over it and unsquare the
+     tiles (measured: 162px tall in a 147px column). */
+  content-visibility:auto;
+  aspect-ratio:1/1;
+  box-sizing:content-box;
 }
 .image-tile:hover{
   border-color:var(--line-strong);
@@ -5368,18 +5496,25 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease
 }
 
 /* ---- skeleton shimmer: a slow light sweep over a card whose thumbnail
-   is still on its way (app.js keeps img.img-fade on it until load) ---- */
+   is still on its way (app.js keeps img.img-fade on it until load).
+   A positioned overlay moved by transform, so the sweep composites; and
+   only on cards the reveal observer has already brought on screen
+   (.rv-in) — the first version animated background-position on EVERY
+   lazy tile of a 400-photo album at once, which is ~450 main-thread
+   style recalcs and repaints per frame, and was what made the phone
+   stutter through the album entrance. ---- */
 @keyframes shimmer{
-  from{ background-position:130% 0; }
-  to  { background-position:-130% 0; }
+  from{ transform:translate3d(-100%, 0, 0); }
+  to  { transform:translate3d(100%, 0, 0); }
 }
-html.fx-anim .album-card__img:has(> img.img-fade),
-html.fx-anim .feat-card__img:has(> img.img-fade),
-html.fx-anim .image-tile a:has(> img.img-fade){
-  background-image:linear-gradient(100deg,
+html.fx-anim .album-card.rv-in .album-card__img:has(> img.img-fade)::before,
+html.fx-anim .feat-card.rv-in .feat-card__img:has(> img.img-fade)::before,
+html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
+  content:"";
+  position:absolute; inset:0; z-index:1;
+  pointer-events:none;
+  background:linear-gradient(100deg,
     transparent 35%, rgba(255,255,255,.055) 50%, transparent 65%);
-  background-size:260% 100%;
-  background-repeat:no-repeat;
   animation: shimmer 1.4s linear infinite;
 }
 

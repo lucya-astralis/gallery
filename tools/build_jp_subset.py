@@ -1,4 +1,5 @@
-"""Rebuild the Noto Sans JP glyph subset (app/static/fonts/NotoSansJP-subset.woff2).
+"""Rebuild the Noto Sans JP glyph subset (app/static/fonts/NotoSansJP-subset.woff2)
+and its static per-weight instances (NotoSansJP-subset-<w>.woff2).
 
 The site ships a tiny woff2 subset of Noto Sans JP instead of the 8.8 MB
 variable TTF. That means every Japanese glyph the site can ever render must
@@ -99,7 +100,13 @@ def main() -> int:
         return 1
     print(f"ok: {OUT.name} rebuilt, {OUT.stat().st_size / 1024:.1f} KB, "
           f"{len(cmap)} codepoints mapped")
-    return 0
+
+    # the pages render the static per-weight instances of this subset, not
+    # the variable file itself (see tools/build_font_instances.py) — they
+    # have to follow every rebuild or the new glyphs stay tofu on screen
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from build_font_instances import build_jp
+    return build_jp()
 
 
 if __name__ == "__main__":

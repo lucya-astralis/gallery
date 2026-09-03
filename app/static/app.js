@@ -898,7 +898,19 @@ window.__stagePixelIn = () => {
     named = null;
   };
 
+  // Touching e.viewTransition materialises its promises; a transition the
+  // browser then skips (hidden tab, reload, a >4s new page) rejects them
+  // with an AbortError that would otherwise surface as "Uncaught (in
+  // promise)". Skipping is a normal outcome, so they are settled quietly.
+  const hush = (vt) => {
+    if (!vt) return;
+    ['ready', 'updateCallbackDone', 'finished'].forEach((k) => {
+      try { vt[k].catch(() => {}); } catch (err) {}
+    });
+  };
+
   window.addEventListener('pageswap', (e) => {
+    hush(e.viewTransition);
     if (!e.viewTransition || !e.activation) return;
     let to;
     try { to = new URL(e.activation.entry.url); } catch (err) { return; }
@@ -909,6 +921,7 @@ window.__stagePixelIn = () => {
     if (albumOf(here) && isList(to)) name(hero());
   });
   window.addEventListener('pagereveal', (e) => {
+    hush(e.viewTransition);
     if (!e.viewTransition) return;
     let from;
     try { from = new URL(navigation.activation.from.url); } catch (err) { return; }

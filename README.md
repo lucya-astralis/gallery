@@ -204,6 +204,19 @@ python tools/build_jp_subset.py     # needs: pip install fonttools brotli
 The subset always contains the full kana blocks plus every kanji currently
 in use (the script scans the repo), so kana-only edits never need a rebuild.
 
+**Static font instances:** the pages do not load the variable fonts
+directly. Space Grotesk, JetBrains Mono and the JP subset are served as
+static per-weight woff2 files (`SpaceGrotesk-400.woff2`,
+`JetBrainsMono-600.woff2`, `NotoSansJP-subset-700.woff2`, …), because
+instantiating a variable font is the most expensive part of a page's first
+layout — on phones it stalled the album entrance animations. The JP script
+above rebuilds its instances itself; after swapping a Latin variable font
+or adding a weight to the stylesheet, run:
+
+```bash
+python tools/build_font_instances.py
+```
+
 **Logo raster:** the terminal CLI can draw the real logo as a picture (see
 [Terminals](#terminals)), which needs a bitmap. `app/static/logo/lucya_logo.png`
 is rasterised from the SVG on a developer machine, so the container needs no
