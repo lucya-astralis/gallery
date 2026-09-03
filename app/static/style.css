@@ -388,6 +388,14 @@ body > .foot{ flex-shrink:0; }
   transition:opacity .12s ease;
   pointer-events:none;
 }
+/* capable devices de-emphasise by blur rather than by fading alone — the
+   grid stays where it is and goes out of focus while the new one is fetched,
+   which reads as "refreshing" instead of "disappearing" */
+html.fx-anim.is-live-loading [data-live]{
+  opacity:.7;
+  filter:blur(4px) saturate(.6);
+  transition:opacity .16s ease, filter .16s ease;
+}
 @media (prefers-reduced-motion: reduce){
   .is-live-loading [data-live]{ transition:none; }
 }
@@ -2850,11 +2858,20 @@ details[open] > summary::before{ content:"▾ "; }
 }
 
 .stage img.is-preview{ filter: saturate(.92) brightness(.96); }
+/* the original replacing the preview "sharpens" in rather than snapping —
+   the filter eases off over half a second once .is-preview is dropped */
+.stage img{ transition: filter .5s ease; }
 
+/* prev / next in flight: the photo dims and nudges a few px AWAY from the
+   direction of travel (the new one arrives from the other side, see the
+   .is-entering-* rules in the motion layer), the spinner only shows up if
+   the fetch takes longer than 300 ms — a warm neighbour never shows one */
 .stage.is-spa-loading img{
-  opacity:.4;
-  transition: opacity .15s ease;
+  opacity:.45;
+  transition: opacity .18s ease, transform .22s ease;
 }
+html.fx-anim .stage.is-spa-loading.is-leaving-next img{ transform:translate3d(-18px,0,0); }
+html.fx-anim .stage.is-spa-loading.is-leaving-prev img{ transform:translate3d(18px,0,0); }
 .stage.is-spa-loading::after{
   content:"";
   position:absolute;
@@ -2864,7 +2881,7 @@ details[open] > summary::before{ content:"▾ "; }
   border:2px solid rgba(255,255,255,.12);
   border-top-color:var(--acc);
   border-radius:50%;
-  animation: lb-spin .9s linear infinite;
+  animation: lb-spin .9s linear infinite, rv-fade .2s ease .3s backwards;
   z-index:5;
   pointer-events:none;
 }
@@ -5063,9 +5080,36 @@ html.fx-anim img.px-wait{ opacity:0; }
   filter:saturate(.92) brightness(.96);
 }
 
-/* ---- image detail: content fades in on load and after every SPA swap
-   (the .detail node is replaced wholesale, so the animation re-runs) ---- */
-html.fx-anim .detail{ animation: rv-fade .32s ease; }
+/* ---- image detail: on load and after every SPA swap (the .detail node
+   is replaced wholesale, so these re-run) the stage fades up — or slides in
+   from the side you are travelling towards when app.js knows the direction
+   (.is-entering-next / -prev, set by spaLoadImage) — and the loader bar and
+   the sidebar panels rise in one after the other underneath the pixel
+   decode. ---- */
+html.fx-anim .stage{ animation: rv-fade .28s ease; }
+html.fx-anim .stage.is-entering-next{ animation: stage-in-next .38s cubic-bezier(.19,.66,.28,.99); }
+html.fx-anim .stage.is-entering-prev{ animation: stage-in-prev .38s cubic-bezier(.19,.66,.28,.99); }
+@keyframes stage-in-next{
+  from{ opacity:0; transform:translate3d(32px, 0, 0); }
+  to  { opacity:1; transform:translate3d(0, 0, 0); }
+}
+@keyframes stage-in-prev{
+  from{ opacity:0; transform:translate3d(-32px, 0, 0); }
+  to  { opacity:1; transform:translate3d(0, 0, 0); }
+}
+/* the loader is centred by its own translateX, so it gets its own keyframe
+   pair rather than rv-rise (which would replace that transform) */
+@keyframes loader-rise{
+  from{ opacity:0; transform:translateX(-50%) translateY(10px); }
+  to  { opacity:1; transform:translateX(-50%) translateY(0); }
+}
+html.fx-anim .stage__loader{ animation: loader-rise .45s cubic-bezier(.19,.66,.28,.99) .12s backwards; }
+html.fx-anim .sidebar > .panel{ animation: rv-rise .5s cubic-bezier(.19,.66,.28,.99) backwards; }
+html.fx-anim .sidebar > .panel:nth-child(1){ animation-delay:.06s; }
+html.fx-anim .sidebar > .panel:nth-child(2){ animation-delay:.12s; }
+html.fx-anim .sidebar > .panel:nth-child(3){ animation-delay:.18s; }
+html.fx-anim .sidebar > .panel:nth-child(4){ animation-delay:.24s; }
+html.fx-anim .sidebar > .panel:nth-child(n+5){ animation-delay:.30s; }
 
 /* ---- welcome hero build-up (one-shot on load) -----------------------
    The hero IS a camera live view, so it enters the way one wakes up: the
@@ -5151,17 +5195,32 @@ html.fx-anim .vf__actions{ animation: rv-rise .6s cubic-bezier(.19,.66,.28,.99) 
 html.fx-anim .vf__meta   { animation: rv-right .6s cubic-bezier(.19,.66,.28,.99) .90s backwards; }
 html.fx-anim .vf__deck   { animation: rv-fade .7s ease .94s backwards; }
 
-/* ---- lightbox: fade the viewer in, image settles from a hair larger.
-   display:none → flex restarts the animation on every open; navigating
-   inside the viewer swaps only src, so it never re-triggers. ---- */
-html.fx-anim .lightbox:not([hidden]){ animation: rv-fade .22s ease; }
-html.fx-anim .lightbox:not([hidden]) .lightbox__img{
-  animation: lb-img-in .32s cubic-bezier(.19,.66,.28,.99);
+/* ---- lightbox: the viewer's backdrop fades in while the photo GROWS out
+   of the stage into its fullscreen box (FLIP — app.js measures both boxes
+   and sets the inverse transform via CSSOM; .is-flip is only the easing).
+   Closing runs the same move in reverse under .is-closing. Flipping
+   through photos inside the viewer slides the new one in from the side
+   you are going (.lb-slide-*). display:none → flex restarts the backdrop
+   fade on every open. ---- */
+html.fx-anim .lightbox:not([hidden]){ animation: rv-fade .24s ease; }
+/* its own keyframes on purpose: re-using rv-fade with `reverse` would only
+   re-parameterise the (already finished) open animation instead of starting
+   a new one, and the viewer would snap to 0 rather than fade */
+html.fx-anim .lightbox.is-closing{ animation: lb-out .32s ease forwards; pointer-events:none; }
+@keyframes lb-out{
+  from{ opacity:1; }
+  to  { opacity:0; }
 }
-@keyframes lb-img-in{
-  from{ opacity:0; transform:scale(.985); }
-  to  { opacity:1; transform:scale(1); }
+.lightbox__img.is-flip{
+  transition: transform .42s cubic-bezier(.19,.66,.28,.99), opacity .15s ease;
+  will-change:transform;
 }
+html.fx-anim .lightbox__img.lb-slide-next{ animation: stage-in-next .3s cubic-bezier(.19,.66,.28,.99); }
+html.fx-anim .lightbox__img.lb-slide-prev{ animation: stage-in-prev .3s cubic-bezier(.19,.66,.28,.99); }
+/* chrome arrives a beat after the photo has landed */
+html.fx-anim .lightbox:not([hidden]) .lightbox__bar{ animation: rv-rise .35s cubic-bezier(.19,.66,.28,.99) .18s backwards; }
+html.fx-anim .lightbox:not([hidden]) .lightbox__close,
+html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease .22s backwards; }
 
 /* ---- sticky nav: deepen once the page scrolls (class from app.js) ---- */
 .nav{ transition: background .25s ease, box-shadow .25s ease; }
@@ -5224,6 +5283,90 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__img{
 @keyframes tile-return{
   0%, 55%{ opacity:1; }
   100%   { opacity:0; }
+}
+
+/* ================================================================
+   MOTION LAYER II  —  app feel
+   The pieces that make navigating read as one running application rather
+   than a chain of documents: a loading hairline for every navigation, the
+   album cover carrying over into the album's hero, skeleton shimmer while
+   thumbnails arrive, and press feedback on everything tappable. Same gates
+   as the motion layer above: html.fx-anim for the JS-driven pieces, the OS
+   preference for the CSS-only ones. The click-to-open pixel decode of a
+   photo is untouched and stays the one way a photo opens.
+   ================================================================ */
+
+/* ---- navigation progress: a 2px accent hairline along the very top.
+   app.js starts it on any same-origin link click / form submit / SPA
+   fetch and finishes it on arrival; the geometry (scaleX) is driven via
+   CSSOM so a fast page never jumps. Purple because loading IS state. ---- */
+.nav-progress{
+  position:fixed; top:0; left:0; right:0;
+  height:2px;
+  z-index:3000;               /* above the nav (100) and the lightbox (2000) */
+  pointer-events:none;
+  opacity:0;
+  transform:scaleX(0);
+  transform-origin:left center;
+  background:linear-gradient(90deg, var(--acc) 0%, var(--acc-soft) 100%);
+  box-shadow:0 0 10px rgba(var(--acc-rgb),.55);
+}
+
+/* ---- album cover → album hero (cross-document View Transitions).
+   app.js names the card image you leave through and the hero you arrive
+   at `album-cover` (and the reverse on the way back), so the picture
+   travels between the two pages instead of crossfading with the rest.
+   Both snapshots fill the moving box so an aspect change reads as a
+   re-crop, never a stretch. Chromium; ignored elsewhere. ---- */
+@media (prefers-reduced-motion: no-preference){
+  ::view-transition-group(album-cover){
+    animation-duration:.42s;
+    animation-timing-function:cubic-bezier(.19,.66,.28,.99);
+  }
+  ::view-transition-old(album-cover),
+  ::view-transition-new(album-cover){
+    width:100%; height:100%;
+    object-fit:cover;
+    animation-duration:.42s;
+  }
+  /* an unpaired snapshot (the card hides behind a filter, say) just fades
+     with the page instead of lingering after the root crossfade is over */
+  ::view-transition-old(album-cover):only-child,
+  ::view-transition-new(album-cover):only-child{ animation-duration:.14s; }
+}
+
+/* ---- skeleton shimmer: a slow light sweep over a card whose thumbnail
+   is still on its way (app.js keeps img.img-fade on it until load) ---- */
+@keyframes shimmer{
+  from{ background-position:130% 0; }
+  to  { background-position:-130% 0; }
+}
+html.fx-anim .album-card__img:has(> img.img-fade),
+html.fx-anim .feat-card__img:has(> img.img-fade),
+html.fx-anim .image-tile a:has(> img.img-fade){
+  background-image:linear-gradient(100deg,
+    transparent 35%, rgba(255,255,255,.055) 50%, transparent 65%);
+  background-size:260% 100%;
+  background-repeat:no-repeat;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* ---- press feedback: cards and tiles give under the finger, the stage
+   and viewer arrows tighten on press. CSS-only, so behind the OS
+   preference like the other micro-interactions. ---- */
+@media (prefers-reduced-motion: no-preference){
+  .album-card:active,
+  .feat-card:active,
+  .image-tile:active{
+    transform:translateY(0) scale(.985);
+    transition-duration:.08s;
+  }
+  .nav-arrow:active{ transform:translateY(-50%) scale(.94); }
+  .lightbox__nav:active,
+  .lightbox__close:active,
+  .fhero__nav:active,
+  .loader-btn:active,
+  .lightbox__btn:active{ transform:scale(.94); }
 }
 
 /* ================================================================

@@ -129,6 +129,70 @@ if (allowHeavyFx() && 'IntersectionObserver' in window) {
   document.documentElement.classList.add('fx-anim');
 }
 
+// ---------- NAVIGATION PROGRESS --------------------------------
+// A 2px accent hairline along the top edge (.nav-progress) that starts the
+// moment a navigation is asked for and completes when the new content is
+// there — the one cue that says "the click landed" while the next page is
+// on its way. Covers full navigations (any same-origin link or form), the
+// photo-to-photo SPA swap and liveNav() tag/sort swaps. Geometry is set
+// via CSSOM (CSP-safe): done() completes from wherever the bar currently
+// is, so a fast arrival never jumps backwards. Not gated on fx-anim — a
+// loading indicator is feedback, not decoration.
+const navProgress = (() => {
+  const bar = document.createElement('div');
+  bar.className = 'nav-progress';
+  bar.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(bar);
+  let active = false;
+  let failsafe = null;
+  const set = (transition, scale, opacity) => {
+    bar.style.transition = transition;
+    bar.style.transform = 'scaleX(' + scale + ')';
+    bar.style.opacity = String(opacity);
+  };
+  const done = () => {
+    if (!active) return;
+    active = false;
+    if (failsafe) { clearTimeout(failsafe); failsafe = null; }
+    set('transform .18s ease-out, opacity .3s ease .18s', 1, 0);
+  };
+  const start = () => {
+    if (active) return;
+    active = true;
+    set('none', 0, 1);
+    void bar.offsetWidth;                 // flush, so the creep starts from 0
+    set('transform 2.4s cubic-bezier(.1,.8,.3,1), opacity .12s ease', .86, 1);
+    if (failsafe) clearTimeout(failsafe);
+    failsafe = setTimeout(done, 12000);   // a navigation that never happened
+  };
+  const reset = () => {
+    active = false;
+    if (failsafe) { clearTimeout(failsafe); failsafe = null; }
+    set('none', 0, 0);
+  };
+  return { start, done, reset };
+})();
+window.__navProgress = navProgress;
+
+document.addEventListener('click', (e) => {
+  if (e.defaultPrevented || e.button !== 0) return;
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const a = e.target.closest('a[href]');
+  if (!a || a.target || a.hasAttribute('download')) return;
+  let url;
+  try { url = new URL(a.href, location.href); } catch (_) { return; }
+  if (url.origin !== location.origin || !/^https?:$/.test(url.protocol)) return;
+  // a same-document hash jump unloads nothing
+  if (url.hash && url.pathname === location.pathname && url.search === location.search) return;
+  navProgress.start();
+});
+document.addEventListener('submit', (e) => {
+  if (e.defaultPrevented || (e.target && e.target.target)) return;
+  navProgress.start();
+});
+// bfcache restore brings the page back exactly as it left — bar included
+window.addEventListener('pageshow', (e) => { if (e.persisted) navProgress.reset(); });
+
 // ---------- NAV SEARCH PLACEHOLDER -----------------------------
 // The full "SEARCH / ALBUM, FILE, TAG" hint is too long for the narrow field
 // on phones, so swap in the short form there (kept in the data-ph-short attr,
@@ -168,11 +232,19 @@ function readAlbumData() {
 
 // SPA-style navigation between images on the same detail page.
 // Fetches the target page, swaps the per-image sections in place and
-// keeps the URL in sync via pushState. Returns true on success.
-async function spaLoadImage(href) {
+// keeps the URL in sync via pushState. `dir` is +1 for next / -1 for prev
+// and drives the directional slide of the stage (0 = plain fade);
+// `push: false` re-syncs the page to a URL the lightbox already replaced.
+// Returns true on success.
+async function spaLoadImage(href, { dir = 0, push = true } = {}) {
   if (!document.querySelector('.detail')) return false;
   const oldStage = document.querySelector('.stage');
-  if (oldStage) oldStage.classList.add('is-spa-loading');
+  if (oldStage) {
+    oldStage.classList.add('is-spa-loading');
+    if (dir > 0) oldStage.classList.add('is-leaving-next');
+    if (dir < 0) oldStage.classList.add('is-leaving-prev');
+  }
+  navProgress.start();
   let success = false;
   try {
     const resp = await fetch(href, {
@@ -182,6 +254,20 @@ async function spaLoadImage(href) {
     if (!resp.ok) throw new Error('bad status ' + resp.status);
     const html = await resp.text();
     const doc = new DOMParser().parseFromString(html, 'text/html');
+    // Have the next preview decoded BEFORE the swap, so the pixel decode
+    // starts on a finished picture instead of on an empty stage. The
+    // neighbours are pre-warmed, so this is normally instant; a cold file
+    // is capped so a slow one never holds the swap itself hostage.
+    const nextImg = doc.querySelector('#stage-img');
+    const nextSrc = nextImg && nextImg.getAttribute('src');
+    if (nextSrc) {
+      await new Promise((resolve) => {
+        const warm = new Image();
+        const cap = setTimeout(resolve, 1500);
+        warm.onload = warm.onerror = () => { clearTimeout(cap); resolve(); };
+        warm.src = nextSrc;
+      });
+    }
     const selectors = ['.crumb', '.section__doc', '.detail', '#album-data'];
     let swapped = 0;
     selectors.forEach(sel => {
@@ -191,7 +277,13 @@ async function spaLoadImage(href) {
     });
     if (!swapped) throw new Error('nothing swapped');
     document.title = doc.title || document.title;
-    try { history.pushState({ spa: true }, '', href); } catch (e) {}
+    if (push) { try { history.pushState({ spa: true }, '', href); } catch (e) {} }
+    // the fresh stage slides in from the side you are travelling towards
+    // (style.css .is-entering-*); the class stays — the node is replaced
+    // wholesale on the next swap, and dropping it would restart the plain
+    // fade the base rule carries
+    const stage = document.querySelector('.stage');
+    if (stage && dir) stage.classList.add(dir > 0 ? 'is-entering-next' : 'is-entering-prev');
     if (typeof window.__initImagePage === 'function') window.__initImagePage();
     if (typeof window.__lightboxReload === 'function') window.__lightboxReload();
     window.scrollTo(0, 0);
@@ -199,10 +291,11 @@ async function spaLoadImage(href) {
   } catch (e) {
     success = false;
   } finally {
+    navProgress.done();
     if (!success) {
-      // on success the old .stage is replaced so the loading class is gone
+      // on success the old .stage is replaced so the loading classes are gone
       const s = document.querySelector('.stage');
-      if (s) s.classList.remove('is-spa-loading');
+      if (s) s.classList.remove('is-spa-loading', 'is-leaving-next', 'is-leaving-prev');
     }
   }
   return success;
@@ -751,6 +844,81 @@ window.__stagePixelIn = () => {
   if (tile) tile.classList.add('is-returned');
 })();
 
+// ---------- COVER ↔ HERO MORPH (cross-document View Transitions) -----
+// Chromium already crossfades between documents (@view-transition in
+// style.css). This names the two ends of an album navigation `album-cover`
+// so the picture travels instead: leaving a list through an album card
+// names that card's cover, arriving on the album names its hero (the reel
+// frame — or the cover hero, which only renders on phones); going back up
+// runs the same pairing in reverse. A name is set for the one navigation
+// it describes and cleared once the transition is over, so nothing pairs
+// by accident. Photos are deliberately NOT part of this: opening one
+// pixel-decodes (see __stagePixelIn). No-op wherever pageswap /
+// pagereveal do not exist.
+(function coverMorph() {
+  if (!('onpageswap' in window) || !('onpagereveal' in window)) return;
+  if (!window.matchMedia('(prefers-reduced-motion: no-preference)').matches) return;
+  const NAME = 'album-cover';
+  let named = null;
+  const albumOf = (url) => {
+    const m = url.pathname.match(/^\/album\/(.+)$/);
+    if (!m) return null;
+    try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; }
+  };
+  // a page that lists albums as cards: the overview, or an album's folders
+  const isList = (url) => url.pathname === '/albums' || !!albumOf(url);
+  // this page's card for `album`, if it lists one — the cover is the morph end
+  const cardCover = (album) => {
+    if (!album) return null;
+    const links = document.querySelectorAll('.album-card a[href], .feat-card a[href]');
+    for (const a of links) {
+      let u;
+      try { u = new URL(a.href, location.href); } catch (e) { continue; }
+      if (albumOf(u) !== album) continue;
+      const img = a.querySelector('.album-card__img img, .feat-card__img img');
+      if (img) return img;
+    }
+    return null;
+  };
+  // this page's hero (the phone cover hero is display:none on desktop and
+  // therefore never captured — the name on it is simply inert there)
+  const hero = () => document.querySelector('.fhero__frame, .album-hero');
+  const name = (el) => {
+    if (!el) return false;
+    named = el;
+    el.style.viewTransitionName = NAME;
+    return true;
+  };
+  const clear = () => {
+    if (named) named.style.viewTransitionName = '';
+    named = null;
+  };
+
+  window.addEventListener('pageswap', (e) => {
+    if (!e.viewTransition || !e.activation) return;
+    let to;
+    try { to = new URL(e.activation.entry.url); } catch (err) { return; }
+    const here = new URL(location.href);
+    // down into an album this page lists: its card cover is what leaves
+    if (name(cardCover(albumOf(to)))) return;
+    // up out of an album into a list: the hero leaves
+    if (albumOf(here) && isList(to)) name(hero());
+  });
+  window.addEventListener('pagereveal', (e) => {
+    if (!e.viewTransition) return;
+    let from;
+    try { from = new URL(navigation.activation.from.url); } catch (err) { return; }
+    const here = new URL(location.href);
+    // back up on a list that has a card for the album we left: it receives
+    if (name(cardCover(albumOf(from)))) { /* paired */ }
+    // down on an album from a list: the hero receives
+    else if (albumOf(here) && isList(from)) name(hero());
+    e.viewTransition.finished.then(clear, clear);
+  });
+  // a bfcache restore brings the old name back with the page — drop it
+  window.addEventListener('pageshow', (ev) => { if (ev.persisted) clear(); });
+})();
+
 // ---------- FIRST-FRAME STATE (must stay synchronous) ----------
 // Everything that decides what the FIRST rendered frame looks like runs
 // here, inside this script's own task — never on DOMContentLoaded.
@@ -934,7 +1102,7 @@ function initImagePage() {
         ? document.querySelector('.nav-arrow.next')
         : document.querySelector('.nav-arrow.prev');
       if (!link) return;
-      const ok = await spaLoadImage(link.href);
+      const ok = await spaLoadImage(link.href, { dir: dx < 0 ? 1 : -1 });
       if (!ok) location.replace(link.href);
     }, { passive: false });
   }
@@ -944,7 +1112,7 @@ function initImagePage() {
     a.addEventListener('click', async (ev) => {
       if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button === 1) return;
       ev.preventDefault();
-      const ok = await spaLoadImage(a.href);
+      const ok = await spaLoadImage(a.href, { dir: a.classList.contains('next') ? 1 : -1 });
       if (!ok) location.replace(a.href);
     });
   });
@@ -1185,7 +1353,59 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setLoading(on){ lb.classList.toggle('is-loading', !!on); }
 
-  function render(){
+  // ---- FLIP: the photo grows out of the stage on open and shrinks back
+  // into it on close. Both boxes are measured live, the inverse transform
+  // goes on via CSSOM (CSP-safe) and .is-flip supplies the easing. Whenever
+  // it can't be done (fx-lite, no stage photo, the viewer image not laid
+  // out yet because it isn't decoded) the backdrop's plain fade is all
+  // there is — which is exactly what it used to be.
+  const fxAnim = () => document.documentElement.classList.contains('fx-anim');
+  function flipDelta(){
+    const s = document.getElementById('stage-img');
+    if (!s) return null;
+    const from = s.getBoundingClientRect();
+    const to = imgEl.getBoundingClientRect();
+    if (!from.width || !from.height || !to.width || !to.height) return null;
+    return {
+      dx: (from.left + from.width / 2) - (to.left + to.width / 2),
+      dy: (from.top + from.height / 2) - (to.top + to.height / 2),
+      sx: from.width / to.width,
+      sy: from.height / to.height,
+    };
+  }
+  const flipTransform = (d) =>
+    'translate(' + d.dx + 'px, ' + d.dy + 'px) scale(' + d.sx + ', ' + d.sy + ')';
+  function flipIn(){
+    if (!fxAnim()) return;
+    const d = flipDelta();
+    if (!d) return;
+    imgEl.classList.remove('is-flip');
+    imgEl.style.transform = flipTransform(d);
+    void imgEl.offsetWidth;               // commit the start box before easing off it
+    imgEl.classList.add('is-flip');
+    imgEl.style.transform = '';
+    const end = (e) => {
+      if (e && e.propertyName !== 'transform') return;
+      imgEl.classList.remove('is-flip');
+      imgEl.removeEventListener('transitionend', end);
+    };
+    imgEl.addEventListener('transitionend', end);
+    setTimeout(end, 600);
+  }
+  function flipOut(){
+    if (!fxAnim()) return;
+    const d = flipDelta();
+    if (!d) return;
+    imgEl.classList.add('is-flip');
+    void imgEl.offsetWidth;
+    imgEl.style.transform = flipTransform(d);
+  }
+  // in-viewer flips slide the new frame in from the side you are going
+  imgEl.addEventListener('animationend', () => {
+    imgEl.classList.remove('lb-slide-next', 'lb-slide-prev');
+  });
+
+  function render(dir = 0){
     const rel = rels[index];
     const filename = relToFilename(rel);
     // file name only. The album is already named on the page behind the viewer,
@@ -1199,15 +1419,24 @@ document.addEventListener('DOMContentLoaded', () => {
     bar.classList.remove('is-loading-full', 'is-full');
     showingFull = false;
 
-    setLoading(true);
     const next = new Image();
-    next.onload = () => {
+    const show = () => {
       imgEl.src = next.src;
       imgEl.alt = filename;
       setLoading(false);
+      if (dir && fxAnim()) {
+        imgEl.classList.remove('lb-slide-next', 'lb-slide-prev');
+        void imgEl.offsetWidth;
+        imgEl.classList.add(dir > 0 ? 'lb-slide-next' : 'lb-slide-prev');
+      }
     };
+    next.onload = show;
     next.onerror = () => setLoading(false);
     next.src = relToPreview(rel);
+    // a decoded neighbour (they are pre-warmed) goes straight on screen —
+    // no dip through the dimmed loading state for a single frame
+    if (next.complete && next.naturalWidth) { next.onload = null; show(); }
+    else setLoading(true);
 
     if (prevBtn) prevBtn.disabled = (index <= 0);
     if (nextBtn) nextBtn.disabled = (index >= total - 1);
@@ -1226,30 +1455,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const target = index + delta;
     if (target < 0 || target >= total) return;
     index = target;
-    render();
+    render(delta);
     bumpIdle();
   }
 
   function open(){
     if (!lb.hidden) return;
+    lb.classList.remove('is-closing');
+    imgEl.classList.remove('is-flip', 'lb-slide-next', 'lb-slide-prev');
+    imgEl.style.transform = '';
     lb.hidden = false;
     document.body.classList.add('lightbox-open');
     render();
+    flipIn();
     bumpIdle();
   }
 
+  let closing = false;
   function close(){
-    if (lb.hidden) return;
+    if (lb.hidden || closing) return;
+    closing = true;
     cancelIdle();
-    // if user navigated to a different image, reload so the
-    // page metadata (EXIF, tags, breadcrumbs) matches the URL.
+    const finish = () => {
+      closing = false;
+      lb.classList.remove('is-closing');
+      lb.hidden = true;
+      document.body.classList.remove('lightbox-open');
+      setLoading(false);
+      imgEl.classList.remove('is-flip');
+      imgEl.style.transform = '';
+    };
+    // flipped through to another photo: bring the page underneath up to
+    // date in place (the URL was already replaced while flipping) — the
+    // viewer fades while the swap runs. A reload remains the fallback,
+    // which is all this ever did before.
     if (index !== initialIndex){
-      window.location.reload();
+      if (fxAnim()) lb.classList.add('is-closing');
+      const target = location.pathname + location.search;
+      // a warm neighbour swaps in a few ms — hold the viewer for its fade
+      // anyway, so it never blinks out of existence
+      const fade = new Promise((r) => setTimeout(r, fxAnim() ? 320 : 0));
+      (async () => {
+        const ok = typeof window.__spaLoadImage === 'function'
+          ? await window.__spaLoadImage(target, { push: false })
+          : false;
+        if (!ok) { window.location.reload(); return; }
+        await fade;
+        finish();
+      })();
       return;
     }
-    lb.hidden = true;
-    document.body.classList.remove('lightbox-open');
-    setLoading(false);
+    if (!fxAnim()) { finish(); return; }
+    lb.classList.add('is-closing');
+    flipOut();
+    // the backdrop is gone at .32s and the stage photo underneath sits
+    // exactly where the shrinking frame is heading, so the hand-over is
+    // invisible even though the transform itself eases a little longer
+    setTimeout(finish, 340);
   }
 
   // any interaction inside the lightbox keeps the UI alive.
@@ -1673,6 +1935,7 @@ async function liveGo(url, { push = true } = {}) {
   const token = ++liveNavToken;
   const root = document.documentElement;
   root.classList.add('is-live-loading');
+  navProgress.start();
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LIVE_NAV_TIMEOUT_MS);
@@ -1724,6 +1987,7 @@ async function liveGo(url, { push = true } = {}) {
   // Re-wire the behaviours that live inside the swapped markup. Everything
   // else on the page was never touched, so it needs nothing.
   root.classList.remove('is-live-loading');
+  navProgress.done();
   swapped.forEach((el) => {
     initSortMenus(el);
     // Order matters: scrollReveal() hides the tiles behind .rv before
