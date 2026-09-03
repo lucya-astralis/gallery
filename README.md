@@ -5,6 +5,7 @@ A lean, read-only web image gallery with folder-based albums, EXIF display, side
 ## Features
 
 - **Folder = album:** every subfolder in `photos/` is automatically an album. Drop an image in → it appears in the album.
+- **Your name on it:** the wordmark, logo, favicon, operator card, legal links and footer badges all come out of `gallery.cfg`; the assets live in `photos/.gallery/`. Nothing is hard-coded, and an unconfigured gallery calls itself “Gallery” behind a neutral mark.
 - **Fully automatic indexing:** filesystem watcher (local) and/or periodic rescan (for SMB/NFS). No manual buttons in the web UI.
 - **Two-tier images:** `/thumb/...` (480 px) for grids, `/preview/...` (1600 px) for the detail view stage. The original (`/full/...`) only loads when you click *Load original*.
 - **EXIF:** camera, lens, exposure, ISO, focal length, … on the detail page. GPS coordinates are stripped by default (privacy).
@@ -132,6 +133,23 @@ the photo folder is ignored. Nothing inside `.album/` is ever indexed,
 thumbnailed or served as a photo, so a font specimen or reference image can
 sit in there safely. `gallery.cfg` is not part of this: it configures the
 gallery as a whole and stays at the root of `photos/` (see below).
+
+**The `.gallery/` folder** is the same idea one tier up — the gallery's own
+assets rather than one album's — and sits beside `gallery.cfg`:
+
+```
+photos/
+├── gallery.cfg            ← gallery-wide settings
+├── .gallery/
+│   ├── logo.svg           ← the wordmark's mark (`logo =`, `favicon =`)
+│   ├── pfp.webp           ← the operator's portrait (`operator_pfp =`)
+│   └── eu.gif             ← a footer badge (`badges =`)
+└── japan_2026/            ← an album
+```
+
+It is excluded from indexing exactly like `.album/`, so a logo never turns
+up as a photo, and `python -m app.cli export` archives it along with every
+`.album/`.
 
 **Album descriptions** are the per-language markdown files above. Missing
 translations fall back to `album_en.md`, then to a plain `album.md`, then to
@@ -272,6 +290,97 @@ album_order =
 # name_asc, name_desc, count_desc, count_asc)
 album_sort = curated
 ```
+
+#### Branding
+
+The same file carries everything that says whose archive this is. All of it
+is optional; with none of it set the gallery calls itself **Gallery** behind
+a neutral built-in mark, so a fresh deployment never wears someone else's
+name. Files named here live in `photos/.gallery/` and are bare filenames —
+nothing with a slash in it.
+
+```ini
+site_name = lucya.systems          # wordmark, first line, and og:site_name
+site_sub  = gallery                # wordmark, second line
+site_hero = Gallery                # the one big word on the welcome screen
+site_desc = Personal photo archive.   # meta description
+site_desc_de = Persönliches Fotoarchiv.  # (also _en / _jp) wins for its language
+
+logo    = logo.svg                 # the mark beside the wordmark
+favicon = logo.svg                 # unset = the logo doubles as the tab icon
+
+operator     = lucya               # who is behind the archive
+operator_url = https://lucya.sh    # the operator card needs this to appear
+operator_pfp = pfp.webp
+
+privacy_url = https://lucya.sh/privacy   # unset = no such footer link
+imprint_url = https://lucya.sh/privacy   # may point at the same page
+
+badges =                           # classic 88x31 web buttons, `file | label`
+    eu.gif | European Union
+    pride.png | Progress Pride
+```
+
+Notes:
+
+- `operator_url` gates both the footer's operator card and the welcome
+  screen's *about me* button — neither is rendered without somewhere to
+  point. Same for the two legal links: unset means the link is gone, which
+  beats a dead one.
+- URLs must be `http(s)` or site-relative; anything else is dropped rather
+  than written into an `href`.
+- Text values may contain commas (the parser splits on them and the gallery
+  rejoins the parts), but the two halves of a badge line may not.
+- `python -m app.cli doctor` reports a key naming a missing file, a bad URL
+  or a badge that will silently vanish — none of which look like errors in
+  the browser.
+- Japanese branding text is a special case: the shipped Noto Sans JP is a
+  glyph **subset**, and `tools/build_jp_subset.py` scans the cfg files at
+  build time. New kanji in `site_desc_jp` need that re-run and the font
+  redeployed, or they render as tofu.
+
+#### Credit
+
+Who took the photographs, written into the **derived** images' EXIF:
+
+```ini
+credit = lucya      # EXIF Artist/Copyright on thumbnails, previews, fulls
+```
+
+Metadata only — nothing is drawn onto a photograph, and the files under
+`photos/` are never rewritten. It sits alongside the `Software` tag naming
+the gallery software itself, and the two answer different questions: one
+says what made the file, the other whose picture it is. Changing `credit`
+re-derives what it affects on the next request (unrelated edits to
+`gallery.cfg` do not), so it needs no manual purge.
+
+#### What stays with the software
+
+Everything above is the operator's to set. What is *not* configurable is the
+software's own origin: however a deployment is branded, it still says what
+it runs on. That set lives in [`app/brand.py`](app/brand.py), reads no
+config, and reaches a visitor through eight independent channels:
+
+| Where | What it says |
+|---|---|
+| `/humans.txt` | the full colophon — software, version, vendor, and the archive beside it. Linked from every page as `rel="author"` |
+| Footer | *lucya.systems gallery · 6.0*, linked, on every page including 404 |
+| `<meta name="generator">` | `lucya.systems gallery 6.0`, outside the overridable `meta` block |
+| `X-Powered-By` | on **every** response — pages, JSON, stylesheets, and image bytes, including originals served untouched |
+| `/api` | `product`, `product_version`, `vendor`, `vendor_url`, kept separate from the archive's own `name` |
+| EXIF `Software` | written into every derived JPEG — thumbnails, previews, converted fulls |
+| `style.css` / `app.js` | a banner at the top of both files, which an operator serves verbatim |
+| CLI masthead | `python -m app.cli` is the vendor's tool, not the operator's site |
+
+The one place it is deliberately *absent* is the photographs themselves.
+Nothing is ever drawn onto a picture, and the EXIF `Artist`/`Copyright` of a
+derived image carry the operator's `credit`, never the vendor's name —
+resizing an image is not authorship. Attribution lives in the chrome, the
+headers and the file metadata, which is where all eight channels above sit.
+
+None of this is enforcement — anyone holding the source can delete a line.
+It is the set of defaults that makes attribution the path of least
+resistance; a licence is what would actually ask for it.
 
 Rules for the hand-picked welcome list:
 

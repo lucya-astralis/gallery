@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PIL import Image, ExifTags, UnidentifiedImageError
 
-from . import db
+from . import brand, db
 
 log = logging.getLogger("scanner")
 
@@ -21,12 +21,21 @@ GPS_IFD_TAG = 0x8825
 # nothing but photos. Never indexed: a stray image in here is metadata (a
 # font specimen, a screenshot of the cfg), not a gallery photo.
 ALBUM_META_DIR = ".album"
+# The same idea one tier up: the gallery's own assets — its logo, the
+# operator's portrait, the footer badges — live in
+# `photos/.gallery/` (see the site-branding section in main.py). It sits
+# directly in the photos root, so without an exclusion it would be walked as
+# an album named ".gallery" whose "photos" are the logo and the badges.
+GALLERY_META_DIR = ".gallery"
+_META_DIRS = (ALBUM_META_DIR, GALLERY_META_DIR)
 
 
 def is_meta_path(relp: Path) -> bool:
-    """True for a path (relative to photos_dir) inside an album's metadata
-    folder — see ALBUM_META_DIR."""
-    return ALBUM_META_DIR in relp.parts
+    """True for a path (relative to photos_dir) inside a metadata folder —
+    an album's `.album/` or the gallery's own `.gallery/`. Never indexed: an
+    image in either is metadata (a mark, a font specimen, a screenshot of the
+    cfg), not a gallery photo."""
+    return any(d in relp.parts for d in _META_DIRS)
 
 
 # iPhone photos are HEIC; without the plugin they cannot be opened at all,
@@ -226,6 +235,90 @@ def strip_gps_inplace(path: Path) -> bool:
         return False
 
 
+# ----- marks on the derived images --------------------------------------
+# Every JPEG this module writes is a DERIVATIVE — a thumbnail, a preview, or
+# a converted full — generated here, and so carrying no metadata of its own
+# unless it is given some. Two names belong in it:
+#
+#   the vendor's     the EXIF `Software` tag. Unconditional, and the one
+#                    attribution that rides in the served bytes rather than
+#                    in the page around them (app/brand.py).
+#
+#   the operator's   EXIF Artist / Copyright, from gallery.cfg `credit` —
+#                    who took the picture. Never the vendor's name there:
+#                    resizing an image is not authorship.
+#
+# Metadata only. Nothing is drawn onto a photograph, and the originals under
+# photos/ are never rewritten — a JPEG original is still handed out as the
+# bytes on disk (the X-Powered-By header is what names the software on that
+# response).
+#
+# The operator half needs PHOTOS_DIR-level knowledge this module does not
+# have, so main.py installs a reader here at import time (the same shape as
+# control.configure) and every writer below asks it. Nothing had to grow a
+# parameter, which matters: thumbs are written from five places (here, the
+# watcher, the CLI, and both serve routes) and metadata that reached only
+# some of them would be worse than none.
+_credit_source = None
+_mark_stamp = None
+
+
+def configure_marks(credit, stamp) -> None:
+    """Install the callbacks main.py answers with.
+
+    credit() -> str | None   gallery.cfg `credit`, or None when unset
+    stamp()  -> float        when that last changed, so that a derivative
+                             written under the old value counts as stale
+                             (see needs_rebuild) and is rebuilt on demand."""
+    global _credit_source, _mark_stamp
+    _credit_source, _mark_stamp = credit, stamp
+
+
+def _credit() -> str | None:
+    if _credit_source is None:
+        return None
+    try:
+        return _credit_source()
+    except Exception as e:  # a cfg problem must never cost a thumbnail
+        log.warning("credit unreadable: %s: %s", type(e).__name__, e)
+        return None
+
+
+def marks_stamp() -> float:
+    if _mark_stamp is None:
+        return 0.0
+    try:
+        return float(_mark_stamp() or 0.0)
+    except Exception:
+        return 0.0
+
+
+def needs_rebuild(dst: Path, src: Path) -> bool:
+    """Does `dst` need rebuilding? Newer than its source is not quite enough
+    on its own: a `credit` added or changed in gallery.cfg has to invalidate
+    the derivatives written before the edit, and that does not touch the
+    photo's own mtime."""
+    try:
+        if not dst.exists():
+            return True
+        return dst.stat().st_mtime < max(src.stat().st_mtime, marks_stamp())
+    except OSError:
+        return True
+
+
+def _jpeg_exif(credit: str | None) -> bytes:
+    """The EXIF block written into every derivative: which software made it,
+    and — when gallery.cfg names one — who the photo belongs to. The
+    originals keep their own EXIF; these files are generated here and would
+    otherwise carry none at all, so nothing is being overwritten."""
+    exif = Image.Exif()
+    exif[0x0131] = brand.GENERATOR            # Software
+    if credit:
+        exif[0x013B] = credit                 # Artist
+        exif[0x8298] = credit                 # Copyright
+    return exif.tobytes()
+
+
 # Decoding a damaged file throws far more than OSError: PIL's plugins raise
 # SyntaxError ("broken PNG file"), ValueError, struct.error, zlib.error and
 # Image.DecompressionBombError straight out of load(). Every decode path below
@@ -244,7 +337,8 @@ def make_thumbnail(src: Path, dst: Path, size: int) -> bool:
                 img = bg
             elif img.mode != "RGB":
                 img = img.convert("RGB")
-            img.save(dst, "JPEG", quality=82, optimize=True, progressive=True)
+            img.save(dst, "JPEG", quality=82, optimize=True, progressive=True,
+                     exif=_jpeg_exif(_credit()))
         return True
     except Exception as e:
         log.warning("thumb failed for %s: %s: %s", src, type(e).__name__, e)
@@ -261,7 +355,8 @@ def make_full_jpeg(src: Path, dst: Path) -> bool:
                 img = bg
             elif img.mode != "RGB":
                 img = img.convert("RGB")
-            img.save(dst, "JPEG", quality=92, optimize=True, progressive=True)
+            img.save(dst, "JPEG", quality=92, optimize=True, progressive=True,
+                     exif=_jpeg_exif(_credit()))
         return True
     except Exception as e:
         log.warning("full jpeg conversion failed for %s: %s: %s", src, type(e).__name__, e)
@@ -273,7 +368,7 @@ def ensure_full_jpeg(photos_dir: Path, fulls_dir: Path, rel_path: str) -> Path |
     if not src.exists() or not is_image(src):
         return None
     dst = (fulls_dir / rel_path).with_suffix(".jpg")
-    if dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime:
+    if not needs_rebuild(dst, src):
         return dst
     if make_full_jpeg(src, dst):
         return dst
@@ -462,16 +557,15 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         try:
             if index_image(photos_dir, file, force=force):
                 added += 1
-            mtime = file.stat().st_mtime
             thumb_path = (thumbs_dir / rel).with_suffix(".jpg")
-            if force or not thumb_path.exists() or thumb_path.stat().st_mtime < mtime:
+            if force or needs_rebuild(thumb_path, file):
                 if make_thumbnail(file, thumb_path, thumb_size):
                     thumbed += 1
                 else:
                     broken = True
             if previews_dir is not None:
                 preview_path = (previews_dir / rel).with_suffix(".jpg")
-                if force or not preview_path.exists() or preview_path.stat().st_mtime < mtime:
+                if force or needs_rebuild(preview_path, file):
                     if make_thumbnail(file, preview_path, preview_size):
                         previewed += 1
                     else:
@@ -516,7 +610,7 @@ def ensure_thumb(photos_dir: Path, thumbs_dir: Path, rel_path: str, size: int) -
     if not src.exists() or not is_image(src):
         return None
     dst = (thumbs_dir / rel_path).with_suffix(".jpg")
-    if dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime:
+    if not needs_rebuild(dst, src):
         return dst
     if make_thumbnail(src, dst, size):
         return dst

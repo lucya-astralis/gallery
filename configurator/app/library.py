@@ -14,7 +14,8 @@ from pathlib import Path
 from . import schema
 
 # Metadata folders and the junk file managers leave behind.
-_SKIP_DIRS = {schema.ALBUM_META_DIR, "@eaDir", "#recycle", "__pycache__"}
+_SKIP_DIRS = {schema.ALBUM_META_DIR, schema.GALLERY_META_DIR,
+              "@eaDir", "#recycle", "__pycache__"}
 _SKIP_FILES = {".DS_Store", "Thumbs.db", "desktop.ini"}
 
 
@@ -104,6 +105,11 @@ class Library:
 
     def gallery_cfg_path(self) -> Path:
         return self.root / schema.GALLERY_CFG_NAME
+
+    def gallery_meta_dir(self) -> Path:
+        """photos/.gallery/ — where the gallery's own logo, portrait and
+        badges live. The one-tier-up counterpart of meta_dir()."""
+        return self.root / schema.GALLERY_META_DIR
 
     def desc_path(self, album: str, lang: str) -> Path:
         if lang not in schema.LANGS:
@@ -272,6 +278,22 @@ class Library:
         if target.is_file() and is_image(target.name):
             return rel
         return None
+
+    # ----- .gallery assets ------------------------------------------------
+    def brand_assets(self) -> list[dict]:
+        """Files in photos/.gallery/. Unlike an album's assets these are not
+        split by role — which key may use which file is decided by the
+        extension whitelist on that key, not by the file itself."""
+        meta = self.gallery_meta_dir()
+        if not meta.is_dir():
+            return []
+        out: list[dict] = []
+        for entry in sorted(os.scandir(meta), key=lambda e: e.name.lower()):
+            if not entry.is_file() or entry.name in _SKIP_FILES:
+                continue
+            out.append({"name": entry.name, "kinds": ["brand"], "kind": "brand",
+                        "size": entry.stat().st_size})
+        return out
 
     # ----- .album assets --------------------------------------------------
     def assets(self, album: str) -> list[dict]:

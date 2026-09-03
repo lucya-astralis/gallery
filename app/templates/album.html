@@ -3,7 +3,7 @@
    (album.cfg `name = …` per level, else the folder name — see
    _album_display_name). Same everywhere the album is named. #}
 {% set album_label = breadcrumbs | map(attribute='name') | join(' / ') if breadcrumbs else album %}
-{% block title %}{{ album_label }} — lucya.systems gallery{% endblock %}
+{% block title %}{{ album_label }} — {{ brand.title }}{% endblock %}
 {% block body_class %}page-album{% if trip %} trip-{{ trip.key }}{% endif %}{% if album_font_css %} album-font{% endif %}{% endblock %}
 {% block head_extra %}
   {# The album's own title face (album.cfg `font = ...`): a generated sheet
@@ -18,7 +18,7 @@
   {% if album_font_css %}<link rel="stylesheet" href="{{ album_font_css }}">{% endif %}
 {% endblock %}
 {% block meta %}
-  {% set og_title = album_label ~ ' — lucya.systems gallery' %}
+  {% set og_title = album_label ~ ' — ' ~ brand.title %}
   {% set img_count = images | length %}
   {% set og_desc = t('album.og_desc', count=img_count, unit=t('album.og_unit_one' if img_count == 1 else 'album.og_unit_many'), album=album_label) %}
   {# the same cover the album's own hero and its card in every list show:
@@ -27,7 +27,7 @@
      link preview whatever the current sort put first — usually the newest
      photo, and on a ?tag= or ?sort= link something else again. #}
   {% set cover_rel = album_cover or (sub_albums[0].cover if sub_albums else None) %}
-  <meta property="og:site_name" content="lucya.systems gallery">
+  <meta property="og:site_name" content="{{ brand.title }}">
   <meta property="og:title" content="{{ og_title }}">
   <meta property="og:description" content="{{ og_desc }}">
   <meta property="og:type" content="website">

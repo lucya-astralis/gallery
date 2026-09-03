@@ -297,7 +297,20 @@ ALBUM_CFG_KEYS = {
 GALLERY_CFG_KEYS = {"welcome", "welcome_desktop", "welcome_mobile", "album_order", "album_sort",
                     # the site backdrop's treatment: the same two knobs an
                     # album.cfg has, one tier up (an album still overrides)
-                    "wallpaper_tint", "wallpaper_dim"}
+                    "wallpaper_tint", "wallpaper_dim",
+                    # who the archive belongs to — wordmark, mark, operator,
+                    # legal links (main._brand). Files live in photos/.gallery/.
+                    "site_name", "site_sub", "site_hero", "site_desc",
+                    "site_desc_en", "site_desc_de", "site_desc_jp",
+                    "logo", "favicon", "operator", "operator_url",
+                    "operator_pfp", "privacy_url", "imprint_url", "badges",
+                    # EXIF Artist/Copyright on the derived images (main._credit)
+                    "credit"}
+# gallery.cfg keys naming a file in photos/.gallery/. Checked the same way
+# and for the same reason as an album's `icon`: a typo here is silent at
+# runtime — the slot simply falls back or disappears.
+BRAND_ASSET_KEYS = ("logo", "favicon", "operator_pfp")
+BRAND_URL_KEYS = ("operator_url", "privacy_url", "imprint_url")
 # Both files carry the knobs with identical rules, so the range check that
 # reads this lives in one place (_check_wallpaper_knobs).
 WALLPAPER_KNOBS = (("wallpaper_tint", (0.0, 1.0), "0–1 or off"),
@@ -465,7 +478,41 @@ def _check_gallery_cfg() -> list[dict]:
             add("error", "album_sort", f"{val!r} is not one of {', '.join(sorted(allowed))}")
     for level, key, detail in _check_wallpaper_knobs(cfg):
         add(level, key, detail)
+    for level, key, detail in _check_brand(cfg):
+        add(level, key, detail)
     return issues
+
+
+def _check_brand(cfg: dict) -> list[tuple]:
+    """(level, key, detail) for the branding block. Every failure here is
+    silent in the browser — a mistyped logo falls back to the built-in mark,
+    a bad URL drops the link, a badge naming a missing file just vanishes —
+    so this is the only place they surface."""
+    out = []
+    meta = gallery._gallery_meta_dir()
+    for key in BRAND_ASSET_KEYS:
+        name = (gallery._cfg_first(cfg, key) or "").strip()
+        if not name:
+            continue
+        if meta is None:
+            out.append(("error", key, f"{name!r} — there is no photos/{gallery.GALLERY_META_DIR}/ folder"))
+            continue
+        if Path(name).name != name:
+            out.append(("error", key, f"{name!r} must be a bare filename inside {gallery.GALLERY_META_DIR}/"))
+        elif gallery._brand_file(name) is None:
+            types = ", ".join(sorted(gallery.BRAND_ASSET_TYPES))
+            out.append(("error", key, f"{name!r} is not a readable file in {gallery.GALLERY_META_DIR}/ ({types})"))
+    for key in BRAND_URL_KEYS:
+        raw = gallery._cfg_text(cfg, key)
+        if raw and gallery._brand_link(cfg, key) is None:
+            out.append(("error", key, f"{raw!r} is not an http(s) or site-relative URL — the link is dropped"))
+    for badge in cfg.get("badges", [])[:gallery.BRAND_BADGE_MAX]:
+        name = badge.partition("|")[0].strip()
+        if name and gallery._brand_file(name) is None:
+            out.append(("error", "badges", f"{name!r} is not a readable image in {gallery.GALLERY_META_DIR}/ — the badge is skipped"))
+    if len(cfg.get("badges", [])) > gallery.BRAND_BADGE_MAX:
+        out.append(("warn", "badges", f"only the first {gallery.BRAND_BADGE_MAX} are shown"))
+    return out
 
 
 # ----- commands ---------------------------------------------------------
@@ -1385,7 +1432,7 @@ def cmd_gps(args) -> int:
 
     files = [p for p in sorted(base.rglob("*"))
              if p.is_file() and scanner.is_image(p)
-             and scanner.ALBUM_META_DIR not in p.parts]
+             and not scanner.is_meta_path(p.relative_to(gallery.PHOTOS_DIR))]
 
     live = ui.Live("reading EXIF", enabled=not args.json)
     carrying: list[str] = []
@@ -1579,11 +1626,13 @@ def cmd_search(args) -> int:
 
 # ----- export -----------------------------------------------------------
 def cmd_export(args) -> int:
-    """Snapshot every hand-written file: gallery.cfg and each `.album/`.
+    """Snapshot every hand-written file: gallery.cfg, `.gallery/` and each
+    `.album/`.
 
     Photos are deliberately left out — they are the one thing that already is
     the backup. What this captures is the part that cannot be regenerated: the
-    config, the descriptions, the icons and the title fonts.
+    config, the descriptions, the icons and title fonts, and the gallery's own
+    branding assets.
     """
     import tarfile
 
@@ -1592,7 +1641,11 @@ def cmd_export(args) -> int:
     gallery_cfg = root / gallery.GALLERY_CFG_NAME
     if gallery_cfg.is_file():
         members.append((gallery_cfg, gallery.GALLERY_CFG_NAME))
-    for meta in sorted(root.rglob(scanner.ALBUM_META_DIR)):
+    metas = sorted(root.rglob(scanner.ALBUM_META_DIR))
+    brand_dir = root / scanner.GALLERY_META_DIR
+    if brand_dir.is_dir():
+        metas.insert(0, brand_dir)
+    for meta in metas:
         if not meta.is_dir():
             continue
         for path in sorted(meta.rglob("*")):

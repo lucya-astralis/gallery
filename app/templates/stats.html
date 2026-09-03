@@ -5,12 +5,12 @@
    identical without JS. #}
 {% extends "base.html" %}
 {% from "_charts.html" import bars, album_bars, cols, dial, stack, card %}
-{% block title %}{{ t('stats.title') }}{% endblock %}
+{% block title %}{{ t('stats.title', brand=brand.title) }}{% endblock %}
 {% block body_class %}page-stats{% endblock %}
 {% block meta %}
   {% set og_desc = t('stats.og_desc', images=figs.photos, albums=figs.albums) %}
-  <meta property="og:site_name" content="lucya.systems gallery">
-  <meta property="og:title" content="{{ t('stats.slug') }} — lucya.systems / gallery">
+  <meta property="og:site_name" content="{{ brand.title }}">
+  <meta property="og:title" content="{{ t('stats.slug') }} — {{ brand.og_title }}">
   <meta property="og:description" content="{{ og_desc }}">
   <meta property="og:type" content="website">
   <meta property="og:url" content="{{ public_base_url(request) }}{{ request.url.path }}">
@@ -23,7 +23,7 @@
   {% else %}
     <meta name="twitter:card" content="summary">
   {% endif %}
-  <meta name="twitter:title" content="{{ t('stats.slug') }} — lucya.systems / gallery">
+  <meta name="twitter:title" content="{{ t('stats.slug') }} — {{ brand.og_title }}">
   <meta name="twitter:description" content="{{ og_desc }}">
   <meta name="theme-color" content="#000000">
 {% endblock %}

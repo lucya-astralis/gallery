@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Gallery">
+  <!-- The unbranded default mark, used when gallery.cfg names no `logo`.
+       Four viewfinder brackets around a frame — the same HUD idiom the
+       welcome screen draws in .vf__corner, so a gallery that has set no
+       logo of its own still looks like it belongs to this software rather
+       than borrowing the vendor's wordmark. Square corners, one weight,
+       white only: it has to survive being 18px tall in the footer and
+       tinting is the operator's job, not the mark's. -->
+  <g fill="none" stroke="#ffffff" stroke-width="6">
+    <path d="M4 21V4h17"/>
+    <path d="M43 4h17v17"/>
+    <path d="M60 43v17H43"/>
+    <path d="M21 60H4V43"/>
+  </g>
+  <rect x="22" y="25" width="20" height="14" fill="#ffffff"/>
+</svg>

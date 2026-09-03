@@ -25,7 +25,7 @@ from . import cfgio, imagemeta, schema, validate
 from .library import Library, asset_kinds, is_image
 
 # This tool's own release version, reported by /api/meta and shown in the UI.
-APP_VERSION = "1.2"
+APP_VERSION = "2.0"
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BASE_DIR.parent
@@ -219,6 +219,8 @@ def api_meta():
         "font_exts": sorted(schema.FONT_EXTS),
         "wallpaper_exts": sorted(schema.WALLPAPER_EXTS),
         "wallpaper_image_exts": sorted(schema.WALLPAPER_IMAGE_EXTS),
+        "brand_exts": sorted(schema.BRAND_EXTS),
+        "gallery_meta_dir": schema.GALLERY_META_DIR,
         "font_scale_range": list(schema.FONT_SCALE_RANGE),
     }
 
@@ -328,6 +330,8 @@ def api_gallery():
         "raw": cfg_file.text(),
         "issues": validate.check_gallery(lib, values),
         "albums": lib.album_paths(),
+        # what the logo / favicon / portrait pickers can offer
+        "assets": lib.brand_assets(),
     }
 
 
@@ -343,7 +347,8 @@ async def api_gallery_cfg(request: Request):
     cfg_file.save(path)
     values = cfg_file.values()
     return {"ok": True, "values": values, "raw": cfg_file.text(),
-            "issues": validate.check_gallery(lib, values)}
+            "issues": validate.check_gallery(lib, values),
+            "assets": lib.brand_assets()}
 
 
 @app.put("/api/gallery/raw")
@@ -359,7 +364,8 @@ async def api_gallery_raw(request: Request):
     cfg_file.save(path)
     values = cfg_file.values()
     return {"ok": True, "values": values, "raw": cfg_file.text(),
-            "issues": validate.check_gallery(lib, values)}
+            "issues": validate.check_gallery(lib, values),
+            "assets": lib.brand_assets()}
 
 
 # ----- photos -----------------------------------------------------------
@@ -539,18 +545,37 @@ _ASSET_TYPES = {
     ".woff2": "font/woff2",
 }
 _MISSING_TYPES = (schema.ICON_EXTS | schema.FONT_EXTS | schema.WALLPAPER_EXTS
-                  ) - set(_ASSET_TYPES)
+                  | schema.BRAND_EXTS) - set(_ASSET_TYPES)
 assert not _MISSING_TYPES, "no content type for %s" % sorted(_MISSING_TYPES)
 
 
+# Assets live in one of two folders, and every route below takes the same
+# `scope` to say which: an album's own `.album/`, or the gallery-wide
+# `.gallery/` holding the logo, the operator's portrait and the footer
+# badges. `path` is only read in the album scope.
+_SCOPES = ("album", "gallery")
+
+
+def _asset_dir(scope: str, path: str) -> Path:
+    if scope not in _SCOPES:
+        raise HTTPException(400, "scope must be one of %s" % ", ".join(_SCOPES))
+    if scope == "gallery":
+        return lib.gallery_meta_dir()
+    return lib.meta_dir(_album_or_400(path))
+
+
+def _asset_listing(scope: str, path: str) -> list[dict]:
+    return lib.brand_assets() if scope == "gallery" else lib.assets(_album_or_400(path))
+
+
 @app.get("/api/asset")
-def api_asset(path: str, name: str):
-    """Serve one file out of an album's .album/ folder: icon and wallpaper
-    previews, and loading a title font into the UI."""
-    album = _album_or_400(path)
+def api_asset(path: str = "", name: str = "", scope: str = "album"):
+    """Serve one file out of an album's .album/ folder — icon and wallpaper
+    previews, loading a title font into the UI — or out of the gallery's
+    .gallery/, which is where its own mark and badges sit."""
     if Path(name).name != name:
         raise HTTPException(400, "asset names are bare filenames")
-    target = lib.meta_dir(album) / name
+    target = _asset_dir(scope, path) / name
     if not target.is_file():
         raise HTTPException(404, "no such asset")
     ext = target.suffix.lower()
@@ -560,49 +585,53 @@ def api_asset(path: str, name: str):
                         headers={"Cache-Control": "no-cache"})
 
 
-# icons, title fonts and page wallpapers all live side by side in .album/
+# icons, title fonts and page wallpapers all live side by side in .album/;
+# the gallery folder takes marks and badges instead, so the whitelist is a
+# different one and no font can be dropped where a logo goes
 _ASSET_EXTS = schema.ICON_EXTS | schema.FONT_EXTS | schema.WALLPAPER_EXTS
+_SCOPE_EXTS = {"album": _ASSET_EXTS, "gallery": schema.BRAND_EXTS}
 
 
 @app.post("/api/asset")
-async def api_asset_upload(path: str = Form(...), file: UploadFile = File(...)):
+async def api_asset_upload(path: str = Form(""), file: UploadFile = File(...),
+                           scope: str = Form("album")):
     """Drop an icon, a title font or a page wallpaper into an album's
-    .album/ folder."""
+    .album/ folder — or a logo, a portrait or a badge into the gallery's
+    .gallery/."""
     _guard_write()
-    album = _album_or_400(path)
+    meta = _asset_dir(scope, path)
+    accepted = _SCOPE_EXTS[scope]
     name = Path(file.filename or "").name
     ext = Path(name).suffix.lower()
-    if not name or ext not in _ASSET_EXTS:
+    if not name or ext not in accepted:
         raise HTTPException(400, "only %s are accepted"
-                            % ", ".join(sorted(_ASSET_EXTS)))
+                            % ", ".join(sorted(accepted)))
     payload = await file.read(MAX_UPLOAD + 1)
     if len(payload) > MAX_UPLOAD:
         raise HTTPException(413, "file is larger than %d MB" % (MAX_UPLOAD // 1048576))
-    meta = lib.meta_dir(album)
     meta.mkdir(parents=True, exist_ok=True)
     target = meta / name
     _backup(target, "asset")
     target.write_bytes(payload)
-    kinds = asset_kinds(name)
+    kinds = ["brand"] if scope == "gallery" else asset_kinds(name)
     return {"ok": True, "name": name, "kinds": kinds, "kind": kinds[0],
-            "assets": lib.assets(album)}
+            "assets": _asset_listing(scope, path)}
 
 
 @app.delete("/api/asset")
-def api_asset_delete(path: str, name: str):
+def api_asset_delete(path: str = "", name: str = "", scope: str = "album"):
     _guard_write()
-    album = _album_or_400(path)
+    meta = _asset_dir(scope, path)
     if Path(name).name != name:
         raise HTTPException(400, "asset names are bare filenames")
-    ext = Path(name).suffix.lower()
-    if ext not in _ASSET_EXTS:
-        raise HTTPException(400, "only icons, fonts and wallpapers can be deleted here")
-    target = lib.meta_dir(album) / name
+    if Path(name).suffix.lower() not in _SCOPE_EXTS[scope]:
+        raise HTTPException(400, "that is not a file this folder holds")
+    target = meta / name
     if not target.is_file():
         raise HTTPException(404, "no such asset")
     _backup(target, "asset")
     target.unlink()
-    return {"ok": True, "assets": lib.assets(album)}
+    return {"ok": True, "assets": _asset_listing(scope, path)}
 
 
 # ----- whole-gallery check ----------------------------------------------

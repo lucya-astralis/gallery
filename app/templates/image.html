@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}{{ image.filename }} — {{ image.album }} — lucya.systems gallery{% endblock %}
+{% block title %}{{ image.filename }} — {{ image.album }} — {{ brand.title }}{% endblock %}
 {% block body_class %}page-image{% endblock %}
 {% block meta %}
   {% set og_title = image.filename ~ ' — ' ~ image.album %}
-  {% set og_desc = description if description else t('image.og_desc', album=image.album) %}
+  {% set og_desc = description if description else t('image.og_desc', album=image.album, brand=brand.title) %}
   {% set og_image = public_base_url(request) ~ '/preview/' ~ image.rel_path %}
-  <meta property="og:site_name" content="lucya.systems gallery">
+  <meta property="og:site_name" content="{{ brand.title }}">
   <meta property="og:title" content="{{ og_title }}">
   <meta property="og:description" content="{{ og_desc | truncate(200) }}">
   <meta property="og:type" content="article">

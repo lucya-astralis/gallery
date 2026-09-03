@@ -1,5 +1,9 @@
 /* ================================================================
-   IMAGESLUCYA  —  black ground, grey furniture, one purple accent
+   lucya.systems gallery  —  https://lucya.systems
+   The stylesheet, and the design language it carries: black ground,
+   grey furniture, one purple accent. The colours, the wordmark and the
+   logo belong to whoever runs the gallery (gallery.cfg); this file and
+   the software under it do not. See app/brand.py.
    ================================================================ */
 
 @font-face {
@@ -240,7 +244,17 @@
      round (status dot, lightbox buttons) have to opt out on purpose. */
   --radius:     0;
   --nav-h:      60px;
-  --page-pad:   clamp(20px, 2.6vw, 56px);
+  /* The gutter every band on the page holds to — the nav, the sections, the
+     footer and the welcome hero's HUD all read this, which is what keeps the
+     logo, the content and the footer mark on one vertical line.
+
+     Flat 20px, matching the configurator's own header inset (`.nav__inner`
+     there is a plain `padding: 0 20px`), so the two apps sit the same
+     distance off the screen edge at every width. It used to grow with the
+     viewport — clamp(20px, 2.6vw, 56px) — which was invisible on a laptop
+     but pushed the wordmark almost three times as far in on a wide monitor,
+     where the welcome hero runs nearly edge to edge behind it. */
+  --page-pad:   20px;
   --page-max:   2000px;
 }
 
@@ -434,14 +448,25 @@ code{
   text-transform:uppercase;
   color:var(--text);
 }
-/* the app name under the wordmark — the accent, so the gallery and the
-   configurator read as two faces of the same system */
+/* The app name under the wordmark. Face, size and TRACKING are shared with
+   the configurator's header — 9.5px JetBrains Mono at .28em — so the two
+   read as two faces of the same system. What is deliberately not shared is
+   the rendered width: "gallery" is seven characters against
+   "configurator"'s twelve, so the same tracking lands them at different
+   lengths, and that is the correct trade. Holding both to one width would
+   mean different tracking, and `site_sub` is the operator's to set anyway —
+   any width tuned here would only ever be right for one word.
+
+   The colour is a step up from the flat accent: --acc alone is a saturated
+   mid-blue that goes a little muddy against black at this size, so a touch
+   of the soft face is mixed in to lift it. Same idiom the stat charts use,
+   so an album accent still repaints it. */
 .nav__brand .brand-sub{
   font-family:"JetBrains Mono", ui-monospace, monospace;
   font-size:9.5px;
   letter-spacing:.28em;
   text-transform:uppercase;
-  color:var(--acc);
+  color:color-mix(in srgb, var(--acc-soft) 30%, var(--acc));
 }
 .nav__brand .jp{
   font-family:"Noto Sans JP", sans-serif;
@@ -3080,6 +3105,12 @@ body.lightbox-open{ overflow:hidden; }
 .foot__links a:hover{ color:var(--acc); border-bottom-color:var(--acc); }
 .foot__meta{ color:var(--text-ghost); }
 .foot__meta b{ color:var(--text-dim); font-weight:400; }
+/* The product name in there links to the vendor, but this line is a
+   colophon and not a piece of navigation: it keeps the ghost weight of the
+   text around it and only lifts to the hover chrome, so it never competes
+   with the real footer links two cells over. */
+.foot__meta a{ color:inherit; transition: color .15s; }
+.foot__meta a:hover{ color:var(--text-dim); }
 
 /* classic 88x31 web buttons */
 .foot__badges{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
@@ -3091,7 +3122,9 @@ body.lightbox-open{ overflow:hidden; }
   border:1px solid var(--line);
 }
 
-/* operator card — who's behind this; pfp + link to lucya.sh */
+/* Operator card — who's behind this archive: the portrait and link from
+   gallery.cfg (`operator_pfp` / `operator_url`). Rendered only when there
+   is a URL to point at, so this whole block can be absent. */
 .foot__op{
   display:flex; align-items:center; gap:10px;
   padding:5px 14px 5px 6px;
@@ -3122,8 +3155,13 @@ body.lightbox-open{ overflow:hidden; }
 
      [ operator card ]   [EU] [pride]
      ——————————————————————————————————————
-     lucya.systems        lucya.systems gallery · 5.2
+     <site_name>          lucya.systems gallery · 5.2
              Statistiken  Datenschutz  Impressum
+
+   (The left half of each row is the operator's — wordmark, card, badges,
+   all out of gallery.cfg — the version stamp on the right is the
+   software's. Any of the operator's blocks can be missing; the cells are
+   placed by hand, so the rest does not shift when one is.)
 
    (Desktop is untouched — it still runs as one flex row.)
 

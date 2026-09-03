@@ -1,3 +1,7 @@
+/* ================================================================
+   lucya.systems gallery  —  https://lucya.systems
+   ================================================================ */
+
 // ---------- UI LANGUAGE ----------------------------------------
 // The server renders <html lang="en|de|ja"> from the language cookie
 // (selector in the nav); client-side strings pick their translation here.

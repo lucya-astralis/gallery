@@ -1,10 +1,25 @@
 {% extends "base.html" %}
-{% block title %}lucya.systems gallery{% endblock %}
+{% block title %}{{ brand.title }}{% endblock %}
 {% block body_class %}page-welcome{% endblock %}
+{% block head_extra %}
+  {# The hero wordmark is set in Ethnocentric and is the largest thing on the
+     page, so it is the one face worth fetching in parallel with the
+     stylesheet rather than only after it is parsed — the title would
+     otherwise show the fallback for a beat and then reflow as the real face
+     swaps in (font-display: swap), which is very visible at 72px and even
+     more so under the per-letter entrance.
+
+     The href is the bare path, NOT static_url(): a preload only matches the
+     later @font-face request when the two URLs are identical, and a `?v=`
+     cache-buster on one side would download the file twice. Same reason the
+     album title face carries crossorigin — fonts fetch in anonymous-CORS
+     mode, and an uncredentialed preload is what that request matches. #}
+  <link rel="preload" href="/static/fonts/Ethnocentric-Regular.otf" as="font" type="font/otf" crossorigin>
+{% endblock %}
 {% block meta %}
   {% set og_desc = t('welcome.og_desc', images=image_count, albums=album_count) %}
-  <meta property="og:site_name" content="lucya.systems gallery">
-  <meta property="og:title" content="lucya.systems / gallery">
+  <meta property="og:site_name" content="{{ brand.title }}">
+  <meta property="og:title" content="{{ brand.og_title }}">
   <meta property="og:description" content="{{ og_desc }}">
   <meta property="og:type" content="website">
   <meta property="og:url" content="{{ public_base_url(request) }}{{ request.url.path }}">
@@ -17,7 +32,7 @@
   {% else %}
     <meta name="twitter:card" content="summary">
   {% endif %}
-  <meta name="twitter:title" content="lucya.systems / gallery">
+  <meta name="twitter:title" content="{{ brand.og_title }}">
   <meta name="twitter:description" content="{{ og_desc }}">
   <meta name="theme-color" content="#000000">
 {% endblock %}
@@ -33,12 +48,12 @@
    reduced-motion visitor gets the finished word with no reflow and nothing
    to wait for — the spans simply never animate.
    `aria-label` on the <h1> gives the accessible name as one word, so a
-   screen reader is never handed seven separate letters. "Gallery" is a
-   brand string, not UI copy, which is why it is not translated and why
-   splitting it per character is safe. #}
-{% macro hero_title() %}
-  <h1 class="vf__title" aria-label="Gallery">
-    {%- for ch in 'Gallery' -%}
+   screen reader is never handed seven separate letters. The word is a brand
+   string (gallery.cfg `site_hero`), not UI copy, which is why it is not
+   translated and why splitting it per character is safe. #}
+{% macro hero_title(word) %}
+  <h1 class="vf__title" aria-label="{{ word }}">
+    {%- for ch in word -%}
       <span class="vf__title-ch">{{ ch }}</span>
     {%- endfor -%}
   </h1>
@@ -78,14 +93,16 @@
 
     <div class="vf__body">
       <div class="vf__intro">
-        {{ hero_title() }}
+        {{ hero_title(brand.hero) }}
         <p class="vf__lead">{{ t('welcome.lead') }}</p>
         <div class="vf__actions">
           <a href="/albums" class="btn-link btn-link--primary"><i class="fa fa-images" aria-hidden="true"></i>{{ t('welcome.browse') }}<i class="fa fa-arrow-right btn-link__go" aria-hidden="true"></i></a>
           <a href="/image/{{ shuffle[0].rel_path }}" class="btn-link" data-vf-open><i class="fa fa-expand" aria-hidden="true"></i>{{ t('welcome.open_frame') }}</a>
-          <a href="https://lucya.sh" class="btn-link btn-link--about" target="_blank" rel="noopener">
-            <img class="btn-link__pfp" src="{{ static_url('pfp.webp') }}" alt="" width="18" height="18" loading="lazy" decoding="async">{{ t('welcome.about_me') }}<i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i>
-          </a>
+          {% if brand.operator_url %}
+            <a href="{{ brand.operator_url }}" class="btn-link btn-link--about" target="_blank" rel="noopener">
+              {% if brand.pfp %}<img class="btn-link__pfp" src="{{ brand.pfp }}" alt="" width="18" height="18" loading="lazy" decoding="async">{% endif %}{{ t('welcome.about_me') }}<i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i>
+            </a>
+          {% endif %}
         </div>
       </div>
       {# which photo you are looking at, and a way into it #}
@@ -117,7 +134,7 @@
     </div>
     <div class="vf__empty">
       <span class="vf__rec vf__rec--off"><i aria-hidden="true"></i>NO SIGNAL</span>
-      {{ hero_title() }}
+      {{ hero_title(brand.hero) }}
       <div class="empty">
         <p>{{ t('welcome.no_images') }}</p>
         <p class="note">Drop subfolders into <code>photos/</code> — each subfolder becomes an album, and albums can nest (e.g. <code>japan/tokyo</code>).</p>

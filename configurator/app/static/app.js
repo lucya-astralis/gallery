@@ -260,6 +260,13 @@ const ALBUM_GROUPS = [
 ];
 
 const GALLERY_GROUPS = [
+  ['Identity', 'What this archive calls itself. All of it is yours to set; the “powered by” line in the gallery’s footer names the software instead and is not configurable. Leave it all empty and the gallery calls itself “Gallery” behind a neutral mark.',
+    ['site_name', 'site_sub', 'site_hero', 'logo', 'favicon',
+     'site_desc', 'site_desc_en', 'site_desc_de', 'site_desc_jp']],
+  ['Operator & footer', 'The person behind the archive, the legal links, and the badge row. The footer’s operator card and the welcome screen’s “about me” button both need a URL to point at — without one, neither is rendered.',
+    ['operator', 'operator_url', 'operator_pfp', 'privacy_url', 'imprint_url', 'badges']],
+  ['Credit', 'Who took the photographs. Written as EXIF Artist/Copyright into every derived image — metadata only, nothing is drawn on a photo and the originals are never rewritten.',
+    ['credit']],
   ['Welcome hero', 'Which photos cycle on the front page.', ['welcome_desktop', 'welcome_mobile', 'welcome']],
   ['Album list', 'The order and default sort on /albums.', ['album_order', 'album_sort']],
   ['Backdrop', 'How the gallery treats the wallpaper behind every page — its own default one, and any an album brings. An album that sets these itself still wins.',
@@ -293,7 +300,7 @@ function renderPane() {
   pane.innerHTML = '';
 
   const tabs = isGallery
-    ? [['settings', 'Settings'], ['raw', 'Raw file']]
+    ? [['settings', 'Settings'], ['assets', 'Files'], ['raw', 'Raw file']]
     : [['settings', 'Settings'], ['photos', 'Photos & tags'], ['text', 'Description'],
        ['assets', 'Files'], ['raw', 'Raw file']];
   if (!tabs.some(([id]) => id === state.tab)) state.tab = 'settings';
@@ -404,6 +411,7 @@ function buildControl(key, spec) {
     case 'welcome': return welcomeControl(key);
     case 'album_list': return albumOrderControl(key);
     case 'asset': return assetControl(key, spec);
+    case 'brand_asset': return brandAssetControl(key, spec);
     default: return textControl(key);
   }
 }
@@ -847,6 +855,27 @@ const ASSET_KIND = {
   wallpaper: 'wallpaper',
   wallpaper_mobile: 'wallpaper',
 };
+/* Assets live in one of two folders and every /api/asset call says which:
+ * an album's own .album/, or the gallery-wide .gallery/ holding the logo,
+ * the operator's portrait and the footer badges. */
+function assetScope() {
+  return state.sel.kind === 'gallery' ? 'gallery' : 'album';
+}
+
+function assetFolder() {
+  return assetScope() === 'gallery'
+    ? (state.meta.gallery_meta_dir || '.gallery') + '/'
+    : state.sel.album + '/.album/';
+}
+
+function assetQuery(name) {
+  return '/api/asset?name=' + encodeURIComponent(name) +
+         '&scope=' + assetScope() +
+         '&path=' + encodeURIComponent(state.sel.album || '');
+}
+
+/* the gallery.cfg keys that can point at a file in .gallery/ */
+const BRAND_CFG_KEYS = ['logo', 'favicon', 'operator_pfp'];
 /* every cfg key that can point at a file in .album/ — "in use" means one of
  * these names it, and a .png could be named by any of them */
 const ASSET_CFG_KEYS = Object.keys(ASSET_KIND);
@@ -856,6 +885,38 @@ const VIDEO_RE = /\.(mp4|webm)$/i;
  * back to the single `kind` so an older server response still works. */
 function assetIs(asset, role) {
   return asset.kinds ? asset.kinds.includes(role) : asset.kind === role;
+}
+
+/* The .gallery/ counterpart of assetControl. Nothing in that folder has a
+ * role of its own — a .png is a possible logo, a badge and a portrait
+ * — so the offered files are filtered by the key's own extension whitelist
+ * rather than by anything about the file. */
+function brandAssetControl(key, spec) {
+  const current = value(key);
+  const exts = spec.exts || [];
+  const files = (state.data.assets || []).filter(
+    (a) => exts.some((e) => a.name.toLowerCase().endsWith(e)));
+  const box = el('div', { class: 'field__control' });
+
+  box.append(el('select', {
+    disabled: READ_ONLY,
+    onchange: (ev) => setValue(key, ev.target.value || null),
+  },
+    el('option', { value: '', text: '(not set)', selected: !current }),
+    files.map((f) => el('option', { value: f.name, text: f.name, selected: current === f.name })),
+    current && !files.some((f) => f.name === current)
+      ? el('option', { value: current, text: current + '  (missing from .gallery/)', selected: true })
+      : null));
+
+  if (!files.length) {
+    box.append(el('div', { class: 'field__help', text:
+      'Nothing usable in .gallery/ yet — add a file on the “Files” tab. Accepted: ' +
+      exts.join(', ') }));
+  }
+  if (current && files.some((f) => f.name === current)) {
+    box.append(el('img', { class: 'iconpreview', src: assetQuery(current), alt: '' }));
+  }
+  return box;
 }
 
 function assetControl(key, spec) {
@@ -1432,11 +1493,18 @@ function renderDescriptions() {
 
 /* ----- assets tab ------------------------------------------------------- */
 function renderAssets() {
-  const usable = (state.data.assets || []).filter(
-    (a) => ['icon', 'font', 'wallpaper'].some((k) => assetIs(a, k)));
+  const gallery = assetScope() === 'gallery';
+  /* In .gallery/ every file is usable by something, so nothing is filtered
+   * out; in an album only the three roles the gallery reads are. */
+  const usable = gallery
+    ? (state.data.assets || [])
+    : (state.data.assets || []).filter(
+        (a) => ['icon', 'font', 'wallpaper'].some((k) => assetIs(a, k)));
   const list = el('div', { class: 'assets' }, usable.length
     ? usable.map(renderAssetRow)
-    : el('div', { class: 'empty-note', text: 'Nothing in this album’s .album/ folder yet.' }));
+    : el('div', { class: 'empty-note', text: gallery
+        ? 'Nothing in photos/.gallery/ yet — this is where the logo, the operator’s portrait and the footer badges go.'
+        : 'Nothing in this album’s .album/ folder yet.' }));
 
   const input = el('input', {
     type: 'file', class: 'u-hidden',
@@ -1445,8 +1513,11 @@ function renderAssets() {
   const drop = el('div', {
     class: 'dropzone',
     text: READ_ONLY ? 'Read-only — uploads are disabled.'
-      : 'Drop an icon or a title font here, or click to choose. Accepted: ' +
-        state.meta.icon_exts.concat(state.meta.font_exts).join(', '),
+      : gallery
+        ? 'Drop a logo, a portrait or a badge here, or click to choose. Accepted: ' +
+          (state.meta.brand_exts || []).join(', ')
+        : 'Drop an icon or a title font here, or click to choose. Accepted: ' +
+          state.meta.icon_exts.concat(state.meta.font_exts).join(', '),
     onclick: () => { if (!READ_ONLY) input.click(); },
     ondragover: (ev) => { ev.preventDefault(); drop.classList.add('is-over'); },
     ondragleave: () => drop.classList.remove('is-over'),
@@ -1459,7 +1530,8 @@ function renderAssets() {
 
   async function upload(file) {
     const form = new FormData();
-    form.append('path', state.sel.album);
+    form.append('path', state.sel.album || '');
+    form.append('scope', assetScope());
     form.append('file', file);
     try {
       const res = await fetch('/api/asset', { method: 'POST', body: form });
@@ -1467,33 +1539,43 @@ function renderAssets() {
       if (!res.ok) throw new Error(payload.detail || res.statusText);
       state.data.assets = payload.assets;
       renderPane();
-      toast('Uploaded ' + payload.name + ' — now pick it as the album’s ' + payload.kind);
+      toast(gallery
+        ? 'Uploaded ' + payload.name + ' — now point a branding key at it on the Settings tab'
+        : 'Uploaded ' + payload.name + ' — now pick it as the album’s ' + payload.kind);
     } catch (err) {
       toast('Upload failed: ' + err.message, 'err');
     }
   }
 
   return el('div', { class: 'tabpanel' },
-    el('div', { class: 'field__help u-mb' },
-      'Files here live in ' + state.sel.album + '/.album/ next to the album.cfg. ' +
-      'Uploading one does not select it — point `icon`, `font` or one of the ' +
-      'wallpaper keys at it on the Settings tab.'),
+    el('div', { class: 'field__help u-mb' }, gallery
+      ? 'Files here live in photos/.gallery/ next to the gallery.cfg — the gallery-wide ' +
+        'counterpart of an album’s .album/. Uploading one does not select it — point ' +
+        '`logo`, `favicon`, `operator_pfp` or `badges` at it on the Settings tab.'
+      : 'Files here live in ' + state.sel.album + '/.album/ next to the album.cfg. ' +
+        'Uploading one does not select it — point `icon`, `font` or one of the ' +
+        'wallpaper keys at it on the Settings tab.'),
     list, el('div', { class: 'u-gap' }), drop, input);
 }
 
 /* "in use" means: some cfg key points at this file. A wallpaper can be
  * claimed by either of the two keys, so kind alone doesn't answer it. */
 function assetInUse(asset) {
-  return ASSET_CFG_KEYS.some((k) => value(k) === asset.name);
+  const keys = assetScope() === 'gallery' ? BRAND_CFG_KEYS : ASSET_CFG_KEYS;
+  if (keys.some((k) => value(k) === asset.name)) return true;
+  /* a badge is named inside a `file | label` line rather than by a key of
+   * its own, so the badge list has to be read the same way the gallery does */
+  return assetScope() === 'gallery'
+    && (value('badges') || []).some((b) => b.split('|')[0].trim() === asset.name);
 }
 
 function renderAssetRow(asset) {
-  const url = '/api/asset?name=' + encodeURIComponent(asset.name) +
-              '&path=' + encodeURIComponent(state.sel.album);
+  const url = assetQuery(asset.name);
+  const folder = assetFolder();
   return el('div', { class: 'asset' },
     el('div', { class: 'asset__icon' },
       VIDEO_RE.test(asset.name) ? '▶'
-        : (assetIs(asset, 'icon') || assetIs(asset, 'wallpaper'))
+        : (assetScope() === 'gallery' || assetIs(asset, 'icon') || assetIs(asset, 'wallpaper'))
           ? el('img', { src: url, alt: '' })
           : 'Aa'),
     el('span', { class: 'asset__name', text: asset.name }),
@@ -1502,10 +1584,9 @@ function renderAssetRow(asset) {
     READ_ONLY ? null : el('button', {
       class: 'btn btn--sm btn--ghost btn--danger', type: 'button', text: 'Delete',
       onclick: async () => {
-        if (!confirm('Delete ' + asset.name + ' from .album/?')) return;
+        if (!confirm('Delete ' + asset.name + ' from ' + folder + '?')) return;
         try {
-          const payload = await api('/api/asset?name=' + encodeURIComponent(asset.name) +
-            '&path=' + encodeURIComponent(state.sel.album), { method: 'DELETE' });
+          const payload = await api(assetQuery(asset.name), { method: 'DELETE' });
           state.data.assets = payload.assets;
           renderPane();
           toast('Deleted ' + asset.name);

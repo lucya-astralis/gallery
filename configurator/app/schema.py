@@ -22,6 +22,15 @@ WALLPAPER_EXTS = WALLPAPER_IMAGE_EXTS | WALLPAPER_VIDEO_EXTS
 ALBUM_META_DIR = ".album"
 ALBUM_CFG_NAME = "album.cfg"
 GALLERY_CFG_NAME = "gallery.cfg"
+# The gallery's own assets — its logo, the operator's portrait, the footer
+# badges — live in photos/.gallery/, the gallery-wide mirror of
+# an album's .album/ folder.
+GALLERY_META_DIR = ".gallery"
+BRAND_EXTS = {".svg", ".png", ".webp", ".gif", ".jpg", ".jpeg"}
+# how many footer badges the gallery renders
+BADGE_MAX = 6
+# http(s) or site-relative; anything else is dropped rather than put in an href
+URL_KEYS = ("operator_url", "privacy_url", "imprint_url")
 
 LANGS = ["en", "de", "jp"]
 
@@ -89,6 +98,27 @@ KEY_SPEC: dict[str, dict] = {
     "welcome_mobile": {"type": "welcome", "multiline": True},
     "album_order": {"type": "album_list", "multiline": True},
     "album_sort": {"type": "choice", "choices": GALLERY_ALBUM_SORTS},
+    # gallery.cfg — branding. Who the archive belongs to; the software's own
+    # attribution is not configurable and stays in the gallery's footer line.
+    # The text keys are prose, so they are joined the way `name` and `loc`
+    # are: the parser comma-splits every value and a sentence must survive it.
+    "site_name": {"type": "text", "joined": True},
+    "site_sub": {"type": "text", "joined": True},
+    "site_hero": {"type": "text", "joined": True},
+    "site_desc": {"type": "text", "joined": True},
+    "site_desc_en": {"type": "text", "joined": True},
+    "site_desc_de": {"type": "text", "joined": True},
+    "site_desc_jp": {"type": "text", "joined": True},
+    "logo": {"type": "brand_asset", "exts": sorted(BRAND_EXTS)},
+    "favicon": {"type": "brand_asset", "exts": sorted(BRAND_EXTS)},
+    "operator": {"type": "text", "joined": True},
+    "operator_url": {"type": "text", "joined": True},
+    "operator_pfp": {"type": "brand_asset", "exts": sorted(BRAND_EXTS)},
+    "privacy_url": {"type": "text", "joined": True},
+    "imprint_url": {"type": "text", "joined": True},
+    "badges": {"type": "list", "multiline": True},
+    # gallery.cfg — whose photographs these are, in the derived images' EXIF
+    "credit": {"type": "text", "joined": True},
 }
 
 ALBUM_KEYS = ["name", "collection", "showcase", "cover", "featured", "order",
@@ -96,7 +126,14 @@ ALBUM_KEYS = ["name", "collection", "showcase", "cover", "featured", "order",
               "accent", "wallpaper", "wallpaper_mobile", "wallpaper_tint",
               "wallpaper_dim", "loc", "stat", "stats"]
 GALLERY_KEYS = ["welcome", "welcome_desktop", "welcome_mobile", "album_order",
-                "album_sort", "wallpaper_tint", "wallpaper_dim"]
+                "album_sort", "wallpaper_tint", "wallpaper_dim",
+                "site_name", "site_sub", "site_hero", "site_desc",
+                "site_desc_en", "site_desc_de", "site_desc_jp",
+                "logo", "favicon", "operator", "operator_url", "operator_pfp",
+                "privacy_url", "imprint_url", "badges", "credit"]
+# Which branding keys name a file in .gallery/, and what each accepts.
+BRAND_ASSET_KEYS = {"logo": BRAND_EXTS, "favicon": BRAND_EXTS,
+                    "operator_pfp": BRAND_EXTS}
 
 # One-line help shown next to each field in the UI.
 HELP: dict[str, str] = {
@@ -127,6 +164,22 @@ HELP: dict[str, str] = {
     "welcome_mobile": "Welcome hero images on phones (detected via User-Agent).",
     "album_order": "Curated album order. Adds “Curated” to the /albums sort menu and fixes the featured rails. A group header frames the albums under it.",
     "album_sort": "Preselect the sort option on /albums.",
+    "site_name": "The archive's name — first line of the wordmark, and the site name on link previews. Empty leaves the gallery calling itself “Gallery”. Commas are fine here.",
+    "site_sub": "Second line of the wordmark, under the name. Usually what the site is rather than who runs it (“gallery”, “archive”). Empty shows the name alone.",
+    "site_hero": "The one big word on the welcome screen. Empty falls back to the sub-line, then to the name.",
+    "site_desc": "Meta description used on link previews. The per-language keys below win for their own language; with none of them set the gallery's own translated line stands.",
+    "site_desc_en": "English meta description. Overrides the shared one.",
+    "site_desc_de": "German meta description. Overrides the shared one.",
+    "site_desc_jp": "Japanese meta description. Overrides the shared one. Note the gallery ships a glyph SUBSET of its Japanese font — new kanji here need tools/build_jp_subset.py re-run and the font redeployed.",
+    "logo": "The mark beside the wordmark, in the nav and the footer. Lives in .gallery/. Empty means the gallery's own neutral mark.",
+    "favicon": "Browser tab icon. Lives in .gallery/. Empty means the logo doubles as one.",
+    "operator": "Who is behind the archive — the name in the footer's operator card and its “about” link. Empty falls back to the site name.",
+    "operator_url": "Where the operator card and the welcome screen's “about me” button point. Both only appear when this is set. http(s) or site-relative.",
+    "operator_pfp": "The portrait on the operator card. Lives in .gallery/.",
+    "privacy_url": "Footer privacy link. Empty means no such link — better than a dead one. May point at the same page as the imprint.",
+    "imprint_url": "Footer imprint link. Empty means no such link.",
+    "badges": "Classic 88x31 web buttons in the footer, `file | label` per line. The label is the alt text and the tooltip. Files live in .gallery/. No commas in either half — the cfg parser splits on them.",
+    "credit": "Who took the photographs — written as EXIF Artist/Copyright into every derived image (thumbnails, previews, converted fulls). Metadata only: nothing is drawn on a photo and the originals are never rewritten.",
 }
 
 

@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import control, db, i18n, scanner, stats, watcher
+from . import brand, control, db, i18n, scanner, stats, watcher
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 log = logging.getLogger("main")
@@ -53,7 +53,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # Flag-file channel the CLI talks to this process through (app/control.py).
 control.configure(DATA_DIR)
 
-app = FastAPI(title="lucya.systems gallery", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title=brand.PRODUCT, docs_url=None, redoc_url=None, openapi_url=None)
 
 BASE_DIR = Path(__file__).parent
 
@@ -96,6 +96,10 @@ def _i18n_context(request: Request) -> dict:
         "t": partial(i18n.t, lang),
         "month_label": partial(i18n.month_label, lang),
         "date_label": partial(i18n.date_label, lang),
+        # Who this archive belongs to (gallery.cfg — see the site-branding
+        # section). Per request rather than a template global because one of
+        # its values, the meta description, is localized.
+        "brand": _brand(lang),
     }
 
 
@@ -119,10 +123,12 @@ def _static_url(path: str) -> str:
 
 templates.env.globals["static_url"] = _static_url
 
-# The gallery's own release version, shown in the nav and the footer.
-# Distinct from API_VERSION, which versions the JSON API contract.
-APP_VERSION = "5.2"
+APP_VERSION = brand.VERSION
 templates.env.globals["app_version"] = APP_VERSION
+# Who BUILT the gallery. Fixed, config-free, and the counterpart to the
+# per-request `brand` context (the OPERATOR's name, logo and links) that
+# _i18n_context injects — see the site-branding section further down.
+templates.env.globals["vendor"] = brand.CONTEXT
 
 
 def _public_base_url(request: Request) -> str:
@@ -606,6 +612,16 @@ def _cfg_first(cfg: dict[str, list[str]], key: str) -> str | None:
     """First configured value for a scalar key, or None."""
     vals = cfg.get(key)
     return vals[0] if vals else None
+
+
+def _cfg_text(cfg: dict[str, list[str]], key: str) -> str:
+    """A scalar key whose value is PROSE, with the parser's comma split
+    undone. Every value here is comma-split on the way in, which is what
+    list keys want and what a sentence does not: `site_desc = Archive,
+    mostly Japan.` arrives as two values, and taking the first would silently
+    truncate it at the comma. Rejoining reconstructs the line (whitespace
+    around the commas is normalized, which no display string minds)."""
+    return ", ".join(cfg.get(key) or []).strip()
 
 
 def _album_meta_dir(album: str) -> Path | None:
@@ -1383,6 +1399,257 @@ templates.env.globals["site_bg"] = _site_bg
 templates.env.globals["theme_css_url"] = _theme_css_url
 
 
+# ----- site branding (gallery.cfg owns it) ------------------------------
+# The archive's own identity: its wordmark, its mark, the person behind it
+# and where the legal pages live. Every bit of that describes the OPERATOR
+# and none of it describes the software, so it lives in gallery.cfg instead
+# of hard-coded in the templates, where it used to sit as one repeated
+# string:
+#
+#   site_name    = lucya.systems      wordmark, first line
+#   site_sub     = gallery            wordmark, second line
+#   site_hero    = Gallery            the big word on the welcome screen
+#   site_desc    = Personal photo …   meta description (+ _de / _jp)
+#   logo         = logo.svg           the mark beside the wordmark
+#   favicon      = logo.svg           tab icon; unset = the logo
+#   operator     = lucya              who is behind the archive
+#   operator_url = https://lucya.sh   where the "about" links point
+#   operator_pfp = pfp.webp           the face on the footer's operator card
+#   privacy_url  = https://…/privacy  footer link; unset = the link is gone
+#   imprint_url  = https://…/privacy  footer link; unset = the link is gone
+#   badges       = eu.gif | European Union
+#
+# Nothing here falls back to the vendor's own name (app/brand.py): an empty
+# gallery.cfg leaves the site calling itself "Gallery" behind a neutral
+# mark. Falling back to "lucya.systems" would quietly make the vendor the
+# default operator again, which is the exact coupling this replaces. What
+# stays vendor-side is the "powered by" line and the machine-readable
+# generator marks — see app/brand.py for that half.
+#
+# The files sit in photos/.gallery/, the gallery-wide mirror of an album's
+# `.album/` folder, and reach the page through /brand/{slot}: like the
+# album icon and font routes, that reads the filename back OUT of the cfg
+# rather than taking it from the URL, so it can only ever serve a file the
+# cfg actually names.
+# one definition, in scanner, because that is what has to skip the folder
+GALLERY_META_DIR = scanner.GALLERY_META_DIR
+# same set the per-album icon accepts — a mark is a mark
+BRAND_ASSET_TYPES = ALBUM_ICON_TYPES
+# URL slot -> cfg key. Also the whitelist /brand/{slot} validates against,
+# so the route has no notion of a key that isn't one of these three.
+BRAND_SLOTS = {"logo": "logo", "favicon": "favicon", "pfp": "operator_pfp"}
+BRAND_DEFAULT_NAME = "Gallery"
+# the unbranded mark, shipped so a gallery that names no logo still has one
+BRAND_DEFAULT_LOGO = "logo/gallery-mark.svg"
+# `badges = eu.gif | European Union` — the label is what the alt text and
+# the tooltip say. Neither half can contain a comma: _parse_cfg splits list
+# values on them (the same caveat album.cfg `stat` carries).
+BRAND_BADGE_MAX = 6
+
+
+def _gallery_meta_dir() -> Path | None:
+    """photos/.gallery/, or None when the gallery keeps no brand assets."""
+    folder = PHOTOS_DIR / GALLERY_META_DIR
+    return folder if folder.is_dir() else None
+
+
+def _brand_file(name: str) -> Path | None:
+    """A branding filename resolved inside photos/.gallery/, or None.
+
+    Same rules as _album_icon_file: a bare filename only — anything carrying
+    a path separator is refused — and an extension we are willing to serve.
+    A cfg edit therefore can never reach outside that one folder."""
+    folder = _gallery_meta_dir()
+    if folder is None or not name:
+        return None
+    if Path(name).name != name or Path(name).suffix.lower() not in BRAND_ASSET_TYPES:
+        return None
+    path = folder / name
+    return path if path.is_file() else None
+
+
+def _brand_stamp(path: Path) -> int:
+    """Cache-busting stamp for a brand asset: the newer of the file's own
+    mtime and gallery.cfg's. The filename never travels in the URL, so
+    repointing `logo =` at a different file has to invalidate through the
+    cfg's mtime or the browser would keep showing the old mark."""
+    stamps = []
+    for p in (path, PHOTOS_DIR / GALLERY_CFG_NAME):
+        try:
+            stamps.append(int(p.stat().st_mtime))
+        except OSError:
+            pass
+    return max(stamps, default=0)
+
+
+def _brand_asset(slot: str, cfg: dict[str, list[str]]) -> dict | None:
+    """{url, type} for one branding slot, or None when it is not configured
+    (or names a file that isn't there)."""
+    key = BRAND_SLOTS.get(slot)
+    if key is None:
+        return None
+    path = _brand_file((_cfg_first(cfg, key) or "").strip())
+    if path is None:
+        return None
+    return {"url": f"/brand/{slot}?v={_brand_stamp(path)}",
+            "type": BRAND_ASSET_TYPES[path.suffix.lower()]}
+
+
+def _brand_badge_names(cfg: dict[str, list[str]]) -> list[str]:
+    return [raw.partition("|")[0].strip() for raw in cfg.get("badges", [])[:BRAND_BADGE_MAX]]
+
+
+def _brand_badges(cfg: dict[str, list[str]]) -> list[dict]:
+    """The footer's badge row. An entry naming a file that isn't in
+    .gallery/ is dropped rather than rendered broken, and the label after
+    the `|` is optional — without one the filename's stem stands in."""
+    out = []
+    for raw in cfg.get("badges", [])[:BRAND_BADGE_MAX]:
+        name, _, label = raw.partition("|")
+        path = _brand_file(name.strip())
+        if path is None:
+            continue
+        out.append({"url": f"/brand/badge/{len(out)}?v={_brand_stamp(path)}",
+                    "label": label.strip() or path.stem})
+    return out
+
+
+def _brand_badge_file(index: int) -> Path | None:
+    """The badge at position `index` of the RENDERED row, so the index means
+    the same thing in the URL as it did in the page — dropped entries and
+    all. Same guarantee as the other brand routes: the filename comes back
+    out of the cfg, never out of the URL."""
+    cfg = _gallery_config()
+    files = [f for f in (_brand_file(n) for n in _brand_badge_names(cfg)) if f is not None]
+    return files[index] if 0 <= index < len(files) else None
+
+
+# http(s) and site-relative only: these values end up in an href, which is
+# the reason a `javascript:` string from a cfg never gets that far.
+_BRAND_URL = re.compile(r"^(?:https?://[^\s\"'<>]+|/[^\s\"'<>]*)$")
+
+
+def _brand_link(cfg: dict[str, list[str]], key: str) -> str | None:
+    raw = _cfg_text(cfg, key)
+    return raw if raw and _BRAND_URL.match(raw) else None
+
+
+def _brand(lang: str = i18n.DEFAULT_LANG) -> dict:
+    """Everything the chrome needs in order to name the archive, in one dict
+    handed to every template as `brand` (see _i18n_context). Read per
+    request, like every other gallery.cfg reader here, so an edit lands
+    without a restart.
+
+    `desc` is the one localized value, and it resolves through the same
+    three tiers as an album description: `site_desc_de` / `site_desc_jp`
+    win for their own language, `site_desc` is the shared fallback, and with
+    neither set it lands on the translated built-in."""
+    cfg = _gallery_config()
+
+    def txt(key: str) -> str:
+        return _cfg_text(cfg, key)
+
+    name = txt("site_name") or BRAND_DEFAULT_NAME
+    sub = txt("site_sub")
+    logo = _brand_asset("logo", cfg)
+    favicon = _brand_asset("favicon", cfg) or logo
+    if logo is None:
+        logo = {"url": _static_url(BRAND_DEFAULT_LOGO), "type": "image/svg+xml"}
+    if favicon is None:
+        favicon = logo
+    return {
+        "name": name,
+        "sub": sub,
+        # "<name> <sub>" — the <title> suffix and og:site_name
+        "title": f"{name} {sub}".strip(),
+        # "<name> / <sub>" — the headline form the OG/Twitter cards use
+        "og_title": f"{name} / {sub}" if sub else name,
+        # the welcome screen's one big word, falling back through the wordmark
+        "hero": txt("site_hero") or sub or name,
+        "desc": (txt(f"site_desc_{lang}") or txt("site_desc")
+                 or i18n.t(lang, "meta.site_desc")),
+        "logo": logo["url"],
+        "favicon": favicon["url"],
+        "favicon_type": favicon["type"],
+        # `operator` names the person, `operator_url` is where the two
+        # "about" entries point — and having somewhere to point is what
+        # gates both of them, so an archive that names nobody shows neither
+        "operator": txt("operator") or name,
+        "operator_url": _brand_link(cfg, "operator_url"),
+        "pfp": (_brand_asset("pfp", cfg) or {}).get("url"),
+        "privacy_url": _brand_link(cfg, "privacy_url"),
+        "imprint_url": _brand_link(cfg, "imprint_url"),
+        "badges": _brand_badges(cfg),
+    }
+
+
+# ----- credit on the derived images (gallery.cfg owns it) ---------------
+# Every thumbnail, preview and converted full is generated by scanner.py and
+# carries an EXIF block written there: the `Software` tag naming this
+# software (app/brand.py, not configurable), and — when gallery.cfg sets one
+# — Artist/Copyright naming the operator:
+#
+#   credit = lucya      who took the photographs
+#
+# Metadata only: nothing is drawn onto a photograph, and the files under
+# photos/ are never rewritten. The two names answer different questions and
+# neither stands in for the other — the software says what made the file,
+# the credit says whose picture it is.
+#
+# Changing `credit` re-derives what it affects on the next request, through
+# the fingerprint below. Unrelated edits to gallery.cfg do not.
+MARKS_STATE_FILE = "credit.state"
+
+
+def _credit() -> str | None:
+    """gallery.cfg `credit`, or None. Read per request like every other cfg
+    value here; scanner calls this for each derivative it writes."""
+    return _cfg_text(_gallery_config(), "credit") or None
+
+
+def _marks_stamp() -> float:
+    """When `credit` last CHANGED, as an mtime scanner can compare a
+    derivative against.
+
+    Using gallery.cfg's own mtime would have been simpler and wrong: every
+    unrelated edit to it — a welcome image, an album order — would then
+    invalidate all ~800 thumbnails at once. So the resolved value is
+    fingerprinted into a file under DATA_DIR and only a real change to it
+    rewrites that file.
+
+    The first run has nothing to invalidate — there is no earlier setting the
+    files on disk could have been built under — so the record is created
+    backdated to the epoch. Only changes made after that count."""
+    path = DATA_DIR / MARKS_STATE_FILE
+    fingerprint = json.dumps({"credit": _credit()}, sort_keys=True)
+    try:
+        previous = path.read_text(encoding="utf-8")
+    except OSError:
+        previous = None
+    if previous != fingerprint:
+        try:
+            # Written through a temp file: a full scan asks about this once
+            # per derivative and a page render once per thumbnail, so several
+            # threads can arrive at the same moment. A reader catching a
+            # half-written file would see a mismatch and rebuild for nothing.
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(fingerprint, encoding="utf-8")
+            os.replace(tmp, path)
+            if previous is None:
+                os.utime(path, (0, 0))
+        except OSError as e:
+            log.warning("could not record credit state: %s", e)
+            return 0.0
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+# scanner writes every derivative; this is how it learns whose they are
+scanner.configure_marks(_credit, _marks_stamp)
+
+
 # ----- showcase / featured (album.cfg owns it) --------------------------
 # album.cfg is the only source of truth for:
 #   showcase = true|false   -> is this a showcase album? (★ on /albums)
@@ -1622,7 +1889,7 @@ def _fetch_trip_weather(cfg: dict) -> dict:
         "&daily=temperature_2m_max,temperature_2m_min&forecast_days=1"
         "&timezone=Asia%2FTokyo"
     )
-    req = urllib.request.Request(url, headers={"User-Agent": "lucya.systems-gallery"})
+    req = urllib.request.Request(url, headers={"User-Agent": brand.USER_AGENT})
     with urllib.request.urlopen(req, timeout=8) as resp:
         payload = json.load(resp)
     if isinstance(payload, dict):  # single-location responses aren't wrapped
@@ -1944,6 +2211,10 @@ async def security_headers(request: Request, call_next):
         response.headers["Vary"] = f"{vary}, {extra}" if vary else extra
         response.headers.setdefault("Cache-Control", "no-store")
     response.headers.setdefault("Content-Security-Policy", CSP)
+    # Which software served this — the header half of the attribution the
+    # footer carries in words (app/brand.py). Not a security header; it sits
+    # here because this is the one place every response passes through.
+    response.headers.setdefault("X-Powered-By", f"{brand.PRODUCT}/{brand.VERSION}")
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -2201,6 +2472,18 @@ def _safe_rel(album: str, filename: str) -> Path:
 #                                    sets its own still wins. See the per-album
 #                                    theme section above.
 #   wallpaper_dim = .9            -> how bright that backdrop is (off | 0.25–1).
+#   site_name / site_sub / site_hero / site_desc[_de|_jp] / logo / favicon /
+#   operator / operator_url / operator_pfp / privacy_url / imprint_url /
+#   badges                        -> who this archive belongs to: the
+#                                    wordmark, the mark, the person behind it
+#                                    and the footer's legal links. Files sit
+#                                    in photos/.gallery/. See the site-branding
+#                                    section above; what stays with the
+#                                    software rather than the operator is in
+#                                    app/brand.py.
+#   credit                        -> EXIF Artist/Copyright written into every
+#                                    derived image, naming whoever took the
+#                                    photographs. See the credit section above.
 GALLERY_CFG_NAME = "gallery.cfg"
 GALLERY_GROUP_KEYS = frozenset({"album_order"})
 WELCOME_FEED_MAX = 24
@@ -2212,18 +2495,34 @@ _WELCOME_KEYWORDS = {
 _warned_welcome: set[str] = set()
 
 
+_gallery_cfg_cache: tuple[tuple[int, int], dict[str, list[str]]] | None = None
+
+
 def _gallery_config() -> dict[str, list[str]]:
     """Parse photos/gallery.cfg (see _parse_cfg), or {} when there's no such
-    file. Cheap enough to read per request, so edits show up without a
-    restart (matching album.cfg behaviour)."""
+    file. Edits still show up without a restart — the parse is keyed on the
+    file's (mtime, size), so a changed file is re-read and an unchanged one
+    is not. It used to re-parse on every call, which was fine while only
+    page renders asked; the branding and credit readers ask far more often
+    than that, a full scan once per derivative written."""
+    global _gallery_cfg_cache
     cfg_path = PHOTOS_DIR / GALLERY_CFG_NAME
-    if not cfg_path.is_file():
+    try:
+        st = cfg_path.stat()
+    except OSError:
+        _gallery_cfg_cache = None
         return {}
+    key = (int(st.st_mtime), st.st_size)
+    cached = _gallery_cfg_cache
+    if cached is not None and cached[0] == key:
+        return cached[1]
     try:
         text = cfg_path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return {}
-    return _parse_cfg(text, group_keys=GALLERY_GROUP_KEYS)
+    cfg = _parse_cfg(text, group_keys=GALLERY_GROUP_KEYS)
+    _gallery_cfg_cache = (key, cfg)
+    return cfg
 
 
 def _is_mobile_request(request: Request) -> bool:
@@ -2688,7 +2987,13 @@ def api_index(request: Request):
     image_sorts = [SORT_CURATED, SORT_DAYS] + list(SORT_IMAGE_SQL)
     album_sorts = [SORT_CURATED] + list(SORT_ALBUM_SQL)
     return _json_cors({
-        "name": app.title,
+        # the archive's own name, and separately the software serving it —
+        # a client that wants to credit one should not end up citing the other
+        "name": _brand()["title"],
+        "product": brand.PRODUCT,
+        "product_version": brand.VERSION,
+        "vendor": brand.NAME,
+        "vendor_url": brand.URL,
         "version": API_VERSION,
         "base_url": base,
         "languages": list(i18n.LANGS),
@@ -3506,6 +3811,68 @@ def serve_album_icon(album: str):
                         headers={"Cache-Control": "public, max-age=31536000"})
 
 
+@app.get("/humans.txt", response_class=Response)
+def humans_txt(request: Request):
+    """The colophon, at the address the convention reserves for one.
+
+    Everything the site says about itself in the chrome is the operator's
+    (gallery.cfg) and everything it says about the software is fixed
+    (app/brand.py); this is the one page that states both side by side, in
+    plain text, with no styling to strip. It is also the only vendor mark a
+    person can be pointed at rather than having to view source for — which
+    is the whole reason /humans.txt exists as a convention.
+
+    The archive half is skipped where the cfg names nobody: a colophon that
+    invents an operator would be worse than a short one."""
+    brand_ctx = _brand(_request_lang(request))
+    lines = [
+        "/* SOFTWARE */",
+        f"    Name      {brand.PRODUCT}",
+        f"    Version   {brand.VERSION}",
+        f"    Vendor    {brand.NAME}",
+        f"    Site      {brand.URL}",
+        "",
+        "/* ARCHIVE */",
+        f"    Name      {brand_ctx['title']}",
+    ]
+    if brand_ctx["operator"] and brand_ctx["operator"] != brand_ctx["title"]:
+        lines.append(f"    Operator  {brand_ctx['operator']}")
+    if brand_ctx["operator_url"]:
+        lines.append(f"    Site      {brand_ctx['operator_url']}")
+    lines.append(f"    Address   {_public_base_url(request)}")
+    return Response("\n".join(lines) + "\n", media_type="text/plain; charset=utf-8",
+                    headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/brand/badge/{index}")
+def serve_brand_badge(index: int):
+    """One badge of the footer row (gallery.cfg `badges = file | Label`).
+    Indexed rather than named for the same reason the other brand routes
+    exist at all: the filename is read back out of the cfg, so nothing but a
+    file the cfg lists can come out of photos/.gallery/."""
+    path = _brand_badge_file(index)
+    if path is None:
+        raise HTTPException(404, "not found")
+    return FileResponse(str(path), media_type=BRAND_ASSET_TYPES[path.suffix.lower()],
+                        headers={"Cache-Control": "public, max-age=31536000"})
+
+
+@app.get("/brand/{slot}")
+def serve_brand_asset(slot: str):
+    """The gallery's own logo / favicon / operator portrait, as named in
+    gallery.cfg and resolved inside photos/.gallery/. `slot` is matched
+    against BRAND_SLOTS, and the filename never comes from the URL — same
+    contract as /album-icon."""
+    cfg = _gallery_config()
+    if slot not in BRAND_SLOTS:
+        raise HTTPException(404, "not found")
+    path = _brand_file((_cfg_first(cfg, BRAND_SLOTS[slot]) or "").strip())
+    if path is None:
+        raise HTTPException(404, "not found")
+    return FileResponse(str(path), media_type=BRAND_ASSET_TYPES[path.suffix.lower()],
+                        headers={"Cache-Control": "public, max-age=31536000"})
+
+
 @app.get("/album-wallpaper/{variant}/{album:path}")
 def serve_album_wallpaper(variant: str, album: str):
     """The backdrop an album's cfg names in `wallpaper =` / `wallpaper_mobile =`.
@@ -3531,7 +3898,7 @@ def serve_thumb(album: str, filename: str):
     if not src.exists():
         raise HTTPException(404, "not found")
     dst = (THUMBS_DIR / rel).with_suffix(".jpg")
-    if not dst.exists() or dst.stat().st_mtime < src.stat().st_mtime:
+    if scanner.needs_rebuild(dst, src):
         t = scanner.ensure_thumb(PHOTOS_DIR, THUMBS_DIR, rel, THUMB_SIZE)
         if not t:
             raise HTTPException(500, "thumb generation failed")
@@ -3546,7 +3913,7 @@ def serve_preview(album: str, filename: str):
     if not src.exists():
         raise HTTPException(404, "not found")
     dst = (PREVIEWS_DIR / rel).with_suffix(".jpg")
-    if not dst.exists() or dst.stat().st_mtime < src.stat().st_mtime:
+    if scanner.needs_rebuild(dst, src):
         t = scanner.ensure_thumb(PHOTOS_DIR, PREVIEWS_DIR, rel, PREVIEW_SIZE)
         if not t:
             raise HTTPException(500, "preview generation failed")

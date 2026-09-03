@@ -193,6 +193,61 @@ def check_gallery(lib: Library,
                               "curated preset without an `album_order` list"))
 
     out += _check_wallpaper_knobs(cfg)
+    out += _check_brand(lib, cfg)
+
+    return out
+
+
+# http(s) or site-relative — what the gallery is willing to put in an href
+_URL_RE = re.compile(r"^(?:https?://[^\s\"'<>]+|/[^\s\"'<>]*)$")
+
+
+def _check_brand(lib: Library, cfg: dict[str, list[str]]) -> list[dict]:
+    """The branding keys. A mistake here never shows as an error on the site
+    — a mistyped logo falls back to the built-in mark, a bad URL drops the
+    link, a badge naming a missing file just vanishes — so this is the only
+    place it surfaces."""
+    out: list[dict] = []
+    meta = lib.gallery_meta_dir()
+    present = {a["name"] for a in lib.brand_assets()}
+
+    def check_file(key: str, name: str, exts: set) -> None:
+        if Path(name).name != name:
+            out.append(_issue("error", key,
+                              "%r must be a bare filename inside %s/"
+                              % (name, schema.GALLERY_META_DIR)))
+        elif not meta.is_dir():
+            out.append(_issue("error", key, "%r -- there is no %s/ folder yet"
+                              % (name, schema.GALLERY_META_DIR)))
+        elif name not in present:
+            out.append(_issue("error", key, "%r is not in %s/"
+                              % (name, schema.GALLERY_META_DIR)))
+        elif Path(name).suffix.lower() not in exts:
+            out.append(_issue("error", key, "%r is not one of %s"
+                              % (name, ", ".join(sorted(exts)))))
+
+    for key, exts in schema.BRAND_ASSET_KEYS.items():
+        name = (cfgio.first(cfg, key) or "").strip()
+        if name:
+            check_file(key, name, exts)
+
+    for key in schema.URL_KEYS:
+        raw = ", ".join(cfg.get(key) or []).strip()
+        if raw and not _URL_RE.match(raw):
+            out.append(_issue("error", key,
+                              "%r is not an http(s) or site-relative URL -- "
+                              "the link is dropped" % raw))
+
+    badges = cfg.get("badges") or []
+    for badge in badges[:schema.BADGE_MAX]:
+        name = badge.partition("|")[0].strip()
+        if name and name not in present:
+            out.append(_issue("error", "badges",
+                              "%r is not in %s/ -- the badge is skipped"
+                              % (name, schema.GALLERY_META_DIR)))
+    if len(badges) > schema.BADGE_MAX:
+        out.append(_issue("warn", "badges",
+                          "only the first %d are shown" % schema.BADGE_MAX))
 
     return out
 

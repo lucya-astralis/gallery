@@ -41,9 +41,14 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "nav.search_ph_short": ("Search", "Suchen", "検索"),
     "nav.lang_label": ("Language", "Sprache", "言語"),
     "foot.operator": ("Operator", "Operator", "オペレーター"),
-    "foot.about": ("lucya / about me", "lucya / über mich", "lucya / 私について"),
+    # {operator} is gallery.cfg's `operator` — who runs this archive. The
+    # name used to be baked in here, which made the translation table a
+    # branding file; see the site-branding section in main.py.
+    "foot.about": ("{operator} / about me", "{operator} / über mich",
+                   "{operator} / 私について"),
     "foot.privacy": ("Privacy", "Datenschutz", "プライバシー"),
-    # same page as the privacy notice — lucya.sh/privacy carries both
+    # gallery.cfg `privacy_url` / `imprint_url` decide where these point,
+    # and a deployment is free to send both to one combined page
     "foot.imprint": ("Imprint", "Impressum", "運営者情報"),
 
     # ---- breadcrumbs / pathbar ---------------------------------------
@@ -205,9 +210,8 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     # and why the lead says so out loud.
     "stats.slug": ("Statistics", "Statistiken", "統計"),
     "stats.crumb": ("Statistics", "Statistiken", "統計"),
-    "stats.title": ("Statistics — lucya.systems gallery",
-                    "Statistiken — lucya.systems gallery",
-                    "統計 — lucya.systems gallery"),
+    "stats.title": ("Statistics — {brand}", "Statistiken — {brand}",
+                    "統計 — {brand}"),
     "stats.og_desc": (
         "What the archive holds: {images} photos across {albums} albums, charted.",
         "Was das Archiv enthält: {images} Fotos in {albums} Alben, als Diagramme.",
@@ -307,9 +311,9 @@ STRINGS: dict[str, tuple[str, str, str]] = {
 
     # ---- image detail ------------------------------------------------------
     "image.og_desc": (
-        "Photo from album “{album}” · lucya.systems gallery",
-        "Foto aus dem Album „{album}“ · lucya.systems gallery",
-        "アルバム「{album}」の写真 · lucya.systems gallery",
+        "Photo from album “{album}” · {brand}",
+        "Foto aus dem Album „{album}“ · {brand}",
+        "アルバム「{album}」の写真 · {brand}",
     ),
     "kv.album": ("Album", "Album", "アルバム"),
     "kv.filename": ("Filename", "Dateiname", "ファイル名"),

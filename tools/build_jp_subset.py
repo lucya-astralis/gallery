@@ -12,8 +12,14 @@ What goes into the subset:
     kana-only edits never need a rebuild,
   * every CJK ideograph / fullwidth form actually used right now, scanned
     from: photos/**/album*.md (the per-language album descriptions),
-    app/i18n.py (UI strings), app/templates/*.html, app/static/app.js and
-    app/main.py (trip config).
+    photos/**/*.cfg (album names, and the branding block in gallery.cfg —
+    site_name, site_desc_jp and the rest), app/i18n.py (UI strings),
+    app/templates/*.html, app/static/app.js and app/main.py (trip config).
+
+Note the limit this has: the cfg files are RUNTIME data, read per request,
+while the subset is built here. Editing Japanese branding text on a running
+gallery therefore needs this script re-run and the woff2 redeployed — or the
+text kept to kana and punctuation, which are baked in whole.
 
 Only codepoints inside the @font-face unicode-range in style.css
 (U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF) are kept — anything else falls
@@ -48,6 +54,7 @@ def _in_jp_ranges(cp: int) -> bool:
 def collect_text() -> str:
     files: list[Path] = []
     files += sorted((ROOT / "photos").rglob("album*.md"))
+    files += sorted((ROOT / "photos").rglob("*.cfg"))
     files += sorted((ROOT / "app" / "templates").glob("*.html"))
     files += [ROOT / "app" / "i18n.py", ROOT / "app" / "main.py",
               ROOT / "app" / "static" / "app.js"]

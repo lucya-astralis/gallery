@@ -190,12 +190,19 @@ body {
   color: var(--text);
 }
 
+/* The app name under the wordmark, kept in step with the gallery's own nav
+   (.nav__brand .brand-sub there): same face, same 9.5px, same .28em, and
+   now the same colour. This used to be the flat --acc-soft, which read a
+   good deal lighter than the gallery's line and made the two headers look
+   like they belonged to different products. The words underneath differ in
+   length and are allowed to — the tracking is what is shared, not the
+   rendered width. */
 .brand-sub {
   font-family: var(--mono);
   font-size: 9.5px;
   letter-spacing: .28em;
   text-transform: uppercase;
-  color: var(--acc-soft);
+  color: color-mix(in srgb, var(--acc-soft) 30%, var(--acc));
 }
 
 .brand-jp {
