@@ -36,12 +36,24 @@
    tie to this JP face and then skips to the NEXT family for Latin — the
    hero title lost Ethnocentric that way. Their texts are HUD/brand chrome
    (never Japanese), and any JP glyph in their stacks still resolves via
-   the Space Grotesk / JetBrains Mono fallbacks below. */
+   the Space Grotesk / JetBrains Mono fallbacks below.
+
+   The variable families are not immune to that either, which cost the site
+   its mono face for a while: this alias declared `font-weight: 100 900`
+   while the real JetBrains Mono face declares `100 800`. For any requested
+   weight both faces match, Chrome broke the tie towards the wider-ranged JP
+   one, found the Latin codepoints outside its unicode-range, and fell
+   through to the NEXT FAMILY instead of to the sibling face — so every
+   mono label on the site was drawn in Consolas and the .ttf was never even
+   fetched. The weight range of a JP alias must therefore be IDENTICAL to
+   the Latin face it shadows, not merely a superset. If a Latin face's range
+   ever changes, change its alias with it. */
 @font-face {
   font-family: 'Space Grotesk';
   src: local('Noto Sans JP'),
        url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
-  font-weight: 100 900;
+  /* Must match the Latin face's range above EXACTLY — see the note below. */
+  font-weight: 300 700;
   font-style: normal;
   font-display: swap;
   unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
@@ -50,7 +62,8 @@
   font-family: 'JetBrains Mono';
   src: local('Noto Sans JP'),
        url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
-  font-weight: 100 900;
+  /* Must match the Latin face's range below EXACTLY — see the note below. */
+  font-weight: 100 800;
   font-style: normal;
   font-display: swap;
   unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
@@ -244,6 +257,14 @@
      round (status dot, lightbox buttons) have to opt out on purpose. */
   --radius:     0;
   --nav-h:      60px;
+  /* The mono face, spelled once. Every label, readout and HUD string on the
+     site reads this, and it is character-for-character the configurator's
+     own --mono so the two apps can never drift apart again. The tail past
+     the webfont matters more than it looks: while JetBrains Mono is loading
+     - or, as happened once, silently failing to load at all - this is what
+     is actually on screen, and `monospace` alone resolves to a face some 6
+     percent narrower than `ui-monospace` does. */
+  --mono:       "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   /* The gutter every band on the page holds to — the nav, the sections, the
      footer and the welcome hero's HUD all read this, which is what keeps the
      logo, the content and the footer mark on one vertical line.
@@ -376,13 +397,13 @@ a:hover{ color:var(--acc); }
 
 img{ user-select:none; -webkit-user-drag:none; }
 
-.mono{ font-family:"JetBrains Mono", ui-monospace, monospace; letter-spacing:0; }
+.mono{ font-family:var(--mono); letter-spacing:0; }
 .jp  { font-family:"Noto Sans JP", "Space Grotesk", sans-serif; }
 .dim { color:var(--text-dim); }
 .small{ font-size:12px; }
 
 code{
-  font-family:"JetBrains Mono", ui-monospace, monospace;
+  font-family:var(--mono);
   font-size:.88em;
   background:rgba(255,255,255,.05);
   border:1px solid var(--line);
@@ -462,7 +483,7 @@ code{
    of the soft face is mixed in to lift it. Same idiom the stat charts use,
    so an album accent still repaints it. */
 .nav__brand .brand-sub{
-  font-family:"JetBrains Mono", ui-monospace, monospace;
+  font-family:var(--mono);
   font-size:9.5px;
   letter-spacing:.28em;
   text-transform:uppercase;
@@ -507,7 +528,7 @@ code{
   background:transparent;
   border:0; outline:0;
   color:var(--text);
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:12px;
   letter-spacing:.08em;
   padding:9px 0;
@@ -516,7 +537,7 @@ code{
 
 .nav__status{
   display:flex; align-items:center; gap:8px;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:11px;
   letter-spacing:.16em;
   text-transform:uppercase;
@@ -539,7 +560,7 @@ code{
    instead of loose text links hanging off a divider. */
 .nav__lang{
   display:flex; align-items:center; gap:2px;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:11px;
   letter-spacing:.12em;
   padding:3px;
@@ -593,7 +614,7 @@ section{
   align-items:baseline;
   gap:5px 18px;
   margin:0 0 18px;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10.5px;
   letter-spacing:.18em;
   text-transform:uppercase;
@@ -668,7 +689,7 @@ section{
 .section__slug .section__parent{
   display:none; align-items:center; gap:6px;
   align-self:center;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:13px;
   letter-spacing:.04em;
   color:var(--text-dim);
@@ -972,7 +993,7 @@ section{
   margin-bottom:18px;
 }
 .tag{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10.5px;
   letter-spacing:.16em;
   text-transform:uppercase;
@@ -1284,7 +1305,7 @@ section{
   position:absolute;
   top:8px; right:8px;
   z-index:3;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9px;
   letter-spacing:.22em;
   text-transform:uppercase;
@@ -1390,7 +1411,7 @@ section{
   -webkit-backdrop-filter:var(--glass-blur);
   border:1px solid var(--line);
   color:var(--text-dim);
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10.5px;
   letter-spacing:.18em;
   text-transform:uppercase;
@@ -1432,7 +1453,7 @@ section{
 .sort__menu[hidden]{ display:none; }
 .sort__head{
   padding:8px 14px 6px;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9.5px;
   letter-spacing:.24em;
   text-transform:uppercase;
@@ -1443,7 +1464,7 @@ section{
 .sort__option{
   display:flex; align-items:center; gap:8px;
   padding:9px 14px;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:11px;
   letter-spacing:.14em;
   text-transform:uppercase;
@@ -1539,7 +1560,7 @@ section{
    hands off to the chrome instead of switching typeface halfway down. */
 .section__stat{
   margin:9px 0 0;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10.5px;
   letter-spacing:.2em;
   text-transform:uppercase;
@@ -1566,7 +1587,7 @@ section{
   margin-bottom:13px;
   padding-bottom:8px;
   border-bottom:1px solid var(--line);
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10.5px;
   letter-spacing:.22em;
   text-transform:uppercase;
@@ -1652,7 +1673,7 @@ section{
   position:absolute;
   top:10px; left:10px;
   z-index:3;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9px;
   letter-spacing:.2em;
   color:var(--text);
@@ -1680,7 +1701,7 @@ section{
   text-shadow:0 1px 10px rgba(0,0,0,.6);
 }
 .feat-card__meta{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10px;
   letter-spacing:.18em;
   text-transform:uppercase;
@@ -1688,7 +1709,7 @@ section{
   text-shadow:0 1px 6px rgba(0,0,0,.7);
 }
 .feat-card__cta{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9.5px;
   letter-spacing:.22em;
   text-transform:uppercase;
@@ -1740,7 +1761,7 @@ section{
   margin-bottom:13px;
   padding-bottom:8px;
   border-bottom:1px solid var(--line);
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10.5px;
   letter-spacing:.22em;
   text-transform:uppercase;
@@ -1830,7 +1851,7 @@ section{
   position:absolute;
   top:8px; left:8px;
   z-index:3;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9px;
   letter-spacing:.18em;
   color:var(--text-dim);
@@ -1852,7 +1873,7 @@ section{
   pointer-events:none;
 }
 .album-card__hover span{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10px;
   letter-spacing:.28em;
   text-transform:uppercase;
@@ -1878,7 +1899,7 @@ section{
     var(--bg-2);
   display:flex; align-items:center; justify-content:center;
   color:var(--text-ghost);
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:11px;
   letter-spacing:.22em;
   text-transform:uppercase;
@@ -1899,7 +1920,7 @@ section{
 .album-card__meta{
   display:flex; align-items:baseline; gap:10px;
   justify-content:space-between;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10px;
   letter-spacing:.16em;
   color:var(--text-dim);
@@ -1932,7 +1953,7 @@ section{
   display:flex; align-items:baseline; gap:12px;
   margin-bottom:12px; padding-bottom:8px;
   border-bottom:1px solid var(--line);
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   text-transform:uppercase;
 }
 .sub-albums__head--photos{ margin-top:30px; }
@@ -1981,7 +2002,7 @@ section{
   margin-bottom:12px;
   padding-bottom:8px;
   border-bottom:1px solid var(--line);
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   text-transform:uppercase;
 }
 .album-group__name{
@@ -2161,9 +2182,9 @@ section{
 .album-desc__body ol{ margin:.6em 0; padding-left:1.35em; }
 .album-desc__body li{ margin:.28em 0; }
 .album-desc__body ul li::marker{ color:var(--acc); }
-.album-desc__body ol li::marker{ color:var(--acc); font-family:"JetBrains Mono", monospace; }
+.album-desc__body ol li::marker{ color:var(--acc); font-family:var(--mono); }
 .album-desc__body code{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:.86em;
   background:rgba(255,255,255,.05);
   border:1px solid var(--line);
@@ -2348,7 +2369,7 @@ section{
   pointer-events:none;
 }
 .image-tile__overlay span{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9.5px;
   letter-spacing:.18em;
   text-transform:uppercase;
@@ -2539,7 +2560,7 @@ details[open] > summary::before{ content:"▾ "; }
   background:rgba(0,0,0,.4);
   border:1px solid var(--line);
   padding:10px 12px;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:11px;
   line-height:1.5;
   max-height:340px;
@@ -3371,7 +3392,7 @@ body.page-welcome{ --page-max: 2400px; }
   margin:0 auto;
   padding:20px var(--page-pad) 0;
   display:flex; align-items:center; gap:16px;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10px;
   letter-spacing:.2em;
   text-transform:uppercase;
@@ -3544,7 +3565,7 @@ body.page-welcome{ --page-max: 2400px; }
   background:var(--glass-hi);
 }
 .vf__meta-key{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9px;
   letter-spacing:.3em;
   text-transform:uppercase;
@@ -3558,7 +3579,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 
 .vf__auto{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9.5px;
   letter-spacing:.2em;
   text-transform:uppercase;
@@ -3710,14 +3731,14 @@ body.page-welcome{ --page-max: 2400px; }
    competing with the hero title above */
 .arc__label{
   margin:0;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10.5px; font-weight:400;
   letter-spacing:.18em; text-transform:uppercase;
   color:var(--text-dim);
 }
 .arc__more{
   display:inline-flex; align-items:center;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
   color:var(--acc);
   border-bottom:1px solid rgba(var(--acc-rgb),.35);
@@ -3758,7 +3779,7 @@ body.page-welcome{ --page-max: 2400px; }
   background:var(--bg-2);
 }
 .arc__key{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
   color:var(--text-dim);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
@@ -3914,7 +3935,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .st-card__title{
   margin:0;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:11px; font-weight:400;
   letter-spacing:.24em; text-transform:uppercase;
   color:var(--label);
@@ -3947,7 +3968,7 @@ body.page-welcome{ --page-max: 2400px; }
 .st-card__body > *{ width:100%; }
 .st-foot{
   margin:20px 0 0;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10px; letter-spacing:.14em; text-transform:uppercase;
   color:var(--text-dim);
 }
@@ -3987,7 +4008,7 @@ body.page-welcome{ --page-max: 2400px; }
    magnitude ramp further down this section) */
 .ch-bar.is-peak .ch-bar__label{ color:var(--text); }
 .ch-bar__val{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:11.5px; letter-spacing:.06em;
   color:var(--text);
   font-variant-numeric:tabular-nums;
@@ -4009,7 +4030,7 @@ body.page-welcome{ --page-max: 2400px; }
   display:flex; flex-direction:column; align-items:stretch; gap:5px;
 }
 .ch-col__n{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9.5px; letter-spacing:.04em;
   color:var(--text-dim);
   font-variant-numeric:tabular-nums;
@@ -4032,7 +4053,7 @@ body.page-welcome{ --page-max: 2400px; }
 .ch-col.is-zero .ch-col__n{ color:var(--text-ghost); }
 .ch-col__label,
 .ch-col__tick{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9.5px; letter-spacing:.08em; text-transform:uppercase;
   text-align:center;
   white-space:nowrap;
@@ -4115,7 +4136,7 @@ body.page-welcome{ --page-max: 2400px; }
 .ch-dial__spoke.is-b3{ stroke:color-mix(in srgb, var(--acc-soft) 50%, var(--acc)); }
 .ch-dial__spoke.is-peak{ stroke:var(--acc-soft); }
 .ch-dial__tick{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:11px; letter-spacing:.08em;
   fill:var(--text-dim);
 }
@@ -4126,7 +4147,7 @@ body.page-welcome{ --page-max: 2400px; }
   fill:var(--text);
 }
 .ch-dial__peak-n{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:11px; letter-spacing:.16em;
   fill:var(--label);
 }
@@ -4179,7 +4200,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .ch-stack__share,
 .ch-stack__n{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:11.5px; letter-spacing:.06em;
   font-variant-numeric:tabular-nums;
   font-feature-settings:"tnum";
@@ -4388,7 +4409,7 @@ body.page-welcome{ --page-max: 2400px; }
   display:flex; align-items:baseline; gap:6px 18px; flex-wrap:wrap;
   padding:11px 14px;
   border-bottom:1px solid var(--line);
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10.5px;
   letter-spacing:.18em;
   text-transform:uppercase;
@@ -4447,7 +4468,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip__cd-label{
   display:flex; align-items:center; gap:8px;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
   color:var(--text-dim);
 }
@@ -4512,7 +4533,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip__cd-unit b::selection{ -webkit-text-fill-color:var(--text); }
 .trip__cd-unit i{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-style:normal; font-size:9.5px; letter-spacing:.2em; text-transform:uppercase;
   color:var(--text-ghost);
 }
@@ -4521,7 +4542,7 @@ body.page-welcome{ --page-max: 2400px; }
   display:inline-flex; align-self:flex-start; align-items:center; gap:7px;
   padding:3px 9px;
   border:1px solid var(--line);
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9.5px; letter-spacing:.2em; text-transform:uppercase;
   color:var(--text-ghost);
 }
@@ -4557,7 +4578,7 @@ body.page-welcome{ --page-max: 2400px; }
   left:50%; top:-9px; margin-left:-7px;
   width:14px; height:9px;
   display:flex; align-items:center; justify-content:center;
-  font-family:"JetBrains Mono", monospace; font-size:9px; line-height:1;
+  font-family:var(--mono); font-size:9px; line-height:1;
   color:var(--text-ghost);
 }
 /* Hover reads on the whole card, in --chrome like every other hover on the
@@ -4640,7 +4661,7 @@ body.page-welcome{ --page-max: 2400px; }
   animation:trip-pulse 1.8s ease-out infinite;
 }
 .trip__stop-dates{
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:10px; letter-spacing:.14em; text-transform:uppercase;
   color:var(--text-dim);
   font-variant-numeric:tabular-nums;
@@ -4667,7 +4688,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip__stop-wx-now{
   display:inline-flex; align-items:center; gap:6px;
-  font-family:"JetBrains Mono", monospace; font-weight:500;
+  font-family:var(--mono); font-weight:500;
   font-size:14px; letter-spacing:.02em; color:var(--text);
   font-variant-numeric:tabular-nums; white-space:nowrap;
 }
@@ -4691,7 +4712,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip__stop-wx-sub{
   display:flex; align-items:baseline; min-width:0;
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
   color:var(--text-ghost);
 }
@@ -4705,7 +4726,7 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__stop-meta{
   padding:3px 8px;
   border:1px solid rgba(var(--label-rgb),.3);
-  font-family:"JetBrains Mono", monospace;
+  font-family:var(--mono);
   font-size:9.5px; letter-spacing:.18em; text-transform:uppercase;
   color:var(--text-dim); white-space:nowrap;
 }
@@ -4756,7 +4777,7 @@ body.page-welcome{ --page-max: 2400px; }
 .trip-map::after{
   content:"日本 / ROUTE";
   position:absolute; right:9px; bottom:7px;
-  font-family:"Noto Sans JP", "JetBrains Mono", monospace;
+  font-family:"Noto Sans JP", var(--mono);
   font-size:10px; letter-spacing:.12em; color:var(--text-ghost);
   pointer-events:none;
 }
@@ -4800,7 +4821,7 @@ body.page-welcome{ --page-max: 2400px; }
 .trip-map__city.is-active .trip-map__ring{ opacity:.75; animation:trip-map-spin 16s linear infinite; }
 
 .trip-map__lbl{
-  font-family:"JetBrains Mono", monospace; font-size:11px;
+  font-family:var(--mono); font-size:11px;
   letter-spacing:.1em; fill:var(--text-dim);
 }
 .trip-map__city.is-active .trip-map__lbl{ fill:var(--trip-live); }
