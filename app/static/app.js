@@ -866,98 +866,76 @@ window.__stagePixelIn = () => {
   window.__scrollPlaced = true;
 })();
 
-// ---------- COVER ↔ HERO MORPH (cross-document View Transitions) -----
-// Chromium already crossfades between documents (@view-transition in
-// style.css). This names the two ends of an album navigation `album-cover`
-// so the picture travels instead: leaving a list through an album card
-// names that card's cover, arriving on the album names its hero (the reel
-// frame — or the cover hero, which only renders on phones); going back up
-// runs the same pairing in reverse. A name is set for the one navigation
-// it describes and cleared once the transition is over, so nothing pairs
-// by accident. Photos are deliberately NOT part of this: opening one
-// pixel-decodes (see __stagePixelIn). No-op wherever pageswap /
-// pagereveal do not exist.
-(function coverMorph() {
-  if (!('onpageswap' in window) || !('onpagereveal' in window)) return;
-  if (!window.matchMedia('(prefers-reduced-motion: no-preference)').matches) return;
-  const NAME = 'album-cover';
-  let named = null;
-  const albumOf = (url) => {
-    const m = url.pathname.match(/^\/album\/(.+)$/);
-    if (!m) return null;
-    try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; }
+// ---------- ALBUM DEPARTURE / RETURN CUES ----------------------
+// What replaced the cover→hero morph. That was a cross-document View
+// Transition naming the card you left through and the hero you arrived at
+// as one element, so the picture flew between the pages. It looked right
+// on a fast desktop and fell apart everywhere else — by construction: a
+// cross-document transition FREEZES the outgoing page until the new one
+// has rendered, so on a slow connection the card hung mid-flight for as
+// long as the album took to arrive, on a phone the full-width image it
+// animated dropped frames, and past Chromium's 4 s cut-off it stopped dead
+// halfway. Removed 2026-09-03 at the user's request ("kaputt bei Latenz,
+// am Handy, oder wenn das Gerät eine Kartoffel ist").
+//
+// Both cues here live entirely on ONE page and cost nothing but opacity,
+// a border colour and the independent `scale`:
+//   leaving   — the card you tap goes into its selected state at once
+//               (accent brackets, pressed) and stays there while the next
+//               page loads. With the progress bar that is the "the tap
+//               landed" the morph was really for — and a slow network only
+//               makes it stay longer instead of breaking it.
+//   returning — back on a list, the card of the album you just left blinks
+//               its brackets once, the way a photo's tile does when you
+//               step back out of it ("you are here"). The album travels
+//               across the navigation in sessionStorage, exactly like the
+//               photo key in photoAlbumContinuity() above.
+(function albumDepartureReturn() {
+  const KEY = 'vt:last-album';
+  const CARD = '.album-card, .feat-card';
+  const ss = {
+    get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} },
+    del(k) { try { sessionStorage.removeItem(k); } catch (e) {} },
   };
-  // a page that lists albums as cards: the overview, or an album's folders
-  const isList = (url) => url.pathname === '/albums' || !!albumOf(url);
-  // this page's card for `album`, if it lists one — the cover is the morph end
-  const cardCover = (album) => {
-    if (!album) return null;
-    const links = document.querySelectorAll('.album-card a[href], .feat-card a[href]');
-    for (const a of links) {
-      let u;
-      try { u = new URL(a.href, location.href); } catch (e) { continue; }
-      if (albumOf(u) !== album) continue;
-      const img = a.querySelector('.album-card__img img, .feat-card__img img');
-      if (img) return img;
-    }
-    return null;
-  };
-  // this page's hero (the phone cover hero is display:none on desktop and
-  // therefore never captured — the name on it is simply inert there)
-  const hero = () => document.querySelector('.fhero__frame, .album-hero');
-  const name = (el) => {
-    if (!el) return false;
-    named = el;
-    el.style.viewTransitionName = NAME;
-    return true;
-  };
-  const clear = () => {
-    if (named) named.style.viewTransitionName = '';
-    named = null;
+  const albumOf = (href) => {
+    try {
+      const m = new URL(href, location.href).pathname.match(/^\/album\/(.+)$/);
+      return m ? decodeURIComponent(m[1]) : null;
+    } catch (e) { return null; }
   };
 
-  // Touching e.viewTransition materialises its promises; a transition the
-  // browser then skips (hidden tab, reload, a >4s new page) rejects them
-  // with an AbortError that would otherwise surface as "Uncaught (in
-  // promise)". Skipping is a normal outcome, so they are settled quietly.
-  const hush = (vt) => {
-    if (!vt) return;
-    ['ready', 'updateCallbackDone', 'finished'].forEach((k) => {
-      try { vt[k].catch(() => {}); } catch (err) {}
-    });
-  };
+  // ---- leaving through a card ----
+  document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest('a[href]');
+    if (!a || a.target || a.hasAttribute('download')) return;
+    const card = a.closest(CARD);
+    if (!card || !albumOf(a.href)) return;
+    card.classList.add('is-leaving');
+    // a navigation that never happens (blocked, cancelled) must not leave
+    // the card selected for good
+    setTimeout(() => card.classList.remove('is-leaving'), 10000);
+  });
+  // a bfcache restore brings the page back exactly as it left, card included
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted) return;
+    document.querySelectorAll('.is-leaving').forEach((c) => c.classList.remove('is-leaving'));
+  });
 
-  window.addEventListener('pageswap', (e) => {
-    hush(e.viewTransition);
-    if (!e.viewTransition || !e.activation) return;
-    let to;
-    try { to = new URL(e.activation.entry.url); } catch (err) { return; }
-    const here = new URL(location.href);
-    // down into an album this page lists: its card cover is what leaves
-    if (name(cardCover(albumOf(to)))) return;
-    // up out of an album into a list: the hero leaves
-    if (albumOf(here) && isList(to)) name(hero());
+  // ---- the album being left, for the list it comes back to ----
+  const here = albumOf(location.href);
+  if (here) window.addEventListener('pagehide', () => ss.set(KEY, here));
+  // every load consumes the note exactly once, so a stale one can never
+  // light up a card on some later visit
+  const left = ss.get(KEY);
+  ss.del(KEY);
+  if (!left || left === here) return;
+  document.querySelectorAll(CARD).forEach((card) => {
+    const a = card.querySelector('a[href]');
+    if (a && albumOf(a.href) === left) card.classList.add('is-returned');
   });
-  window.addEventListener('pagereveal', (e) => {
-    hush(e.viewTransition);
-    if (!e.viewTransition) return;
-    let from;
-    try { from = new URL(navigation.activation.from.url); } catch (err) { return; }
-    const here = new URL(location.href);
-    // back up on a list that has a card for the album we left: it receives
-    if (name(cardCover(albumOf(from)))) { /* paired */ }
-    // down on an album from a list: the hero receives. The morph is its
-    // entrance — take it out of the scroll-reveal cascade (scrollReveal()
-    // has already tagged it, but nothing has painted yet), otherwise it
-    // would land invisible and then rise a second time inside the morph.
-    else if (albumOf(here) && isList(from) && name(hero())) {
-      named.classList.remove('rv');
-      named.classList.add('is-morphed');
-    }
-    e.viewTransition.finished.then(clear, clear);
-  });
-  // a bfcache restore brings the old name back with the page — drop it
-  window.addEventListener('pageshow', (ev) => { if (ev.persisted) clear(); });
 })();
 
 // ---------- SCROLL MEMORY (back / forward) ---------------------
@@ -978,9 +956,9 @@ window.__stagePixelIn = () => {
 // inside the rel=expect render gate (see base.html) — the same pre-paint
 // moment photoAlbumContinuity() already relies on, by which point the
 // stylesheet is parsed and every card, tile and hero has its final box.
-// That is also what the reverse cover→hero morph needs: the card the
-// hero flies back into has to be where the visitor left it before the
-// transition takes its snapshot.
+// The return blink on the card you came back to (albumDepartureReturn())
+// relies on this too: it only reads as "you are here" if the card is where
+// you left it.
 const scrollMemory = (() => {
   const PREFIX = 'sm:';         // keyed by history entry
   const UPREFIX = 'smu:';       // keyed by URL, for the site's own back links

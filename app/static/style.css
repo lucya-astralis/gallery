@@ -5169,10 +5169,9 @@ html.fx-anim .rv.rv-in{
    comes up out of black, settling from a hair wide — instead of rising
    like a text block. Still driven by the reveal observer (so it skips on
    fx-return and replays on a liveNav swap); the scale is small because the
-   trip module wraps the frame without clipping it. Arriving through the
-   cover→hero morph, app.js strips .rv off the frame before first paint
-   (see coverMorph): the morph IS its entrance, a second one on top read
-   as the frame stuttering. ---- */
+   trip module wraps the frame without clipping it. This IS the album's
+   arrival cue now that the cover→hero morph is gone (see
+   albumDepartureReturn() in app.js for why it went). ---- */
 html.fx-anim .fhero__frame.rv.rv-in{
   animation-name: fhero-expose;
   animation-duration:.9s;
@@ -5453,7 +5452,12 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease
    scrolls the album to its tile and blinks the corner brackets once ---- */
 @media (prefers-reduced-motion: no-preference){
   .image-tile.is-returned::before,
-  .image-tile.is-returned::after{
+  .image-tile.is-returned::after,
+  /* and the album card you came back up to (albumDepartureReturn) */
+  .album-card.is-returned::before,
+  .album-card.is-returned::after,
+  .feat-card.is-returned::before,
+  .feat-card.is-returned::after{
     animation: tile-return 1.5s ease .25s backwards;
   }
 }
@@ -5489,27 +5493,29 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease
   box-shadow:0 0 10px rgba(var(--acc-rgb),.55);
 }
 
-/* ---- album cover → album hero (cross-document View Transitions).
-   app.js names the card image you leave through and the hero you arrive
-   at `album-cover` (and the reverse on the way back), so the picture
-   travels between the two pages instead of crossfading with the rest.
-   Both snapshots fill the moving box so an aspect change reads as a
-   re-crop, never a stretch. Chromium; ignored elsewhere. ---- */
+/* ---- album departure / return cues — what replaced the cover→hero
+   morph (a cross-document View Transition; see albumDepartureReturn() in
+   app.js for why it went). The card you tap goes selected and pressed the
+   instant you tap it and stays that way while the next page loads; back
+   on the list, the card of the album you just left blinks its brackets
+   once, the same "you are here" a photo's tile gives (tile-return above).
+   Purple is right here: a tapped card IS state. Opacity, a border colour
+   and the independent `scale` only — nothing that can jank a weak device,
+   and nothing that waits on the next page. ---- */
+.album-card.is-leaving::before,
+.album-card.is-leaving::after,
+.feat-card.is-leaving::before,
+.feat-card.is-leaving::after{
+  opacity:1;
+  border-color:var(--acc);
+}
+/* the ENTER → overlay a hover would show stays up on the tapped card, so
+   a phone (which has no hover) still gets the label it is acting on */
+.album-card.is-leaving .album-card__hover{ opacity:1; }
+.album-card.is-leaving .album-card__hover span{ transform:translateY(0); }
 @media (prefers-reduced-motion: no-preference){
-  ::view-transition-group(album-cover){
-    animation-duration:.42s;
-    animation-timing-function:cubic-bezier(.19,.66,.28,.99);
-  }
-  ::view-transition-old(album-cover),
-  ::view-transition-new(album-cover){
-    width:100%; height:100%;
-    object-fit:cover;
-    animation-duration:.42s;
-  }
-  /* an unpaired snapshot (the card hides behind a filter, say) just fades
-     with the page instead of lingering after the root crossfade is over */
-  ::view-transition-old(album-cover):only-child,
-  ::view-transition-new(album-cover):only-child{ animation-duration:.14s; }
+  .album-card.is-leaving,
+  .feat-card.is-leaving{ scale:.985; }
 }
 
 /* ---- skeleton shimmer: a slow light sweep over a card whose thumbnail
