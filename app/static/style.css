@@ -5027,11 +5027,43 @@ html.fx-anim .rv.rv-in{
 }
 @media print{ html.fx-anim .rv{ opacity:1; } }
 
-/* countdown block: its own staged entry right after the trip module's
-   reveal lands — keyed to .rv-in so it also skips on fx-return, exactly
-   like the block reveal it follows */
-html.fx-anim .trip.rv-in .trip__cd{
-  animation: rv-rise .55s cubic-bezier(.19,.66,.28,.99) .22s backwards;
+/* ---- album hero reel: the frame exposes like the welcome viewfinder —
+   comes up out of black, settling from a hair wide — instead of rising
+   like a text block. Still driven by the reveal observer (so it skips on
+   fx-return and replays on a liveNav swap); the scale is small because the
+   trip module wraps the frame without clipping it. Arriving through the
+   cover→hero morph, app.js strips .rv off the frame before first paint
+   (see coverMorph): the morph IS its entrance, a second one on top read
+   as the frame stuttering. ---- */
+html.fx-anim .fhero__frame.rv.rv-in{
+  animation-name: fhero-expose;
+  animation-duration:.9s;
+}
+@keyframes fhero-expose{
+  from{ opacity:0; transform:scale(1.012); }
+  to  { opacity:1; transform:scale(1); }
+}
+
+/* ---- trip module: the instrument is there from the first frame (border,
+   phase rule, ground) and its readouts come up one after the other — the
+   meta bar, the reel, the countdown, then the legs in route order and
+   finally their progress fills. Each part is its own reveal target
+   (app.js), so the whole builds as one cascade and nothing animates an
+   ANCESTOR of the reel frame, which is what used to make the morphed-in
+   frame tear away from the module rising around it. ---- */
+html.fx-anim .trip__bar.rv.rv-in{ animation-name: rv-fade; animation-duration:.5s; }
+html.fx-anim .trip__stop.rv.rv-in{ animation-duration:.6s; }
+/* desktop lays the legs out left→right as a route: they arrive along it */
+@media (min-width:1100px){
+  html.fx-anim .trip__stop.rv.rv-in{ animation-name: rv-right; }
+}
+/* the leg's progress fill holds at zero until its card has landed, then
+   sweeps to the live value — the one thing on the card that moves after
+   arrival, so it reads as the instrument taking its reading. The !important
+   is needed against the inline width initTrip() writes on every tick. */
+html.fx-anim .trip__stop.rv:not(.rv-in) .trip__stop-track i{ width:0 !important; }
+html.fx-anim .trip__stop.rv-in .trip__stop-track i{
+  transition: width .8s cubic-bezier(.19,.66,.28,.99) .45s;
 }
 
 /* section title rule: scan sweep once the header reveals */

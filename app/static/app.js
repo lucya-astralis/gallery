@@ -645,7 +645,11 @@ function scrollReveal(root = document) {
   const targets = root.querySelectorAll([
     '.section__doc',
     '.section__head',
-    '.trip',
+    // the trip module builds up part by part (bar, reel, countdown, legs)
+    // rather than as one block — see the trip rules in the motion layer
+    '.trip__bar',
+    '.trip__cd',
+    '.trip__stop',
     '.archive-head',
     '.album-group__head',
     '.sub-albums__head',
@@ -911,8 +915,14 @@ window.__stagePixelIn = () => {
     const here = new URL(location.href);
     // back up on a list that has a card for the album we left: it receives
     if (name(cardCover(albumOf(from)))) { /* paired */ }
-    // down on an album from a list: the hero receives
-    else if (albumOf(here) && isList(from)) name(hero());
+    // down on an album from a list: the hero receives. The morph is its
+    // entrance — take it out of the scroll-reveal cascade (scrollReveal()
+    // has already tagged it, but nothing has painted yet), otherwise it
+    // would land invisible and then rise a second time inside the morph.
+    else if (albumOf(here) && isList(from) && name(hero())) {
+      named.classList.remove('rv');
+      named.classList.add('is-morphed');
+    }
     e.viewTransition.finished.then(clear, clear);
   });
   // a bfcache restore brings the old name back with the page — drop it
