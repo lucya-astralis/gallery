@@ -280,32 +280,14 @@ def _featured_map() -> tuple[dict[str, list[tuple[str, str]]], list[dict]]:
 
 
 # ----- config validation ------------------------------------------------
-ALBUM_CFG_KEYS = {
-    "collection", "cover", "showcase", "featured", "reel", "order", "sort",
-    "tags", "effect", "icon", "font", "font_scale",
-    # per-album page backdrop; `wallpaper` may be a clip, `wallpaper_mobile`
-    # is stills only (phones never load a backdrop video)
-    "wallpaper", "wallpaper_mobile",
-    # per-album theme: the accent colour of this album's pages, and how the
-    # backdrop behind them is treated (see _album_theme_css_url)
-    "accent", "wallpaper_tint", "wallpaper_dim",
-    # Editorial stats block (_album_stats): `loc` is one line whose comma-split
-    # parts get rejoined, `stat` is the freeform custom "Label: Value" line
-    # (repeat the key for more), `stats = off` hides the block entirely.
-    "loc", "stat", "stats",
-}
-GALLERY_CFG_KEYS = {"welcome", "welcome_desktop", "welcome_mobile", "album_order", "album_sort",
-                    # the site backdrop's treatment: the same two knobs an
-                    # album.cfg has, one tier up (an album still overrides)
-                    "wallpaper_tint", "wallpaper_dim",
-                    # who the archive belongs to — wordmark, mark, operator,
-                    # legal links (main._brand). Files live in photos/.gallery/.
-                    "site_name", "site_sub", "site_hero", "site_desc",
-                    "site_desc_en", "site_desc_de", "site_desc_jp",
-                    "logo", "favicon", "operator", "operator_url",
-                    "operator_pfp", "privacy_url", "imprint_url", "badges",
-                    # EXIF Artist/Copyright on the derived images (main._credit)
-                    "credit"}
+# What counts as a KNOWN key is the gallery's own business, so both sets come
+# from there (main.ALBUM_CFG_KEYS / main.GALLERY_CFG_KEYS, declared next to the
+# comment block that documents them). This file used to keep its own copy and
+# it went stale — `name` was never added, so doctor reported every album that
+# set a display name as an error.
+ALBUM_CFG_KEYS = gallery.ALBUM_CFG_KEYS
+GALLERY_CFG_KEYS = gallery.GALLERY_CFG_KEYS
+
 # gallery.cfg keys naming a file in photos/.gallery/. Checked the same way
 # and for the same reason as an album's `icon`: a typo here is silent at
 # runtime — the slot simply falls back or disappears.
@@ -447,12 +429,13 @@ def _check_album_cfg(album: str) -> list[dict]:
 
 def _check_gallery_cfg() -> list[dict]:
     cfg = gallery._gallery_config()
-    if not cfg:
-        return []
     issues: list[dict] = []
 
     def add(level, key, detail):
         issues.append({"album": "(gallery.cfg)", "level": level, "key": key, "detail": detail})
+
+    if not cfg:
+        return issues
 
     for key in cfg:
         if key not in GALLERY_CFG_KEYS:
@@ -1023,7 +1006,7 @@ def cmd_cfg(args) -> int:
     _connect()
     if args.gallery:
         cfg = gallery._gallery_config()
-        path = gallery.PHOTOS_DIR / gallery.GALLERY_CFG_NAME
+        path = gallery.GALLERY_CFG_PATH
         issues = _check_gallery_cfg()
         title = "gallery.cfg"
     else:
@@ -1638,9 +1621,7 @@ def cmd_export(args) -> int:
 
     root = gallery.PHOTOS_DIR
     members: list[tuple[Path, str]] = []
-    gallery_cfg = root / gallery.GALLERY_CFG_NAME
-    if gallery_cfg.is_file():
-        members.append((gallery_cfg, gallery.GALLERY_CFG_NAME))
+    # gallery.cfg lives inside `.gallery/`, which the walk below takes whole
     metas = sorted(root.rglob(scanner.ALBUM_META_DIR))
     brand_dir = root / scanner.GALLERY_META_DIR
     if brand_dir.is_dir():

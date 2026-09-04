@@ -1,6 +1,6 @@
 # Gallery Configurator 1.0
 
-A standalone web GUI for the gallery's config files — `photos/gallery.cfg` and
+A standalone web GUI for the gallery's config files — `photos/.gallery/gallery.cfg` and
 every `<album>/.album/album.cfg`, plus the per-language `album_*.md`
 descriptions and the icon/font assets that sit beside them.
 
@@ -22,7 +22,7 @@ Then open <http://localhost:8090>.
 
 | File | Where | What the UI gives you |
 | --- | --- | --- |
-| `gallery.cfg` | photos root | welcome hero pickers (desktop / mobile / shared), a drag-sortable `album_order` with group headers, `album_sort` |
+| `gallery.cfg` | `photos/.gallery/` | welcome hero pickers (desktop / mobile / shared), a drag-sortable `album_order` with group headers, `album_sort` |
 | `album.cfg` | `<album>/.album/` | every documented key as a real control — cover picker, drag-sortable `featured` / `order`, reel/sort/effect dropdowns, tags, custom attributes, icon & font pickers |
 | `album_en/de/jp.md` | `<album>/.album/` | a markdown editor per language; saving an empty one deletes the file |
 | `icon.svg`, `*.otf` … | `<album>/.album/` | upload, preview (the font is loaded and shown set in the album's name), delete |
@@ -94,7 +94,7 @@ as many `Label: Value` lines as you want.
 The GUI edits those as **Label / Value pairs** rather than raw strings, which
 removes the two ways to write one the gallery drops without a word — a line
 with no colon, and a line with an empty value. Both are also reported by the
-checks now, in this tool *and* in the gallery's own `debug.py cfg`, whose
+checks now, in this tool *and* in the gallery's own `app.cli doctor`, whose
 known-key list was missing `loc`, `stat` and `stats` entirely.
 
 `loc` is a single text field even though the parser comma-splits it: the

@@ -1,9 +1,12 @@
 """What the gallery accepts in album.cfg / gallery.cfg.
 
-Mirrored by hand from the gallery app (its cfg format block in main.py and the
-key checks in debug.py) so this tool stays a standalone editor: it never
-imports the gallery, and it can point at a photos/ folder served by any
-version of it. When the gallery grows a key, add it here.
+Mirrored by hand from the gallery app -- its cfg format block in main.py and
+the ALBUM_CFG_KEYS / GALLERY_CFG_KEYS sets declared right under it -- so this
+tool stays a standalone editor: it never imports the gallery, and it can point
+at a photos/ folder served by any version of it. When the gallery grows a key,
+add it here too. The gallery's own `doctor` imports those sets rather than
+copying them; this file is the one deliberate copy, because it ships as a
+separate image and needs a per-key TYPE the gallery has no use for.
 """
 
 from __future__ import annotations

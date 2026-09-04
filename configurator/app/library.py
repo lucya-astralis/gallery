@@ -104,7 +104,9 @@ class Library:
         return self.meta_dir(album) / schema.ALBUM_CFG_NAME
 
     def gallery_cfg_path(self) -> Path:
-        return self.root / schema.GALLERY_CFG_NAME
+        """photos/.gallery/gallery.cfg — with the gallery's own metadata, the
+        same way an album.cfg sits in `.album/`."""
+        return self.gallery_meta_dir() / schema.GALLERY_CFG_NAME
 
     def gallery_meta_dir(self) -> Path:
         """photos/.gallery/ — where the gallery's own logo, portrait and

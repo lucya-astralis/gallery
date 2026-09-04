@@ -1,4 +1,4 @@
-"""Config checks, mirroring what the gallery's `debug.py cfg` reports.
+"""Config checks, mirroring what the gallery's `python -m app.cli doctor` reports.
 
 Runs against the filesystem rather than the gallery's index, so it catches the
 same class of mistake (a cover pointing at a file that isn't there, a font the

@@ -131,16 +131,15 @@ photos/japan_2026/
 This is the **only** place looked at — a cfg or description left loose in
 the photo folder is ignored. Nothing inside `.album/` is ever indexed,
 thumbnailed or served as a photo, so a font specimen or reference image can
-sit in there safely. `gallery.cfg` is not part of this: it configures the
-gallery as a whole and stays at the root of `photos/` (see below).
+sit in there safely.
 
 **The `.gallery/` folder** is the same idea one tier up — the gallery's own
-assets rather than one album's — and sits beside `gallery.cfg`:
+settings and assets rather than one album's:
 
 ```
 photos/
-├── gallery.cfg            ← gallery-wide settings
 ├── .gallery/
+│   ├── gallery.cfg        ← gallery-wide settings
 │   ├── logo.svg           ← the wordmark's mark (`logo =`, `favicon =`)
 │   ├── pfp.webp           ← the operator's portrait (`operator_pfp =`)
 │   └── eu.gif             ← a footer badge (`badges =`)
@@ -266,10 +265,10 @@ Optional file in the album's **`.album/` folder** (see above):
 
 ### Gallery settings (`gallery.cfg`)
 
-Optional file in the **root of `photos/`**. By default the welcome hero cycles through a random selection of showcased photos (falling back to fully random when nothing is showcased). To pick the images yourself:
+Optional file in **`photos/.gallery/`**, next to the assets it names. By default the welcome hero cycles through a random selection of showcased photos (falling back to fully random when nothing is showcased). To pick the images yourself:
 
 ```ini
-# photos/gallery.cfg — welcome hero feed
+# photos/.gallery/gallery.cfg — welcome hero feed
 # one of:
 #   welcome = showcase      ← random featured photos (default, same as no file)
 #   welcome = random        ← random photos, ignore the featured flags

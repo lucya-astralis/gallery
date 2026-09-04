@@ -542,8 +542,17 @@ def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
 #   photos/japan_2026/.album/icon.svg           <- `icon = …` album mark
 #
 # This is the only place looked at — a cfg or description left in the photo
-# folder itself is ignored. gallery.cfg is NOT part of this: it configures
-# the gallery as a whole and stays at the root of PHOTOS_DIR.
+# folder itself is ignored.
+#
+# gallery.cfg follows the same idea one tier up: it describes the gallery
+# rather than any one album, so it lives with the gallery's own metadata in
+# `photos/.gallery/` (GALLERY_META_DIR), next to the logo and the badges it
+# names:
+#
+#   photos/.gallery/gallery.cfg                 <- site-wide settings
+#   photos/.gallery/logo.svg                    <- `logo = …` wordmark
+#
+# This is the only place looked at, exactly like `.album/` above.
 #
 # album.cfg keys (file sits in the album's `.album/` folder):
 #   name = Japan 2026    -> the album's display name, used everywhere the album
@@ -598,6 +607,33 @@ def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
 #                           readouts derived from the photos' EXIF (_album_stats).
 #   stats = off          -> hide the whole stats block for this album.
 ALBUM_META_DIR = scanner.ALBUM_META_DIR
+
+# Every key the block above documents, as data. This is the ONLY list — the
+# CLI's `doctor` imports it to decide what counts as an unknown key, rather
+# than keeping a second copy. It used to keep one, and the copy went stale:
+# it never learned about `name`, so doctor called a perfectly valid
+# `name = Japan 2026` an error on every album that set one (11 of them on the
+# live gallery, reported 2026-09-04). Add a key to the docs above and to this
+# set in the same edit.
+#
+# The configurator has its own copy in configurator/app/schema.py, and that
+# one is deliberate: it ships as a separate app with its own image and cannot
+# import from here. It needs a per-key TYPE anyway, which this set has no room
+# for. Keep the two in sync by hand — see the note in schema.py.
+ALBUM_CFG_KEYS = frozenset({
+    "name", "collection", "cover", "showcase", "featured", "reel", "order",
+    "sort", "tags", "effect", "icon", "font", "font_scale",
+    # per-album page backdrop; `wallpaper` may be a clip, `wallpaper_mobile`
+    # is stills only (phones never load a backdrop video)
+    "wallpaper", "wallpaper_mobile",
+    # per-album theme: the accent colour of this album's pages, and how the
+    # backdrop behind them is treated (see the per-album theme section)
+    "accent", "wallpaper_tint", "wallpaper_dim",
+    # editorial stats block (_album_stats): `loc` is one line whose comma-split
+    # parts get rejoined, `stat` is the freeform "Label: Value" line (repeat
+    # the key for more), `stats = off` hides the block entirely
+    "loc", "stat", "stats",
+})
 
 _TRUE = {"1", "true", "yes", "on"}
 _FALSE = {"0", "false", "no", "off", "none", "hide"}
@@ -1240,7 +1276,7 @@ def _theme_version(album: str | None) -> int:
     on this page — each album.cfg from the album up to the root, plus
     gallery.cfg. Editing a VALUE never touches a file whose name travels in
     the URL, so the cfg mtimes are all there is to version on."""
-    paths = [PHOTOS_DIR / GALLERY_CFG_NAME]
+    paths = [GALLERY_CFG_PATH]
     if album:
         parts = album.replace("\\", "/").strip("/").split("/")
         for depth in range(len(parts), 0, -1):
@@ -1534,7 +1570,7 @@ def _brand_stamp(path: Path) -> int:
     repointing `logo =` at a different file has to invalidate through the
     cfg's mtime or the browser would keep showing the old mark."""
     stamps = []
-    for p in (path, PHOTOS_DIR / GALLERY_CFG_NAME):
+    for p in (path, GALLERY_CFG_PATH):
         try:
             stamps.append(int(p.stat().st_mtime))
         except OSError:
@@ -2535,8 +2571,8 @@ def _safe_rel(album: str, filename: str) -> Path:
 
 
 # ----- gallery-wide config (gallery.cfg) ---------------------------------
-# Optional `gallery.cfg` dropped into the photos ROOT (next to the album
-# folders). Same format as album.cfg (see _parse_cfg: `key = value`, list
+# Optional `gallery.cfg` in `photos/.gallery/`, next to the brand assets it
+# names. Same format as album.cfg (see _parse_cfg: `key = value`, list
 # values comma-separated / repeated keys / one entry per line). Known keys:
 #   welcome = showcase            -> hero feed = random featured photos
 #                                    (default; same as no file / no key)
@@ -2578,7 +2614,25 @@ def _safe_rel(album: str, filename: str) -> Path:
 #                                    derived image, naming whoever took the
 #                                    photographs. See the credit section above.
 GALLERY_CFG_NAME = "gallery.cfg"
+# Next to the assets it names, the way an album.cfg sits in `.album/`.
+GALLERY_CFG_PATH = PHOTOS_DIR / GALLERY_META_DIR / GALLERY_CFG_NAME
 GALLERY_GROUP_KEYS = frozenset({"album_order"})
+# The gallery.cfg counterpart to ALBUM_CFG_KEYS — same contract: one list,
+# imported by the CLI's `doctor`, kept next to the keys it documents.
+GALLERY_CFG_KEYS = frozenset({
+    "welcome", "welcome_desktop", "welcome_mobile", "album_order", "album_sort",
+    # the site backdrop's treatment: the same two knobs an album.cfg has, one
+    # tier up (an album still overrides)
+    "wallpaper_tint", "wallpaper_dim",
+    # who the archive belongs to — wordmark, mark, operator, legal links
+    # (_brand). The files live in photos/.gallery/.
+    "site_name", "site_sub", "site_hero", "site_desc",
+    "site_desc_en", "site_desc_de", "site_desc_jp",
+    "logo", "favicon", "operator", "operator_url",
+    "operator_pfp", "privacy_url", "imprint_url", "badges",
+    # EXIF Artist/Copyright written into the derived images (_credit)
+    "credit",
+})
 WELCOME_FEED_MAX = 24
 
 _WELCOME_KEYWORDS = {
@@ -2592,14 +2646,13 @@ _gallery_cfg_cache: tuple[tuple[int, int], dict[str, list[str]]] | None = None
 
 
 def _gallery_config() -> dict[str, list[str]]:
-    """Parse photos/gallery.cfg (see _parse_cfg), or {} when there's no such
-    file. Edits still show up without a restart — the parse is keyed on the
-    file's (mtime, size), so a changed file is re-read and an unchanged one
-    is not. It used to re-parse on every call, which was fine while only
-    page renders asked; the branding and credit readers ask far more often
-    than that, a full scan once per derivative written."""
+    """Parse gallery.cfg (see _parse_cfg), or {} when there's no such file. Edits still show up without a restart — the parse is
+    keyed on the file's (mtime, size), so a changed file is re-read and an
+    unchanged one is not. It used to re-parse on every call, which was fine
+    while only page renders asked; the branding and credit readers ask far
+    more often than that, a full scan once per derivative written."""
     global _gallery_cfg_cache
-    cfg_path = PHOTOS_DIR / GALLERY_CFG_NAME
+    cfg_path = GALLERY_CFG_PATH
     try:
         st = cfg_path.stat()
     except OSError:
