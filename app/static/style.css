@@ -936,10 +936,21 @@ section{
   line-height:1;
   transition:color .15s;
 }
-.pathbar__back:hover{
-  color:var(--text);
-  border-color:rgba(var(--acc-rgb),.55);
-  background:var(--glass-hi);
+/* Gated on a real hovering pointer, and this one matters more than most:
+   the back button is the single control on the site a phone visitor reaches
+   for on every page. A :hover that repaints its face — background, border,
+   label colour — is a render change caused by the tap itself, and a touch
+   browser spends the first tap applying it instead of following the link.
+   The blanket revert in the TOUCH: NO HOVER STATES block further down only
+   undoes hovers that MOVE or REVEAL; a colour change is just as much a
+   repaint, so these are gated where they are written instead. The press
+   feedback (:active) is untouched — that one is supposed to fire on touch. */
+@media (hover: hover){
+  .pathbar__back:hover{
+    color:var(--text);
+    border-color:rgba(var(--acc-rgb),.55);
+    background:var(--glass-hi);
+  }
 }
 /* On a wide screen it sits next to a trail that starts at the same place, so
    it stays narrow and quiet: the arrow plus the parent's name, no "Back to"
@@ -971,7 +982,9 @@ section{
   .pathbar__back .pathbar__back-txt{ font-weight:500; max-width:22ch; }
   .pathbar__back:hover .pathbar__back-txt{ text-decoration:none; }
 }
-.pathbar__back:hover .pathbar__back-txt{ text-decoration:underline; text-underline-offset:3px; }
+@media (hover: hover){
+  .pathbar__back:hover .pathbar__back-txt{ text-decoration:underline; text-underline-offset:3px; }
+}
 /* a square flex box, so the chevron is centred by layout rather than by the
    glyph's bearing inside its em box — that left it visibly high on phones,
    where the button is tall enough for a pixel or two to show */
@@ -2875,11 +2888,20 @@ details[open] > summary::before{ content:"▾ "; }
     font-weight:600;
     transition:background .15s, border-color .15s, box-shadow .15s;
   }
-  .pathbar__back:hover,
+  /* :active is the press — it must fire on touch. :hover is split off and
+     gated, because on a phone the "hover" IS the first tap (see the note at
+     the base .pathbar__back:hover rule). */
   .pathbar__back:active{
     background:linear-gradient(180deg, rgba(var(--acc-rgb),.30), rgba(var(--acc-rgb),.14));
     border-color:var(--acc);
     color:var(--acc);
+  }
+  @media (hover: hover){
+    .pathbar__back:hover{
+      background:linear-gradient(180deg, rgba(var(--acc-rgb),.30), rgba(var(--acc-rgb),.14));
+      border-color:var(--acc);
+      color:var(--acc);
+    }
   }
   /* a button label does not underline on press */
   .pathbar__back:hover .pathbar__back-txt{ text-decoration:none; }
@@ -5792,9 +5814,14 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
 @media (hover: none){
 
   /* --- cards: no lift, no bracket blink, no cover zoom --- */
+  /* border-color belongs in here as much as the lift does. A repaint is a
+     repaint: the browser spends the first tap on any :hover that changes how
+     the card renders, and re-styling the card re-styles an ANCESTOR of the
+     link inside it — the worst case. Leaving the border out is what made
+     tapping an album card take two goes. */
   .feat-card:hover,
-  .image-tile:hover{ transform:none; }
-  .album-card:hover{ background:var(--surface); transform:none; }
+  .image-tile:hover{ transform:none; border-color:var(--line); }
+  .album-card:hover{ background:var(--surface); transform:none; border-color:var(--line); }
 
   .feat-card:hover::before,
   .feat-card:hover::after,
@@ -5833,6 +5860,16 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
   .nav-arrow.prev:hover,
   .nav-arrow.next:hover{ transform:translateY(-50%); }
   .pathbar__back:hover .pathbar__back-ico{ transform:none; }
+
+  /* --- the last two ancestor-restyles-a-descendant hovers on the site.
+     They only change a colour, so they were easy to miss when this block
+     was written — but the rule that matters here is not "does it move",
+     it is "does tapping the link repaint something inside it": that is
+     what a touch browser spends the first tap on. Both links sit in
+     chrome the visitor taps to get somewhere (the breadcrumb's parent
+     album, the footer's operator card). --- */
+  .section__parent:hover .section__parent-name{ border-bottom-color:transparent; }
+  .foot__op:hover .foot__op-val{ color:var(--text-dim); }
 }
 
 /* ================================================================
