@@ -498,21 +498,40 @@ body > .foot{ flex-shrink:0; }
 /* liveNav(): a tag or sort click swaps the marked regions instead of
    reloading. The only visible cue is the swapped area dimming while the
    fetch is in flight — anything louder would be worse than the reload. */
+/* The timing lives on the RESTING region, not on the loading state, and that
+   is the whole point: a transition only runs when the property is animatable
+   in the style being transitioned TO. With `transition` declared solely
+   inside the .is-live-loading rule, dropping the class took the blur and the
+   transition away in the same step — the region went out of focus over .16s
+   and then came back in a single frame. Declared here it runs both ways, and
+   the swapped-in grid pulls into focus instead of cutting to sharp.
+   (liveGo() flushes style with the class still on the new markup so the
+   return has a from-state at all.) */
+[data-live]{
+  transition:opacity .12s ease;
+}
 .is-live-loading [data-live]{
   opacity:.55;
-  transition:opacity .12s ease;
   pointer-events:none;
 }
 /* capable devices de-emphasise by blur rather than by fading alone — the
    grid stays where it is and goes out of focus while the new one is fetched,
-   which reads as "refreshing" instead of "disappearing" */
+   which reads as "refreshing" instead of "disappearing". Coming back is
+   given longer than going out: the blur-out happens under the visitor's own
+   tap and wants to be immediate, the return is the answer arriving. */
+html.fx-anim [data-live]{
+  transition:opacity .16s ease, filter .26s ease;
+}
 html.fx-anim.is-live-loading [data-live]{
   opacity:.7;
   filter:blur(4px) saturate(.6);
   transition:opacity .16s ease, filter .16s ease;
 }
 @media (prefers-reduced-motion: reduce){
+  [data-live]{ transition:none; }
+  html.fx-anim [data-live]{ transition:none; }
   .is-live-loading [data-live]{ transition:none; }
+  html.fx-anim.is-live-loading [data-live]{ transition:none; }
 }
 
 a{ color:inherit; text-decoration:none; }
@@ -1284,7 +1303,7 @@ section{
   border:1px solid var(--line-strong);
   color:var(--text-dim);
   cursor:pointer;
-  transition:color .15s, border-color .15s, background .15s;
+  transition:color .15s, border-color .15s, background .15s, scale .14s ease;
 }
 .fhero__nav:hover{
   color:var(--chrome);
@@ -1661,9 +1680,19 @@ section{
     font-size:12px;
     letter-spacing:.12em;
   }
+  /* and back down the way it came — sortCloseMenu() holds the node for the
+     length of this before hiding it */
+  .sort__menu.is-closing{
+    animation: sort-sheet-out .2s ease forwards;
+    pointer-events:none;
+  }
   @keyframes sort-sheet-in {
     from { transform: translateY(100%); }
     to   { transform: translateY(0); }
+  }
+  @keyframes sort-sheet-out {
+    from { transform: translateY(0); }
+    to   { transform: translateY(100%); }
   }
 }
 
@@ -1741,7 +1770,8 @@ section{
   margin:0;
   background:var(--surface);
   border:1px solid var(--line);
-  transition: border-color .2s, transform .2s ease;
+  /* scale: see the note on .album-card */
+  transition: border-color .2s, transform .2s ease, scale .2s ease;
 }
 .feat-card:hover{ border-color:var(--line-strong); transform:translateY(-2px); }
 /* corner brackets — same hover signature as .album-card */
@@ -1917,7 +1947,13 @@ section{
   border:1px solid var(--line);
   margin:0;
   position:relative;
-  transition: background .2s, border-color .2s, transform .2s ease;
+  /* `scale` is in the list on purpose: the press feedback and the departure
+     cue both drive the independent scale property (they must — the card can
+     carry a hover translate at the same time), and a property that is not
+     listed here does not transition at all. Without it the card jumped to
+     its pressed size in one frame while the ENTER overlay over it faded in
+     over .2s — one gesture, two speeds, and the jump is the one you feel. */
+  transition: background .2s, border-color .2s, transform .2s ease, scale .2s ease;
 }
 .album-card::before,
 .album-card::after{
@@ -2444,7 +2480,7 @@ section{
   background:var(--surface);
   border:1px solid var(--line);
   position:relative;
-  transition: border-color .2s, transform .2s ease;
+  transition: border-color .2s, transform .2s ease, scale .2s ease;
   /* Off-screen tiles skip style, layout and paint entirely: a 400-photo
      album laid out ~6700 boxes on every relayout (fonts arriving, an image
      landing, a class flip), which on a phone blocked the main thread for
@@ -2937,7 +2973,7 @@ details[open] > summary::before{ content:"▾ "; }
   font:inherit;
   letter-spacing:inherit;
   text-transform:inherit;
-  transition: color .15s, background .15s;
+  transition: color .15s, background .15s, scale .14s ease;
   text-decoration:none;
   display:inline-flex; align-items:center;
   white-space:nowrap;
@@ -2988,7 +3024,11 @@ details[open] > summary::before{ content:"▾ "; }
 .stage img.is-preview{ filter: saturate(.92) brightness(.96); }
 /* the original replacing the preview "sharpens" in rather than snapping —
    the filter eases off over half a second once .is-preview is dropped */
-.stage img{ transition: filter .5s ease; }
+/* opacity is in the list for the decode's fallback paths: when the mosaic
+   is skipped (tiny box, no 2d context, load error) .px-wait comes off with
+   nothing underneath to cover the step, and a bare class removal there was
+   the photo blinking on */
+.stage img{ transition: filter .5s ease, opacity .22s ease; }
 
 /* prev / next in flight: the photo dims and nudges a few px AWAY from the
    direction of travel (the new one arrives from the other side, see the
@@ -3105,7 +3145,7 @@ body.lightbox-open{ overflow:hidden; }
   font-family:inherit;
   font-size:16px;
   cursor:pointer;
-  transition: color .15s, border-color .15s, background .15s;
+  transition: color .15s, border-color .15s, background .15s, scale .14s ease;
 }
 .lightbox__close:hover{
   color:var(--red);
@@ -3128,7 +3168,7 @@ body.lightbox-open{ overflow:hidden; }
   font-family:inherit;
   font-size:30px;
   cursor:pointer;
-  transition: color .15s, border-color .15s, background .15s;
+  transition: color .15s, border-color .15s, background .15s, scale .14s ease;
 }
 .lightbox__nav:hover{
   color:var(--chrome);
@@ -3203,7 +3243,7 @@ body.lightbox-open{ overflow:hidden; }
   text-decoration:none;
   white-space:nowrap;
   display:inline-flex; align-items:center;
-  transition: color .15s, background .15s;
+  transition: color .15s, background .15s, scale .14s ease;
 }
 .lightbox__btn:last-child{ border-right:0; }
 .lightbox__btn:hover{ color:var(--chrome); background:rgba(var(--chrome-rgb),.08); }
@@ -5145,6 +5185,26 @@ html.fx-lite .album-fx{ display:none; }
   from{ opacity:0; }
   to  { opacity:1; }
 }
+/* Movement-only twins of the two above. They exist because the entrance
+   easing below — cubic-bezier(.19,.66,.28,.99) — is deliberately expo-ish:
+   it is what makes the SETTLE read as clean, but run on opacity it puts the
+   element at ~90% visible after 30% of the duration, i.e. it pops on and
+   then merely drifts the last few pixels. That "clean animation, abrupt way
+   into it" is what you feel on a phone, where the element is large in frame
+   and there is no hover to have warned you it was coming. So the two halves
+   are animated separately now: the travel keeps the snappy curve, the fade
+   gets an even one over the same span. Anything that overrides the entrance
+   below writes the full `animation` shorthand rather than a lone
+   animation-name, because a single name would collapse the two-item lists
+   back to one animation. */
+@keyframes rv-lift{
+  from{ translate:0 14px; }
+  to  { translate:0 0; }
+}
+@keyframes rv-lift-right{
+  from{ translate:14px 0; }
+  to  { translate:0 0; }
+}
 /* one-shot HUD scan: an accent hairline sweeps along the header rule, then
    fades out again — the resting design stays exactly as before */
 @keyframes rv-scan{
@@ -5161,7 +5221,8 @@ html.fx-lite .album-fx{ display:none; }
 html.fx-anim .rv{ opacity:0; }
 html.fx-anim .rv.rv-in{
   opacity:1;
-  animation: rv-rise .55s cubic-bezier(.19,.66,.28,.99) backwards;
+  animation: rv-lift .55s cubic-bezier(.19,.66,.28,.99) backwards,
+             rv-fade .55s cubic-bezier(.33,.04,.4,1) backwards;
 }
 @media print{ html.fx-anim .rv{ opacity:1; } }
 
@@ -5173,12 +5234,12 @@ html.fx-anim .rv.rv-in{
    arrival cue now that the cover→hero morph is gone (see
    albumDepartureReturn() in app.js for why it went). ---- */
 html.fx-anim .fhero__frame.rv.rv-in{
-  animation-name: fhero-expose;
-  animation-duration:.9s;
+  animation: fhero-scale .9s cubic-bezier(.19,.66,.28,.99) backwards,
+             rv-fade .9s cubic-bezier(.33,.04,.4,1) backwards;
 }
-@keyframes fhero-expose{
-  from{ opacity:0; transform:scale(1.012); }
-  to  { opacity:1; transform:scale(1); }
+@keyframes fhero-scale{
+  from{ transform:scale(1.012); }
+  to  { transform:scale(1); }
 }
 
 /* ---- trip module: the instrument is there from the first frame (border,
@@ -5188,11 +5249,14 @@ html.fx-anim .fhero__frame.rv.rv-in{
    (app.js), so the whole builds as one cascade and nothing animates an
    ANCESTOR of the reel frame, which is what used to make the morphed-in
    frame tear away from the module rising around it. ---- */
-html.fx-anim .trip__bar.rv.rv-in{ animation-name: rv-fade; animation-duration:.5s; }
+html.fx-anim .trip__bar.rv.rv-in{ animation: rv-fade .5s cubic-bezier(.33,.04,.4,1) backwards; }
 html.fx-anim .trip__stop.rv.rv-in{ animation-duration:.6s; }
 /* desktop lays the legs out left→right as a route: they arrive along it */
 @media (min-width:1100px){
-  html.fx-anim .trip__stop.rv.rv-in{ animation-name: rv-right; }
+  html.fx-anim .trip__stop.rv.rv-in{
+    animation: rv-lift-right .6s cubic-bezier(.19,.66,.28,.99) backwards,
+               rv-fade .6s cubic-bezier(.33,.04,.4,1) backwards;
+  }
 }
 /* the leg's progress fill holds at zero until its card has landed, then
    sweeps to the live value — the one thing on the card that moves after
@@ -5245,9 +5309,13 @@ html.fx-anim img.px-wait{ opacity:0; }
   pointer-events:none;
   image-rendering:pixelated; /* nearest-neighbour upscale = crisp mosaic */
   /* geometry (left/top/width/height) is set per image by app.js;
-     filter matches .stage img.is-preview so the final snap is seamless */
+     filter matches .stage img.is-preview so the hand-off is seamless */
   filter:saturate(.92) brightness(.96);
+  /* the mosaic is faded off the finished photo rather than deleted out from
+     over it — see finish() in __stagePixelIn */
+  transition: opacity .22s ease;
 }
+.px-canvas.px-gone{ opacity:0; }
 
 /* ---- image detail: on load and after every SPA swap (the .detail node
    is replaced wholesale, so these re-run) the stage fades up — or slides in
@@ -5256,8 +5324,6 @@ html.fx-anim img.px-wait{ opacity:0; }
    the sidebar panels rise in one after the other underneath the pixel
    decode. ---- */
 html.fx-anim .stage{ animation: rv-fade .28s ease; }
-html.fx-anim .stage.is-entering-next{ animation: stage-in-next .38s cubic-bezier(.19,.66,.28,.99); }
-html.fx-anim .stage.is-entering-prev{ animation: stage-in-prev .38s cubic-bezier(.19,.66,.28,.99); }
 @keyframes stage-in-next{
   from{ opacity:0; transform:translate3d(32px, 0, 0); }
   to  { opacity:1; transform:translate3d(0, 0, 0); }
@@ -5266,6 +5332,35 @@ html.fx-anim .stage.is-entering-prev{ animation: stage-in-prev .38s cubic-bezier
   from{ opacity:0; transform:translate3d(-32px, 0, 0); }
   to  { opacity:1; transform:translate3d(0, 0, 0); }
 }
+/* A prev/next inside the photo page is a SWAP, not a page load, and the
+   two halves of it used to be strangers: the outgoing photo dimmed to .45
+   and nudged away, then the node was replaced and the incoming one started
+   again from BLACK. That step from .45 to 0 is a blink between two frames
+   of the same reel — the abrupt part of the move, not the slide. So the
+   swap gets its own keyframes, which pick the brightness up exactly where
+   the outgoing photo left it. `spa-swap` is set on <html> by spaLoadImage()
+   before the first swap and stays for the life of the document, so a real
+   photo-page LOAD (no class) still comes up out of black. */
+@keyframes stage-swap-in{
+  from{ opacity:.45; }
+  to  { opacity:1; }
+}
+@keyframes stage-swap-next{
+  from{ opacity:.45; transform:translate3d(26px, 0, 0); }
+  to  { opacity:1; transform:translate3d(0, 0, 0); }
+}
+@keyframes stage-swap-prev{
+  from{ opacity:.45; transform:translate3d(-26px, 0, 0); }
+  to  { opacity:1; transform:translate3d(0, 0, 0); }
+}
+html.fx-anim.spa-swap .stage{ animation: stage-swap-in .3s cubic-bezier(.33,.04,.4,1); }
+html.fx-anim.spa-swap .stage.is-entering-next{ animation: stage-swap-next .42s cubic-bezier(.24,.62,.3,1); }
+html.fx-anim.spa-swap .stage.is-entering-prev{ animation: stage-swap-prev .42s cubic-bezier(.24,.62,.3,1); }
+/* the directional classes only ever exist after a swap, but keep a
+   no-class fallback so a stray .is-entering-* can never leave the stage
+   sitting at whatever the last rule left behind */
+html.fx-anim .stage.is-entering-next{ animation: stage-in-next .38s cubic-bezier(.19,.66,.28,.99); }
+html.fx-anim .stage.is-entering-prev{ animation: stage-in-prev .38s cubic-bezier(.19,.66,.28,.99); }
 /* The loader bar gets its own keyframes, and they move it with the
    independent `translate` property rather than with `transform`. The bar
    carries a different transform per layout — centred by translateX(-50%)
@@ -5279,13 +5374,24 @@ html.fx-anim .stage.is-entering-prev{ animation: stage-in-prev .38s cubic-bezier
   from{ opacity:0; translate:0 10px; }
   to  { opacity:1; translate:0 0; }
 }
-html.fx-anim .stage__loader{ animation: loader-rise .45s cubic-bezier(.19,.66,.28,.99) .12s backwards; }
-html.fx-anim .sidebar > .panel{ animation: rv-rise .5s cubic-bezier(.19,.66,.28,.99) backwards; }
-html.fx-anim .sidebar > .panel:nth-child(1){ animation-delay:.06s; }
-html.fx-anim .sidebar > .panel:nth-child(2){ animation-delay:.12s; }
-html.fx-anim .sidebar > .panel:nth-child(3){ animation-delay:.18s; }
-html.fx-anim .sidebar > .panel:nth-child(4){ animation-delay:.24s; }
-html.fx-anim .sidebar > .panel:nth-child(n+5){ animation-delay:.30s; }
+/* Only on a real photo-page LOAD. spaLoadImage() replaces the whole
+   .detail node, so every one of these re-ran on every prev/next — the EXIF
+   panels restaged themselves, one after the other, each time you flicked to
+   the next photo. Nothing about them changed enough to earn an entrance: the
+   panels are the instrument you are reading, the photo is what swapped. The
+   `spa-swap` class on <html> is set before the first swap and stays, so from
+   the first flick onwards the sidebar and the loader bar are simply there
+   while the stage does the moving. */
+html.fx-anim:not(.spa-swap) .stage__loader{ animation: loader-rise .45s cubic-bezier(.19,.66,.28,.99) .12s backwards; }
+html.fx-anim:not(.spa-swap) .sidebar > .panel{
+  animation: rv-lift .5s cubic-bezier(.19,.66,.28,.99) backwards,
+             rv-fade .5s cubic-bezier(.33,.04,.4,1) backwards;
+}
+html.fx-anim:not(.spa-swap) .sidebar > .panel:nth-child(1){ animation-delay:.06s; }
+html.fx-anim:not(.spa-swap) .sidebar > .panel:nth-child(2){ animation-delay:.12s; }
+html.fx-anim:not(.spa-swap) .sidebar > .panel:nth-child(3){ animation-delay:.18s; }
+html.fx-anim:not(.spa-swap) .sidebar > .panel:nth-child(4){ animation-delay:.24s; }
+html.fx-anim:not(.spa-swap) .sidebar > .panel:nth-child(n+5){ animation-delay:.30s; }
 
 /* ---- welcome hero build-up (one-shot on load) -----------------------
    The hero IS a camera live view, so it enters the way one wakes up: the
@@ -5555,7 +5661,12 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
      against an edge or a centre line and several hold a translate of
      their own (.nav-arrow and .lightbox__nav are centred vertically by
      translateY(-50%)), which a transform here would drop for as long as
-     the finger is down — the button jumped half its own height. */
+     the finger is down — the button jumped half its own height.
+     Each of these elements now names `scale` in its own transition list
+     (.nav-arrow gets it from `transition: all`); an unlisted property
+     does not transition, so the press used to snap down and snap back
+     with nothing in between — the one micro-interaction on the page that
+     had no motion in it at all. */
   .nav-arrow:active,
   .lightbox__nav:active,
   .lightbox__close:active,

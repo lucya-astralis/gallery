@@ -268,6 +268,13 @@ async function spaLoadImage(href, { dir = 0, push = true } = {}) {
         warm.src = nextSrc;
       });
     }
+    // From here on this document is a swapped one, and it stays marked for
+    // good: the whole .detail node is replaced, so without this the sidebar
+    // panels and the loader bar replayed their staggered entrance on every
+    // single prev/next. The stage keeps its move (see the .spa-swap stage
+    // rules in style.css) — the photo is what changed, the EXIF readout
+    // beside it is just showing different numbers.
+    document.documentElement.classList.add('spa-swap');
     const selectors = ['.crumb', '.section__doc', '.detail', '#album-data'];
     let swapped = 0;
     selectors.forEach(sel => {
@@ -751,7 +758,16 @@ window.__stagePixelIn = () => {
     canvas.style.top = img.offsetTop + 'px';
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    const finish = () => { reveal(); canvas.remove(); };
+    // The last mosaic step used to be swapped for the sharp photo in one
+    // frame — the decode read clean right up to a hard cut at the end. The
+    // sharp image is uncovered UNDER the mosaic instead (the canvas is
+    // opaque and sits exactly on the photo box), then the mosaic is faded
+    // off it: same destination, no step. Removal waits out the fade.
+    const finish = () => {
+      reveal();
+      canvas.classList.add('px-gone');
+      setTimeout(() => canvas.remove(), 260);
+    };
     let step = 0;
     const paint = () => {
       const cell = CELLS_PX[step];
@@ -1526,19 +1542,41 @@ function sortCloseMenu(sort) {
   const menu = sort.querySelector('.sort__menu') ||
                (sort._menu && sort._menu.parentNode === document.body ? sort._menu : null);
   if (!menu) return;
-  menu.hidden = true;
+  if (menu._closeTimer) { clearTimeout(menu._closeTimer); menu._closeTimer = null; }
+
+  const finish = () => {
+    menu._closeTimer = null;
+    menu.classList.remove('is-closing');
+    menu.hidden = true;
+    // restore the menu to its original parent if we lifted it
+    if (menu._origParent && menu.parentNode === document.body) {
+      if (menu._origNext && menu._origNext.parentNode === menu._origParent) {
+        menu._origParent.insertBefore(menu, menu._origNext);
+      } else {
+        menu._origParent.appendChild(menu);
+      }
+      menu._origParent = null;
+      menu._origNext = null;
+    }
+  };
+
+  const wasOpen = !menu.hidden;
   if (btn) btn.setAttribute('aria-expanded', 'false');
   if (sortBackdrop) sortBackdrop.classList.remove('is-open');
   document.body.classList.remove('sort-open');
-  // restore the menu to its original parent if we lifted it
-  if (menu._origParent && menu.parentNode === document.body) {
-    if (menu._origNext && menu._origNext.parentNode === menu._origParent) {
-      menu._origParent.insertBefore(menu, menu._origNext);
-    } else {
-      menu._origParent.appendChild(menu);
-    }
-    menu._origParent = null;
-    menu._origNext = null;
+
+  // The phone sheet SLID up into place over .22s and then used to be
+  // deleted mid-air in a single frame — while the backdrop behind it was
+  // still fading out over .2s. One gesture, one thing gliding and one
+  // thing gone. It slides back down now, on the backdrop's clock. Desktop
+  // keeps the instant close: that menu is a 240px dropdown next to its
+  // button, not a panel covering the bottom of the screen.
+  if (wasOpen && sortIsMobile() &&
+      document.documentElement.classList.contains('fx-anim')) {
+    menu.classList.add('is-closing');
+    menu._closeTimer = setTimeout(finish, 200);
+  } else {
+    finish();
   }
 }
 
@@ -1559,6 +1597,10 @@ function initSortMenus(root = document) {
 
     function open() {
       sortCloseAll(sort);
+      // reopening while the sheet is still sliding out: cancel the pending
+      // hide, or it would fire on the freshly opened menu
+      if (menu._closeTimer) { clearTimeout(menu._closeTimer); menu._closeTimer = null; }
+      menu.classList.remove('is-closing');
       menu.hidden = false;
       btn.setAttribute('aria-expanded', 'true');
       if (sortIsMobile()) {
@@ -1577,7 +1619,12 @@ function initSortMenus(root = document) {
 
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (menu.hidden) open(); else sortCloseMenu(sort);
+      // a sheet still sliding out counts as closed: it is on its way off
+      // screen and `hidden` does not land until the slide is over, so
+      // asking `hidden` alone made the second tap of a fast toggle close
+      // an already-closing menu instead of bringing it back
+      if (menu.hidden || menu.classList.contains('is-closing')) open();
+      else sortCloseMenu(sort);
     });
   });
 }
@@ -1586,7 +1633,7 @@ function initSortMenus(root = document) {
 document.addEventListener('click', (e) => {
   document.querySelectorAll('[data-sort]').forEach((sort) => {
     const menu = sort._menu;
-    if (!menu || menu.hidden) return;
+    if (!menu || menu.hidden || menu.classList.contains('is-closing')) return;
     if (sort.contains(e.target) || menu.contains(e.target)) return;
     sortCloseMenu(sort);
   });
@@ -2345,7 +2392,6 @@ async function liveGo(url, { push = true } = {}) {
 
   // Re-wire the behaviours that live inside the swapped markup. Everything
   // else on the page was never touched, so it needs nothing.
-  root.classList.remove('is-live-loading');
   navProgress.done();
   // Stepping back into a previous filter/sort replaces the grid under the
   // visitor; without this the new markup is shorter or taller than what it
@@ -2358,6 +2404,15 @@ async function liveGo(url, { push = true } = {}) {
     scrollReveal(el);
     thumbFadeIn(el);
   });
+  // The outgoing grid goes out of focus while the new one is fetched, which
+  // reads as "refreshing" — but the class used to come off before the new
+  // markup had ever been styled, so the incoming grid was simply sharp from
+  // its first frame: a clean blur-out landing on a hard cut. Reading a
+  // layout property flushes the new nodes' style WITH the loading class
+  // still on them, so dropping it here is a real state change and the
+  // region pulls back into focus on the [data-live] transition.
+  void document.body.offsetWidth;
+  root.classList.remove('is-live-loading');
 }
 
 document.addEventListener('click', (e) => {
