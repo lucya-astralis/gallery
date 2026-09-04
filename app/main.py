@@ -1012,11 +1012,12 @@ def _album_font_file(album: str) -> Path | None:
     return path if path.is_file() else None
 
 
-def _album_font_scale(album: str) -> float | None:
-    """The album's `font_scale` as a float, or None when it is unset, not a
-    number, or outside ALBUM_FONT_SCALE_RANGE. None means "don't emit the
-    property" — style.css then falls back to its own default of 1."""
-    raw = (_cfg_first(_album_config(album), "font_scale") or "").strip()
+def _cfg_font_scale(raw: str | None) -> float | None:
+    """A `font_scale = …` as a float, or None when it is unset, not a number,
+    or outside ALBUM_FONT_SCALE_RANGE. None means "don't emit the property" —
+    style.css then falls back to its own default of 1. Shared by the album's
+    face and the site's (gallery.cfg), which are tuned on the same terms."""
+    raw = (raw or "").strip()
     if not raw:
         return None
     try:
@@ -1025,6 +1026,13 @@ def _album_font_scale(album: str) -> float | None:
         return None
     lo, hi = ALBUM_FONT_SCALE_RANGE
     return scale if lo <= scale <= hi else None
+
+
+def _album_font_scale(album: str) -> float | None:
+    """The album's own `font_scale`. No inheritance and no gallery.cfg tier:
+    it sizes the face the SAME cfg brought, so a scale without a `font` next
+    to it means nothing (the doctor says so)."""
+    return _cfg_font_scale(_cfg_first(_album_config(album), "font_scale"))
 
 
 def _album_font_version(album: str) -> int:
@@ -1073,9 +1081,9 @@ def _album_font_preload(album: str) -> dict | None:
     }
 
 
-# ----- per-album theme (album.cfg `accent` / `wallpaper_tint` / `_dim`) ---
-# An album can repaint the one accent colour of its own pages, and retune how
-# the backdrop behind them is treated:
+# ----- theme: accent + backdrop treatment (gallery.cfg / album.cfg) ------
+# The site sets its colours in gallery.cfg and an album can repaint its own
+# pages over the top — one key set, two tiers, resolved by _cfg_tiered:
 #   accent          = #7ad1ff   the accent for this album's pages
 #   wallpaper_tint  = off       how much colour the backdrop keeps
 #   wallpaper_dim   = .9        how bright it is
@@ -1088,7 +1096,10 @@ def _album_font_preload(album: str) -> dict | None:
 # They inherit down the tree the way `wallpaper` does: a sub-album that sets
 # nothing takes the nearest ancestor's, otherwise `japan_2026/kansai` would
 # drop back to the site colours mid-browse while still wearing its parent's
-# wallpaper.
+# wallpaper. Below the whole album chain sits gallery.cfg with the same three
+# keys, which is what a non-album page (welcome, /albums, search, 404) reads —
+# so an operator paints the site once instead of repeating a colour in every
+# album.cfg, and an album that wants to differ still says so itself.
 _HEX_COLOR = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 # Guard rails, same spirit as ALBUM_FONT_SCALE_RANGE: room to tune, not room
@@ -1205,30 +1216,42 @@ def _cfg_inherited(album: str | None, key: str) -> tuple[str, str] | None:
     return None
 
 
-def _album_accent(album: str | None) -> dict | None:
-    """The album's accent as the three derived faces, or None when neither it
-    nor any ancestor sets a usable `accent = #hex`."""
-    found = _cfg_inherited(album, "accent")
-    if found is None:
+def _cfg_tiered(album: str | None, key: str) -> str | None:
+    """The raw value of `key` for a page, through the two tiers every themable
+    key has: the album and its ancestors (_cfg_inherited), then gallery.cfg.
+    None when nobody sets it and the built-in default stands.
+
+    This is the whole inheritance story in one function, and every themable
+    key goes through it — accent, both backdrop knobs, the title face — so
+    "gallery.cfg paints the site, an album overrides it for its own pages"
+    is one rule rather than one per key."""
+    found = _cfg_inherited(album, key)
+    if found is not None:
+        return found[1]
+    return (_cfg_first(_gallery_config(), key) or "").strip() or None
+
+
+def _page_accent(album: str | None) -> dict | None:
+    """The page's accent as the three derived faces, or None when neither the
+    album chain nor gallery.cfg sets a usable `accent = #hex`. With none set
+    anywhere, style.css's own --acc… tokens stand."""
+    raw = _cfg_tiered(album, "accent")
+    if raw is None:
         return None
-    rgb = _parse_hex_color(found[1])
+    rgb = _parse_hex_color(raw)
     return None if rgb is None else _accent_shades(rgb)
 
 
 def _wallpaper_knob(album: str | None, key: str, default: float,
                     span: tuple[float, float], off: float) -> float | None:
-    """One backdrop knob, resolved through three tiers: this album and its
-    ancestors, then gallery.cfg, then the built-in default. Returns None when
-    nobody set it at all — the caller needs to tell "nothing configured" from
-    "configured to the same value the site uses", because that is what decides
-    whether a stylesheet is emitted for this page at all."""
-    found = _cfg_inherited(album, key)
-    if found is None:
-        raw = (_cfg_first(_gallery_config(), key) or "").strip()
-        if not raw:
-            return None
-    else:
-        raw = found[1]
+    """One backdrop knob, resolved through the tiers of _cfg_tiered and then
+    the built-in default. Returns None when nobody set it at all — the caller
+    needs to tell "nothing configured" from "configured to the same value the
+    site uses", because that is what decides whether a stylesheet is emitted
+    for this page at all."""
+    raw = _cfg_tiered(album, key)
+    if raw is None:
+        return None
     return _cfg_ratio(raw, default, span, off=off)
 
 
@@ -1297,7 +1320,7 @@ def _theme_decls(album: str | None) -> list[str]:
     Every value is re-serialised from parsed numbers, never printed straight
     out of a cfg."""
     decls = []
-    accent = _album_accent(album)
+    accent = _page_accent(album)
     if accent is not None:
         decls += ["--acc:%s" % accent["acc"], "--acc-rgb:%s" % accent["rgb"],
                   "--acc-deep:%s" % accent["deep"], "--acc-soft:%s" % accent["soft"]]
@@ -1466,27 +1489,181 @@ def _album_wallpaper_url(album: str | None, variant: str) -> str | None:
     return f"/album-wallpaper/{variant}/{quote(owner)}?v={max(stamps, default=0)}"
 
 
+# ----- the site's own face and backdrop (gallery.cfg owns them) ---------
+# Everything above this line is an album dressing its own pages. This is the
+# tier underneath all of it — what the archive itself wears, and what an album
+# that configures nothing falls back to:
+#
+#   font             = MusashiBrush.otf   the display face of the chrome
+#   font_scale       = 1.1                how to size it
+#   wallpaper        = bg.mp4             the site backdrop on desktop
+#   wallpaper_mobile = bg.jpg             …and on phones
+#
+# The files live in photos/.gallery/ next to the logo and the badges — the
+# gallery-wide mirror of an album's `.album/` folder — and they reach the page
+# exactly the way an album's do: a generated stylesheet for the face (the CSP
+# drops inline styles, see CSP below) and a route that reads the filename back
+# OUT of the cfg rather than taking it from the URL.
+#
+# What the face restyles is the chrome carrying the brand voice and nothing
+# else — the wordmark in the nav, the one big word on the welcome screen, the
+# 404 — through style.css's --display-font token, which is where the stock
+# Ethnocentric stack lives. It deliberately does NOT reach an album's hero
+# title: that title has its own `font` key one tier up, and a site face
+# quietly restyling stock album titles would make one key name two different
+# treatments depending on which file it was written in.
+# one definition, in scanner, because that is what has to skip the folder
+GALLERY_META_DIR = scanner.GALLERY_META_DIR
+# A constant, for the reason ALBUM_FONT_FAMILY is one: at most one site sheet
+# ever loads on a page, so the name cannot collide — not even with an album's.
+SITE_FONT_FAMILY = "site-display"
+
+
+def _gallery_meta_dir() -> Path | None:
+    """photos/.gallery/, or None when the gallery keeps no assets of its own."""
+    folder = PHOTOS_DIR / GALLERY_META_DIR
+    return folder if folder.is_dir() else None
+
+
+def _gallery_asset_file(name: str, allowed) -> Path | None:
+    """A gallery.cfg filename resolved inside photos/.gallery/, or None.
+
+    The rule every key naming a file in that folder shares — the mark, the
+    favicon, the portrait, the badges, the site face, the site backdrop: a
+    BARE filename only (anything carrying a path separator is refused) whose
+    extension is one that key is willing to serve. Same guarantee
+    _album_icon_file gives one tier up, so a cfg edit can never reach outside
+    the one folder, whichever key made it."""
+    folder = _gallery_meta_dir()
+    if folder is None or not name:
+        return None
+    if Path(name).name != name or Path(name).suffix.lower() not in allowed:
+        return None
+    path = folder / name
+    return path if path.is_file() else None
+
+
+def _gallery_asset_stamp(path: Path) -> int:
+    """Cache-busting stamp for a file in photos/.gallery/: the newer of its own
+    mtime and gallery.cfg's. The filename never travels in the URL, so
+    repointing `logo =` — or `font =`, or `wallpaper =` — at a different file
+    has to invalidate through the cfg's mtime, or the browser keeps serving
+    the old one. The cfg counts for a second reason on the face: `font_scale`
+    rides on the same generated sheet, and retuning it never touches the font
+    file (_album_font_version versions on its own cfg for exactly this)."""
+    stamps = []
+    for p in (path, GALLERY_CFG_PATH):
+        try:
+            stamps.append(int(p.stat().st_mtime))
+        except OSError:
+            pass
+    return max(stamps, default=0)
+
+
+def _gallery_cfg_asset(key: str, allowed) -> Path | None:
+    """The file gallery.cfg names in `key`, or None when it names none — or
+    one that isn't there, or isn't a type this key serves."""
+    return _gallery_asset_file((_cfg_first(_gallery_config(), key) or "").strip(),
+                               allowed)
+
+
+def _site_font_file() -> Path | None:
+    """The site's display face as a real file, or None. _album_font_file one
+    tier up, read out of gallery.cfg against photos/.gallery/."""
+    return _gallery_cfg_asset("font", ALBUM_FONT_TYPES)
+
+
+def _site_font_scale() -> float | None:
+    """gallery.cfg's `font_scale`, on the same terms as an album's — a
+    multiplier on every text the site face sets, held to the same range."""
+    return _cfg_font_scale(_cfg_first(_gallery_config(), "font_scale"))
+
+
+def _site_font() -> dict | None:
+    """What base.html needs to dress the chrome in the site's own face, or
+    None when gallery.cfg names none and style.css's stock stack stands:
+      css      the generated @font-face + --display-font sheet
+      preload  {href, type} for the file itself, so it downloads ALONGSIDE
+               that sheet rather than only after the browser has fetched and
+               parsed it — the same serial waterfall _album_font_preload
+               exists to break, and more visible here: the face is on the
+               welcome hero at 72px.
+    Both carry the same version, so the two requests hit one cache entry."""
+    font = _site_font_file()
+    if font is None:
+        return None
+    _fmt, mime = ALBUM_FONT_TYPES[font.suffix.lower()]
+    stamp = _gallery_asset_stamp(font)
+    return {
+        "css": f"/site-font.css?v={stamp}",
+        "preload": {"href": f"/site-font?v={stamp}", "type": mime},
+    }
+
+
+def _site_wallpaper_file(variant: str) -> Path | None:
+    """The site's own backdrop for one variant, or None. The same two keys and
+    the same per-variant whitelist an album.cfg carries — phones never get a
+    clip — read from gallery.cfg against photos/.gallery/."""
+    key, allowed = ALBUM_WALLPAPER_KEYS[variant]
+    return _gallery_cfg_asset(key, allowed)
+
+
+def _site_wallpaper_url(variant: str) -> str | None:
+    path = _site_wallpaper_file(variant)
+    if path is None:
+        return None
+    return f"/site-wallpaper/{variant}?v={_gallery_asset_stamp(path)}"
+
+
+templates.env.globals["site_font"] = _site_font
+
+
+def _bg_layer(album: str | None, variant: str) -> tuple[str, Path] | None:
+    """(url, file) for one backdrop slot, through the tiers a wallpaper has:
+    the album and its ancestors, then gallery.cfg's own. None when neither
+    configures one and the shipped /static default is what shows."""
+    src = _album_wallpaper_source(album, variant)
+    if src is not None:
+        return _album_wallpaper_url(album, variant), src[1]
+    path = _site_wallpaper_file(variant)
+    if path is not None:
+        return _site_wallpaper_url(variant), path
+    return None
+
+
 def _site_bg(album: str | None = None) -> dict:
     """What base.html paints behind the page. Three slots so the template
     stays dumb and CSP-safe (no inline styles anywhere):
       still_mobile / still_desktop — <picture> sources; the browser fetches
         exactly one, and the desktop still doubles as the poster frame behind
         a loading video
-      video — desktop clip, or None when the album's desktop wallpaper is a
-        still image and there is nothing to play
-    An album that configures nothing lands on the site defaults, which is the
-    same backdrop every non-album page shows."""
-    desktop = _album_wallpaper_url(album, "desktop")
-    mobile = _album_wallpaper_url(album, "mobile")
-    src = _album_wallpaper_source(album, "desktop")
-    desktop_is_video = (src is not None
-                        and src[1].suffix.lower() in ALBUM_WALLPAPER_VIDEO_TYPES)
+      video — desktop clip, or None when the desktop wallpaper is a still
+        image and there is nothing to play
+    Every slot goes through _bg_layer, so an album's own backdrop wins, then
+    gallery.cfg's, then the one shipped under /static — the same fall-through
+    the rest of the theme has.
+
+    The poster behind a CONFIGURED clip is the configured mobile still rather
+    than the shipped bg-poster.jpg: the two are crops of one backdrop, and
+    flashing a stock photograph for the beat before the clip buffers had the
+    site briefly wearing someone else's picture. With nothing configured at
+    all it is the shipped clip that plays, and the shipped poster is the frame
+    that belongs to it."""
+    desktop = _bg_layer(album, "desktop")
+    mobile = _bg_layer(album, "mobile")
     default_still = _static_url("bg-poster.jpg")
+    desktop_is_video = (desktop is not None
+                        and desktop[1].suffix.lower() in ALBUM_WALLPAPER_VIDEO_TYPES)
+    if desktop is None:
+        still_desktop = default_still
+    elif desktop_is_video:
+        still_desktop = mobile[0] if mobile else default_still
+    else:
+        still_desktop = desktop[0]
     return {
-        "still_mobile": mobile or default_still,
-        # a desktop video still wants a poster behind it while it buffers
-        "still_desktop": (default_still if desktop_is_video or not desktop else desktop),
-        "video": (desktop if desktop_is_video else
+        "still_mobile": mobile[0] if mobile else default_still,
+        "still_desktop": still_desktop,
+        "video": (desktop[0] if desktop_is_video else
                   (None if desktop else _static_url("bg.mp4"))),
     }
 
@@ -1527,8 +1704,6 @@ templates.env.globals["theme_css_url"] = _theme_css_url
 # album icon and font routes, that reads the filename back OUT of the cfg
 # rather than taking it from the URL, so it can only ever serve a file the
 # cfg actually names.
-# one definition, in scanner, because that is what has to skip the folder
-GALLERY_META_DIR = scanner.GALLERY_META_DIR
 # same set the per-album icon accepts — a mark is a mark
 BRAND_ASSET_TYPES = ALBUM_ICON_TYPES
 # URL slot -> cfg key. Also the whitelist /brand/{slot} validates against,
@@ -1543,39 +1718,12 @@ BRAND_DEFAULT_LOGO = "logo/gallery-mark.svg"
 BRAND_BADGE_MAX = 6
 
 
-def _gallery_meta_dir() -> Path | None:
-    """photos/.gallery/, or None when the gallery keeps no brand assets."""
-    folder = PHOTOS_DIR / GALLERY_META_DIR
-    return folder if folder.is_dir() else None
-
-
 def _brand_file(name: str) -> Path | None:
-    """A branding filename resolved inside photos/.gallery/, or None.
-
-    Same rules as _album_icon_file: a bare filename only — anything carrying
-    a path separator is refused — and an extension we are willing to serve.
-    A cfg edit therefore can never reach outside that one folder."""
-    folder = _gallery_meta_dir()
-    if folder is None or not name:
-        return None
-    if Path(name).name != name or Path(name).suffix.lower() not in BRAND_ASSET_TYPES:
-        return None
-    path = folder / name
-    return path if path.is_file() else None
-
-
-def _brand_stamp(path: Path) -> int:
-    """Cache-busting stamp for a brand asset: the newer of the file's own
-    mtime and gallery.cfg's. The filename never travels in the URL, so
-    repointing `logo =` at a different file has to invalidate through the
-    cfg's mtime or the browser would keep showing the old mark."""
-    stamps = []
-    for p in (path, GALLERY_CFG_PATH):
-        try:
-            stamps.append(int(p.stat().st_mtime))
-        except OSError:
-            pass
-    return max(stamps, default=0)
+    """A branding filename resolved inside photos/.gallery/, or None: the rule
+    every key against that folder shares (_gallery_asset_file), held to the
+    types a mark may be. These assets are versioned on the stamp shared with
+    the rest of the folder — _gallery_asset_stamp, in the same section."""
+    return _gallery_asset_file(name, BRAND_ASSET_TYPES)
 
 
 def _brand_asset(slot: str, cfg: dict[str, list[str]]) -> dict | None:
@@ -1587,7 +1735,7 @@ def _brand_asset(slot: str, cfg: dict[str, list[str]]) -> dict | None:
     path = _brand_file((_cfg_first(cfg, key) or "").strip())
     if path is None:
         return None
-    return {"url": f"/brand/{slot}?v={_brand_stamp(path)}",
+    return {"url": f"/brand/{slot}?v={_gallery_asset_stamp(path)}",
             "type": BRAND_ASSET_TYPES[path.suffix.lower()]}
 
 
@@ -1605,7 +1753,7 @@ def _brand_badges(cfg: dict[str, list[str]]) -> list[dict]:
         path = _brand_file(name.strip())
         if path is None:
             continue
-        out.append({"url": f"/brand/badge/{len(out)}?v={_brand_stamp(path)}",
+        out.append({"url": f"/brand/badge/{len(out)}?v={_gallery_asset_stamp(path)}",
                     "label": label.strip() or path.stem})
     return out
 
@@ -2601,6 +2749,17 @@ def _safe_rel(album: str, filename: str) -> Path:
 #                                    sets its own still wins. See the per-album
 #                                    theme section above.
 #   wallpaper_dim = .9            -> how bright that backdrop is (off | 0.25–1).
+#   wallpaper = bg.mp4            -> the site's OWN backdrop on desktop (video
+#                                    or still), replacing the one shipped
+#                                    under /static. An album still wins.
+#   wallpaper_mobile = bg.jpg     -> the same on phones. Stills only.
+#   accent = #7ad1ff              -> the accent colour of every page an album
+#                                    has not repainted. See the theme section.
+#   font = MusashiBrush.otf       -> the display face of the chrome: the
+#                                    wordmark, the welcome screen's one big
+#                                    word, the 404. Not an album's hero title
+#                                    — that has its own `font` in album.cfg.
+#   font_scale = 1.1              -> size multiplier for that face (0.5–2.5).
 #   site_name / site_sub / site_hero / site_desc[_de|_jp] / logo / favicon /
 #   operator / operator_url / operator_pfp / privacy_url / imprint_url /
 #   badges                        -> who this archive belongs to: the
@@ -2621,9 +2780,12 @@ GALLERY_GROUP_KEYS = frozenset({"album_order"})
 # imported by the CLI's `doctor`, kept next to the keys it documents.
 GALLERY_CFG_KEYS = frozenset({
     "welcome", "welcome_desktop", "welcome_mobile", "album_order", "album_sort",
-    # the site backdrop's treatment: the same two knobs an album.cfg has, one
-    # tier up (an album still overrides)
-    "wallpaper_tint", "wallpaper_dim",
+    # How the site looks: the same theme keys an album.cfg carries, one tier
+    # DOWN — gallery.cfg dresses every page, an album still overrides its own.
+    # The files (`font`, both wallpapers) sit in photos/.gallery/ rather than
+    # in an `.album/`; see the site face/backdrop section.
+    "accent", "font", "font_scale",
+    "wallpaper", "wallpaper_mobile", "wallpaper_tint", "wallpaper_dim",
     # who the archive belongs to — wordmark, mark, operator, legal links
     # (_brand). The files live in photos/.gallery/.
     "site_name", "site_sub", "site_hero", "site_desc",
@@ -3340,7 +3502,7 @@ def api_album(request: Request, album: str, images: bool = False, sort: str | No
         "effect": effect if effect in ALBUM_EFFECTS else None,
         "font": {"css": font_css, "scale": _album_font_scale(album),
                  "preload": _album_font_preload(album)} if font_css else None,
-        "theme": {"css": theme_css, "accent": (_album_accent(album) or {}).get("acc"),
+        "theme": {"css": theme_css, "accent": (_page_accent(album) or {}).get("acc"),
                   "wallpaper": _wallpaper_decls(album) or None} if theme_css else None,
         "trip": _trip_for_album(album, code),
         "reel": {"mode": reel_mode, "items": _serialize_photos(reel_rows, base)},
@@ -3929,6 +4091,65 @@ def album_font_css(album: str):
     )
     return Response(css, media_type="text/css",
                     headers=IMMUTABLE)
+
+
+@app.get("/site-font.css")
+def site_font_css():
+    """The @font-face + --display-font binding for gallery.cfg's `font = …`
+    (plus --display-scale for its `font_scale = …`). The album sheet's twin,
+    one tier down: same reason it is a real stylesheet rather than an inline
+    <style> (the CSP drops those), and the same re-serialisation guarantee —
+    the family name is a constant and the scale is a validated float, so
+    nothing that came out of a cfg is printed into the CSS. The url() needs no
+    escaping either: the path carries no filename, only the version."""
+    font = _site_font_file()
+    if font is None:
+        raise HTTPException(404, "not found")
+    fmt, _mime = ALBUM_FONT_TYPES[font.suffix.lower()]
+    src = f"/site-font?v={_gallery_asset_stamp(font)}"
+    scale = _site_font_scale()
+    # the stock stack stays behind it: a display face that has no glyph for
+    # what the chrome is currently saying falls through rather than tofus
+    root = (f"--display-font:'{SITE_FONT_FAMILY}','Ethnocentric',"
+            "'Space Grotesk',sans-serif")
+    if scale is not None:
+        root += f";--display-scale:{scale:g}"
+    css = (
+        "@font-face{"
+        f"font-family:'{SITE_FONT_FAMILY}';"
+        f"src:url('{src}') format('{fmt}');"
+        "font-weight:400;font-style:normal;font-display:swap}"
+        f":root{{{root}}}"
+    )
+    return Response(css, media_type="text/css", headers=IMMUTABLE)
+
+
+@app.get("/site-font")
+def serve_site_font():
+    """The font file gallery.cfg names in `font = …`. Like every other route
+    against photos/.gallery/, the filename is read back OUT of the cfg and
+    never taken from the URL — there is nothing in the URL but a version."""
+    font = _site_font_file()
+    if font is None:
+        raise HTTPException(404, "not found")
+    _fmt, mime = ALBUM_FONT_TYPES[font.suffix.lower()]
+    return FileResponse(str(font), media_type=mime, headers=IMMUTABLE)
+
+
+@app.get("/site-wallpaper/{variant}")
+def serve_site_wallpaper(variant: str):
+    """The backdrop gallery.cfg names in `wallpaper =` / `wallpaper_mobile =` —
+    what every page shows that no album has dressed. The album route's twin,
+    with the same guarantee: the variant picks the cfg key and the whitelist,
+    and the filename comes back out of the cfg."""
+    if variant not in ALBUM_WALLPAPER_KEYS:
+        raise HTTPException(404, "not found")
+    path = _site_wallpaper_file(variant)
+    if path is None:
+        raise HTTPException(404, "not found")
+    return FileResponse(str(path),
+                        media_type=ALBUM_WALLPAPER_TYPES[path.suffix.lower()],
+                        headers=IMMUTABLE)
 
 
 @app.get("/album-font/{album:path}")

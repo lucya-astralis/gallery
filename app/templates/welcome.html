@@ -13,8 +13,15 @@
      later @font-face request when the two URLs are identical, and a `?v=`
      cache-buster on one side would download the file twice. Same reason the
      album title face carries crossorigin — fonts fetch in anonymous-CORS
-     mode, and an uncredentialed preload is what that request matches. #}
+     mode, and an uncredentialed preload is what that request matches.
+
+     Skipped when gallery.cfg brings a face of its own: base.html has then
+     already preloaded THAT file, the hero is set in it, and Ethnocentric is
+     only the fallback behind it — fetching a 68 KB face nothing paints would
+     be spending the hero's own head start on it. #}
+  {% if not site_font() %}
   <link rel="preload" href="/static/fonts/Ethnocentric-Regular.otf" as="font" type="font/otf" crossorigin>
+  {% endif %}
 {% endblock %}
 {% block meta %}
   {% set og_desc = t('welcome.og_desc', images=image_count, albums=album_count) %}

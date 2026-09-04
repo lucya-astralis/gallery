@@ -142,7 +142,9 @@ photos/
 │   ├── gallery.cfg        ← gallery-wide settings
 │   ├── logo.svg           ← the wordmark's mark (`logo =`, `favicon =`)
 │   ├── pfp.webp           ← the operator's portrait (`operator_pfp =`)
-│   └── eu.gif             ← a footer badge (`badges =`)
+│   ├── eu.gif             ← a footer badge (`badges =`)
+│   ├── Display.otf        ← the site's display face (`font =`)
+│   └── bg.mp4             ← the site's backdrop (`wallpaper =`)
 └── japan_2026/            ← an album
 ```
 
@@ -174,6 +176,12 @@ styles, the binding is served as a real stylesheet at
 `.album-font .album-hero__title` in `style.css` reads; the file itself comes
 from `/album-font/{album}`. Only the file named in the cfg is ever served —
 the filename never travels in the URL.
+
+The **site** has the same two keys one tier down, in `gallery.cfg` against
+`photos/.gallery/` — see [Look](#look). They do not collide: `album.cfg`'s
+`font` sets that album's hero title, `gallery.cfg`'s sets the chrome (the
+wordmark, the welcome screen's big word, the 404), and an album's hero title
+is never restyled by the site face.
 
 **An album's own icon.** Any album can carry a small mark — a civic emblem, a
 crest, a logo. Drop the image into `.album/` and name it in `album.cfg`:
@@ -262,6 +270,11 @@ Optional file in the album's **`.album/` folder** (see above):
 | `icon`       | a filename in `.album/`         | The album's own mark — `.svg` / `.png` / `.webp` / `.gif` / `.jpg` — shown wherever the album is named: cards, breadcrumb, hero title, trip stops (see above). |
 | `font`       | a filename in `.album/`         | Display face for the album's hero title — `.otf` / `.ttf` / `.woff2` / `.woff` (see above). |
 | `font_scale` | a number, `0.5`–`2.5`           | Size multiplier for that face, so a small-reading display face can be evened up. Only read when `font` is set; ignored when out of range. |
+| `accent`     | a hex colour, `#7ad1ff`         | The accent of this album's pages — links, focus, the active state, the featured mark, the hero button. Sub-albums inherit it. Unset falls through to `gallery.cfg`'s `accent`, then to the built-in colour. A colour too dark to read on the black page is lightened (`doctor` says when). |
+| `wallpaper`  | a filename in `.album/`         | This album's page backdrop on desktop — `.mp4` / `.webm` / `.jpg` / `.png` / `.webp` / `.avif`. Sub-albums inherit it. Unset falls through to `gallery.cfg`, then to the one shipped with the gallery. |
+| `wallpaper_mobile` | a filename in `.album/`   | The same on phones. **Stills only** — the gallery never loads a backdrop video there. It also stands in as the poster frame behind a desktop clip while that buffers. |
+| `wallpaper_tint` | `off`, or `0`–`1`           | How much colour that backdrop keeps. Unset inherits (ancestor album → `gallery.cfg` → the built-in near-greyscale). `off` is full colour, and also drops the accent wash lying over the picture. |
+| `wallpaper_dim`  | `off`, or `0.25`–`1`        | How bright it is; `1` and `off` both leave it untouched. Unset inherits the same way, ending at the built-in `0.72`. |
 
 ### Gallery settings (`gallery.cfg`)
 
@@ -302,6 +315,62 @@ album_order =
 # name_asc, name_desc, count_desc, count_asc)
 album_sort = curated
 ```
+
+#### Look
+
+The same file carries how the archive looks. Every key here is one an
+`album.cfg` also has, spelled identically — this is simply the tier below it:
+**`gallery.cfg` dresses the whole site, and an album still overrides it for
+its own pages.** Nothing is required; with none of it set the gallery wears
+its built-in colours, face and backdrop.
+
+```ini
+# photos/.gallery/gallery.cfg — how the site looks
+
+# the accent every page wears that no album has repainted: links, focus,
+# the active state, the featured mark, the hero button
+accent = #7ad1ff
+
+# the display face of the CHROME — the wordmark, the welcome screen's one
+# big word, the 404. Lives in photos/.gallery/ next to the logo.
+font = Display.otf          # .otf / .ttf / .woff2 / .woff
+font_scale = 1.1            # optional, 0.5–2.5 — size multiplier for it
+
+# the backdrop behind every page an album has not dressed
+wallpaper = bg.mp4          # desktop: a clip or a still
+wallpaper_mobile = bg.jpg   # phones: stills only
+
+# how that backdrop is treated (an album that sets these still wins)
+wallpaper_tint = off        # off | 0–1   — how much colour it keeps
+wallpaper_dim  = .72        # off | .25–1 — how bright it is
+```
+
+Three things worth knowing:
+
+* **`font` is the chrome's face, not an album's title.** An album's hero
+  title has its own `font` in `album.cfg` and is never restyled by this one —
+  otherwise the same key would mean two different treatments depending on
+  which file you wrote it in. `font_scale` here scales every text the site
+  face sets at once, so a face that inks small comes back up everywhere
+  rather than one heading at a time.
+* **`accent` is checked, not trusted.** It is parsed into three derived faces
+  (small text on black, a fill under black label text, and the one face that
+  carries white text), each held to a 4.5:1 contrast floor — so a colour too
+  dark to read is lightened rather than shipped unreadable. `doctor` reports
+  when that happened.
+* **The backdrop falls through in tiers.** An album's own wins, then its
+  nearest ancestor's, then `gallery.cfg`'s, then the clip shipped under
+  `/static`. When a configured clip is playing, the configured
+  `wallpaper_mobile` is the poster frame behind it — two crops of one
+  backdrop rather than a stock photo flashing for a beat.
+
+Because the CSP forbids inline styles, all of it reaches the page as real
+stylesheets: `/site-theme.css` (or `/album-theme.css/{album}`) redefines the
+`--acc…` and `--wallpaper-filter` tokens `style.css` already reads, and
+`/site-font.css` carries the `@font-face` plus `--display-font` /
+`--display-scale`. The files themselves come from `/site-font` and
+`/site-wallpaper/{desktop|mobile}`. As everywhere else, only the file the cfg
+names is ever served — the filename never travels in the URL.
 
 #### Branding
 
@@ -988,6 +1057,13 @@ All GET, all public:
 - `GET /album-font.css/{album}` — generated stylesheet for an album's `font =` face (`@font-face` + `--album-title-font`, plus `--album-title-scale` when it sets `font_scale =`); 404 when the album sets none
 - `GET /album-font/{album}` — the font file itself; only ever the one named in that album's `album.cfg`
 - `GET /album-icon/{album}` — the album's `icon =` mark; only ever the file named in that album's `album.cfg`, 404 when it sets none
+- `GET /site-font.css` — the same thing one tier down for `gallery.cfg`'s `font =` (`@font-face` + `--display-font`, plus `--display-scale` for `font_scale =`); 404 when the gallery sets none
+- `GET /site-font` — that face's file; only ever the one named in `gallery.cfg`
+- `GET /site-theme.css` — the theme of every page that is not an album's: `--acc…` from `gallery.cfg`'s `accent =`, `--wallpaper-filter` from its backdrop knobs. 404 when nothing is themed and `style.css`'s own tokens stand
+- `GET /album-theme.css/{album}` — the same for one album, resolved through its ancestors and then `gallery.cfg`
+- `GET /album-wallpaper/{desktop|mobile}/{album}` — the backdrop an `album.cfg` names; the album in the path is the one that *set* the key, so a sub-album never serves through its parent's URL
+- `GET /site-wallpaper/{desktop|mobile}` — the backdrop `gallery.cfg` names, for every page no album has dressed
+- `GET /brand/{logo|favicon|pfp}` + `GET /brand/badge/{index}` — the operator's marks and footer badges from `photos/.gallery/`; the index is the position in the *rendered* row
 - `GET /search?q=…` — search (`?sort=`)
 - `GET /lang/{en|de|jp}?next=…` — set the language cookie, 303 back to `next` (relative paths only)
 - `GET /api` + `/api/stats` + `/api/albums` + `/api/album/{album}` + `/api/photos` + `/api/photo/{rel_path}` + `/api/tags` + `/api/showcase` + `/api/shuffle` — the JSON API, CORS-enabled (see [API](#api))

@@ -301,13 +301,64 @@ REEL_VALUES = {"featured", "random", "shuffle", "off", "false", "0", "no", "none
 
 
 def _wallpaper_line(album: str, variant: str) -> str:
-    """`file.jpg` for an album's own backdrop, `file.jpg (from japan_2026)`
-    when it inherited one, `— (gallery default)` when nothing is set."""
+    """The backdrop this album actually shows, named through the tiers it is
+    resolved by: `file.jpg` for its own, `file.jpg (from japan_2026)` for an
+    inherited one, `file.jpg (gallery.cfg)` when the site's own is what shows,
+    and `— (shipped default)` when nothing anywhere configures one."""
     src = gallery._album_wallpaper_source(album, variant)
-    if src is None:
-        return "— (gallery default)"
-    owner, path = src
-    return path.name if owner == album else f"{path.name} (from {owner})"
+    if src is not None:
+        owner, path = src
+        return path.name if owner == album else f"{path.name} (from {owner})"
+    site = gallery._site_wallpaper_file(variant)
+    if site is not None:
+        return f"{site.name} (gallery.cfg)"
+    return "— (shipped default)"
+
+
+# What each file key of the theme block will and will not accept, for the
+# message a typo gets. Same two keys in both cfg files (_check_theme).
+_WALLPAPER_HINTS = {"wallpaper": "video or still", "wallpaper_mobile": "stills only"}
+
+
+def _check_theme(cfg: dict, files: dict, scale, where: str) -> list[tuple]:
+    """(level, key, detail) for the theme block BOTH cfg files carry: the
+    accent, the face (`font` / `font_scale`) and the backdrop (`wallpaper`,
+    `wallpaper_mobile`, and the two knobs).
+
+    The keys are spelled identically in album.cfg and gallery.cfg — gallery.cfg
+    dresses the site, an album overrides its own pages — so the rules live
+    here once. All the caller passes in is what genuinely differs: how the
+    file keys resolve (`files`: key -> a no-arg resolver returning a Path or
+    None), how the scale resolves, and the folder to name in a message."""
+    out = []
+    for key, resolve in files.items():
+        if key not in cfg:
+            continue
+        raw = gallery._cfg_first(cfg, key)
+        if resolve() is None:
+            hint = _WALLPAPER_HINTS.get(key)
+            detail = f"{raw!r} not found in {where} (or unsupported type"
+            detail += f" — {hint})" if hint else ")"
+            out.append(("error", key, detail))
+    if "font_scale" in cfg and scale() is None:
+        lo, hi = gallery.ALBUM_FONT_SCALE_RANGE
+        out.append(("warn", "font_scale",
+                    f"ignored — not a number in {lo}–{hi}, or no `font` set"))
+    if "accent" in cfg:
+        raw = (gallery._cfg_first(cfg, "accent") or "").strip()
+        rgb = gallery._parse_hex_color(raw)
+        if rgb is None:
+            out.append(("error", "accent",
+                        f"{raw!r} is not a hex colour (#abc or #aabbcc) — ignored"))
+        elif gallery._accent_shades(rgb)["lifted"]:
+            # not an error: the gallery lightens it rather than shipping an
+            # unreadable page, but the colour on screen is then not the one
+            # in the file, and that is worth saying out loud.
+            out.append(("warn", "accent",
+                        f"{raw!r} is too dark to read on the black page — the gallery "
+                        f"lightens it to {gallery._accent_shades(rgb)['acc']}"))
+    out += _check_wallpaper_knobs(cfg)
+    return out
 
 
 def _check_wallpaper_knobs(cfg: dict) -> list[tuple]:
@@ -383,34 +434,12 @@ def _check_album_cfg(album: str) -> list[dict]:
         raw = gallery._cfg_first(cfg, "icon")
         if gallery._album_icon_file(album) is None:
             add("error", "icon", f"{raw!r} not found in .album/ (or unsupported type)")
-    if "font" in cfg:
-        raw = gallery._cfg_first(cfg, "font")
-        if gallery._album_font_file(album) is None:
-            add("error", "font", f"{raw!r} not found in .album/ (or unsupported type)")
-    for key, variant in (("wallpaper", "desktop"), ("wallpaper_mobile", "mobile")):
-        if key in cfg:
-            raw = gallery._cfg_first(cfg, key)
-            if gallery._album_wallpaper_file(album, variant) is None:
-                hint = ("stills only" if variant == "mobile" else "video or still")
-                add("error", key,
-                    f"{raw!r} not found in .album/ (or unsupported type — {hint})")
-    if "font_scale" in cfg:
-        if gallery._album_font_scale(album) is None:
-            lo, hi = gallery.ALBUM_FONT_SCALE_RANGE
-            add("warn", "font_scale", f"ignored — not a number in {lo}–{hi}, or no `font` set")
-    if "accent" in cfg:
-        raw = (gallery._cfg_first(cfg, "accent") or "").strip()
-        rgb = gallery._parse_hex_color(raw)
-        if rgb is None:
-            add("error", "accent", f"{raw!r} is not a hex colour (#abc or #aabbcc) — ignored")
-        elif gallery._accent_shades(rgb)["lifted"]:
-            # not an error: the gallery lightens it rather than shipping an
-            # unreadable page, but the colour on screen is then not the one
-            # in the file, and that is worth saying out loud.
-            add("warn", "accent",
-                f"{raw!r} is too dark to read on the black page — the gallery "
-                f"lightens it to {gallery._accent_shades(rgb)['acc']}")
-    for level, key, detail in _check_wallpaper_knobs(cfg):
+    for level, key, detail in _check_theme(
+            cfg,
+            {"font": lambda: gallery._album_font_file(album),
+             "wallpaper": lambda: gallery._album_wallpaper_file(album, "desktop"),
+             "wallpaper_mobile": lambda: gallery._album_wallpaper_file(album, "mobile")},
+            lambda: gallery._album_font_scale(album), ".album/"):
         add(level, key, detail)
     # A custom stat renders as KEY / VALUE, so it needs the colon to split on;
     # without one _album_stats drops the line silently.
@@ -459,7 +488,12 @@ def _check_gallery_cfg() -> list[dict]:
         allowed = set(gallery.SORT_ALBUM_SQL) | {gallery.SORT_CURATED}
         if val and val not in allowed:
             add("error", "album_sort", f"{val!r} is not one of {', '.join(sorted(allowed))}")
-    for level, key, detail in _check_wallpaper_knobs(cfg):
+    for level, key, detail in _check_theme(
+            cfg,
+            {"font": gallery._site_font_file,
+             "wallpaper": lambda: gallery._site_wallpaper_file("desktop"),
+             "wallpaper_mobile": lambda: gallery._site_wallpaper_file("mobile")},
+            gallery._site_font_scale, ".gallery/"):
         add(level, key, detail)
     for level, key, detail in _check_brand(cfg):
         add(level, key, detail)

@@ -19,6 +19,70 @@ def _issue(level: str, key: str, detail: str) -> dict:
     return {"level": level, "key": key, "detail": detail}
 
 
+def _check_meta_files(cfg: dict[str, list[str]], keys, present: set[str],
+                      folder_ok: bool, where: str) -> list[dict]:
+    """The check every key naming a file in a meta folder gets: a bare
+    filename, an extension that key accepts, and the file actually sitting
+    there. `.album/` and `.gallery/` differ only in which folder and which
+    keys -- the rule is the same, and so is the reason it is worth checking:
+    none of this ever shows as an error on the site, a mistyped name simply
+    falls back or disappears.
+
+    `keys` is (key, allowed extensions) pairs; `present` the filenames in the
+    folder; `where` how to name it in a message."""
+    out: list[dict] = []
+    for key, exts in keys:
+        if key not in cfg:
+            continue
+        raw = (cfgio.first(cfg, key) or "").strip()
+        if not raw:
+            continue
+        if Path(raw).name != raw:
+            out.append(_issue("error", key,
+                              "%r must be a bare filename inside %s" % (raw, where)))
+        elif Path(raw).suffix.lower() not in exts:
+            out.append(_issue("error", key, "%r is not one of %s"
+                              % (raw, ", ".join(sorted(exts)))))
+        elif not folder_ok:
+            out.append(_issue("error", key,
+                              "%r -- there is no %s folder yet" % (raw, where)))
+        elif raw not in present:
+            out.append(_issue("error", key, "%r is not in %s" % (raw, where)))
+    return out
+
+
+def _check_theme(cfg: dict[str, list[str]]) -> list[dict]:
+    """The value half of the theme block BOTH cfg files carry: `accent`, the
+    face's `font_scale`, and the two backdrop knobs. Spelled identically in
+    album.cfg and gallery.cfg -- gallery.cfg dresses the site, an album
+    overrides its own pages -- so the rules live here once. The file half of
+    the same block (`font`, both wallpapers) goes through _check_meta_files,
+    which is where the folder they resolve against differs."""
+    out: list[dict] = []
+    if "font_scale" in cfg:
+        lo, hi = schema.FONT_SCALE_RANGE
+        raw = (cfgio.first(cfg, "font_scale") or "").strip()
+        try:
+            ok = lo <= float(raw.replace(",", ".")) <= hi
+        except ValueError:
+            ok = False
+        if not ok:
+            out.append(_issue("warn", "font_scale",
+                              "ignored -- not a number in %s-%s" % (lo, hi)))
+        elif "font" not in cfg:
+            out.append(_issue("warn", "font_scale", "ignored -- no `font` set"))
+
+    if "accent" in cfg:
+        raw = (cfgio.first(cfg, "accent") or "").strip()
+        if raw and not re.match(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$", raw):
+            out.append(_issue("error", "accent",
+                              "%r is not a hex colour (#abc or #aabbcc) -- "
+                              "the gallery ignores it" % raw))
+
+    out += _check_wallpaper_knobs(cfg)
+    return out
+
+
 def _check_wallpaper_knobs(cfg: dict[str, list[str]]) -> list[dict]:
     """`wallpaper_tint` / `wallpaper_dim`, which album.cfg and gallery.cfg both
     carry under identical rules -- gallery.cfg sets the site default, an album
@@ -94,44 +158,15 @@ def check_album(lib: Library, album: str,
             out.append(_issue("error", "effect", "%r is not whitelisted (%s)"
                               % (val, ", ".join(schema.EFFECTS))))
 
-    for key, exts in (("icon", schema.ICON_EXTS), ("font", schema.FONT_EXTS),
-                      ("wallpaper", schema.WALLPAPER_EXTS),
-                      ("wallpaper_mobile", schema.WALLPAPER_IMAGE_EXTS)):
-        if key not in cfg:
-            continue
-        raw = (cfgio.first(cfg, key) or "").strip()
-        if not raw:
-            continue
-        if Path(raw).name != raw:
-            out.append(_issue("error", key,
-                              "%r must be a bare filename inside .album/" % raw))
-        elif Path(raw).suffix.lower() not in exts:
-            out.append(_issue("error", key, "%r is not one of %s"
-                              % (raw, ", ".join(sorted(exts)))))
-        elif not (lib.meta_dir(album) / raw).is_file():
-            out.append(_issue("error", key, "%r is not in this album's .album/" % raw))
-
-    if "font_scale" in cfg:
-        lo, hi = schema.FONT_SCALE_RANGE
-        raw = (cfgio.first(cfg, "font_scale") or "").strip()
-        try:
-            ok = lo <= float(raw) <= hi
-        except ValueError:
-            ok = False
-        if not ok:
-            out.append(_issue("warn", "font_scale",
-                              "ignored -- not a number in %s-%s" % (lo, hi)))
-        elif "font" not in cfg:
-            out.append(_issue("warn", "font_scale", "ignored -- no `font` set"))
-
-    if "accent" in cfg:
-        raw = (cfgio.first(cfg, "accent") or "").strip()
-        if raw and not re.match(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$", raw):
-            out.append(_issue("error", "accent",
-                              "%r is not a hex colour (#abc or #aabbcc) -- "
-                              "the gallery ignores it" % raw))
-
-    out += _check_wallpaper_knobs(cfg)
+    meta = lib.meta_dir(album)
+    out += _check_meta_files(
+        cfg,
+        (("icon", schema.ICON_EXTS), ("font", schema.FONT_EXTS),
+         ("wallpaper", schema.WALLPAPER_EXTS),
+         ("wallpaper_mobile", schema.WALLPAPER_IMAGE_EXTS)),
+        {e.name for e in meta.iterdir() if e.is_file()} if meta.is_dir() else set(),
+        meta.is_dir(), ".album/")
+    out += _check_theme(cfg)
 
     # _album_stats splits on the FIRST colon and skips an entry whose value is
     # empty, so both shapes vanish from the page without a word.
@@ -192,7 +227,11 @@ def check_gallery(lib: Library,
             out.append(_issue("warn", "album_sort",
                               "curated preset without an `album_order` list"))
 
-    out += _check_wallpaper_knobs(cfg)
+    meta = lib.gallery_meta_dir()
+    out += _check_meta_files(cfg, schema.GALLERY_ASSET_KEYS.items(),
+                             {a["name"] for a in lib.brand_assets()},
+                             meta.is_dir(), schema.GALLERY_META_DIR + "/")
+    out += _check_theme(cfg)
     out += _check_brand(lib, cfg)
 
     return out
@@ -203,33 +242,14 @@ _URL_RE = re.compile(r"^(?:https?://[^\s\"'<>]+|/[^\s\"'<>]*)$")
 
 
 def _check_brand(lib: Library, cfg: dict[str, list[str]]) -> list[dict]:
-    """The branding keys. A mistake here never shows as an error on the site
-    — a mistyped logo falls back to the built-in mark, a bad URL drops the
+    """The branding keys that are NOT a plain filename -- the links and the
+    badge row. (The keys that do name a file, marks and theme files alike, go
+    through _check_meta_files with everything else pointed at .gallery/.)
+    A mistake here never shows as an error on the site — a bad URL drops the
     link, a badge naming a missing file just vanishes — so this is the only
     place it surfaces."""
     out: list[dict] = []
-    meta = lib.gallery_meta_dir()
     present = {a["name"] for a in lib.brand_assets()}
-
-    def check_file(key: str, name: str, exts: set) -> None:
-        if Path(name).name != name:
-            out.append(_issue("error", key,
-                              "%r must be a bare filename inside %s/"
-                              % (name, schema.GALLERY_META_DIR)))
-        elif not meta.is_dir():
-            out.append(_issue("error", key, "%r -- there is no %s/ folder yet"
-                              % (name, schema.GALLERY_META_DIR)))
-        elif name not in present:
-            out.append(_issue("error", key, "%r is not in %s/"
-                              % (name, schema.GALLERY_META_DIR)))
-        elif Path(name).suffix.lower() not in exts:
-            out.append(_issue("error", key, "%r is not one of %s"
-                              % (name, ", ".join(sorted(exts)))))
-
-    for key, exts in schema.BRAND_ASSET_KEYS.items():
-        name = (cfgio.first(cfg, key) or "").strip()
-        if name:
-            check_file(key, name, exts)
 
     for key in schema.URL_KEYS:
         raw = ", ".join(cfg.get(key) or []).strip()

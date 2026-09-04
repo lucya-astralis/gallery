@@ -22,10 +22,19 @@ Then open <http://localhost:8090>.
 
 | File | Where | What the UI gives you |
 | --- | --- | --- |
-| `gallery.cfg` | `photos/.gallery/` | welcome hero pickers (desktop / mobile / shared), a drag-sortable `album_order` with group headers, `album_sort` |
+| `gallery.cfg` | `photos/.gallery/` | welcome hero pickers (desktop / mobile / shared), a drag-sortable `album_order` with group headers, `album_sort`, the branding block, and the site's own **Look** and **Backdrop** — accent, display face and page backdrop |
 | `album.cfg` | `<album>/.album/` | every documented key as a real control — cover picker, drag-sortable `featured` / `order`, reel/sort/effect dropdowns, tags, custom attributes, icon & font pickers |
 | `album_en/de/jp.md` | `<album>/.album/` | a markdown editor per language; saving an empty one deletes the file |
 | `icon.svg`, `*.otf` … | `<album>/.album/` | upload, preview (the font is loaded and shown set in the album's name), delete |
+| `logo.svg`, `*.otf`, `bg.mp4` … | `photos/.gallery/` | the same, for the gallery's own marks, badges, display face and backdrop |
+
+The theme keys — `accent`, `font`, `font_scale`, `wallpaper`,
+`wallpaper_mobile` and the two backdrop knobs — appear on **both** tabs under
+the same two group headings, because both files spell them identically: the
+gallery tab dresses the whole site, an album's tab overrides it for that
+album's pages. What changes between the tabs is only which folder the file
+pickers read (`.gallery/` vs that album's `.album/`) and the help text under
+each field.
 | `<photo>.tags` | next to each photo | per-photo tags, one photo or forty at a time |
 
 Every file also has a **Raw file** tab if you would rather just type.

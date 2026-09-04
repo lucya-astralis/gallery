@@ -355,11 +355,29 @@
   --glass-blur: blur(18px) saturate(140%);
   --scrim-blur: blur(14px) saturate(130%);
 
+  /* The DISPLAY face: the brand voice of the chrome, and nothing else — the
+     wordmark, the welcome screen's one big word, the 404. A token for the
+     same reason --wallpaper-filter and --acc are: gallery.cfg's `font = …`
+     replaces it site-wide through the generated /site-font.css sheet, which
+     puts the archive's own face in front of this stack and leaves it behind
+     as the fallback. Every rule that sets display type reads the token, so
+     none of them has to know whether a face is configured.
+
+     --display-scale rides along on that same sheet (gallery.cfg
+     `font_scale = …`) and is why those rules wrap their size in a calc():
+     display faces disagree wildly about how much of the em they ink, so the
+     archive that brings the face also says how to size it. At the stock 1
+     the calc() is the plain size. Note this is the SITE face — an album's
+     hero title has its own key and its own token (--album-title-font). */
+  --display-font: "Ethnocentric","Space Grotesk", sans-serif;
+  --display-scale: 1;
+
   /* How the wallpaper behind the page is treated before anything is laid
      over it — see .bg-still/.bg-video. A token, because an album.cfg can
      retune it per album (`wallpaper_tint` / `wallpaper_dim`) through the
-     generated /album-theme.css sheet; nothing else in the sheet has to
-     know whether it is looking at the site default or an album's. */
+     generated /album-theme.css sheet — and gallery.cfg can retune the site's
+     own the same way, one tier down; nothing else in the sheet has to know
+     which of the three it is looking at. */
   --wallpaper-filter: grayscale(.92) brightness(.72) contrast(1.04);
   /* The one coloured thing laid OVER that wallpaper (see .site-bg::after).
      It belongs to the tint, not to the dimming: `wallpaper_tint = off` sets
@@ -605,8 +623,8 @@ code{
   min-width:0;
 }
 .nav__brand .brand-name{
-  font-family:"Ethnocentric","Space Grotesk", sans-serif;
-  font-size:15px;
+  font-family:var(--display-font);
+  font-size:calc(15px * var(--display-scale));
   letter-spacing:.14em;
   text-transform:uppercase;
   color:var(--text);
@@ -3666,8 +3684,8 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .vf__title{
   margin:0;
-  font-family:"Ethnocentric","Space Grotesk", sans-serif;
-  font-size:clamp(30px, 5.4vw, 72px);
+  font-family:var(--display-font);
+  font-size:calc(clamp(30px, 5.4vw, 72px) * var(--display-scale));
   line-height:1.06;
   letter-spacing:.04em;
   color:var(--text);
@@ -4049,7 +4067,7 @@ body.page-welcome{ --page-max: 2400px; }
   .vf__body{ bottom:50px; padding-bottom:20px; }
   /* stacked title: always break between the words on small screens — two
      short lines allow much larger type than one squeezed line */
-  .vf__title{ letter-spacing:.02em; font-size:clamp(30px, 9.5vw, 52px); }
+  .vf__title{ letter-spacing:.02em; font-size:calc(clamp(30px, 9.5vw, 52px) * var(--display-scale)); }
   .vf__lead{ font-size:13.5px; }
   .vf__deck{ gap:8px; padding:10px var(--deck-pad) 12px; }
   .vf__nav{ padding:5px 12px; }
@@ -4498,8 +4516,8 @@ body.page-welcome{ --page-max: 2400px; }
 .notfound__code::before{ top:-1px; left:-1px; border-right:0; border-bottom:0; }
 .notfound__code::after{ bottom:-1px; right:-1px; border-left:0; border-top:0; }
 .notfound__big{
-  font-family:"Ethnocentric","Space Grotesk", sans-serif;
-  font-size:clamp(64px, 12vw, 120px);
+  font-family:var(--display-font);
+  font-size:calc(clamp(64px, 12vw, 120px) * var(--display-scale));
   letter-spacing:.06em;
   line-height:1;
   color:var(--red);
@@ -4514,8 +4532,8 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .notfound__text{ max-width:560px; }
 .notfound__title{
-  font-family:"Ethnocentric","Space Grotesk", sans-serif;
-  font-size:clamp(22px, 2.6vw, 32px);
+  font-family:var(--display-font);
+  font-size:calc(clamp(22px, 2.6vw, 32px) * var(--display-scale));
   letter-spacing:.04em;
   margin:0 0 14px;
   color:var(--text);

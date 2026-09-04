@@ -30,6 +30,11 @@ GALLERY_CFG_NAME = "gallery.cfg"
 # an album's .album/ folder.
 GALLERY_META_DIR = ".gallery"
 BRAND_EXTS = {".svg", ".png", ".webp", ".gif", ".jpg", ".jpeg"}
+# Everything that folder may now hold. It started as marks only; the theme
+# block one tier down (`font`, `wallpaper`, `wallpaper_mobile` in gallery.cfg)
+# puts a face and a backdrop next to them, so the upload whitelist is the
+# union rather than the marks alone.
+GALLERY_EXTS = BRAND_EXTS | FONT_EXTS | WALLPAPER_EXTS
 # how many footer badges the gallery renders
 BADGE_MAX = 6
 # http(s) or site-relative; anything else is dropped rather than put in an href
@@ -129,14 +134,37 @@ ALBUM_KEYS = ["name", "collection", "showcase", "cover", "featured", "order",
               "accent", "wallpaper", "wallpaper_mobile", "wallpaper_tint",
               "wallpaper_dim", "loc", "stat", "stats"]
 GALLERY_KEYS = ["welcome", "welcome_desktop", "welcome_mobile", "album_order",
-                "album_sort", "wallpaper_tint", "wallpaper_dim",
+                "album_sort",
+                # the theme block, spelled exactly as album.cfg spells it —
+                # gallery.cfg dresses the site, an album overrides its pages
+                "accent", "font", "font_scale",
+                "wallpaper", "wallpaper_mobile",
+                "wallpaper_tint", "wallpaper_dim",
                 "site_name", "site_sub", "site_hero", "site_desc",
                 "site_desc_en", "site_desc_de", "site_desc_jp",
                 "logo", "favicon", "operator", "operator_url", "operator_pfp",
                 "privacy_url", "imprint_url", "badges", "credit"]
-# Which branding keys name a file in .gallery/, and what each accepts.
-BRAND_ASSET_KEYS = {"logo": BRAND_EXTS, "favicon": BRAND_EXTS,
-                    "operator_pfp": BRAND_EXTS}
+# Which gallery.cfg keys name a file in .gallery/, and what each accepts.
+# Marks first, then the theme block's three — checked identically, because
+# the folder rule is the same one whatever the file is for.
+GALLERY_ASSET_KEYS = {"logo": BRAND_EXTS, "favicon": BRAND_EXTS,
+                      "operator_pfp": BRAND_EXTS,
+                      "font": FONT_EXTS,
+                      "wallpaper": WALLPAPER_EXTS,
+                      "wallpaper_mobile": WALLPAPER_IMAGE_EXTS}
+
+# Where a key means something different on the gallery tab than on an album's.
+# Both files spell the theme block identically, but one tier down the files
+# live in .gallery/ rather than in an .album/, and what they dress is the whole
+# site rather than one album. Only the DIFFERENCE is written here — every
+# other key, and every other half of these ones, falls through to KEY_SPEC
+# and HELP.
+GALLERY_SPEC: dict[str, dict] = {
+    "font": {"type": "brand_asset", "exts": sorted(FONT_EXTS)},
+    "wallpaper": {"type": "brand_asset", "exts": sorted(WALLPAPER_EXTS)},
+    "wallpaper_mobile": {"type": "brand_asset",
+                         "exts": sorted(WALLPAPER_IMAGE_EXTS)},
+}
 
 # One-line help shown next to each field in the UI.
 HELP: dict[str, str] = {
@@ -154,9 +182,9 @@ HELP: dict[str, str] = {
     "font": "Display face for the album's hero title. Lives in .album/.",
     "font_scale": "Size multiplier for that face (%s–%s). Only read when a font is set."
                   % FONT_SCALE_RANGE,
-    "wallpaper": "Page backdrop on desktop — a clip or a still. Sub-albums inherit it. Empty means the gallery's default video.",
-    "wallpaper_mobile": "Page backdrop on phones. Stills only; the gallery never loads a backdrop video there. Empty means the gallery's default still.",
-    "accent": "This album's accent colour -- links, focus, active state, the featured mark, the hero button. Sub-albums inherit it. Empty means the gallery's own accent. The gallery lightens a colour too dark to read on the black page.",
+    "wallpaper": "Page backdrop on desktop — a clip or a still. Sub-albums inherit it. Empty means the gallery's own (gallery.cfg), and failing that the one shipped with it.",
+    "wallpaper_mobile": "Page backdrop on phones. Stills only; the gallery never loads a backdrop video there. Empty means the gallery's own, then the shipped one.",
+    "accent": "This album's accent colour -- links, focus, active state, the featured mark, the hero button. Sub-albums inherit it. Empty means the gallery's own accent (gallery.cfg). The gallery lightens a colour too dark to read on the black page.",
     "wallpaper_tint": "How much colour the backdrop keeps. Empty = inherit (an album takes its parent's, then gallery.cfg; gallery.cfg takes the built-in near-greyscale treatment). “off” = the picture in full colour, a number = partial.",
     "wallpaper_dim": "How bright that backdrop is -- 1 and “off” both leave it untouched. Empty = inherit, ending at the built-in 0.72. In gallery.cfg this dresses the site's own default wallpaper.",
     "loc": "Location, shown as the LOC line at the top of the stats block. Commas are fine here — the gallery rejoins them.",
@@ -183,6 +211,21 @@ HELP: dict[str, str] = {
     "imprint_url": "Footer imprint link. Empty means no such link.",
     "badges": "Classic 88x31 web buttons in the footer, `file | label` per line. The label is the alt text and the tooltip. Files live in .gallery/. No commas in either half — the cfg parser splits on them.",
     "credit": "Who took the photographs — written as EXIF Artist/Copyright into every derived image (thumbnails, previews, converted fulls). Metadata only: nothing is drawn on a photo and the originals are never rewritten.",
+}
+
+
+# What the shared theme keys mean on the gallery tab. Same idea as
+# GALLERY_SPEC: only the entries that genuinely differ, everything else falls
+# through to HELP.
+GALLERY_HELP: dict[str, str] = {
+    "accent": "The gallery's accent colour -- links, focus, active state, the featured mark, the hero button, on every page no album has repainted. An album's own `accent` still wins for its own pages. Empty means the gallery's built-in colour. A colour too dark to read on the black page is lightened.",
+    "font": "The archive's display face: the wordmark, the welcome screen's one big word, the 404. Lives in .gallery/. NOT an album's hero title -- that has its own `font` in album.cfg and is untouched by this. Empty means the gallery's stock face.",
+    "font_scale": "Size multiplier for that face (%s-%s). It scales every text the face sets at once, so a face that inks small comes back up everywhere rather than one heading at a time. Only read when a `font` is set."
+                  % FONT_SCALE_RANGE,
+    "wallpaper": "The site's backdrop on desktop -- a clip or a still, in .gallery/. Every page that no album has dressed shows it. Empty means the one shipped with the gallery.",
+    "wallpaper_mobile": "The site's backdrop on phones. Stills only; the gallery never loads a backdrop video there. It also stands in as the poster frame behind a desktop clip while that buffers.",
+    "wallpaper_tint": "How much colour the site backdrop keeps -- the gallery's own and any an album brings that says nothing itself. Empty = the built-in near-greyscale treatment. \u201coff\u201d = full colour, a number = partial.",
+    "wallpaper_dim": "How bright that backdrop is -- 1 and \u201coff\u201d both leave it untouched. Empty = the built-in 0.72. An album that sets it wins for its own pages.",
 }
 
 

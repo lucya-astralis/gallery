@@ -214,11 +214,27 @@ async function select(sel, keepTab = false) {
 
 const dirty = () => Object.keys(state.edits).length > 0;
 
+/* The theme keys — accent, font, font_scale, both wallpapers — are spelled
+ * identically in album.cfg and gallery.cfg, but one tier down they name a
+ * file in .gallery/ rather than in an .album/ and they dress the whole site
+ * rather than one album. The server sends only that difference
+ * (gallery_spec / gallery_help); everything else falls through, so no key
+ * has to be described twice. */
+function specFor(key) {
+  const override = state.sel.kind === 'gallery' && state.meta.gallery_spec;
+  return (override && override[key]) || state.meta.spec[key] || {};
+}
+
+function helpFor(key) {
+  const override = state.sel.kind === 'gallery' && state.meta.gallery_help;
+  return (override && override[key]) || state.meta.help[key] || '';
+}
+
 function value(key) {
   if (key in state.edits) return state.edits[key];
   const raw = state.data.values[key];
   if (raw === undefined) return null;
-  const spec = state.meta.spec[key] || {};
+  const spec = specFor(key);
   const listy = ['photo_list', 'list', 'kv_list', 'welcome', 'album_list'].includes(spec.type);
   if (listy) return raw;
   // `joined` keys (loc) are one logical line the parser happened to split on
@@ -263,14 +279,16 @@ const GALLERY_GROUPS = [
   ['Identity', 'What this archive calls itself. All of it is yours to set; the “powered by” line in the gallery’s footer names the software instead and is not configurable. Leave it all empty and the gallery calls itself “Gallery” behind a neutral mark.',
     ['site_name', 'site_sub', 'site_hero', 'logo', 'favicon',
      'site_desc', 'site_desc_en', 'site_desc_de', 'site_desc_jp']],
+  ['Look', 'The accent every page wears and the display face of the chrome — the wordmark, the welcome screen’s big word, the 404. Not an album’s hero title: that keeps its own `font`. An album that sets its own accent still wins for its pages.',
+    ['accent', 'font', 'font_scale']],
+  ['Backdrop', 'What sits behind every page, and how the gallery treats it — its own backdrop, and any an album brings. An album that sets these itself still wins for its pages.',
+    ['wallpaper', 'wallpaper_mobile', 'wallpaper_tint', 'wallpaper_dim']],
   ['Operator & footer', 'The person behind the archive, the legal links, and the badge row. The footer’s operator card and the welcome screen’s “about me” button both need a URL to point at — without one, neither is rendered.',
     ['operator', 'operator_url', 'operator_pfp', 'privacy_url', 'imprint_url', 'badges']],
   ['Credit', 'Who took the photographs. Written as EXIF Artist/Copyright into every derived image — metadata only, nothing is drawn on a photo and the originals are never rewritten.',
     ['credit']],
   ['Welcome hero', 'Which photos cycle on the front page.', ['welcome_desktop', 'welcome_mobile', 'welcome']],
   ['Album list', 'The order and default sort on /albums.', ['album_order', 'album_sort']],
-  ['Backdrop', 'How the gallery treats the wallpaper behind every page — its own default one, and any an album brings. An album that sets these itself still wins.',
-    ['wallpaper_tint', 'wallpaper_dim']],
 ];
 
 /* Where the pane was before the last re-render, and where it actually landed
@@ -376,8 +394,8 @@ function renderSettings(groups) {
 }
 
 function renderField(key) {
-  const spec = state.meta.spec[key] || {};
-  const help = state.meta.help[key] || '';
+  const spec = specFor(key);
+  const help = helpFor(key);
   const unset = value(key) === null;
 
   return el('div', {
@@ -854,6 +872,10 @@ const ASSET_KIND = {
   font: 'font',
   wallpaper: 'wallpaper',
   wallpaper_mobile: 'wallpaper',
+  /* the .gallery/ keys, so one preview dispatcher covers both folders */
+  logo: 'icon',
+  favicon: 'icon',
+  operator_pfp: 'icon',
 };
 /* Assets live in one of two folders and every /api/asset call says which:
  * an album's own .album/, or the gallery-wide .gallery/ holding the logo,
@@ -874,8 +896,10 @@ function assetQuery(name) {
          '&path=' + encodeURIComponent(state.sel.album || '');
 }
 
-/* the gallery.cfg keys that can point at a file in .gallery/ */
-const BRAND_CFG_KEYS = ['logo', 'favicon', 'operator_pfp'];
+/* the gallery.cfg keys that can point at a file in .gallery/ — the marks,
+ * and the site's own face and backdrop */
+const BRAND_CFG_KEYS = ['logo', 'favicon', 'operator_pfp',
+                        'font', 'wallpaper', 'wallpaper_mobile'];
 /* every cfg key that can point at a file in .album/ — "in use" means one of
  * these names it, and a .png could be named by any of them */
 const ASSET_CFG_KEYS = Object.keys(ASSET_KIND);
@@ -887,10 +911,28 @@ function assetIs(asset, role) {
   return asset.kinds ? asset.kinds.includes(role) : asset.kind === role;
 }
 
+/* What a row can actually put in an <img>. The .gallery/ folder carries no
+ * per-file role — it holds faces, clips and the gallery.cfg itself next to the
+ * marks — so the extension is what answers "is there a picture here", in both
+ * folders. */
+const IMAGE_RE = /\.(svg|png|webp|gif|jpe?g|avif)$/i;
+
+/* One preview per ROLE, wherever the file happens to live: a mark is shown as
+ * an image, a backdrop at the shape it will be seen in (a clip plays), a face
+ * set in itself. Both pickers call this, so a font picked out of .gallery/
+ * previews exactly the way one picked out of an .album/ does. */
+function assetPreview(key, name, url) {
+  const kind = ASSET_KIND[key] || 'icon';
+  if (kind === 'font') return fontSample(name, url);
+  if (kind === 'wallpaper') return wallpaperPreview(name, url);
+  return el('img', { class: 'iconpreview', src: url, alt: '' });
+}
+
 /* The .gallery/ counterpart of assetControl. Nothing in that folder has a
- * role of its own — a .png is a possible logo, a badge and a portrait
- * — so the offered files are filtered by the key's own extension whitelist
- * rather than by anything about the file. */
+ * role of its own — a .png is a possible logo, a badge and a portrait, and
+ * since the site's own theme lives there too a .jpg is a possible backdrop
+ * as well — so the offered files are filtered by the key's own extension
+ * whitelist rather than by anything about the file. */
 function brandAssetControl(key, spec) {
   const current = value(key);
   const exts = spec.exts || [];
@@ -914,7 +956,7 @@ function brandAssetControl(key, spec) {
       exts.join(', ') }));
   }
   if (current && files.some((f) => f.name === current)) {
-    box.append(el('img', { class: 'iconpreview', src: assetQuery(current), alt: '' }));
+    box.append(assetPreview(key, current, assetQuery(current)));
   }
   return box;
 }
@@ -946,9 +988,7 @@ function assetControl(key, spec) {
   if (current && files.some((f) => f.name === current)) {
     const url = '/api/asset?name=' + encodeURIComponent(current) +
                 '&path=' + encodeURIComponent(state.sel.album);
-    if (kind === 'icon') box.append(el('img', { class: 'iconpreview', src: url, alt: '' }));
-    else if (kind === 'wallpaper') box.append(wallpaperPreview(current, url));
-    else box.append(fontSample(current, url));
+    box.append(assetPreview(key, current, url));
   }
   return box;
 }
@@ -965,14 +1005,19 @@ function wallpaperPreview(name, url) {
   return el('img', { class: 'wallpreview', src: url, alt: '' });
 }
 
+/* The face, set in the word it will actually carry: an album's name on the
+ * album tab, the archive's own wordmark on the gallery tab. */
 function fontSample(name, url) {
   const family = 'cfgfont_' + name.replace(/[^a-z0-9]/gi, '_');
-  const sample = el('div', { class: 'fontsample', text: state.data.name || 'Sample' });
+  const label = (state.sel.kind === 'gallery'
+    ? value('site_hero') || value('site_name')
+    : state.data.name) || 'Sample';
+  const sample = el('div', { class: 'fontsample', text: label });
   if (window.FontFace) {
     new FontFace(family, 'url("' + url + '")').load().then((loaded) => {
       document.fonts.add(loaded);
       sample.style.fontFamily = '"' + family + '", serif';
-    }).catch(() => { sample.textContent = state.data.name + '  (font could not be loaded)'; });
+    }).catch(() => { sample.textContent = label + '  (font could not be loaded)'; });
   }
   return sample;
 }
@@ -1503,7 +1548,7 @@ function renderAssets() {
   const list = el('div', { class: 'assets' }, usable.length
     ? usable.map(renderAssetRow)
     : el('div', { class: 'empty-note', text: gallery
-        ? 'Nothing in photos/.gallery/ yet — this is where the logo, the operator’s portrait and the footer badges go.'
+        ? 'Nothing in photos/.gallery/ yet — this is where the logo, the operator’s portrait, the footer badges and the site’s own face and backdrop go.'
         : 'Nothing in this album’s .album/ folder yet.' }));
 
   const input = el('input', {
@@ -1514,7 +1559,7 @@ function renderAssets() {
     class: 'dropzone',
     text: READ_ONLY ? 'Read-only — uploads are disabled.'
       : gallery
-        ? 'Drop a logo, a portrait or a badge here, or click to choose. Accepted: ' +
+        ? 'Drop a mark, a badge, a display face or a backdrop here, or click to choose. Accepted: ' +
           (state.meta.brand_exts || []).join(', ')
         : 'Drop an icon or a title font here, or click to choose. Accepted: ' +
           state.meta.icon_exts.concat(state.meta.font_exts).join(', '),
@@ -1540,7 +1585,7 @@ function renderAssets() {
       state.data.assets = payload.assets;
       renderPane();
       toast(gallery
-        ? 'Uploaded ' + payload.name + ' — now point a branding key at it on the Settings tab'
+        ? 'Uploaded ' + payload.name + ' — now point a gallery.cfg key at it on the Settings tab'
         : 'Uploaded ' + payload.name + ' — now pick it as the album’s ' + payload.kind);
     } catch (err) {
       toast('Upload failed: ' + err.message, 'err');
@@ -1551,7 +1596,8 @@ function renderAssets() {
     el('div', { class: 'field__help u-mb' }, gallery
       ? 'Files here live in photos/.gallery/ next to the gallery.cfg — the gallery-wide ' +
         'counterpart of an album’s .album/. Uploading one does not select it — point ' +
-        '`logo`, `favicon`, `operator_pfp` or `badges` at it on the Settings tab.'
+        '`logo`, `favicon`, `operator_pfp`, `badges`, `font` or one of the wallpaper ' +
+        'keys at it on the Settings tab.'
       : 'Files here live in ' + state.sel.album + '/.album/ next to the album.cfg. ' +
         'Uploading one does not select it — point `icon`, `font` or one of the ' +
         'wallpaper keys at it on the Settings tab.'),
@@ -1574,10 +1620,13 @@ function renderAssetRow(asset) {
   const folder = assetFolder();
   return el('div', { class: 'asset' },
     el('div', { class: 'asset__icon' },
+      /* A clip gets a play mark, a real image gets shown, everything else —
+       * a face, the cfg itself — gets "Aa". It used to put ANY .gallery/ file
+       * in an <img>, back when that folder only held marks; a font or the
+       * gallery.cfg then rendered as a broken image and a 415 in the console. */
       VIDEO_RE.test(asset.name) ? '▶'
-        : (assetScope() === 'gallery' || assetIs(asset, 'icon') || assetIs(asset, 'wallpaper'))
-          ? el('img', { src: url, alt: '' })
-          : 'Aa'),
+        : IMAGE_RE.test(asset.name) ? el('img', { src: url, alt: '' })
+        : 'Aa'),
     el('span', { class: 'asset__name', text: asset.name }),
     assetInUse(asset) ? el('span', { class: 'pill pill--ok', text: 'in use' }) : null,
     el('span', { class: 'asset__meta', text: bytes(asset.size) }),

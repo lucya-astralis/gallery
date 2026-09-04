@@ -209,6 +209,12 @@ def api_meta():
         "gallery_keys": schema.GALLERY_KEYS,
         "spec": schema.KEY_SPEC,
         "help": schema.HELP,
+        # The theme keys are spelled the same in both files but mean one tier
+        # down on the gallery tab — a file in .gallery/ rather than in an
+        # .album/, the whole site rather than one album. Only the differences
+        # travel; the UI falls through to `spec`/`help` for everything else.
+        "gallery_spec": schema.GALLERY_SPEC,
+        "gallery_help": schema.GALLERY_HELP,
         "langs": schema.LANGS,
         "effects": schema.EFFECTS,
         "reel_values": schema.REEL_VALUES,
@@ -219,7 +225,9 @@ def api_meta():
         "font_exts": sorted(schema.FONT_EXTS),
         "wallpaper_exts": sorted(schema.WALLPAPER_EXTS),
         "wallpaper_image_exts": sorted(schema.WALLPAPER_IMAGE_EXTS),
-        "brand_exts": sorted(schema.BRAND_EXTS),
+        # what .gallery/ accepts: the marks, plus the face and the backdrop
+        # the site's own theme block names there
+        "brand_exts": sorted(schema.GALLERY_EXTS),
         "gallery_meta_dir": schema.GALLERY_META_DIR,
         "font_scale_range": list(schema.FONT_SCALE_RANGE),
     }
@@ -551,8 +559,9 @@ assert not _MISSING_TYPES, "no content type for %s" % sorted(_MISSING_TYPES)
 
 # Assets live in one of two folders, and every route below takes the same
 # `scope` to say which: an album's own `.album/`, or the gallery-wide
-# `.gallery/` holding the logo, the operator's portrait and the footer
-# badges. `path` is only read in the album scope.
+# `.gallery/` holding the logo, the operator's portrait, the footer badges,
+# and the site's own display face and backdrop. `path` is only read in the
+# album scope.
 _SCOPES = ("album", "gallery")
 
 
@@ -585,19 +594,20 @@ def api_asset(path: str = "", name: str = "", scope: str = "album"):
                         headers={"Cache-Control": "no-cache"})
 
 
-# icons, title fonts and page wallpapers all live side by side in .album/;
-# the gallery folder takes marks and badges instead, so the whitelist is a
-# different one and no font can be dropped where a logo goes
+# Icons, title fonts and page wallpapers all live side by side in .album/.
+# The gallery folder holds the same three roles one tier down — its face, its
+# backdrop — plus the marks and badges that only exist there, so its whitelist
+# is the wider of the two rather than a different one.
 _ASSET_EXTS = schema.ICON_EXTS | schema.FONT_EXTS | schema.WALLPAPER_EXTS
-_SCOPE_EXTS = {"album": _ASSET_EXTS, "gallery": schema.BRAND_EXTS}
+_SCOPE_EXTS = {"album": _ASSET_EXTS, "gallery": schema.GALLERY_EXTS}
 
 
 @app.post("/api/asset")
 async def api_asset_upload(path: str = Form(""), file: UploadFile = File(...),
                            scope: str = Form("album")):
     """Drop an icon, a title font or a page wallpaper into an album's
-    .album/ folder — or a logo, a portrait or a badge into the gallery's
-    .gallery/."""
+    .album/ folder — or a logo, a portrait, a badge, or the site's own face
+    or backdrop into the gallery's .gallery/."""
     _guard_write()
     meta = _asset_dir(scope, path)
     accepted = _SCOPE_EXTS[scope]
