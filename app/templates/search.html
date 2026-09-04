@@ -20,53 +20,75 @@
 
   <header class="section__head">
     <h1 class="section__slug"><span class="name">{{ t('search.slug') }}</span></h1>
+    {% set hits = (albums | length) + (images | length) %}
     <p class="section__stat" data-live="doc">
-      <b>{{ images | length }}</b>
-      {{ t('search.hits_one') if images | length == 1 else t('search.hits_many') }}
+      <b>{{ hits }}{% if capped %}+{% endif %}</b>
+      {{ t('search.hits_one') if hits == 1 and not capped else t('search.hits_many') }}
       <span class="section__stat-sep" aria-hidden="true">·</span>
       <span class="section__stat-q">{{ query }}</span>
     </p>
   </header>
 
-  {% if not images %}
+  {% if not images and not albums %}
     <div class="empty">
       <p>{{ t('search.no_match_prefix') }}<code>{{ query }}</code>{{ t('search.no_match_suffix') }}</p>
       <p class="note">{{ t('search.hint') }}</p>
     </div>
   {% else %}
     <div data-live="body">
-    <div class="toolbar">
-      <span class="toolbar__spacer"></span>
-      <div class="sort" data-sort>
-        <button type="button" class="sort__btn" aria-haspopup="true" aria-expanded="false">
-          <i class="fa fa-arrow-down-wide-short" aria-hidden="true"></i>
-          <span class="sort__btn-label">{{ t('sort.btn') }}</span>
-          <b>{{ sort_label }}</b>
-          <i class="fa fa-chevron-down sort__btn-caret" aria-hidden="true"></i>
-        </button>
-        <div class="sort__menu" hidden role="menu">
-          <div class="sort__head">{{ t('sort.by') }}</div>
-          {% for opt in sort_options %}
-            <a class="sort__option{% if opt.active %} is-active{% endif %}"
-               role="menuitem"
-               href="/search?q={{ query | urlencode }}&sort={{ opt.key }}">
-              {{ opt.label }}
-            </a>
+
+    {# Albums the query named, above the photos. Searching "hokkaido" used to
+       answer with 181 thumbnails and no way to tell you the album exists. #}
+    {% if albums %}
+      <section class="search-group">
+        <h2 class="search-group__label"><i class="fa fa-folder" aria-hidden="true"></i>{{ t('search.albums_head') }}<span class="search-group__n">{{ albums | length }}</span></h2>
+        <ul class="album-grid">
+          {% for a in albums %}
+            {% set card_idx = loop.index %}
+            {% include "_album_card.html" %}
           {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {% if images %}
+    <section class="search-group">
+      <h2 class="search-group__label"><i class="fa fa-image" aria-hidden="true"></i>{{ t('search.photos_head') }}<span class="search-group__n">{{ images | length }}{% if capped %}+{% endif %}</span></h2>
+      <div class="toolbar">
+        <span class="toolbar__spacer"></span>
+        <div class="sort" data-sort>
+          <button type="button" class="sort__btn" aria-haspopup="true" aria-expanded="false">
+            <i class="fa fa-arrow-down-wide-short" aria-hidden="true"></i>
+            <span class="sort__btn-label">{{ t('sort.btn') }}</span>
+            <b>{{ sort_label }}</b>
+            <i class="fa fa-chevron-down sort__btn-caret" aria-hidden="true"></i>
+          </button>
+          <div class="sort__menu" hidden role="menu">
+            <div class="sort__head">{{ t('sort.by') }}</div>
+            {% for opt in sort_options %}
+              <a class="sort__option{% if opt.active %} is-active{% endif %}"
+                 role="menuitem"
+                 href="/search?q={{ query | urlencode }}&sort={{ opt.key }}">
+                {{ opt.label }}
+              </a>
+            {% endfor %}
+          </div>
         </div>
       </div>
-    </div>
 
-    <ul class="image-grid">
-      {% for img in images %}
-        <li class="image-tile">
-          <a href="/image/{{ img.rel_path }}{% if current_sort != default_sort %}?sort={{ current_sort }}{% endif %}" title="{{ img.album }} / {{ img.filename }}">
-            <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
-            <div class="image-tile__overlay"><span>{{ img.album }}</span></div>
-          </a>
-        </li>
-      {% endfor %}
-    </ul>
+      <ul class="image-grid">
+        {% for img in images %}
+          <li class="image-tile">
+            <a href="/image/{{ img.rel_path }}{% if current_sort != default_sort %}?sort={{ current_sort }}{% endif %}" title="{{ img.album }} / {{ img.filename }}">
+              <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
+              <div class="image-tile__overlay"><span>{{ img.album }}</span></div>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+      {% if capped %}<p class="note search-group__capped">{{ t('search.capped', n=limit) }}</p>{% endif %}
+    </section>
+    {% endif %}
     </div>
   {% endif %}
 </section>

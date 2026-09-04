@@ -66,8 +66,16 @@
            data-idx="{{ loop.index0 }}" data-album="{{ img.album }}"
            data-filename="{{ img.filename }}" data-rel="{{ img.rel_path }}"
            tabindex="-1" aria-hidden="{% if loop.first %}false{% else %}true{% endif %}">
-          <img src="/preview/{{ img.rel_path }}" alt="{{ img.filename }}"
-               loading="{% if loop.index0 < 2 %}eager{% else %}lazy{% endif %}" decoding="async">
+          {# Same deal as the album reel (see _featured.html): stacked slides
+             all read as on-screen, so lazy never deferred any of them. First
+             frame only; app.js hydrates the rest one ahead of the crossfade. #}
+          {% if loop.first %}
+            <img src="/preview/{{ img.rel_path }}" alt="{{ img.filename }}"
+                 loading="eager" fetchpriority="high" decoding="async">
+          {% else %}
+            <img data-src="/preview/{{ img.rel_path }}" alt="{{ img.filename }}"
+                 loading="lazy" decoding="async">
+          {% endif %}
         </a>
       {% endfor %}
       <div class="vf__shade" aria-hidden="true"></div>

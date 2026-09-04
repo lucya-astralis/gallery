@@ -1,6 +1,7 @@
 import colorsys
 import json
 import logging
+import mimetypes
 import os
 import re
 import threading
@@ -19,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import brand, control, db, i18n, scanner, stats, watcher
+from . import brand, compress, control, db, i18n, scanner, stats, watcher
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 log = logging.getLogger("main")
@@ -128,6 +129,17 @@ def _i18n_context(request: Request) -> dict:
 
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"),
                             context_processors=[_i18n_context])
+# Python's mimetypes table has no entry for the web font formats, so
+# StaticFiles fell back to `text/plain; charset=utf-8` for every .woff2 —
+# which is what base.html's `<link rel=preload as=font type="font/woff2">`
+# is then compared against, and a preload whose type doesn't match what
+# arrives is thrown away and fetched a second time. Registering them here,
+# before the mount, is also what tells compress.py not to gzip a font.
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("font/woff", ".woff")
+mimetypes.add_type("font/ttf", ".ttf")
+mimetypes.add_type("font/otf", ".otf")
+
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
@@ -2291,6 +2303,13 @@ async def security_headers(request: Request, call_next):
     return response
 
 
+# Added AFTER security_headers on purpose: the last middleware registered is
+# the outermost one, so compression sees the finished response — headers and
+# all — and appends its own `Vary: Accept-Encoding` to the Vary that the
+# language handling above already set. Photos are left alone (see compress.py).
+app.add_middleware(compress.CompressMiddleware)
+
+
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     # API clients get JSON (with the CORS headers they need to read it),
@@ -4010,30 +4029,94 @@ def serve_full(album: str, filename: str):
     return FileResponse(str(src), headers=IMMUTABLE)
 
 
+# ----- search ------------------------------------------------------------
+# One field over three things a visitor might remember: what the album is
+# CALLED, what the file is called, and what it was tagged. Results come back
+# as albums first (the thing you were probably after) and photos below.
+#
+# Both halves are capped. A query is free-form and a short one matches most of
+# the library, which as one un-paginated page meant hundreds of KB of markup
+# and a wall of thumbnails to scroll past.
+SEARCH_PHOTO_LIMIT = 300
+SEARCH_ALBUM_LIMIT = 24
+
+
+def _matches(needle: str, haystack: str | None) -> bool:
+    """Case-insensitive substring test for the parts of the search that run in
+    Python rather than in SQL. `casefold()` is Unicode-aware, so an album
+    called "Lüneburg" is found by typing "lüneburg" or "LÜNEBURG" — sqlite's
+    own `lower()` only folds ASCII, which is all the photo-row half can do."""
+    return bool(haystack) and needle.casefold() in haystack.casefold()
+
+
 @app.get("/search", response_class=HTMLResponse)
 def search(request: Request, q: str = "", sort: str | None = None):
     q = q.strip()
     c = db.conn()
     if not q:
         return RedirectResponse("/albums")
+    lang = _request_lang(request)
     current_sort = _pick_sort(sort, SORT_IMAGE_SQL, SORT_IMAGE_DEFAULT)
     qualified_sql = _qualify_sort(SORT_IMAGE_SQL[current_sort])
-    like = f"%{q}%"
+
+    # Albums the query names. The `album` column is the FOLDER path, so on its
+    # own it could not find "Japan 2026" — the name the album is called
+    # everywhere on the site — for a folder called japan_2026. Matching the
+    # display name (album.cfg `name = …`) and the album's own tags here is what
+    # makes the search hint ("searches album names") true. The tree is a few
+    # dozen entries and every cfg is cached, so this is a dict lookup, not IO.
+    matched_albums = [
+        a for a in _albums_with_ancestors()
+        if _matches(q, a) or _matches(q, _album_display_name(a))
+        or any(_matches(q, tag) for tag in _album_tags(a))
+    ]
+    # A matched album stands for everything under it: naming a collection has
+    # to bring back its sub-albums' photos too, or "Japan 2026" would find the
+    # album and none of its 436 pictures.
+    scope_albums = sorted({
+        node for a in matched_albums
+        for node in _albums_with_ancestors()
+        if node == a or node.startswith(a + "/")
+    })
+
+    needle = q.casefold()
+    where = ["instr(lower(i.album), ?) > 0",
+             "instr(lower(i.filename), ?) > 0",
+             "instr(lower(t.name), ?) > 0"]
+    params: list = [needle, needle, needle]
+    if scope_albums:
+        where.append("i.album IN (%s)" % ",".join("?" * len(scope_albums)))
+        params += scope_albums
+    # instr(), not LIKE: `%` and `_` are LIKE wildcards, so typing either one
+    # used to match the entire library (798 of 798 photos for a single "%").
+    # Same case-insensitivity as LIKE had — both are ASCII-only in sqlite.
     rows = c.execute(
         f"""SELECT DISTINCT i.* FROM images i
            LEFT JOIN image_tags it ON it.image_id = i.id
            LEFT JOIN tags t ON t.id = it.tag_id
-           WHERE i.album LIKE ? OR i.filename LIKE ? OR t.name LIKE ?
-           ORDER BY {qualified_sql}""",
-        (like, like, like),
+           WHERE {" OR ".join(where)}
+           ORDER BY {qualified_sql}
+           LIMIT ?""",
+        (*params, SEARCH_PHOTO_LIMIT + 1),
     ).fetchall()
-    sort_options = _image_sort_options_for_template(current_sort, lang=_request_lang(request))
+    # One row over the limit is fetched purely to tell "exactly this many" from
+    # "this many and more" — a broad query used to render every matching row,
+    # and a one-letter search meant a 340 KB page of 600 thumbnails.
+    capped = len(rows) > SEARCH_PHOTO_LIMIT
+    images = [dict(r) for r in rows[:SEARCH_PHOTO_LIMIT]]
+
+    album_cards = _sorted_album_cards(
+        [_album_card(a) for a in matched_albums[:SEARCH_ALBUM_LIMIT]], "name_asc")
+    sort_options = _image_sort_options_for_template(current_sort, lang=lang)
     return templates.TemplateResponse(
         "search.html",
         {
             "request": request,
             "query": q,
-            "images": [dict(r) for r in rows],
+            "albums": album_cards,
+            "images": images,
+            "capped": capped,
+            "limit": SEARCH_PHOTO_LIMIT,
             "current_sort": current_sort,
             "default_sort": SORT_IMAGE_DEFAULT,
             "sort_options": sort_options,

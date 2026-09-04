@@ -806,6 +806,30 @@ section{
    that would be restyling data — `Pride_MUC_26` is not `PRIDE_MUC_26`. */
 .page-albums .section__slug .name,
 .page-search .section__slug .name{ text-transform:uppercase; }
+
+/* ---- search result groups (albums, then photos) ----
+   Same eyebrow as .sub-albums__head so a result group reads as the same kind
+   of block as the folder list on an album page. Nested <section>, so the
+   global section padding/centring is cancelled the way .sub-albums does it,
+   or the grids would sit indented and mis-aligned against every other grid. */
+.search-group{ margin:0 0 34px; padding:0; }
+.search-group__label{
+  display:flex; align-items:baseline; gap:10px;
+  margin:0 0 12px; padding-bottom:8px;
+  border-bottom:1px solid var(--line);
+  font-family:var(--mono);
+  font-size:11px; font-weight:400; letter-spacing:.24em;
+  text-transform:uppercase;
+  color:var(--label);
+}
+.search-group__label i{ color:var(--text-ghost); }
+.search-group__n{
+  margin-left:auto;
+  font-size:10px; letter-spacing:.18em; color:var(--text-dim);
+}
+/* the photo half is capped (SEARCH_PHOTO_LIMIT); say so under the grid
+   instead of silently showing a truncated result */
+.search-group__capped{ margin-top:14px; }
 /* parent-album link before the title (e.g. "↑ japan / tokyo"). Hidden on every
    viewport now that the pathbar "‹ Back to <parent>" button is always shown —
    the inline link would just duplicate it. */

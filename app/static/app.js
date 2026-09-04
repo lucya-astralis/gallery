@@ -223,6 +223,49 @@ window.addEventListener('pageshow', (e) => { if (e.persisted) navProgress.reset(
 })();
 
 // ---------- SHARED HELPERS -------------------------------------
+
+// Run something once the browser is otherwise idle, so it never competes
+// with the first paint. No requestIdleCallback in Safari, hence the timeout.
+function whenIdle(fn, timeout = 1200) {
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(fn, { timeout });
+  else setTimeout(fn, 300);
+}
+
+// Deferred slide images, shared by the welcome viewfinder and the album reel.
+//
+// A crossfade carousel stacks every slide at the same spot, so the browser
+// counts them all as being in the viewport and loading="lazy" defers exactly
+// nothing: an eight-frame reel pulled all eight 1600px previews before the
+// visitor had scrolled — ~3 MB on /album/japan_2026, most of it never seen.
+// The templates therefore give only the first slide a src and hand the rest a
+// data-src. Slides are hydrated one step AHEAD of the crossfade, so the frame
+// that is about to appear is already decoded when it does.
+function hydrateSlide(slides, idx) {
+  if (!slides.length) return;
+  const slide = slides[((idx % slides.length) + slides.length) % slides.length];
+  const img = slide && slide.querySelector('img[data-src]');
+  if (!img) return;
+  img.src = img.dataset.src;
+  img.removeAttribute('data-src');
+}
+
+// the frame being shown plus both neighbours — covers auto-advance, the
+// prev button and a swipe back
+function warmSlides(slides, idx) {
+  hydrateSlide(slides, idx);
+  hydrateSlide(slides, idx + 1);
+  hydrateSlide(slides, idx - 1);
+}
+
+// Someone reaching for the controls will very likely jump around, and a
+// segment click lands on a frame no prefetch anticipated. Once there is
+// intent, load the lot — passive visitors still never pay for it.
+function warmAllSlidesOnIntent(root, slides) {
+  const all = () => slides.forEach((_, i) => hydrateSlide(slides, i));
+  ['pointerdown', 'keydown', 'focusin'].forEach((ev) =>
+    root.addEventListener(ev, all, { once: true, passive: true }));
+}
+
 function readAlbumData() {
   const el = document.getElementById('album-data');
   if (!el) return null;
@@ -370,6 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function goTo(idx) {
     const target = ((idx % frames.length) + frames.length) % frames.length;
+    warmSlides(frames, target);   // the one after this is already on its way
     if (target !== current) {
       frames[current].classList.remove('is-on');
       frames[current].setAttribute('aria-hidden', 'true');
@@ -392,6 +436,10 @@ document.addEventListener('DOMContentLoaded', () => {
     f.setAttribute('aria-hidden', i === current ? 'false' : 'true');
   });
   syncFrame(current);
+  // frame 0 came with its src; fetch its neighbour once the page has settled
+  // so the first crossfade has something to fade to (see warmSlides)
+  whenIdle(() => warmSlides(frames, current));
+  warmAllSlidesOnIntent(vf, frames);
 
   if (autoOk) {
     vf.classList.add('vf--auto');
@@ -547,6 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function goTo(idx) {
     const target = ((idx % slides.length) + slides.length) % slides.length;
+    warmSlides(slides, target);   // the one after this is already on its way
     if (target !== current) {
       slides[current].classList.remove('is-on');
       slides[current].setAttribute('aria-hidden', 'true');
@@ -561,6 +610,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const regress = () => goTo(current - 1);
 
   sync(current);
+  // slide 0 came with its src; fetch its neighbour once the page has settled
+  // so the first crossfade has something to fade to (see warmSlides)
+  whenIdle(() => warmSlides(slides, current));
+  warmAllSlidesOnIntent(hero, slides);
 
   if (autoOk) {
     hero.classList.add('fhero--auto');

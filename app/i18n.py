@@ -290,6 +290,15 @@ STRINGS: dict[str, tuple[str, str, str]] = {
         "Durchsucht Albumnamen, Dateinamen und Tags.",
         "アルバム名・ファイル名・タグを検索します。",
     ),
+    # results are grouped: the albums a query names first, its photos below
+    "search.albums_head": ("Albums", "Alben", "アルバム"),
+    "search.photos_head": ("Photos", "Fotos", "写真"),
+    # shown when the photo half hit its cap — see SEARCH_PHOTO_LIMIT
+    "search.capped": (
+        "Showing the first {n}. Narrow the search for a shorter list.",
+        "Die ersten {n} werden gezeigt. Suche eingrenzen für eine kürzere Liste.",
+        "最初の{n}件を表示しています。検索を絞り込んでください。",
+    ),
 
     # ---- 404 --------------------------------------------------------------
     "nf.title": ("Not found", "Nicht gefunden", "見つかりません"),

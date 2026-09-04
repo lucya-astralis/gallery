@@ -26,8 +26,20 @@
         <a class="fhero__slide{% if loop.first %} is-on{% endif %}" href="/image/{{ img.rel_path }}"
            data-filename="{{ feat_label(img) }}"
            tabindex="-1" aria-hidden="{% if loop.first %}false{% else %}true{% endif %}">
-          <img src="/preview/{{ img.rel_path }}" alt="{{ feat_label(img) }}"
-               loading="{% if loop.first %}eager{% else %}lazy{% endif %}" decoding="async">
+          {# Only the first frame ships a real src. Crossfade slides stack at
+             one spot, so every one of them counts as "in the viewport" and
+             loading="lazy" deferred nothing — an eight-frame reel pulled all
+             eight 1600px previews before the visitor had scrolled. The rest
+             carry data-src and app.js (warmSlides) hydrates them one ahead of
+             the crossfade. Without JS only the first slide is ever shown, so
+             nothing is lost there either. #}
+          {% if loop.first %}
+            <img src="/preview/{{ img.rel_path }}" alt="{{ feat_label(img) }}"
+                 loading="eager" fetchpriority="high" decoding="async">
+          {% else %}
+            <img data-src="/preview/{{ img.rel_path }}" alt="{{ feat_label(img) }}"
+                 loading="lazy" decoding="async">
+          {% endif %}
         </a>
       {% endfor %}
       <div class="fhero__shade" aria-hidden="true"></div>
