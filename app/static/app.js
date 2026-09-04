@@ -1519,7 +1519,6 @@ window.__initImagePage = initImagePage;
 initImagePage();
 
 // ---------- SORT DROPDOWN --------------------------------------
-// ---------- SORT DROPDOWN --------------------------------------
 // Per-menu wiring lives in initSortMenus() so it can be re-run on the markup
 // that liveNav() swaps in; the document-level listeners below are registered
 // once, because re-registering them per swap would pile up.

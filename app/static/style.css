@@ -677,27 +677,8 @@ code{
 }
 .nav__search input::placeholder{ color:var(--text-ghost); letter-spacing:.14em; text-transform:uppercase; font-size:11px; }
 
-.nav__status{
-  display:flex; align-items:center; gap:8px;
-  font-family:var(--mono);
-  font-size:11px;
-  letter-spacing:.16em;
-  text-transform:uppercase;
-  color:var(--text-dim);
-  border-left:1px solid var(--line);
-  padding-left:18px;
-  white-space:nowrap;
-}
-.dot{
-  width:8px; height:8px; border-radius:50%;
-  background:var(--ok);
-  box-shadow:0 0 8px var(--ok);
-  animation:pulse 2s ease-in-out infinite;
-}
-@keyframes pulse{ 50%{ transform:scale(.6); opacity:.6; } }
-
-/* language selector (top right; stays visible on mobile where the ONLINE
-   status is dropped — it's the only interactive chrome in the nav).
+/* language selector (top right; the only interactive chrome in the nav
+   besides search, and the only one that stays on mobile).
    Boxed as a segmented control so it reads as one deliberate module
    instead of loose text links hanging off a divider. */
 .nav__lang{
@@ -1492,7 +1473,6 @@ section{
   color:var(--text-ghost);
 }
 .showcase__label{ color:var(--label); letter-spacing:.01em; }
-.showcase__count{ margin-left:auto; }
 .showcase__more{
   margin-left:auto;
   color:var(--text-dim);
@@ -1643,8 +1623,8 @@ section{
   color:var(--acc);
   background:rgba(var(--acc-rgb),.08);
   border-left-color:var(--acc);
+  font-weight:600;
 }
-.sort__option.is-active{ font-weight:600; }
 
 /* Mobile: bottom-sheet variant */
 .sort__backdrop{
@@ -2623,7 +2603,6 @@ section{
   border:1px solid var(--line);
   pointer-events:none;
 }
-.stage__corner--bl{ bottom:8px; left:8px; }
 .stage__corner--br{ bottom:8px; right:8px; }
 
 .nav-arrow{
@@ -2819,7 +2798,6 @@ details[open] > summary::before{ content:"▾ "; }
   .nav__brand .jp{ display:none; }
   .nav__brand .brand-name{ font-size:13px; }
   .nav__brand img{ height:24px; }
-  .nav__status{ display:none; }
   /* search field and language selector share one height so the two controls
      read as a matched pair; the option pills stretch to fill the taller box,
      which also gives them bigger tap targets */
@@ -3094,10 +3072,6 @@ html.fx-anim .stage.is-spa-loading.is-leaving-prev img{ transform:translate3d(18
   touch-action:manipulation;
   overscroll-behavior:contain;
 }
-.lightbox__img{
-  /* let the browser handle pinch on the image itself */
-  touch-action: pinch-zoom;
-}
 .lightbox[hidden]{ display:none; }
 body.lightbox-open{ overflow:hidden; }
 
@@ -3118,6 +3092,8 @@ body.lightbox-open{ overflow:hidden; }
   display:block;
   user-select:none;
   -webkit-user-drag:none;
+  /* let the browser handle pinch on the image itself */
+  touch-action: pinch-zoom;
   transition: opacity .15s ease;
   cursor:zoom-in;
 }
@@ -3788,15 +3764,6 @@ body.page-welcome{ --page-max: 2400px; }
   word-break:break-word;
 }
 
-.vf__auto{
-  font-family:var(--mono);
-  font-size:9.5px;
-  letter-spacing:.2em;
-  text-transform:uppercase;
-  color:var(--text-ghost);
-  white-space:nowrap;
-}
-
 /* ---- deck: prev/next + segmented frame track + tune ---- */
 .vf__deck{
   position:absolute; z-index:7;
@@ -3884,6 +3851,7 @@ body.page-welcome{ --page-max: 2400px; }
   font-family:inherit;
   font-size:12px;
   letter-spacing:.2em;
+  text-transform:uppercase;
   color:var(--text-ghost);
   white-space:nowrap;
 }
@@ -4321,9 +4289,10 @@ body.page-welcome{ --page-max: 2400px; }
 .is-b2 .ch-bar__fill,
 .is-b2 .ch-col__fill{ fill:var(--acc); }               /* 4.3:1 */
 .is-b3 .ch-bar__fill,
-.is-b3 .ch-col__fill{ fill:var(--acc); }
-.is-b3 .ch-bar__fill,
-.is-b3 .ch-col__fill{ fill:color-mix(in srgb, var(--acc-soft) 50%, var(--acc)); }  /* 6.1:1 */
+.is-b3 .ch-col__fill{
+  fill:var(--acc);                                     /* fallback: no color-mix */
+  fill:color-mix(in srgb, var(--acc-soft) 50%, var(--acc));  /* 6.1:1 */
+}
 .is-peak .ch-bar__fill,
 .is-peak .ch-col__fill{ fill:var(--acc-soft); }        /* 8.8:1 */
 
@@ -4349,8 +4318,10 @@ body.page-welcome{ --page-max: 2400px; }
   stroke-linecap:butt;
 }
 .ch-dial__spoke.is-b2{ stroke:var(--acc); }
-.ch-dial__spoke.is-b3{ stroke:var(--acc); }
-.ch-dial__spoke.is-b3{ stroke:color-mix(in srgb, var(--acc-soft) 50%, var(--acc)); }
+.ch-dial__spoke.is-b3{
+  stroke:var(--acc);                                   /* fallback: no color-mix */
+  stroke:color-mix(in srgb, var(--acc-soft) 50%, var(--acc));
+}
 .ch-dial__spoke.is-peak{ stroke:var(--acc-soft); }
 .ch-dial__tick{
   font-family:var(--mono);
@@ -4384,10 +4355,11 @@ body.page-welcome{ --page-max: 2400px; }
    way up as everywhere else. The old bottom two steps (.36 / .2 alpha) put
    a 7% slice at 1.2:1 against the track, which is why this card read as one
    bar with a bruise on the end. */
-.ch-stack__seg.is-s1{ fill:var(--acc); }
 .ch-stack__seg.is-s1{ fill:var(--acc-soft); }
-.ch-stack__seg.is-s2{ fill:var(--acc); }
-.ch-stack__seg.is-s2{ fill:color-mix(in srgb, var(--acc-soft) 50%, var(--acc)); }
+.ch-stack__seg.is-s2{
+  fill:var(--acc);                                     /* fallback: no color-mix */
+  fill:color-mix(in srgb, var(--acc-soft) 50%, var(--acc));
+}
 .ch-stack__seg.is-s3{ fill:var(--acc); }
 .ch-stack__seg.is-s4{ fill:rgba(var(--acc-rgb),.85); }
 .ch-stack__legend{
@@ -4404,10 +4376,11 @@ body.page-welcome{ --page-max: 2400px; }
   width:10px; height:10px;
   background:rgba(var(--acc-rgb),.85);
 }
-.ch-stack__swatch.is-s1{ background:var(--acc); }
 .ch-stack__swatch.is-s1{ background:var(--acc-soft); }
-.ch-stack__swatch.is-s2{ background:var(--acc); }
-.ch-stack__swatch.is-s2{ background:color-mix(in srgb, var(--acc-soft) 50%, var(--acc)); }
+.ch-stack__swatch.is-s2{
+  background:var(--acc);                               /* fallback: no color-mix */
+  background:color-mix(in srgb, var(--acc-soft) 50%, var(--acc));
+}
 .ch-stack__swatch.is-s3{ background:var(--acc); }
 .ch-stack__swatch.is-s4{ background:rgba(var(--acc-rgb),.85); }
 .ch-stack__name{
@@ -5713,7 +5686,6 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
   .section__slug .jp{ font-size:13px; }
 
   /* section headings (grey mono eyebrows above each block) */
-  .fhero__label,
   .showcase__label,
   .feat__label,
   .archive-head__label,

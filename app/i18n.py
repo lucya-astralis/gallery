@@ -176,8 +176,6 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "aria.album_info": ("Album info", "Album-Info", "アルバム情報"),
 
     # ---- featured reel (_featured.html) ---------------------------------
-    "reel.random": ("Random", "Zufall", "ランダム"),
-    "reel.featured": ("Featured", "Ausgewählt", "特集"),
     "unit.photo": ("photo", "Foto", "枚"),
     "unit.photos": ("photos", "Fotos", "枚"),
     "reel.open": ("Open", "Öffnen", "開く"),
@@ -327,9 +325,10 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "panel.raw_dump": ("raw dump", "Rohdaten", "生データ"),
     "panel.no_exif": ("No EXIF data.", "Keine EXIF-Daten.", "EXIFデータがありません。"),
     # the stage starts on the downscaled preview and swaps to the original on
-    # demand; app.js flips this marker between the two
+    # demand. Only the initial state is rendered here — both labels the marker
+    # then flips between live in app.js (UI_STRINGS.qualityPreview /
+    # .qualityOriginal), so there is deliberately no "quality.original" key.
     "quality.preview": ("Preview", "Vorschau", "プレビュー"),
-    "quality.original": ("Original", "Original", "オリジナル"),
     "btn.load_original": ("Load original", "Original laden", "オリジナルを読み込む"),
     "btn.fullscreen": ("Fullscreen", "Vollbild", "全画面"),
     "btn.download": ("Download", "Herunterladen", "ダウンロード"),

@@ -7,6 +7,7 @@ import threading
 import time
 import urllib.request
 from collections import Counter
+from contextlib import asynccontextmanager
 from datetime import date, datetime
 from functools import partial
 from pathlib import Path
@@ -39,6 +40,15 @@ HIDE_GPS = os.environ.get("HIDE_GPS", "1") not in ("0", "false", "False", "")
 STRIP_GPS = os.environ.get("STRIP_GPS", "1") not in ("0", "false", "False", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 
+# Every route that hands out a derived or configured FILE (thumbs, previews,
+# originals, album fonts and icons, wallpapers, brand assets, the generated
+# theme sheets) sends this. A year is safe because none of those URLs is
+# ambiguous: a photo route is keyed on the photo's own path, and the generated
+# ones carry a `?v=` stamp derived from the source file's mtime, so a change
+# produces a different URL rather than a stale hit. HTML is the exception and
+# gets no-store — see the security_headers middleware.
+IMMUTABLE = {"Cache-Control": "public, max-age=31536000"}
+
 _scan_lock = threading.Lock()
 _STARTED_AT = time.time()
 
@@ -53,7 +63,20 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # Flag-file channel the CLI talks to this process through (app/control.py).
 control.configure(DATA_DIR)
 
-app = FastAPI(title=brand.PRODUCT, docs_url=None, redoc_url=None, openapi_url=None)
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    """Process start / stop. The bodies live further down next to the indexer
+    control section they belong to (_startup / _shutdown) — they are looked up
+    when this runs, not when it is defined, so the order in the file is free to
+    follow the reading order."""
+    _startup()
+    yield
+    _shutdown()
+
+
+app = FastAPI(title=brand.PRODUCT, docs_url=None, redoc_url=None, openapi_url=None,
+              lifespan=_lifespan)
 
 BASE_DIR = Path(__file__).parent
 
@@ -635,20 +658,45 @@ def _album_meta_dir(album: str) -> Path | None:
     return folder if folder.is_dir() else None
 
 
+# album path -> ((mtime_ns, size), parsed cfg). Same contract as
+# _gallery_cfg_cache further down: the parse is keyed on what the file looks
+# like on disk, so an edit is picked up on the very next call and an unchanged
+# file is never re-read. One entry per album, so the whole thing is a few
+# dozen small dicts even on a large tree.
+_album_cfg_cache: dict[str, tuple[tuple[int, int], dict[str, list[str]]]] = {}
+
+
 def _album_config(album: str) -> dict[str, list[str]]:
     """Parse the album's `album.cfg` (see _parse_cfg), or {} when there's no
-    such file. Cheap enough to call per album card."""
+    such file.
+
+    Cached on the file's (mtime, size). It reads like a per-card cost, but
+    nearly every helper on this page takes an album and looks its cfg up
+    again — name, cover, icon, tags, font, reel, showcase, effect, plus the
+    ancestor walks for theme and wallpaper — so rendering one album page
+    asked for the same handful of files ~74 times, 20 of them the identical
+    one. The returned dict is shared and never mutated by callers."""
     meta = _album_meta_dir(album)
     if meta is None:
+        _album_cfg_cache.pop(album, None)
         return {}
     cfg_path = meta / "album.cfg"
-    if not cfg_path.is_file():
+    try:
+        st = cfg_path.stat()
+    except OSError:
+        _album_cfg_cache.pop(album, None)
         return {}
+    key = (st.st_mtime_ns, st.st_size)
+    cached = _album_cfg_cache.get(album)
+    if cached is not None and cached[0] == key:
+        return cached[1]
     try:
         text = cfg_path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return {}
-    return _parse_cfg(text)
+    cfg = _parse_cfg(text)
+    _album_cfg_cache[album] = (key, cfg)
+    return cfg
 
 
 def _album_display_name(album: str, cfg: dict[str, list[str]] | None = None) -> str:
@@ -1869,8 +1917,15 @@ def _trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
 # all stops; results are cached for WEATHER_TTL so page-view bursts cost
 # at most one fetch, and the last good payload is served on upstream errors.
 WEATHER_TTL = 900  # seconds; weather for a dashboard doesn't need more
+# How long a failed upstream call is remembered. Without it an outage cost one
+# blocking 8s request per page view: only a SUCCESS refreshes the TTL, so every
+# caller went past the cache check, queued on the lock and waited out the
+# timeout again. Short enough that the widget comes back on its own once
+# Open-Meteo does.
+WEATHER_RETRY_AFTER = 60
 _weather_lock = threading.Lock()
 _weather_cache: dict[str, tuple[float, dict]] = {}  # trip key -> (fetched_at, payload)
+_weather_failed_at: dict[str, float] = {}  # trip key -> when the last fetch blew up
 
 
 def _fetch_trip_weather(cfg: dict) -> dict:
@@ -1932,17 +1987,29 @@ def api_trip_weather(trip: str):
     # so this blocks a threadpool worker, not the event loop)
     with _weather_lock:
         cached = _weather_cache.get(trip)
-        if cached and now - cached[0] < WEATHER_TTL:
+        fresh = cached is not None and now - cached[0] < WEATHER_TTL
+        # A recent failure is remembered as well, so an upstream outage costs
+        # one timeout per WEATHER_RETRY_AFTER instead of one per page view —
+        # the threadpool worker each of those parks for 8 seconds is the whole
+        # reason this backoff exists.
+        cooling = now - _weather_failed_at.get(trip, 0.0) < WEATHER_RETRY_AFTER
+        if fresh:
             data = cached[1]
+        elif cooling:
+            if cached is None:
+                raise HTTPException(502, "weather upstream unavailable")
+            data = cached[1]  # stale beats nothing
         else:
             try:
                 data = _fetch_trip_weather(cfg)
                 _weather_cache[trip] = (now, data)
+                _weather_failed_at.pop(trip, None)
             except Exception:
                 log.warning("trip weather fetch failed (%s)", trip, exc_info=True)
-                if not cached:
+                _weather_failed_at[trip] = time.time()
+                if cached is None:
                     raise HTTPException(502, "weather upstream unavailable")
-                data = cached[1]  # stale beats nothing; retried next TTL window
+                data = cached[1]  # stale beats nothing; retried after the backoff
     return JSONResponse(data, headers={"Cache-Control": "public, max-age=600"})
 
 
@@ -2385,8 +2452,10 @@ def _control_loop():
             log.warning("control tick failed: %s: %s", type(e).__name__, e)
 
 
-@app.on_event("startup")
 def _startup():
+    """Everything this process has to have running: the index, the featured
+    flags, the watcher and the control loop. Driven by _lifespan (top of the
+    file) — FastAPI's on_event hooks are deprecated."""
     db.init(DATA_DIR)
     _recompute_featured()
     log.info(
@@ -2415,7 +2484,6 @@ def _startup():
     _publish_status()
 
 
-@app.on_event("shutdown")
 def _shutdown():
     # Drop the snapshot so the CLI reports "not running" right away instead
     # of waiting for the heartbeat to age out.
@@ -2432,6 +2500,12 @@ def _safe_rel(album: str, filename: str) -> Path:
     if ".." in rel.parts or rel.is_absolute():
         raise HTTPException(400, "invalid path")
     if scanner.is_meta_path(rel):
+        raise HTTPException(404, "not found")
+    # These routes serve a PHOTO. Without this the extension was never looked
+    # at, and /full/ handed out any other file sitting in an album folder
+    # verbatim — a `.tags` sidecar, a stray note. Nothing links to those and
+    # nothing is meant to read them over HTTP.
+    if not scanner.is_image(rel):
         raise HTTPException(404, "not found")
     full = (PHOTOS_DIR / rel).resolve()
     try:
@@ -2512,7 +2586,7 @@ def _gallery_config() -> dict[str, list[str]]:
     except OSError:
         _gallery_cfg_cache = None
         return {}
-    key = (int(st.st_mtime), st.st_size)
+    key = (st.st_mtime_ns, st.st_size)
     cached = _gallery_cfg_cache
     if cached is not None and cached[0] == key:
         return cached[1]
@@ -3738,7 +3812,7 @@ def _theme_css_response(album: str | None):
     if not decls:
         raise HTTPException(404, "not found")
     return Response(":root{%s}" % ";".join(decls), media_type="text/css",
-                    headers={"Cache-Control": "public, max-age=31536000"})
+                    headers=IMMUTABLE)
 
 
 @app.get("/site-theme.css")
@@ -3782,7 +3856,7 @@ def album_font_css(album: str):
         f":root{{{root}}}"
     )
     return Response(css, media_type="text/css",
-                    headers={"Cache-Control": "public, max-age=31536000"})
+                    headers=IMMUTABLE)
 
 
 @app.get("/album-font/{album:path}")
@@ -3795,7 +3869,7 @@ def serve_album_font(album: str):
         raise HTTPException(404, "not found")
     _fmt, mime = ALBUM_FONT_TYPES[font.suffix.lower()]
     return FileResponse(str(font), media_type=mime,
-                        headers={"Cache-Control": "public, max-age=31536000"})
+                        headers=IMMUTABLE)
 
 
 @app.get("/album-icon/{album:path}")
@@ -3808,7 +3882,7 @@ def serve_album_icon(album: str):
     if icon is None:
         raise HTTPException(404, "not found")
     return FileResponse(str(icon), media_type=ALBUM_ICON_TYPES[icon.suffix.lower()],
-                        headers={"Cache-Control": "public, max-age=31536000"})
+                        headers=IMMUTABLE)
 
 
 @app.get("/humans.txt", response_class=Response)
@@ -3854,7 +3928,7 @@ def serve_brand_badge(index: int):
     if path is None:
         raise HTTPException(404, "not found")
     return FileResponse(str(path), media_type=BRAND_ASSET_TYPES[path.suffix.lower()],
-                        headers={"Cache-Control": "public, max-age=31536000"})
+                        headers=IMMUTABLE)
 
 
 @app.get("/brand/{slot}")
@@ -3870,7 +3944,7 @@ def serve_brand_asset(slot: str):
     if path is None:
         raise HTTPException(404, "not found")
     return FileResponse(str(path), media_type=BRAND_ASSET_TYPES[path.suffix.lower()],
-                        headers={"Cache-Control": "public, max-age=31536000"})
+                        headers=IMMUTABLE)
 
 
 @app.get("/album-wallpaper/{variant}/{album:path}")
@@ -3888,37 +3962,38 @@ def serve_album_wallpaper(variant: str, album: str):
         raise HTTPException(404, "not found")
     return FileResponse(str(path),
                         media_type=ALBUM_WALLPAPER_TYPES[path.suffix.lower()],
-                        headers={"Cache-Control": "public, max-age=31536000"})
+                        headers=IMMUTABLE)
+
+
+def _serve_derivative(album: str, filename: str, out_dir: Path, size: int, kind: str):
+    """A downscaled JPEG off the photo at album/filename, built on demand.
+
+    The two sizes the gallery serves — the grid thumbnail and the stage
+    preview — differ in nothing but their output directory and their long
+    edge, so they share this. A derivative that is missing or older than its
+    source is (re)built here rather than being left to the next scan: a photo
+    dropped in seconds ago is already linked from the page that asked for it."""
+    rel = _safe_rel(album, filename).as_posix()
+    src = PHOTOS_DIR / rel
+    if not src.exists():
+        raise HTTPException(404, "not found")
+    dst = (out_dir / rel).with_suffix(".jpg")
+    if scanner.needs_rebuild(dst, src):
+        built = scanner.ensure_thumb(PHOTOS_DIR, out_dir, rel, size)
+        if not built:
+            raise HTTPException(500, f"{kind} generation failed")
+        dst = built
+    return FileResponse(str(dst), media_type="image/jpeg", headers=IMMUTABLE)
 
 
 @app.get("/thumb/{album}/{filename:path}")
 def serve_thumb(album: str, filename: str):
-    rel = _safe_rel(album, filename).as_posix()
-    src = PHOTOS_DIR / rel
-    if not src.exists():
-        raise HTTPException(404, "not found")
-    dst = (THUMBS_DIR / rel).with_suffix(".jpg")
-    if scanner.needs_rebuild(dst, src):
-        t = scanner.ensure_thumb(PHOTOS_DIR, THUMBS_DIR, rel, THUMB_SIZE)
-        if not t:
-            raise HTTPException(500, "thumb generation failed")
-        dst = t
-    return FileResponse(str(dst), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=31536000"})
+    return _serve_derivative(album, filename, THUMBS_DIR, THUMB_SIZE, "thumb")
 
 
 @app.get("/preview/{album}/{filename:path}")
 def serve_preview(album: str, filename: str):
-    rel = _safe_rel(album, filename).as_posix()
-    src = PHOTOS_DIR / rel
-    if not src.exists():
-        raise HTTPException(404, "not found")
-    dst = (PREVIEWS_DIR / rel).with_suffix(".jpg")
-    if scanner.needs_rebuild(dst, src):
-        t = scanner.ensure_thumb(PHOTOS_DIR, PREVIEWS_DIR, rel, PREVIEW_SIZE)
-        if not t:
-            raise HTTPException(500, "preview generation failed")
-        dst = t
-    return FileResponse(str(dst), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=31536000"})
+    return _serve_derivative(album, filename, PREVIEWS_DIR, PREVIEW_SIZE, "preview")
 
 
 @app.get("/full/{album}/{filename:path}")
@@ -3931,8 +4006,8 @@ def serve_full(album: str, filename: str):
         dst = scanner.ensure_full_jpeg(PHOTOS_DIR, FULLS_DIR, rel)
         if not dst:
             raise HTTPException(500, "full conversion failed")
-        return FileResponse(str(dst), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=31536000"})
-    return FileResponse(str(src), headers={"Cache-Control": "public, max-age=31536000"})
+        return FileResponse(str(dst), media_type="image/jpeg", headers=IMMUTABLE)
+    return FileResponse(str(src), headers=IMMUTABLE)
 
 
 @app.get("/search", response_class=HTMLResponse)

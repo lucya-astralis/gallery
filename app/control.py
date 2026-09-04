@@ -59,6 +59,7 @@ def configure(data_dir: Path) -> Path:
         _dir.mkdir(parents=True, exist_ok=True)
     except OSError:
         pass  # read-only data dir: reads still work, writes will just fail
+    _sweep_tmp()
     return _dir
 
 
@@ -90,15 +91,53 @@ def _read(name: str) -> dict | None:
 def _write(name: str, payload: dict) -> bool:
     """Atomically replace a control file. The reader is another process, so a
     plain open+write could hand it a truncated file — write a sibling tmp and
-    os.replace() it in, which is atomic on both POSIX and Windows."""
+    os.replace() it in, which is atomic on both POSIX and Windows.
+
+    The tmp is always cleaned up. status.json is rewritten every CONTROL_TICK,
+    so a replace that fails (on Windows an antivirus or the search indexer can
+    hold the target open for a moment) used to leave one `.tmp<pid>` behind
+    per attempt and nothing ever collected them. _sweep_tmp additionally
+    clears the ones a killed process left mid-write."""
     try:
         target = _path(name)
-        tmp = target.with_suffix(target.suffix + f".tmp{os.getpid()}")
+    except RuntimeError:
+        return False
+    tmp = target.with_suffix(target.suffix + f".tmp{os.getpid()}")
+    try:
         tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
         os.replace(tmp, target)
         return True
-    except (OSError, RuntimeError):
+    except OSError:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
         return False
+
+
+TMP_STALE_AFTER = 60.0
+
+
+def _sweep_tmp() -> None:
+    """Drop `<file>.tmp<pid>` leftovers from a run that died mid-write.
+
+    Age-gated rather than pid-gated: the CLI and the server both configure()
+    the same directory, and a live _write holds its tmp for microseconds, so
+    anything older than TMP_STALE_AFTER belongs to nobody. Called once at
+    configure() time by both sides."""
+    if _dir is None:
+        return
+    cutoff = time.time() - TMP_STALE_AFTER
+    try:
+        entries = list(_dir.glob("*.tmp*"))
+    except OSError:
+        return
+    for f in entries:
+        try:
+            if f.stat().st_mtime < cutoff:
+                f.unlink()
+        except OSError:
+            pass
 
 
 def _remove(name: str) -> bool:

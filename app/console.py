@@ -263,10 +263,6 @@ def init_color(enabled: bool | None = None) -> bool:
     return _color
 
 
-def color_enabled() -> bool:
-    return _color
-
-
 def term_report() -> dict:
     """Everything the detection above looked at — the answer to "why do I get
     no colours on this box"."""

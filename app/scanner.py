@@ -6,7 +6,7 @@ from datetime import datetime
 from fractions import Fraction
 from pathlib import Path
 
-from PIL import Image, ExifTags, UnidentifiedImageError
+from PIL import Image, ExifTags
 
 from . import brand, db
 
@@ -398,18 +398,51 @@ def _read_sidecar_tags(image_path: Path) -> list[str]:
 
 
 def _sync_tags(image_id: int, tag_names: list[str]):
+    """Point an image's `image_tags` rows at exactly `tag_names`.
+
+    Compares against what is stored and returns without writing when the two
+    already agree, which is the common case: a re-index is usually triggered
+    by the photo, not by its sidecar. Readers get a proper snapshot now that
+    every thread has its own connection (app/db.py), so the DELETE-then-INSERT
+    below is no longer observable half-done — but the cheapest write is still
+    the one that doesn't happen, and a scan re-reads every sidecar it walks.
+
+    The unused-tag sweep deliberately does NOT live here: it scans the whole
+    `tags` table and used to run once per indexed photo. prune_tags() does it
+    once per scan instead.
+    """
     c = db.conn()
+    wanted = list(dict.fromkeys(tag_names))
     with db.lock():
+        current = [r["name"] for r in c.execute(
+            "SELECT t.name FROM tags t JOIN image_tags it ON it.tag_id = t.id "
+            "WHERE it.image_id = ?", (image_id,)).fetchall()]
+        # tags.name is COLLATE NOCASE, so compare the way the table does
+        if {n.casefold() for n in current} == {n.casefold() for n in wanted}:
+            return
         c.execute("DELETE FROM image_tags WHERE image_id = ?", (image_id,))
-        for name in tag_names:
+        for name in wanted:
             c.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", (name,))
             tag_id = c.execute("SELECT id FROM tags WHERE name = ?", (name,)).fetchone()["id"]
             c.execute(
                 "INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)",
                 (image_id, tag_id),
             )
-        c.execute("DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM image_tags)")
         c.commit()
+
+
+def prune_tags() -> int:
+    """Drop `tags` rows no photo carries any more; returns how many went.
+
+    A whole-table sweep — cheap once, wasteful per photo, which is where it
+    used to sit (inside _sync_tags, so a 5000-photo scan ran it 5000 times).
+    Orphans are invisible in the meantime: every query that reads tags joins
+    through image_tags, so this is housekeeping, not correctness."""
+    c = db.conn()
+    with db.lock():
+        cur = c.execute("DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM image_tags)")
+        c.commit()
+        return cur.rowcount or 0
 
 
 def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
@@ -594,6 +627,8 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
                 c.execute("DELETE FROM images WHERE rel_path = ?", (rel,))
                 removed += 1
         c.commit()
+    # once per scan, not once per photo — see prune_tags()
+    prune_tags()
     return {
         "indexed": added,
         "thumbnails": thumbed,
