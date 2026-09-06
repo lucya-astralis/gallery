@@ -102,6 +102,27 @@
   --glass-hi:   rgba(40, 40, 45, .58);
   --glass-blur: blur(18px) saturate(140%);
 
+  /* How the backdrop is treated before anything is laid over it. Both
+     figures are retuned from the gallery's defaults, because those defaults
+     are set for a PHOTOGRAPH and this is not one:
+
+       tint OFF (no grayscale). The gallery drains its wallpaper because a
+       photograph behind the page introduces a FOREIGN hue that every blurred
+       pane over it then picks up — that cast is what the palette pass was
+       about. Nova has no foreign hue to introduce: it is brand art drawn in
+       the accent's own colour, so draining it removes the one thing it was
+       made to say. The gallery spells this position `wallpaper_tint = off`;
+       it is a supported setting, not a departure. The photo thumbnails in
+       the grids are still the most saturated thing on screen, which is the
+       rule that actually matters.
+
+       brightness .95, not .72. A photograph arrives bright and full-range
+       and needs holding back; nova arrives dark by construction — its own
+       gradient falls to #07070d — so the gallery's figure crushed it. */
+  --wallpaper-filter: brightness(.95) contrast(1.04);
+  /* the one coloured thing laid back OVER that wallpaper */
+  --wallpaper-bloom: rgba(var(--acc-rgb), .07);
+
   /* Square, everywhere: the one shape rule the gallery's whole surface
      language is built on. The handful of genuinely round things (the status
      dot) opt out on purpose. */
@@ -146,8 +167,10 @@ body {
   isolation: isolate;
 }
 
-/* Fixed backdrop: the gallery's signature grid + radial wash, minus the
-   ambient video — a config tool has no business decoding 1080p behind a form. */
+/* Fixed backdrop: the nova artwork under the gallery's signature grid +
+   radial wash. No ambient video — a config tool has no business decoding
+   1080p behind a form, which is also why the art is vector: a backdrop that
+   costs nothing to paint is one this tool can afford. */
 .site-bg {
   position: fixed;
   inset: 0;
@@ -156,6 +179,31 @@ body {
   background: var(--bg);
 }
 
+/* Drained the same way the gallery drains its own — see --wallpaper-filter. */
+.site-bg .bg-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: var(--wallpaper-filter);
+}
+
+/* The grid, the accent bloom and the dim, painted OVER the art — the same
+   four layers as the gallery's .site-bg::after. This used to carry TWO accent
+   radials, because with no artwork under it the radials WERE the backdrop.
+
+   The one figure that differs: the dim is FLAT (.62 both ends) where the
+   gallery ramps .62 -> .82. That ramp exists to darken a photograph towards
+   the footer of a scrolling page. Nova already falls off downward on its own,
+   so the ramp landed on top of the artwork's own falloff and the bottom half
+   of the picture went black — "man sieht nur die obere Hälfte" (user,
+   2026-09-06). Nothing was actually cropped: at any normal window the cover
+   fit crops the SIDES and shows the full height. It was two darkenings
+   stacking.
+
+   ::after comes after the <img> in tree order, so it lands on top without
+   needing a z-index. */
 .site-bg::after {
   content: "";
   position: absolute;
@@ -163,11 +211,10 @@ body {
   background-image:
     linear-gradient(to right, rgba(255, 255, 255, .03) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, .03) 1px, transparent 1px),
-    radial-gradient(ellipse at 22% 32%, rgba(var(--acc-rgb), .07) 0%, transparent 45%),
-    radial-gradient(ellipse at 80% 70%, rgba(var(--acc-rgb), .05) 0%, transparent 50%),
-    linear-gradient(rgba(0, 0, 0, .72), rgba(0, 0, 0, .86));
-  background-size: 32px 32px, 32px 32px, auto, auto, auto;
-  background-repeat: repeat, repeat, no-repeat, no-repeat, no-repeat;
+    radial-gradient(ellipse at 78% 68%, var(--wallpaper-bloom) 0%, transparent 52%),
+    linear-gradient(rgba(0, 0, 0, .62), rgba(0, 0, 0, .62));
+  background-size: 32px 32px, 32px 32px, auto, auto;
+  background-repeat: repeat, repeat, no-repeat, no-repeat;
 }
 
 /* ----- nav ------------------------------------------------------------- */

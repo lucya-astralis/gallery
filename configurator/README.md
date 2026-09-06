@@ -176,9 +176,32 @@ re-copy them from `app/static/`.
 
 One deliberate departure:
 
-- **No ambient video.** The gallery's `bg.mp4` backdrop is replaced by the
-  grid + radial wash alone. A config tool has no business decoding 1080p
-  behind a form.
+- **No ambient video.** Where the gallery plays `bg.mp4`, this plays nothing:
+  a config tool has no business decoding 1080p behind a form. It gets the
+  **nova** artwork as a still instead — vector, so a full-viewport backdrop
+  costs nothing to paint, which is the whole reason one is affordable here.
+  A `<picture>` hands phones the square cut (`nova-square.svg`) and everything
+  else the 16:9 one, so exactly one of the two is fetched; the wide cut turns
+  to mush cropped into a portrait viewport.
+
+  It sits under the same four overlay layers as the gallery's backdrop —
+  grid, accent bloom, dim — but all three of the gallery's figures are
+  retuned, because those defaults are set for a **photograph** and this is
+  not one:
+
+  | | gallery | here | why |
+  | --- | --- | --- | --- |
+  | tint | `grayscale(.92)` | **off** | The drain exists because a photograph behind the page introduces a *foreign* hue that every blurred pane then picks up. Nova has none to introduce — it is brand art drawn in the accent's own colour, so draining it removes the one thing it was made to say. The gallery spells this `wallpaper_tint = off`: a supported setting, not a departure. The photo thumbnails are still the most saturated thing on screen, which is the rule that actually matters. |
+  | brightness | `.72` | `.95` | A photograph arrives bright and full-range and needs holding back. Nova arrives dark by construction — its own gradient falls to `#07070d`. |
+  | dim | `.62 → .82` | flat `.62` | That ramp darkens a photo towards the footer of a scrolling page. Nova already falls off downward on its own, so the ramp landed on the artwork's own falloff and took the bottom half to black. |
+
+  Nothing was ever cropped, incidentally: at any normal window the cover fit
+  crops the **sides** and shows the full height.
+
+  The source lives in [`designs/nova/`](../designs/nova/); what the app serves
+  is a **copy** under `app/static/bg/`, for the same reason the fonts and the
+  logo are copies — the two apps deploy as separate images and never share a
+  mount.
 
 The header carries the mark, the wordmark and the two actions and nothing
 else — no mount path (it is the footer's `TARGET` stamp and never changes

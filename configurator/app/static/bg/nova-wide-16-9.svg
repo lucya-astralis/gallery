@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="2160" viewBox="0 0 3840 2160">
+  <defs>
+    <linearGradient id="wBase" gradientUnits="userSpaceOnUse" x1="-70" y1="152" x2="3910" y2="2008">
+      <stop offset="0" stop-color="#4034c0"></stop>
+      <stop offset="0.14" stop-color="#221b6a"></stop>
+      <stop offset="0.4" stop-color="#0b0a18"></stop>
+      <stop offset="0.72" stop-color="#07070d"></stop>
+      <stop offset="1" stop-color="#0a0a12"></stop>
+    </linearGradient>
+    <linearGradient id="wShardViolet" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7869f0" stop-opacity="0.8"></stop>
+      <stop offset="0.72" stop-color="#3c32af" stop-opacity="0.22"></stop>
+      <stop offset="1" stop-color="#14103c" stop-opacity="0"></stop>
+    </linearGradient>
+    <linearGradient id="wShardGrey" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a0a2b0" stop-opacity="0.16"></stop>
+      <stop offset="0.65" stop-color="#4e4f5c" stop-opacity="0.05"></stop>
+      <stop offset="1" stop-color="#2a2a33" stop-opacity="0"></stop>
+    </linearGradient>
+    <linearGradient id="wShardVioletSoft" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6e60e1" stop-opacity="0.28"></stop>
+      <stop offset="0.7" stop-color="#322a96" stop-opacity="0.08"></stop>
+      <stop offset="1" stop-color="#0f0c32" stop-opacity="0"></stop>
+    </linearGradient>
+    <linearGradient id="wLineViolet" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6a5cf5" stop-opacity="0"></stop>
+      <stop offset="0.26" stop-color="#6a5cf5" stop-opacity="1"></stop>
+      <stop offset="0.6" stop-color="#8b7dff" stop-opacity="1"></stop>
+      <stop offset="0.92" stop-color="#8b7dff" stop-opacity="0"></stop>
+    </linearGradient>
+    <linearGradient id="wLineSilver" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c6c8d7" stop-opacity="0"></stop>
+      <stop offset="0.42" stop-color="#c6c8d7" stop-opacity="0.6"></stop>
+      <stop offset="0.95" stop-color="#c6c8d7" stop-opacity="0"></stop>
+    </linearGradient>
+    <radialGradient id="wGlow" gradientUnits="userSpaceOnUse" cx="845" cy="691" r="3149">
+      <stop offset="0" stop-color="#100e1e"></stop>
+      <stop offset="0.48" stop-color="#08080f"></stop>
+      <stop offset="1" stop-color="#05050a"></stop>
+    </radialGradient>
+    <radialGradient id="wVignette" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#040408" stop-opacity="0.94"></stop>
+      <stop offset="0.46" stop-color="#05050a" stop-opacity="0.7"></stop>
+      <stop offset="0.84" stop-color="#05050a" stop-opacity="0"></stop>
+    </radialGradient>
+    <pattern id="wDots" patternUnits="userSpaceOnUse" x="0" y="0" width="6" height="6">
+      <circle cx="3" cy="3" r="1" fill="#ffffff"></circle>
+    </pattern>
+  </defs>
+
+  <rect id="Hintergrund" x="0" y="0" width="3840" height="2160" fill="url(#wGlow)"></rect>
+  <rect id="Basis-Verlauf" x="0" y="0" width="3840" height="2160" fill="url(#wBase)"></rect>
+
+  <polygon id="Shard-Violett-Gross" fill="url(#wShardViolet)" points="-944.88,-726.72 407.88,-1273.28 2355.85,3548.06 1003.09,4094.62"></polygon>
+  <polygon id="Shard-Grau" fill="url(#wShardGrey)" points="591.37,-920.96 982.63,-1079.04 2930.60,3742.30 2539.34,3900.38"></polygon>
+  <polygon id="Shard-Violett-Weich" fill="url(#wShardVioletSoft)" points="2033.34,-813.07 2958.66,-1186.93 4906.63,3634.41 3981.31,4008.27"></polygon>
+
+  <polygon id="Linie-Violett" fill="url(#wLineViolet)" points="883.00,-307.00 893.20,-311.12 2245.54,3036.00 2235.34,3040.12"></polygon>
+  <polygon id="Linie-Silber" fill="url(#wLineSilver)" points="2688.00,461.00 2695.42,458.00 3731.21,3021.65 3723.79,3024.65"></polygon>
+
+  <ellipse id="Vignette" cx="2150" cy="1145" rx="2300" ry="1425" fill="url(#wVignette)"></ellipse>
+  <rect id="Punktraster" x="0" y="0" width="3840" height="2160" fill="url(#wDots)" opacity="0.05"></rect>
+</svg>

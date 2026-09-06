@@ -9,7 +9,21 @@
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
 </head>
 <body>
-  <div class="site-bg" aria-hidden="true"></div>
+  {# The backdrop. Same construction as the gallery's: a real element rather
+     than a body pseudo-element, and a <picture> so the browser fetches
+     exactly ONE of the two cuts — a display:none <img> would still be
+     downloaded. The wide cut is 16:9 art and turns to mush cropped into a
+     phone's portrait viewport, so phones get the square one.
+
+     Where the gallery plays a clip, this plays nothing: a config tool has no
+     business decoding 1080p behind a form. Vector stills cost nothing, which
+     is the whole reason a backdrop is affordable here at all. #}
+  <div class="site-bg" aria-hidden="true">
+    <picture>
+      <source media="(max-width: 760px)" srcset="{{ static_url('bg/nova-square.svg') }}">
+      <img class="bg-still" src="{{ static_url('bg/nova-wide-16-9.svg') }}" alt="" decoding="async">
+    </picture>
+  </div>
 
   <nav class="nav">
     <div class="nav__inner">
