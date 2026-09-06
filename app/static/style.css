@@ -1,9 +1,23 @@
 /* ================================================================
    lucya.systems gallery  —  https://lucya.systems
-   The stylesheet, and the design language it carries: black ground,
-   grey furniture, one purple accent. The colours, the wordmark and the
-   logo belong to whoever runs the gallery (gallery.cfg); this file and
-   the software under it do not. See app/brand.py.
+
+   NEBULA — the design language this sheet carries, and the one the
+   configurator carries too (configurator/app/static/style.css). Named
+   after the accent it rations: #5865F2, "Nebula Blue". Four rules, and
+   every decision in here is one of them:
+
+     1. Black ground, grey furniture, ONE purple accent. --acc marks
+        STATE and nothing else; furniture is --chrome or --label. Before
+        colouring something purple, ask whether it carries state.
+     2. Square corners, always. --radius: 0.
+     3. Depth comes from blurred translucency over a drained wallpaper,
+        never from darker fills. --glass / --scrim and their blurs.
+     4. Mono, uppercase, tracked = the chrome AROUND a photo grid.
+        Space Grotesk, sentence case = everything a person reads.
+
+   The colours, the wordmark and the logo belong to whoever runs the
+   gallery (gallery.cfg); this file and the software under it do not.
+   See app/brand.py.
    ================================================================ */
 
 /* No local('…') anywhere in these faces, on purpose: every local() entry

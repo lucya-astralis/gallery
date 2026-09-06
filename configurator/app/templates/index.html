@@ -2,7 +2,8 @@
 <html lang="en" data-read-only="{{ 1 if read_only else 0 }}">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
   <title>Configurator — lucya.systems</title>
   <link rel="icon" type="image/svg+xml" href="{{ static_url('logo/lucya_logo.svg') }}">
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
@@ -12,30 +13,38 @@
 
   <nav class="nav">
     <div class="nav__inner">
+      <!-- Phone-only: the album tree is a drawer there, this is its handle. -->
+      <button type="button" class="navmenu" id="btn-menu"
+              aria-label="Albums" aria-expanded="false" aria-controls="sidebar">
+        <span class="navmenu__bars"></span>
+      </button>
+
       <span class="nav__brand">
         <img src="{{ static_url('logo/lucya_logo.svg') }}" alt="">
         <span class="brand-text">
           <span class="brand-name">lucya.systems</span>
           <span class="brand-sub">configurator</span>
         </span>
-        <span class="brand-jp">画像庫</span>
       </span>
-      <div class="nav__path" title="mounted photo folder">{{ photos_dir }}</div>
       <div class="nav__actions">
-        <div class="nav__status{% if read_only %} is-ro{% endif %}">
-          <span class="dot"></span>
-          <span>{{ 'READONLY' if read_only else 'READWRITE' }}</span>
-        </div>
-        <button type="button" class="btn" id="btn-check">Check all</button>
+        {# Only the read-only case is worth a mark: it is the one that changes
+           what the tool can do. A "READWRITE" lamp on every normal session was
+           a green light reporting that nothing is wrong. #}
+        {% if read_only %}<span class="pill pill--warn" title="the photo mount is read-only — every write is disabled">read-only</span>{% endif %}
+        <button type="button" class="btn" id="btn-check">Check<span class="u-wide-only"> all</span></button>
         <button type="button" class="btn" id="btn-reload">Reload</button>
       </div>
     </div>
   </nav>
 
   <main class="layout">
+    <div class="scrim" id="scrim" hidden></div>
+
     <nav class="sidebar" id="sidebar">
       <div class="sidebar__search">
-        <input type="search" id="tree-filter" placeholder="Filter albums&hellip;" autocomplete="off">
+        <input type="search" id="tree-filter" class="fieldsearch" placeholder="Filter albums&hellip;" autocomplete="off">
+        <button type="button" class="btn btn--ghost btn--icon sidebar__close" id="btn-menu-close"
+                aria-label="Close the album list">&times;</button>
       </div>
       <ul class="tree" id="tree"><li class="tree__empty">Loading&hellip;</li></ul>
     </nav>
@@ -48,12 +57,12 @@
   <footer class="foot">
     <div class="foot__brand">
       <img src="{{ static_url('logo/lucya_logo.svg') }}" alt="">
-      <span>lucya.systems</span>
+      <span class="foot__wordmark">lucya.systems</span>
     </div>
     <div class="foot__meta">
-      <b>SIG</b> / LUCYA.CONFIGURATOR &nbsp;·&nbsp;
-      <b>VER</b> / {{ app_version }} &nbsp;·&nbsp;
-      <b>TARGET</b> / {{ photos_dir }}
+      <span class="foot__bit"><b>SIG</b> / LUCYA.CONFIGURATOR</span>
+      <span class="foot__bit foot__bit--keep"><b>VER</b> / {{ app_version }}</span>
+      <span class="foot__bit"><b>TARGET</b> / {{ photos_dir }}</span>
     </div>
   </footer>
 
@@ -64,8 +73,8 @@
     <div class="modal__box" role="dialog" aria-modal="true">
       <header class="modal__head">
         <h2 id="modal-title">Pick photos</h2>
-        <input type="search" id="modal-filter" placeholder="Filter by name or folder&hellip;" autocomplete="off">
-        <button type="button" class="btn btn--ghost btn--icon" data-close>&times;</button>
+        <button type="button" class="btn btn--ghost btn--icon modal__x" data-close aria-label="Close">&times;</button>
+        <input type="search" id="modal-filter" class="fieldsearch" placeholder="Filter by name or folder&hellip;" autocomplete="off">
       </header>
       <div class="modal__body" id="modal-body"></div>
       <footer class="modal__foot">

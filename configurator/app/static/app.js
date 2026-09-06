@@ -24,9 +24,44 @@ const state = {
   vocab: [],          // every tag in use, for autocomplete
   browse: null,       // Photos-tab browser state
   openPaths: new Set(),
+  // Settings view: a filter over the key list, "only what this file sets",
+  // whether the per-key help is drawn, and which groups are folded shut.
+  query: '',
+  setOnly: false,
+  showHelp: true,
+  collapsed: new Set(),
 };
 
 const READ_ONLY = document.documentElement.dataset.readOnly === '1';
+
+/* The three view switches are preferences, not data — they belong to the
+ * person, not the album, so they outlive a reload. Everything else here is
+ * derived from the server on boot. */
+const PREFS_KEY = 'cfgtool.view';
+
+function loadPrefs() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    if (typeof saved.setOnly === 'boolean') state.setOnly = saved.setOnly;
+    if (typeof saved.showHelp === 'boolean') state.showHelp = saved.showHelp;
+    if (Array.isArray(saved.collapsed)) state.collapsed = new Set(saved.collapsed);
+  } catch (_) { /* a broken or blocked store just means defaults */ }
+  syncHelpClass();
+}
+
+function savePrefs() {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({
+      setOnly: state.setOnly,
+      showHelp: state.showHelp,
+      collapsed: [...state.collapsed],
+    }));
+  } catch (_) { /* private mode: the switches just don't persist */ }
+}
+
+function syncHelpClass() {
+  document.documentElement.classList.toggle('no-help', !state.showHelp);
+}
 
 /* ----- helpers ---------------------------------------------------------- */
 function el(tag, attrs = {}, ...children) {
@@ -86,8 +121,27 @@ function splitPath(value) {
 
 const strip = (v) => String(v).replace(/^\/+/, '');
 
+/* ----- drawer ----------------------------------------------------------- */
+/* Below 900px the album tree is an overlay rather than a column: as a 38vh
+ * band above the editor it ate a third of a phone screen on every page and
+ * still only showed four albums. It slides in over the pane instead, and
+ * closes the moment an album is picked — the choice is the whole errand. */
+function drawerOpen() {
+  return document.body.classList.contains('drawer-open');
+}
+
+function setDrawer(open) {
+  document.body.classList.toggle('drawer-open', open);
+  $('#scrim').hidden = !open;
+  $('#btn-menu').setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) $('#tree-filter').focus();
+}
+
+const isNarrow = () => window.matchMedia('(max-width: 900px)').matches;
+
 /* ----- boot ------------------------------------------------------------- */
 async function boot() {
+  loadPrefs();
   try {
     state.meta = await api('/api/meta');
     await Promise.all([loadTree(), loadVocab()]);
@@ -102,9 +156,36 @@ async function boot() {
     if (state.sel) select(state.sel, true);
     toast('Reloaded');
   });
-  $('#btn-check').addEventListener('click', checkAll);
+  $('#btn-check').addEventListener('click', () => { setDrawer(false); checkAll(); });
   $('#tree-filter').addEventListener('input', renderTree);
+  $('#btn-menu').addEventListener('click', () => setDrawer(!drawerOpen()));
+  $('#btn-menu-close').addEventListener('click', () => setDrawer(false));
+  $('#scrim').addEventListener('click', () => setDrawer(false));
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && drawerOpen()) setDrawer(false);
+  });
+  // The pane's own header sticks; past the first line of scroll it drops the
+  // file path and shrinks, so a long settings page keeps its tabs without
+  // spending 90px on them.
+  wirePaneShrink();
   wireModal();
+}
+
+function wirePaneShrink() {
+  const pane = $('#pane');
+  let pending = false;
+  pane.addEventListener('scroll', () => {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => {
+      pending = false;
+      const scrolled = pane.scrollTop > 18;
+      pane.classList.toggle('is-scrolled', scrolled);
+      // the gallery brightens its nav hairline the moment the bar floats
+      // over content; here the pane is the thing that scrolls under it
+      $('.nav').classList.toggle('nav--scrolled', scrolled);
+    });
+  }, { passive: true });
 }
 
 async function loadTree() {
@@ -192,7 +273,8 @@ async function select(sel, keepTab = false) {
   state.sel = sel;
   state.edits = {};
   state.browse = null;
-  if (!keepTab) state.tab = 'settings';
+  if (!keepTab) { state.tab = 'settings'; state.query = ''; }
+  if (isNarrow()) setDrawer(false);
   if (sel.kind === 'album') {
     const parts = sel.album.split('/');
     for (let i = 1; i < parts.length; i++) state.openPaths.add(parts.slice(0, i).join('/'));
@@ -323,13 +405,17 @@ function renderPane() {
        ['assets', 'Files'], ['raw', 'Raw file']];
   if (!tabs.some(([id]) => id === state.tab)) state.tab = 'settings';
 
-  pane.append(renderHead(isGallery));
-  pane.append(el('div', { class: 'tabs' }, tabs.map(([id, label]) =>
-    el('button', {
-      class: 'tab' + (state.tab === id ? ' is-active' : ''),
-      type: 'button', text: label,
-      onclick: () => { state.tab = id; renderPane(); },
-    }))));
+  /* Header and tabs travel together as one sticky block: on a settings page
+   * three screens tall, scrolling used to take the album's name and every
+   * tab with it. */
+  pane.append(el('div', { class: 'pane__top' },
+    renderHead(isGallery),
+    el('div', { class: 'tabs' }, tabs.map(([id, label]) =>
+      el('button', {
+        class: 'tab' + (state.tab === id ? ' is-active' : ''),
+        type: 'button', text: label,
+        onclick: () => { state.tab = id; renderPane(); },
+      })))));
 
   if (state.data.issues && state.data.issues.length) {
     pane.append(el('div', { class: 'issues' }, state.data.issues.map((issue) =>
@@ -368,14 +454,17 @@ function renderHead(isGallery) {
   if (errors) meta.push(el('span', { class: 'pill pill--err', text: errors + ' errors' }));
   if (warns) meta.push(el('span', { class: 'pill pill--warn', text: warns + ' warnings' }));
 
+  const path = isGallery
+    ? state.meta.photos_dir + '/gallery.cfg'
+    : state.meta.photos_dir + '/' + state.sel.album + '/.album/album.cfg';
+
+  /* Title and pills share one line so the sticky block stays short; the file
+   * path is the first thing dropped once the pane is scrolled. */
   return el('div', { class: 'head' },
-    el('div', {
-      class: 'head__crumb',
-      text: isGallery ? state.meta.photos_dir + '/gallery.cfg'
-                      : state.meta.photos_dir + '/' + state.sel.album + '/.album/album.cfg',
-    }),
-    el('h1', { class: 'head__title', text: isGallery ? 'gallery.cfg' : data.name }),
-    el('div', { class: 'head__meta' }, meta));
+    el('div', { class: 'head__crumb', text: path, title: path }),
+    el('div', { class: 'head__line' },
+      el('h1', { class: 'head__title', text: isGallery ? 'gallery.cfg' : data.name }),
+      el('div', { class: 'head__meta' }, meta)));
 }
 
 /* ----- settings --------------------------------------------------------- */
@@ -384,26 +473,137 @@ function renderHead(isGallery) {
  * acre of nothing, so those tile two or three across instead. */
 const WIDE_TYPES = new Set(['photo_list', 'welcome', 'album_list', 'kv_list']);
 
+const isSet = (key) => value(key) !== null;
+
+/* The filter reads the key name and its help text, so "colour" finds
+ * `accent` and "phone" finds `wallpaper_mobile` — nobody remembers a
+ * thirty-key vocabulary by name. */
+function matchesQuery(key, q) {
+  if (!q) return true;
+  return key.toLowerCase().includes(q) ||
+         String(helpFor(key)).toLowerCase().includes(q);
+}
+
+const groupId = (title) => state.sel.kind + ':' + title;
+
+function toggleGroup(title) {
+  const id = groupId(title);
+  if (state.collapsed.has(id)) state.collapsed.delete(id);
+  else state.collapsed.add(id);
+  savePrefs();
+  renderPane();
+}
+
 function renderSettings(groups) {
-  return el('div', { class: 'tabpanel' }, groups.map(([title, blurb, keys]) =>
-    el('section', { class: 'group' },
-      el('header', { class: 'group__head' },
-        el('h2', { class: 'group__title', text: title }),
-        el('p', { class: 'group__blurb', text: blurb })),
-      el('div', { class: 'fields' }, keys.map(renderField)))));
+  const q = state.query.trim().toLowerCase();
+  const allKeys = groups.flatMap(([, , keys]) => keys);
+  const setTotal = allKeys.filter(isSet).length;
+  const blocks = [];
+  let shown = 0;
+
+  for (const [title, blurb, keys] of groups) {
+    // A query on the group's own title keeps the whole block: searching
+    // "backdrop" should hand back the four keys that answer to it.
+    const groupHit = !!q && title.toLowerCase().includes(q);
+    const keep = keys.filter((key) =>
+      (groupHit || matchesQuery(key, q)) &&
+      (!state.setOnly || isSet(key) || key in state.edits));
+    if (!keep.length) continue;
+    shown += keep.length;
+
+    const setHere = keys.filter(isSet).length;
+    // A filter overrules a fold: a hit hidden inside a shut group reads as
+    // "no result".
+    const folded = !q && state.collapsed.has(groupId(title));
+
+    blocks.push(el('section', { class: 'group' + (folded ? ' is-folded' : '') },
+      el('header', {
+        class: 'group__head', role: 'button', tabindex: '0',
+        'aria-expanded': folded ? 'false' : 'true',
+        title: folded ? 'show these keys' : 'fold this group away',
+        onclick: () => toggleGroup(title),
+        onkeydown: (ev) => {
+          if (ev.key !== 'Enter' && ev.key !== ' ') return;
+          ev.preventDefault();
+          toggleGroup(title);
+        },
+      },
+        el('span', { class: 'group__twisty', text: '▶' }),
+        el('div', { class: 'group__text' },
+          el('h2', { class: 'group__title', text: title }),
+          el('p', { class: 'group__blurb', text: blurb })),
+        el('span', {
+          class: 'group__count' + (setHere ? ' is-on' : ''),
+          text: setHere + ' / ' + keys.length,
+          title: setHere + ' of ' + keys.length + ' keys written in this file',
+        })),
+      folded ? null : el('div', { class: 'fields' }, keep.map(renderField))));
+  }
+
+  const panel = el('div', { class: 'tabpanel' },
+    renderSettingsBar(groups, setTotal, allKeys.length, shown));
+  if (blocks.length) panel.append(...blocks);
+  else {
+    panel.append(el('div', { class: 'empty-note', text: state.setOnly && !q
+      ? 'This file sets nothing yet — switch “only set” off to see the whole vocabulary.'
+      : 'No key matches “' + state.query.trim() + '”.' }));
+  }
+  return panel;
+}
+
+/* One row above the groups: find a key, hide the ones this file leaves at
+ * the gallery's default, drop the help text, fold everything shut. Which of
+ * those you want is a habit, not a property of the album, so the three
+ * switches persist across reloads. */
+function renderSettingsBar(groups, setTotal, total, shown) {
+  const q = state.query.trim();
+  const allFolded = groups.every(([title]) => state.collapsed.has(groupId(title)));
+  const filtering = !!q || state.setOnly;
+
+  const sw = (on, label, title, onclick) => el('button', {
+    class: 'chipbtn' + (on ? ' is-on' : ''), type: 'button', text: label,
+    title, 'aria-pressed': on ? 'true' : 'false', onclick,
+  });
+
+  return el('div', { class: 'stoolbar' },
+    el('div', { class: 'stoolbar__find' },
+      el('input', {
+        type: 'search', class: 'fieldsearch', 'data-fk': '__q', value: state.query,
+        placeholder: 'Find a setting — name or description…', autocomplete: 'off',
+        oninput: (ev) => { state.query = ev.target.value; renderPane(); },
+      })),
+    el('div', { class: 'stoolbar__switches' },
+      sw(state.setOnly, 'Only set', 'show just the keys this file writes', () => {
+        state.setOnly = !state.setOnly; savePrefs(); renderPane();
+      }),
+      sw(state.showHelp, 'Help', 'show the description under each key', () => {
+        state.showHelp = !state.showHelp; syncHelpClass(); savePrefs(); renderPane();
+      }),
+      sw(false, allFolded ? 'Unfold all' : 'Fold all', 'fold every group', () => {
+        if (allFolded) state.collapsed.clear();
+        else for (const [title] of groups) state.collapsed.add(groupId(title));
+        savePrefs(); renderPane();
+      })),
+    el('span', { class: 'stoolbar__count', text: filtering
+      ? shown + ' of ' + total + ' keys shown'
+      : setTotal + ' of ' + total + ' keys set' }));
 }
 
 function renderField(key) {
   const spec = specFor(key);
   const help = helpFor(key);
   const unset = value(key) === null;
+  const edited = key in state.edits;
 
   return el('div', {
     class: 'field' + (WIDE_TYPES.has(spec.type) ? ' field--wide' : '') +
-           (unset ? ' is-unset' : ''),
+           (unset ? ' is-unset' : '') + (edited ? ' is-edited' : ''),
+    'data-key': key,
   },
     el('div', { class: 'field__top' },
       el('span', { class: 'field__label', text: key }),
+      edited ? el('span', { class: 'field__flag', text: 'edited',
+                            title: 'changed here, not yet written to the file' }) : null,
       unset || READ_ONLY ? null : el('button', {
         class: 'field__unset', type: 'button', text: '✕',
         title: 'unset — remove this line from the file',
@@ -615,7 +815,7 @@ function kvListControl(key) {
 
   if (!pairs.length) box.append(el('div', { class: 'empty-note', text: 'No custom attributes.' }));
   if (pairs.some(([, v]) => v.includes(','))) {
-    box.append(el('div', { class: 'field__help' },
+    box.append(el('div', { class: 'field__help field__hint' },
       'A value with a comma gets split into two entries by the cfg parser.'));
   }
   if (!READ_ONLY) {
@@ -951,7 +1151,7 @@ function brandAssetControl(key, spec) {
       : null));
 
   if (!files.length) {
-    box.append(el('div', { class: 'field__help', text:
+    box.append(el('div', { class: 'field__help field__hint', text:
       'Nothing usable in .gallery/ yet — add a file on the “Files” tab. Accepted: ' +
       exts.join(', ') }));
   }
@@ -981,7 +1181,7 @@ function assetControl(key, spec) {
       : null));
 
   if (!files.length) {
-    box.append(el('div', { class: 'field__help', text:
+    box.append(el('div', { class: 'field__help field__hint', text:
       'No ' + kind + ' in this album’s .album/ yet — add one on the “Files” tab. Accepted: ' +
       spec.exts.join(', ') }));
   }
@@ -1023,23 +1223,58 @@ function fontSample(name, url) {
 }
 
 /* ----- save bar --------------------------------------------------------- */
+/* Every staged key as its own chip: the name jumps to the field — through a
+ * filter or a folded group, which is exactly when an edit is easy to lose
+ * track of — and the ✕ drops that one change instead of all of them. As one
+ * run-on "a · b · c" line, eight edits ran off the end of the bar. */
 function renderSaveBar() {
   const changed = Object.keys(state.edits);
-  return el('div', { class: 'savebar' + (changed.length ? ' is-dirty' : '') },
-    el('span', {
-      class: 'savebar__note',
-      text: READ_ONLY ? 'readonly mount · saving disabled'
-        : changed.length ? changed.length + ' unsaved · ' + changed.join(' · ')
-        : 'idle · comments and untouched keys survive every save',
-    }),
+  const bar = el('div', { class: 'savebar savebar--settings' + (changed.length ? ' is-dirty' : '') });
+
+  if (!changed.length) {
+    bar.append(el('span', { class: 'savebar__note', text: READ_ONLY
+      ? 'readonly mount · saving disabled'
+      : 'idle · comments and untouched keys survive every save' }));
+  } else {
+    bar.append(el('span', { class: 'savebar__note',
+      text: changed.length + ' unsaved' }));
+    bar.append(el('div', { class: 'savebar__chips' }, changed.map((key) =>
+      el('span', { class: 'chip chip--edit' },
+        el('button', {
+          class: 'chip__go', type: 'button', text: key, title: 'go to ' + key,
+          onclick: () => revealField(key),
+        }),
+        el('button', {
+          class: 'chip__x', type: 'button', text: '✕', title: 'undo this change',
+          onclick: () => { delete state.edits[key]; renderPane(); },
+        })))));
+  }
+
+  bar.append(el('div', { class: 'savebar__acts' },
     changed.length ? el('button', {
-      class: 'btn', type: 'button', text: 'Discard',
+      class: 'btn', type: 'button', text: 'Discard all',
       onclick: () => { state.edits = {}; renderPane(); },
     }) : null,
     el('button', {
       class: 'btn btn--primary', type: 'button', text: 'Save',
       disabled: READ_ONLY || !changed.length, onclick: saveSettings,
-    }));
+    })));
+  return bar;
+}
+
+/* Bring one key back on screen whatever is hiding it — a filter, "only set",
+ * a folded group — and mark it for a moment so the eye lands on it. */
+function revealField(key) {
+  state.query = '';
+  state.setOnly = false;
+  state.collapsed.clear();
+  savePrefs();
+  renderPane();
+  const node = document.querySelector('.field[data-key="' + CSS.escape(key) + '"]');
+  if (!node) return;
+  node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  node.classList.add('is-flash');
+  setTimeout(() => node.classList.remove('is-flash'), 1200);
 }
 
 async function saveSettings() {
@@ -1064,7 +1299,7 @@ function renderRaw() {
   const area = el('textarea', { class: 'u-tall', spellcheck: 'false', disabled: READ_ONLY });
   area.value = state.data.raw || '';
   return el('div', { class: 'tabpanel' },
-    el('div', { class: 'field__help u-mb' },
+    el('div', { class: 'field__help tabnote u-mb' },
       'The file exactly as it sits on disk. Saving here replaces it wholesale — ' +
       'the structured tabs only ever rewrite the lines they own.'),
     area,
@@ -1164,7 +1399,7 @@ function renderPhotosTab() {
   const b = state.browse;
 
   const panel = el('div', { class: 'tabpanel' });
-  panel.append(el('div', { class: 'field__help u-mb' },
+  panel.append(el('div', { class: 'field__help tabnote u-mb' },
     'Browse folder by folder. Click a photo to select it and see its metadata; ' +
     'use its corner tick — or ctrl-click — to add more, shift-click for a run. ' +
     'Photo files are never modified: tags go into a .tags sidecar next to each ' +
@@ -1356,7 +1591,7 @@ function renderDetail(rel) {
     body.append(el('dl', { class: 'facts' }, facts.map(([k, v]) => [
       el('dt', { text: k }), el('dd', { text: v }),
     ])));
-    body.append(el('p', { class: 'field__help', text:
+    body.append(el('p', { class: 'field__help field__hint', text:
       'Read-only — the configurator never rewrites a photo file.' }));
 
     body.append(el('h3', { class: 'detail__sub', text: 'Tags' }));
@@ -1501,12 +1736,14 @@ function renderDescriptions() {
   area.value = state.data.descriptions[state.descLang] || '';
 
   return el('div', { class: 'tabpanel' },
-    el('div', { class: 'field__help u-mb' },
+    el('div', { class: 'field__help tabnote u-mb' },
       'Markdown shown under the album hero, one file per language. Saving an empty ' +
       'editor deletes that language’s file.'),
-    el('div', { class: 'desc-langs' }, state.meta.langs.map((lang) =>
+    /* The gallery's own language selector is a segmented control, and this
+     * is the same choice being made — so it is the same control. */
+    el('div', { class: 'toggle desc-langs' }, state.meta.langs.map((lang) =>
       el('button', {
-        class: 'btn' + (state.descLang === lang ? ' btn--primary' : ''),
+        class: state.descLang === lang ? 'is-on' : '',
         type: 'button',
         text: 'album_' + lang + '.md' + (state.data.descriptions[lang] ? '' : ' (empty)'),
         onclick: () => {
@@ -1593,7 +1830,7 @@ function renderAssets() {
   }
 
   return el('div', { class: 'tabpanel' },
-    el('div', { class: 'field__help u-mb' }, gallery
+    el('div', { class: 'field__help tabnote u-mb' }, gallery
       ? 'Files here live in photos/.gallery/ next to the gallery.cfg — the gallery-wide ' +
         'counterpart of an album’s .album/. Uploading one does not select it — point ' +
         '`logo`, `favicon`, `operator_pfp`, `badges`, `font` or one of the wallpaper ' +

@@ -445,8 +445,8 @@ config, and reaches a visitor through eight independent channels:
 | Where | What it says |
 |---|---|
 | `/humans.txt` | the full colophon — software, version, vendor, and the archive beside it. Linked from every page as `rel="author"` |
-| Footer | *lucya.systems gallery · 6.0*, linked, on every page including 404 |
-| `<meta name="generator">` | `lucya.systems gallery 6.0`, outside the overridable `meta` block |
+| Footer | *lucya.systems gallery · 7.0*, linked, on every page including 404 |
+| `<meta name="generator">` | `lucya.systems gallery 7.0`, outside the overridable `meta` block |
 | `X-Powered-By` | on **every** response — pages, JSON, stylesheets, and image bytes, including originals served untouched |
 | `/api` | `product`, `product_version`, `vendor`, `vendor_url`, kept separate from the archive's own `name` |
 | EXIF `Software` | written into every derived JPEG — thumbnails, previews, converted fulls |
@@ -470,6 +470,38 @@ Rules for the hand-picked welcome list:
 - Entries that aren't indexed are skipped with a log warning; if nothing resolves, the feed falls back to showcase/random as if the file weren't there.
 - With a hand-picked list the hero shows a `CURATED` label and hides the ⟳ TUNE (reshuffle) button.
 - `welcome_mobile` / `welcome_desktop` accept the same syntax as `welcome` and win over it for their device class. Phones are detected via the User-Agent (`Mobi`); Android tablets and iPads in desktop mode get the desktop feed.
+
+## Design — Nebula
+
+The look has a name, because two apps wear it: the gallery, and the
+[configurator](configurator/) that edits its config files. **Nebula**, after
+the accent it rations — `#5865F2`, "Nebula Blue". Four rules, and everything
+in `app/static/style.css` is one of them:
+
+1. **Black ground, grey furniture, one purple accent.** `--acc` marks *state*
+   and nothing else — links, focus, active/selected/open, the featured mark.
+   Furniture (labels, counts, hovers, HUD strokes) is `--chrome` or `--label`.
+   Before colouring something purple, ask whether it carries state.
+2. **Square corners, always.** `--radius: 0`. Only genuinely round things —
+   the status dot — opt out with their own `border-radius`.
+3. **Depth comes from blur, not from darkness.** Panes float over the drained
+   wallpaper on `--glass` / `--scrim` and their blurs; a surface that needs to
+   read better gets more blur, not a darker fill.
+4. **The mono, tracked, uppercase voice marks the chrome *around* a photo
+   grid** — section labels, counts, measured values, the meta line. Everything
+   a person actually reads is Space Grotesk in sentence case. The display face
+   (Ethnocentric) is the wordmark's voice and is not a heading's.
+
+An album can repaint the accent and dress the backdrop
+(`accent` / `wallpaper*`), and the operator can replace the display face —
+those are the knobs Nebula exposes, and they run through the same derivation
+so a hand-typed hex still lands with the contrast guarantees. Everything else
+is the software's.
+
+The configurator carries the same tokens and the same controls rather than a
+lookalike of them; its README lists which of its objects comes from which of
+the gallery's. The two deploy as separate images and never share a mount, so
+a change to the language has to be made in **both** stylesheets.
 
 ## API
 

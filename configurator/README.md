@@ -1,4 +1,4 @@
-# Gallery Configurator 1.0
+# Gallery Configurator 3.0
 
 A standalone web GUI for the gallery's config files — `photos/.gallery/gallery.cfg` and
 every `<album>/.album/album.cfg`, plus the per-language `album_*.md`
@@ -41,6 +41,17 @@ Every file also has a **Raw file** tab if you would rather just type.
 
 ### Getting around
 
+The album tree is a column on a desktop and a **drawer** on anything under
+900px — it slides in over the editor from the handle in the header and closes
+the moment you pick an album. As a 38vh band above the pane it cost a third of
+a phone screen on every page and still only listed four albums.
+
+The pane's own header — file path, title, status marks and the tab strip —
+**sticks** to the top while you scroll, and sheds the path and a few points of
+title size once you are past the first line. A settings page runs three
+screens deep; without this, scrolling into the middle of one left you with no
+album name and no tabs.
+
 The sidebar lists every album by its **cover**: whatever `album.cfg` pins, else
 the first photo in the folder, else the first photo of its first sub-album — so
 a folder that only holds sub-albums still shows a picture. The frame around it
@@ -53,6 +64,26 @@ list-shaped keys — `featured`, `order`, the welcome reels, `album_order`,
 `stat` — take the full width they actually need. A key written in the file
 gets a violet edge and a filled tile; one left at its default recedes to an
 outline, so what an album actually overrides is visible without reading.
+
+Above the groups sits one row of view controls, because grouping alone stopped
+being enough at `gallery.cfg`'s thirty-odd keys:
+
+| Control | What it does |
+| --- | --- |
+| **Find a setting** | filters by key name **and** by help text — "colour" finds `accent` and `wallpaper_tint`, "phone" finds `wallpaper_mobile`. Nobody remembers a thirty-key vocabulary by name. |
+| **Only set** | hides everything this file leaves at the gallery's default |
+| **Help** | drops the description under each key and the blurb under each group, leaving the controls |
+| **Fold all** | folds every group to its heading. Folded, the whole file is seven lines with an `n / m` count each — the fastest read of what an album actually overrides. |
+
+Groups fold individually by clicking their heading, and each says how many of
+its keys the file writes. A filter overrules a fold, so a hit can never hide
+inside a shut group. The three switches persist across reloads; they are a
+habit, not a property of the album.
+
+A key you have changed but not yet saved is marked `edited` and switches its
+edge to amber, and the save bar lists one chip per staged key: the name jumps
+to that field — through a filter, through a fold — and the ✕ undoes that one
+change rather than all of them.
 
 ### Photos & tags
 
@@ -75,7 +106,10 @@ folder.
 The selection panel and the metadata panel sit in a **column beside the grid**,
 never on top of it. That is deliberate: as a sticky bar across the bottom, the
 tagging controls covered most of the photos they existed to tag, which made
-picking a second photo impossible without scrolling them out of the way.
+picking a second photo impossible without scrolling them out of the way. On a
+phone there is no second column, so they move **above** the grid rather than
+below it — stacked underneath, tagging forty photos meant scrolling past all
+forty to reach the panel that tags them.
 
 Whatever is selected can be tagged in one go. The panel lists the tags already
 in the selection — with a `4/6` count when only some of them carry it — so
@@ -109,26 +143,61 @@ known-key list was missing `loc`, `stat` and `stats` entirely.
 `loc` is a single text field even though the parser comma-splits it: the
 gallery rejoins the parts, so `Paris, France` is one line, not two.
 
-## Design
+## Design — Nebula
 
-Same skin as the gallery — palette, type ramp, 2px corners, grid backdrop,
-accent hairline, HUD labels, logo and footer signature. The fonts
-(Space Grotesk, JetBrains Mono, Ethnocentric) and `lucya_logo.svg` are
-**copies** under this app's own `static/`, because the two apps deploy as
+**Nebula** is the gallery's design language, and this tool is built in it
+rather than in a lookalike of it — the four rules are written out in the
+[gallery's README](../README.md#design--nebula). The sheet carries the same
+token vocabulary — the ground and grey ramp, `--acc` / `--chrome` / `--label`,
+`--glass` and its blur, `--title-a`/`--title-b`, and `--radius: 0`, square
+everywhere — and the chrome is built out of the same objects:
+
+| Object | Where it comes from |
+| --- | --- |
+| header | `.nav`: same ground, same accent hairline, and it brightens once the pane under it is scrolled, exactly as `.nav--scrolled` does |
+| page heading | `.section__slug .name`: Space Grotesk 700 on the same clamp with the white-to-grey fall. It used to be the display face in caps — that is the **wordmark's** voice over there, not a heading's, and it also uppercased data (`japan_2026` is a folder name) |
+| status marks | `.section__doc-mark`: a hairline in its own colour, no fill |
+| tabs, toggles, the language switch | `.nav__lang`: one boxed segmented control, current option in the accent tint under an inset ring |
+| group headings | `.search-group__label`: mono eyebrow at .24em in `--label`, hairline rule, bare count at the end |
+| buttons | `.tag` / `.btn-link`: mono caps on glass, hover in `--chrome`. Only the button that writes the file keeps the accent |
+| filter fields | `.nav__search`: glass pane, mono 12px, uppercase tracked hint — the album tree, the settings finder and the picker are the same control |
+| tags | `.tag`, down to the tracking |
+| footer | `.foot`: `#050505`, the page's own sans at 12px in ghost grey |
+
+The split the gallery's palette pass established holds here too: purple marks
+**meaning** — focus, the current selection, a key this file actually sets, the
+primary action — and everything that is merely furniture takes `--chrome` or
+`--label`. This sheet used to paint both groups purple.
+
+The fonts (Space Grotesk, JetBrains Mono, Ethnocentric) and `lucya_logo.svg`
+are **copies** under this app's own `static/`, because the two apps deploy as
 separate images and never share a mount. If the gallery's brand assets change,
 re-copy them from `app/static/`.
 
-Two deliberate departures:
+One deliberate departure:
 
 - **No ambient video.** The gallery's `bg.mp4` backdrop is replaced by the
   grid + radial wash alone. A config tool has no business decoding 1080p
   behind a form.
-- **The JP face is fenced off.** The gallery's `NotoSansJP-subset.woff2` is a
-  469-glyph subset built for the gallery's own strings, so it is registered
-  here under a private family name and used *only* on the 画像庫 brand mark.
-  The description editor — where arbitrary Japanese actually gets typed — uses
-  the reader's system JP font, which has the full range. Pointing the subset at
-  an `album_jp.md` would render tofu.
+
+The header carries the mark, the wordmark and the two actions and nothing
+else — no mount path (it is the footer's `TARGET` stamp and never changes
+during a session), no JP mark, and no status lamp: a green "READWRITE" light
+on every normal session was a lamp reporting that nothing is wrong. A
+read-only mount still says so, as a warn mark next to the buttons, because
+that one changes what the tool can do.
+
+### On a phone
+
+Everything above 900px is the two-column desktop. Below it the album tree
+becomes the drawer described under *Getting around*, the setting tiles go to
+one column, and the photo browser's side panels move above the grid. Below
+620px the type steps down, every control grows to a finger-sized box, the tab
+strip wraps instead of scrolling sideways, text inputs go to 16px (under that
+iOS zooms the page on focus and leaves it scrolled sideways with no way back),
+the picker modal goes full-screen, and the save bar puts its buttons on their
+own row. The body is sized in `dvh`, so a collapsing address bar cannot push
+the save bar off the bottom.
 
 ## The part that matters: comments survive
 

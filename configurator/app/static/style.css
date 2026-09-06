@@ -1,9 +1,21 @@
 /* ================================================================
    LUCYA.SYSTEMS  —  GALLERY CONFIGURATOR
-   Same megacorp-terminal skin as the gallery: palette, type ramp,
-   2px radius, grid backdrop, HUD labels. A tool, but the same house.
-   Fonts and logo are copies under this app's own static/ — the two
-   apps deploy separately and never share a mount.
+
+   NEBULA, the same design language the gallery is built in — its four
+   rules are written out at the top of app/static/style.css and they are
+   not restated here. What matters on this side: this is not a lookalike.
+   The tokens are the same tokens and the controls are the same controls,
+   so when something here needs a face, go and find the gallery's rather
+   than inventing one:
+
+     header .nav · page title .section__slug .name · status marks
+     .section__doc-mark · group headings .search-group__label · every
+     segmented control (tabs, toggles, the language switch) .nav__lang ·
+     buttons .tag / .btn-link · filter fields .nav__search · footer .foot
+
+   A tool, but the same house. Fonts and logo are copies under this app's
+   own static/ — the two apps deploy separately and never share a mount,
+   so a change to the language has to be made in both sheets.
    ================================================================ */
 
 @font-face {
@@ -30,19 +42,6 @@
   font-style: normal;
   font-display: swap;
 }
-/* The gallery's JP face, deliberately registered under a PRIVATE family name
-   and used only on the brand mark. It is a 469-glyph subset built for the
-   gallery's own strings, so pointing arbitrary Japanese at it (an album_jp.md
-   in the description editor) would render tofu. Everything else falls back to
-   the reader's system JP font, which has the full range. */
-@font-face {
-  font-family: 'Lucya JP Mark';
-  src: url('/static/fonts/NotoSansJP-subset.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   /* Mirrors the gallery's :root — the two apps deploy separately and can
      never share a mount, so a palette change has to be made in both files.
@@ -59,27 +58,70 @@
   --text-dim:    #a1a1a8;
   --text-ghost:  #6b6b73;
 
-  /* Unlike the gallery this sheet has no "chrome" split to make: every
-     accent here already marks state (focus, active row, picked cell,
-     primary button), so both of the old accents collapse onto the one
-     purple, a step apart. */
+  /* One step down from --text for a heading, and the two ends of the
+     display-title gradient — the gallery's .section__slug .name reads these
+     and so does the pane title here. */
+  --text-head:   #cdcdd4;
+  --title-a:     #ffffff;
+  --title-b:     #8b8b94;
+
+  /* The gallery's split, adopted whole: purple marks MEANING — focus, the
+     current selection, a key this file actually sets, the primary action.
+     Everything that is merely furniture — labels, counts, button hovers,
+     HUD strokes — takes --chrome or --label. This sheet used to paint both
+     groups purple, which is the thing the gallery's palette pass was for. */
   --acc:           #5865f2;
   --acc-rgb:       88, 101, 242;
+  --acc-deep:      #404ee7;
   --acc-soft:      #9ea6f7;
   --acc-soft-rgb:  158, 166, 247;
-  --acc-amb:       #d9a24a;
-  --acc-amb-rgb:   217, 162, 74;
-  --acc-ok:        #58f298;
-  --acc-ok-rgb:    88, 242, 152;
-  --acc-red:       #e0625f;
-  --acc-red-rgb:   224, 98, 95;
 
-  --radius:      2px;
+  --chrome:      #e8e8ee;
+  --chrome-rgb:  232, 232, 238;
+  --label:       #b8b8c2;   /* the mono furniture voice */
+  --label-rgb:   184, 184, 194;
+
+  /* Status, dulled the same way — same hexes, same names as the gallery. */
+  --amb:         #d9a24a;
+  --amb-rgb:     217, 162, 74;
+  --ok:          #58f298;
+  --ok-rgb:      88, 242, 152;
+  --red:         #e0625f;
+  --red-rgb:     224, 98, 95;
+  /* the names this sheet grew up with, kept pointing at the shared ones */
+  --acc-amb:     var(--amb);
+  --acc-amb-rgb: var(--amb-rgb);
+  --acc-ok:      var(--ok);
+  --acc-ok-rgb:  var(--ok-rgb);
+  --acc-red:     var(--red);
+  --acc-red-rgb: var(--red-rgb);
+
+  /* Translucent surfaces, one scale for every floating pane — bars, fields,
+     buttons, menus. Legibility comes from blur, not from a darker slab. */
+  --glass:      rgba(26, 26, 30, .42);
+  --glass-hi:   rgba(40, 40, 45, .58);
+  --glass-blur: blur(18px) saturate(140%);
+
+  /* Square, everywhere: the one shape rule the gallery's whole surface
+     language is built on. The handful of genuinely round things (the status
+     dot) opt out on purpose. */
+  --radius:      0;
   --nav-h:       60px;
+  /* The pane's own gutter. Anything that has to bleed to the pane's edge --
+     the sticky header, the save bar -- cancels it with a negative margin, so
+     it lives in one place and the phone layout only has to change it once. */
+  --pane-x:      28px;
+  --pane-top:    18px;
 
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --brand: "Ethnocentric", "Space Grotesk", sans-serif;
+  /* The DISPLAY face is the brand voice of the chrome and nothing else — the
+     wordmark, and that is the whole list. A page heading is Space Grotesk
+     700 here exactly as it is over there; setting page titles in the display
+     face is what made this tool's headers read as a different product.
+     `--brand` is the old name for it and still works. */
+  --display-font: "Ethnocentric", "Space Grotesk", sans-serif;
+  --brand: var(--display-font);
   /* Japanese in editable content: system faces only — see the note above. */
   --jp-text: "Yu Gothic", "Hiragino Sans", "Noto Sans CJK JP", "MS Gothic", sans-serif;
 }
@@ -95,6 +137,9 @@ body {
   font-size: 14px;
   line-height: 1.55;
   letter-spacing: .01em;
+  /* dvh, not vh: a phone's collapsing address bar otherwise pushes the save
+     bar and the footer under the bottom of the screen. */
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -131,7 +176,7 @@ body {
   z-index: 100;
   height: var(--nav-h);
   flex: 0 0 auto;
-  background: rgba(0, 0, 0, .72);
+  background: rgba(0, 0, 0, .86);
   backdrop-filter: blur(10px) saturate(120%);
   -webkit-backdrop-filter: blur(10px) saturate(120%);
   border-bottom: 1px solid var(--line);
@@ -146,9 +191,15 @@ body {
   pointer-events: none;
   background: linear-gradient(90deg,
     transparent 2%, rgba(var(--acc-rgb), .5) 30%,
-    rgba(var(--acc-soft-rgb), .45) 50%, rgba(var(--acc-rgb), .5) 70%, transparent 98%);
-  opacity: .85;
+    rgba(var(--acc-rgb), .45) 50%, rgba(var(--acc-rgb), .5) 70%, transparent 98%);
+  opacity: .35;
+  transition: opacity .25s ease;
 }
+
+/* Brightens once the pane under it is scrolled, exactly as the gallery's
+   .nav--scrolled does — the bar is floating over content at that point and
+   the signature edge is what says so. */
+.nav--scrolled::after { opacity: .85; }
 
 .nav__inner {
   height: 100%;
@@ -158,6 +209,43 @@ body {
   gap: 24px;
   min-width: 0;
 }
+
+/* The drawer handle. Only exists below 900px, where the album tree stops
+   being a column and becomes an overlay. */
+.navmenu {
+  display: none;
+  appearance: none;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 34px;
+  padding: 0;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  position: relative;
+}
+
+.navmenu__bars,
+.navmenu__bars::before,
+.navmenu__bars::after {
+  position: absolute;
+  left: 50%;
+  width: 16px;
+  height: 1.5px;
+  margin-left: -8px;
+  background: var(--text-dim);
+  content: "";
+}
+
+.navmenu__bars { top: 50%; margin-top: -.75px; }
+.navmenu__bars::before { top: -5px; margin-left: 0; left: 0; }
+.navmenu__bars::after  { top:  5px; margin-left: 0; left: 0; }
+
+body.drawer-open .navmenu { border-color: var(--acc); }
+body.drawer-open .navmenu__bars { background: var(--acc); }
+body.drawer-open .navmenu__bars::before,
+body.drawer-open .navmenu__bars::after { background: var(--acc); }
 
 .nav__brand {
   display: flex;
@@ -178,12 +266,12 @@ body {
 .brand-text {
   display: flex;
   flex-direction: column;
-  line-height: 1.15;
+  line-height: 1.05;
   min-width: 0;
 }
 
 .brand-name {
-  font-family: var(--brand);
+  font-family: var(--display-font);
   font-size: 15px;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -205,50 +293,16 @@ body {
   color: color-mix(in srgb, var(--acc-soft) 30%, var(--acc));
 }
 
-.brand-jp {
-  font-family: 'Lucya JP Mark', sans-serif;
-  color: var(--text-ghost);
-  font-size: 10px;
-  letter-spacing: .3em;
-  align-self: center;
-  border-left: 1px solid var(--line);
-  padding-left: 12px;
-}
-
-.nav__path {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: .04em;
-  color: var(--text-ghost);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.nav__actions { display: flex; gap: 10px; align-items: center; flex: 0 0 auto; }
-
-/* live status readout, same as the gallery's ONLINE pill */
-.nav__status {
+/* The mounted path lives in the footer's TARGET stamp and nowhere else — it
+   never changes during a session, and a header is for what you are looking
+   at now. */
+.nav__actions {
   display: flex;
+  gap: 10px;
   align-items: center;
-  gap: 7px;
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: .22em;
-  color: var(--text-dim);
+  flex: 0 0 auto;
+  margin-left: auto;
 }
-
-.nav__status .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--acc-ok);
-  box-shadow: 0 0 8px rgba(var(--acc-ok-rgb), .8);
-}
-
-.nav__status.is-ro .dot { background: var(--acc-amb); box-shadow: 0 0 8px rgba(var(--acc-amb-rgb), .8); }
 
 /* ----- layout ---------------------------------------------------------- */
 .layout {
@@ -268,9 +322,28 @@ body {
 }
 
 .sidebar__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 12px;
   border-bottom: 1px solid var(--line);
 }
+
+/* Only in the drawer: on desktop the sidebar is a column and has nothing to
+   close. */
+.sidebar__close { display: none; flex: 0 0 auto; }
+
+/* Dims the pane while the drawer is over it, and swallows the tap that
+   closes it. Inert on desktop -- it is only ever unhidden by setDrawer(). */
+.scrim {
+  position: fixed;
+  inset: var(--nav-h) 0 0;
+  z-index: 140;
+  background: rgba(0, 0, 0, .6);
+  backdrop-filter: blur(2px);
+}
+
+.scrim[hidden] { display: none; }
 
 .pane {
   min-height: 0;
@@ -278,8 +351,16 @@ body {
   /* No bottom padding: sticky `bottom: 0` resolves against the scrollport's
      padding edge, so padding here would float the save bar off the bottom.
      The breathing room lives on .tabpanel instead. */
-  padding: 24px 28px 0;
+  padding: 0 var(--pane-x);
+  /* The sticky header sits inside the scrollport, so it is what carries the
+     top spacing now. */
+  scroll-padding-top: 120px;
 }
+
+/* The check-all view writes its heading straight into the pane instead of
+   into a sticky block, so it brings the top spacing the block would have. */
+.pane > .head { padding-top: var(--pane-top); }
+.pane > .issues { padding-bottom: 36px; }
 
 .pane__empty {
   color: var(--text-ghost);
@@ -395,76 +476,166 @@ body {
 }
 
 /* ----- pane header ----------------------------------------------------- */
-.head { margin-bottom: 20px; }
+/* Header and tabs are one sticky block. A settings page runs three screens
+   deep; without this, scrolling into the middle of it left you with no album
+   name, no tabs and no save bar in view. */
+.pane__top {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin: 0 calc(var(--pane-x) * -1);
+  padding: var(--pane-top) var(--pane-x) 0;
+  padding-bottom: 14px;
+  background: linear-gradient(180deg, rgba(6, 6, 8, .96) 70%, rgba(6, 6, 8, .88));
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Once it is floating over content it grows the nav's signature edge, the
+   same gradient at the same strength — the two bars are the same bar. */
+.pane__top::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 1px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .25s ease;
+  background: linear-gradient(90deg,
+    transparent 2%, rgba(var(--acc-rgb), .5) 30%,
+    rgba(var(--acc-rgb), .45) 50%, rgba(var(--acc-rgb), .5) 70%, transparent 98%);
+}
+
+.pane.is-scrolled .pane__top::after { opacity: .85; }
+
+.head { margin-bottom: 14px; }
 
 .head__crumb {
   font-family: var(--mono);
   font-size: 10.5px;
   letter-spacing: .1em;
   color: var(--text-ghost);
-  margin-bottom: 8px;
-  word-break: break-all;
+  margin-bottom: 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* Title and status pills share a line — two rows of chrome above every tab
+   was most of the reason the header had to scroll away in the first place. */
+.head__line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+/* The gallery's page title, to the letter: Space Grotesk 700, the same
+   clamp, and the white-to-grey fall that keeps the largest text on a page
+   from being the same flat white as everything under it. It used to be set
+   in the display face in caps — which is the WORDMARK's voice over there,
+   not a heading's, and it also uppercased data: `japan_2026` is a folder
+   name and `gallery.cfg` is a filename. Neither is ours to restyle. */
 .head__title {
-  margin: 0 0 12px;
-  font-family: var(--brand);
-  font-size: 22px;
-  font-weight: 400;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: var(--text);
+  margin: 0;
+  font-family: var(--sans);
+  font-size: clamp(20px, 2.2vw, 28px);
+  font-weight: 700;
+  letter-spacing: .03em;
+  line-height: 1.06;
+  min-width: 0;
+  word-break: break-word;
+  color: var(--title-a);
+  background: linear-gradient(175deg, var(--title-a) 18%, var(--title-b) 96%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  padding-bottom: .04em;
 }
 
-.head__meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.head__title::selection { -webkit-text-fill-color: var(--text); }
+
+.head__meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* Past the first line of scroll the block sheds what it can: the file path
+   goes, the title steps down. The tabs never move. */
+.pane.is-scrolled .head { margin-bottom: 10px; }
+.pane.is-scrolled .head__crumb { display: none; }
+.pane.is-scrolled .head__title { font-size: 16px; }
+.pane.is-scrolled .pane__top {
+  padding-top: 10px;
+  box-shadow: 0 12px 24px -18px rgba(0, 0, 0, .95);
+}
 
 /* ----- pills ----------------------------------------------------------- */
+/* The gallery's .section__doc-mark: a mark on the line, not a sticker. A
+   hairline in its own colour, no fill, no 2px stub down one side. */
 .pill {
   font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: .14em;
+  font-size: 9.5px;
+  letter-spacing: .2em;
   text-transform: uppercase;
-  padding: 5px 10px;
+  padding: 3px 8px;
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, .03);
-  color: var(--text-dim);
-  border: 1px solid var(--line);
-  border-left: 2px solid var(--line-strong);
+  background: none;
+  color: var(--label);
+  border: 1px solid rgba(var(--label-rgb), .35);
 }
 
-.pill--ok   { color: var(--acc-ok);  border-left-color: var(--acc-ok); }
-.pill--warn { color: var(--acc-amb); border-left-color: var(--acc-amb); }
-.pill--err  { color: var(--acc-red); border-left-color: var(--acc-red); }
+.pill--ok   { color: var(--ok);  border-color: rgba(var(--ok-rgb), .4); }
+.pill--warn { color: var(--amb); border-color: rgba(var(--amb-rgb), .4); }
+.pill--err  { color: var(--red); border-color: rgba(var(--red-rgb), .4); }
 
 /* ----- tabs ------------------------------------------------------------ */
+/* The gallery's language selector is the site's one segmented control, so
+   this is that control: a boxed strip of options, the current one carrying
+   the accent tint and an inset ring. It used to be an underlined tab row,
+   an idiom that appears nowhere in the gallery. */
 .tabs {
   display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 22px;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
+
+.tabs::-webkit-scrollbar { height: 0; }
 
 .tab {
   appearance: none;
   background: none;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--radius);
   color: var(--text-ghost);
   font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: .18em;
+  font-size: 11px;
+  letter-spacing: .12em;
   text-transform: uppercase;
-  padding: 11px 16px;
+  padding: 6px 12px;
   cursor: pointer;
   white-space: nowrap;
-  transition: color .15s ease;
+  transition: color .15s ease, background .15s ease, box-shadow .15s ease;
 }
 
-.tab:hover { color: var(--text-dim); }
-.tab.is-active { color: var(--text); border-bottom-color: var(--acc); }
+.tab:hover { color: var(--text); background: rgba(255, 255, 255, .05); }
 
-.tabpanel { padding-bottom: 36px; }
+.tab.is-active {
+  color: var(--acc);
+  background: rgba(var(--acc-rgb), .12);
+  box-shadow: inset 0 0 0 1px rgba(var(--acc-rgb), .35);
+}
+
+.tabpanel { padding-top: 20px; padding-bottom: 36px; }
 .tabpanel[hidden] { display: none; }
 
 /* ----- fields ---------------------------------------------------------- */
@@ -473,7 +644,10 @@ body {
    controls now tile; only list-shaped ones take the full width. */
 .fields {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  /* auto-FILL, not auto-fit: with a filter down to one hit, auto-fit
+     collapses the empty tracks and stretches that single tile across the
+     whole pane — a toggle 1100px wide. */
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
   gap: 8px;
   margin-top: 12px;
   align-items: start;
@@ -500,16 +674,41 @@ body {
   border-left-color: var(--line);
 }
 
+/* Staged but not written. Amber is the file-is-out-of-date colour here (the
+   save bar's dirty note uses it), so an edit is findable by eye without
+   reading the bar's chip list. */
+.field.is-edited {
+  border-left-color: var(--acc-amb);
+  background: linear-gradient(180deg, rgba(var(--acc-amb-rgb), .06), transparent 60%), var(--surface);
+}
+
+.field__flag {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--acc-amb);
+}
+
+/* Jumped to from a save-bar chip. */
+.field.is-flash { animation: fieldflash 1.2s ease-out; }
+
+@keyframes fieldflash {
+  0%, 40% { box-shadow: 0 0 0 1px var(--acc-amb), 0 0 22px -6px rgba(var(--acc-amb-rgb), .8); }
+  100%    { box-shadow: 0 0 0 1px transparent, 0 0 0 0 transparent; }
+}
+
 .field__top { display: flex; align-items: center; gap: 8px; }
 
 .field__label {
   flex: 1 1 auto;
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .14em;
+  font-weight: 400;
+  letter-spacing: .16em;
   text-transform: uppercase;
-  color: var(--text);
+  color: var(--label);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -536,6 +735,22 @@ body {
   font-size: 11px;
   line-height: 1.45;
 }
+
+/* The intro paragraph over a whole tab: the same voice as a field's help,
+   so it answers to the same switch. */
+.tabnote {
+  border-left: 1px solid var(--line);
+  padding-left: 12px;
+  max-width: 92ch;
+}
+
+/* "Help off" strips the prose and leaves the controls. It never touches a
+   hint that explains why a control is empty or refuses to write — those are
+   part of the control, not commentary on it. */
+html.no-help .field > .field__help:not(.field__hint),
+html.no-help .tabnote { display: none; }
+
+html.no-help .group__blurb { display: none; }
 
 .field__control { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 
@@ -566,22 +781,49 @@ input::placeholder, textarea::placeholder { color: var(--text-ghost); }
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--acc);
-  box-shadow: 0 0 0 1px rgba(var(--acc-rgb), .35), 0 0 18px -6px rgba(var(--acc-rgb), .5);
+  background: rgba(var(--acc-rgb), .05);
+  box-shadow: 0 0 0 1px rgba(var(--acc-rgb), .18), 0 0 18px -8px rgba(var(--acc-rgb), .5);
+}
+
+/* Every "filter this list" field in the tool is the gallery's nav search
+   box: a glass pane, mono at 12px, and an uppercase tracked hint. There are
+   three of them — the album tree, the settings finder, the picker — and
+   they are the same control doing the same job in three places. */
+.fieldsearch {
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .08em;
+  padding: 9px 12px;
+}
+
+.fieldsearch::placeholder {
+  color: var(--text-ghost);
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
 }
 
 select { cursor: pointer; }
 select option { background: var(--surface); color: var(--text); }
 
 /* ----- buttons --------------------------------------------------------- */
+/* The gallery's .tag: mono caps on a glass pane, and a hover in --chrome
+   rather than in the accent. A button that merely opens a picker carries no
+   state, and the palette reserves purple for the things that do. */
 .btn {
   appearance: none;
-  background: rgba(255, 255, 255, .04);
-  border: 1px solid var(--line-strong);
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   color: var(--text-dim);
   font-family: var(--mono);
   font-size: 10.5px;
-  letter-spacing: .14em;
+  letter-spacing: .16em;
   text-transform: uppercase;
   padding: 7px 13px;
   cursor: pointer;
@@ -590,22 +832,24 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 .btn:hover:not(:disabled) {
-  color: var(--text);
-  border-color: var(--acc);
-  background: rgba(var(--acc-rgb), .1);
+  color: var(--chrome);
+  border-color: var(--chrome);
+  background: rgba(var(--chrome-rgb), .06);
 }
 
 .btn:disabled { opacity: .35; cursor: not-allowed; }
 
+/* The one button that carries state — it writes the file — keeps the
+   accent, and is the only thing in a row of buttons that does. */
 .btn--primary {
-  background: rgba(var(--acc-rgb), .16);
-  border-color: var(--acc);
+  background: rgba(var(--acc-rgb), .14);
+  border-color: rgba(var(--acc-rgb), .55);
   color: var(--acc);
-  font-weight: 600;
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: rgba(var(--acc-rgb), .28);
+  background: rgba(var(--acc-rgb), .24);
+  border-color: var(--acc);
   color: var(--text);
   box-shadow: 0 0 20px -6px rgba(var(--acc-rgb), .7);
 }
@@ -627,37 +871,42 @@ select option { background: var(--surface); color: var(--text); }
 .row { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
 
 /* ----- segmented toggle ------------------------------------------------ */
+/* Same segmented control as the tabs and the gallery's language selector —
+   one idiom for "pick one of these", wherever it appears. */
 .toggle {
   display: inline-flex;
-  background: var(--surface);
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--glass);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  overflow: hidden;
   width: fit-content;
+  max-width: 100%;
+  flex-wrap: wrap;
 }
 
 .toggle button {
   appearance: none;
   background: none;
   border: 0;
-  border-right: 1px solid var(--line);
+  border-radius: var(--radius);
   color: var(--text-ghost);
   font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: .14em;
+  font-size: 10.5px;
+  letter-spacing: .12em;
   text-transform: uppercase;
-  padding: 7px 15px;
+  padding: 6px 12px;
   cursor: pointer;
-  transition: color .15s ease, background .15s ease;
+  transition: color .15s ease, background .15s ease, box-shadow .15s ease;
 }
 
-.toggle button:last-child { border-right: 0; }
-.toggle button:hover:not(:disabled) { color: var(--text-dim); background: rgba(255, 255, 255, .03); }
+.toggle button:hover:not(:disabled) { color: var(--text); background: rgba(255, 255, 255, .05); }
 
 .toggle button.is-on {
-  background: rgba(var(--acc-rgb), .18);
   color: var(--acc);
-  box-shadow: inset 0 -2px 0 var(--acc);
+  background: rgba(var(--acc-rgb), .12);
+  box-shadow: inset 0 0 0 1px rgba(var(--acc-rgb), .35);
 }
 
 .toggle button:disabled { cursor: not-allowed; opacity: .45; }
@@ -747,7 +996,7 @@ select option { background: var(--surface); color: var(--text); }
   transition: border-color .15s ease;
 }
 
-.pickitem:hover { border-left-color: var(--acc); }
+.pickitem:hover { border-left-color: var(--chrome); }
 .pickitem[draggable="true"] { cursor: grab; }
 .pickitem.is-dragging { opacity: .35; }
 .pickitem.is-over { border-color: var(--acc); border-left-color: var(--acc); }
@@ -884,7 +1133,7 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 /* ----- issues ---------------------------------------------------------- */
-.issues { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
+.issues { display: flex; flex-direction: column; gap: 6px; margin: 18px 0 0; }
 
 .issue {
   display: flex;
@@ -933,13 +1182,15 @@ select option { background: var(--surface); color: var(--text); }
 .savebar {
   position: sticky;
   bottom: 0;
-  margin: 22px -28px 0;
-  padding: 13px 28px;
+  z-index: 25;
+  margin: 22px calc(var(--pane-x) * -1) 0;
+  padding: 11px var(--pane-x);
   background: rgba(12, 12, 14, .94);
   border-top: 1px solid var(--line);
   display: flex;
-  gap: 11px;
+  gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
   backdrop-filter: blur(8px);
 }
 
@@ -961,9 +1212,41 @@ select option { background: var(--surface); color: var(--text); }
   font-size: 10.5px;
   letter-spacing: .08em;
   flex: 1 1 auto;
+  white-space: nowrap;
 }
 
-.savebar.is-dirty .savebar__note { color: var(--acc-amb); }
+/* With edits staged the note shrinks to its label and the chips take the
+   room: one chip per changed key, so eight edits are eight things you can
+   jump to or undo rather than one run-on line off the end of the bar. */
+.savebar.is-dirty .savebar__note { flex: 0 0 auto; color: var(--acc-amb); }
+
+.savebar__chips {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.savebar__acts { flex: 0 0 auto; display: flex; gap: 10px; margin-left: auto; }
+
+.chip--edit { border-left-color: var(--acc-amb); padding-left: 0; }
+
+.chip__go {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 3px 2px 3px 9px;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chip__go:hover { color: var(--acc-amb); }
+
 .savebar.is-dirty::before { opacity: 1; }
 
 /* ----- assets ---------------------------------------------------------- */
@@ -1035,7 +1318,7 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 /* ----- description tab -------------------------------------------------- */
-.desc-langs { display: flex; gap: 6px; margin-bottom: 14px; }
+.desc-langs { margin-bottom: 14px; }
 
 /* ----- modal ----------------------------------------------------------- */
 .modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; }
@@ -1075,7 +1358,9 @@ select option { background: var(--surface); color: var(--text); }
   white-space: nowrap;
 }
 
-.modal__head input { flex: 1 1 auto; }
+.modal__head { flex-wrap: wrap; }
+.modal__head input { flex: 1 1 auto; order: 1; }
+.modal__x { order: 2; }
 
 .modal__body { flex: 1 1 auto; overflow-y: auto; padding: 18px; }
 
@@ -1120,41 +1405,46 @@ select option { background: var(--surface); color: var(--text); }
 .toast.is-err { border-left-color: var(--acc-red); color: var(--acc-red); }
 
 /* ----- footer ---------------------------------------------------------- */
+/* The gallery's footer, kept as a bar because this is an app shell rather
+   than a page that ends: same ground (#050505), same hairline, same voice —
+   the page's own sans at 12px in ghost grey, with the keys a step up. It
+   used to be mono caps at .16em, which is the HUD voice and made a colophon
+   read as an instrument. */
 .foot {
   flex: 0 0 auto;
   border-top: 1px solid var(--line);
-  background: rgba(0, 0, 0, .72);
-  backdrop-filter: blur(10px);
+  background: #050505;
   padding: 0 20px;
   height: 38px;
   display: flex;
   align-items: center;
   gap: 16px;
+  font-size: 12px;
+  letter-spacing: .01em;
+  color: var(--text-ghost);
 }
 
 .foot__brand {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--text-ghost);
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: .16em;
-  text-transform: uppercase;
+  gap: 10px;
+  color: var(--text-dim);
 }
 
-.foot__brand img { height: 14px; width: auto; opacity: .55; }
+.foot__brand img { height: 18px; width: auto; opacity: .85; }
 
 .foot__meta {
   margin-left: auto;
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: .16em;
   color: var(--text-ghost);
-  text-transform: uppercase;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.foot__meta b { color: var(--text-dim); font-weight: 600; }
+.foot__meta b { color: var(--text-dim); font-weight: 400; }
+
+.foot__bit + .foot__bit::before { content: " · "; color: var(--text-ghost); opacity: .6; }
 
 /* ----- custom attribute rows (stat) ------------------------------------ */
 .kv__key {
@@ -1169,31 +1459,126 @@ select option { background: var(--surface); color: var(--text); }
   flex: 0 0 auto;
 }
 
+/* ----- settings toolbar ------------------------------------------------- */
+/* gallery.cfg has thirty-odd keys across seven groups. Grouping alone stopped
+   being enough: this row is how you get to one key without reading all of
+   them — find by name or description, hide everything the file leaves at the
+   default, drop the help text, fold the lot. */
+.stoolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px 14px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.stoolbar__find { flex: 1 1 260px; min-width: 0; }
+.stoolbar__switches { display: flex; gap: 6px; flex: 0 0 auto; flex-wrap: wrap; }
+
+.stoolbar__count {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+}
+
+/* A switch, not a button: it stays lit while what it does is in force. */
+.chipbtn {
+  appearance: none;
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text-ghost);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 7px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+
+.chipbtn.is-on {
+  background: rgba(var(--acc-rgb), .16);
+  border-color: var(--acc);
+  color: var(--acc);
+}
+
 /* ----- setting groups --------------------------------------------------- */
 /* Fifteen keys as one flat list is a wall. Grouped, each block answers one
-   question, and the blurb says which. */
+   question, and the blurb says which. Each group also folds, and says how
+   much of itself the file actually writes. */
 .group { margin-bottom: 30px; }
 
 .group__head {
-  border-bottom: 1px solid var(--line-strong);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
   padding-bottom: 8px;
   margin-bottom: 4px;
+  cursor: pointer;
+  user-select: none;
 }
 
+.group__head:focus-visible { outline: 1px solid var(--acc); outline-offset: 3px; }
+
+/* Same glyph and same turn as the album tree's twisty — one idiom for
+   "there is more under this". */
+.group__twisty {
+  flex: 0 0 auto;
+  width: 13px;
+  color: var(--text-ghost);
+  font-size: 9px;
+  line-height: 2;
+  transform: rotate(90deg);
+  transition: transform .12s ease;
+}
+
+.group.is-folded .group__twisty { transform: none; }
+
+.group__text { flex: 1 1 auto; min-width: 0; }
+
+/* .search-group__n over there: a bare count at the end of the rule, not a
+   boxed badge. */
+.group__count {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .18em;
+  color: var(--text-ghost);
+  padding-top: 1px;
+  white-space: nowrap;
+}
+
+.group__count.is-on { color: var(--text-dim); }
+
+.group.is-folded .group__head { border-bottom-color: var(--line); }
+.group.is-folded .group__blurb { display: none; }
+.group.is-folded { margin-bottom: 10px; }
+
+/* The gallery's .search-group__label — the eyebrow over a group of results
+   is the same object as the eyebrow over a group of keys. */
 .group__title {
   margin: 0;
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .22em;
+  font-weight: 400;
+  letter-spacing: .24em;
   text-transform: uppercase;
-  color: var(--text);
+  color: var(--label);
 }
 
 .group__blurb {
   margin: 4px 0 0;
   font-size: 12px;
   color: var(--text-ghost);
+  max-width: 88ch;
 }
 
 /* ----- breadcrumbs ------------------------------------------------------ */
@@ -1249,7 +1634,7 @@ select option { background: var(--surface); color: var(--text); }
   transition: border-color .15s ease, background .15s ease;
 }
 
-.foldertile:hover { background: var(--surface-2); border-color: var(--acc); }
+.foldertile:hover { background: var(--surface-2); border-color: var(--chrome); }
 
 .foldertile img,
 .foldertile__blank {
@@ -1387,18 +1772,24 @@ select option { background: var(--surface); color: var(--text); }
 /* ----- tag chips -------------------------------------------------------- */
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
 
+/* A tag is the gallery's .tag, down to the tracking — same object, same
+   face. The green stub down one side said nothing: a tag is not a state. */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 5px 3px 9px;
-  border: 1px solid var(--line-strong);
-  border-left: 2px solid var(--acc-ok);
+  padding: 4px 5px 4px 10px;
+  border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--glass);
+  color: var(--text-dim);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
 }
+
+.chip:hover { color: var(--text); border-color: var(--line-strong); background: var(--glass-hi); }
 
 .chip__x {
   appearance: none;
@@ -1449,8 +1840,15 @@ img.is-broken { opacity: .2; }
   transition: opacity .12s ease;
 }
 
-.cell:hover .cell__pick,
 .cell__pick:focus-visible { opacity: 1; }
+
+@media (hover: hover) {
+  .cell:hover .cell__pick { opacity: 1; }
+}
+
+@media (hover: none) {
+  .cell__pick { opacity: .92; }
+}
 
 .cell__pick.is-on {
   opacity: 1;
@@ -1485,6 +1883,7 @@ img.is-broken { opacity: .2; }
 
 /* ----- small utilities -------------------------------------------------- */
 .u-mb  { margin-bottom: 14px; }
+.u-wide-only { display: inline; }
 .u-gap { height: 16px; }
 .u-tall { min-height: 52vh; }
 .u-hidden { display: none; }
@@ -1521,16 +1920,174 @@ img.is-broken { opacity: .2; }
   border: 2px solid transparent;
   background-clip: content-box;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(var(--acc-rgb), .45); background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(var(--chrome-rgb), .3); background-clip: content-box; }
 
-/* ----- narrow ---------------------------------------------------------- */
+/* ----- narrow: the album tree becomes a drawer -------------------------- */
+/* Under 900px the two-column layout stops working: the sidebar used to keep
+   a 38vh band at the top of every page, which cost a third of a phone screen
+   permanently and still only listed four albums. It slides in over the pane
+   instead, and closes as soon as one is picked. */
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
-  .sidebar { max-height: 38vh; border-right: 0; border-bottom: 1px solid var(--line); }
+
+  .sidebar {
+    position: fixed;
+    top: var(--nav-h);
+    bottom: 0;
+    left: 0;
+    width: min(330px, 86vw);
+    z-index: 150;
+    border-right: 1px solid var(--line-strong);
+    background: rgba(10, 10, 12, .98);
+    transform: translateX(-101%);
+    transition: transform .18s ease;
+  }
+
+  body.drawer-open .sidebar {
+    transform: translateX(0);
+    box-shadow: 24px 0 60px -20px rgba(0, 0, 0, .95);
+  }
+
+  .navmenu { display: block; }
+  .sidebar__close { display: inline-flex; }
+
+  .nav__inner { gap: 12px; padding: 0 12px; }
+  .nav__actions { gap: 6px; }
+
   .fields { grid-template-columns: 1fr; }
-  .photos { grid-template-columns: 1fr; }
-  .nav__path { display: none; }
-  .brand-jp { display: none; }
+
+  /* The selection and metadata panels move ABOVE the grid rather than into a
+     column beside it — stacked underneath, tagging forty photos meant
+     scrolling past all forty to reach the panel that tags them. They still
+     never cover the grid, which is the point the side column was making. */
+  .photos { grid-template-columns: 1fr; gap: 12px; }
+  .photos__aside { position: static; order: -1; }
+  .detail__body { max-height: 52vh; }
+  .bulk .detail__body { max-height: 40vh; }
+
+  .stoolbar { gap: 8px; }
+  .stoolbar__find { flex: 1 1 100%; }
+  .stoolbar__count { margin-left: auto; }
+}
+
+/* ----- phone ------------------------------------------------------------ */
+@media (max-width: 620px) {
+  :root {
+    --nav-h:    52px;
+    --pane-x:   14px;
+    --pane-top: 12px;
+  }
+
+  body { font-size: 14px; }
+
+  /* The wordmark goes; the mark stays. Two lines of brand text plus a menu
+     handle plus two buttons do not fit across 375px, and the pane's own
+     heading says which file is open anyway. */
+  .nav__brand img { height: 24px; }
+  .brand-text { display: none; }
+  .u-wide-only { display: none; }
+  .btn { padding: 9px 11px; }
+  .nav__actions .btn { padding: 8px 9px; font-size: 9.5px; letter-spacing: .1em; }
+
+  /* 16px is the threshold under which iOS zooms the page on focus, which then
+     leaves the layout scrolled sideways with no way back. */
+  input[type="text"], input[type="search"], input[type="number"], select, textarea {
+    font-size: 16px;
+    padding: 10px 11px;
+  }
+
+  .head__title { font-size: 17px; }
+  .pane.is-scrolled .head__title { font-size: 14px; }
+  .head__crumb { font-size: 9.5px; }
+
+  /* Five tabs do not fit across a phone, and a strip that scrolls sideways
+     hides the last two behind an edge with nothing to say they are there.
+     Wrapped, every tab is visible and reachable with one thumb. */
+  .tabs { flex-wrap: wrap; width: 100%; overflow: visible; }
+  .tab { flex: 1 1 auto; padding: 9px 10px; font-size: 10px; letter-spacing: .1em; }
+
+  /* Everything you tap gets a finger-sized box. */
+  .toggle button { padding: 10px 14px; }
+  .btn--sm { padding: 8px 10px; font-size: 9.5px; }
+  .btn--icon { padding: 8px 11px; }
+  .chipbtn { padding: 9px 11px; }
+  .chip__x { padding: 4px 6px; }
+  .field__unset { padding: 6px 8px; font-size: 13px; }
+
+  .field { padding: 12px; }
+  .group { margin-bottom: 22px; }
+  .group__blurb { font-size: 11.5px; }
+
+  .stoolbar__switches { flex: 1 1 100%; }
+  .stoolbar__switches .chipbtn { flex: 1 1 auto; text-align: center; }
+  .stoolbar__count { flex: 1 1 100%; margin-left: 0; }
+
+  /* The save bar is the one thing that must never need horizontal hunting on
+     a phone: label and chips take the first line, the buttons the second. */
+  .savebar { gap: 8px; padding: 10px var(--pane-x) 12px; }
+  .savebar__note { flex: 1 1 100%; white-space: normal; font-size: 10px; }
+  /* Idle, the settings bar has nothing to say that is worth two lines at the
+     bottom of a phone — the Save button alone is the state. It speaks up
+     again the moment there is something staged. */
+  .savebar--settings:not(.is-dirty) .savebar__note { display: none; }
+  .savebar__chips { flex: 1 1 100%; }
+  .savebar__acts { flex: 1 1 100%; margin-left: 0; }
+  .savebar__acts .btn { flex: 1 1 auto; }
+
+  .grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+  .folders { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .cell__pick { width: 26px; height: 26px; font-size: 13px; }
+  .cell__roles { left: 38px; }
+
+  /* the drawer is a touch target list, not a dense desktop tree */
+  .tree__row { padding: 7px 12px 7px 0; font-size: 13.5px; }
+  .sidebar__search { padding: 10px 12px; }
+
+  .pickitem { gap: 8px; padding: 6px; }
+  .pickitem__thumb { width: 38px; height: 38px; flex-basis: 38px; }
+  .kv__key { flex: 0 0 40%; }
+
+  .cover-preview { flex-direction: column; }
+  .fontsample { font-size: 24px; padding: 12px; }
+  .wallpreview { max-width: 100%; }
+
+  .desc-langs { flex-wrap: wrap; }
+  .detail__body { max-height: 46vh; }
+
+  /* A picker that is 8% short of the screen on a phone is just a smaller
+     phone screen with the same number of photos in it. */
+  .modal__box {
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .modal__head { padding: 10px 12px; gap: 8px 10px; }
+  .modal__head input { flex: 1 1 100%; order: 2; }
+  .modal__x { order: 0; margin-left: auto; }
+  .modal__body { padding: 12px; }
+  .modal__foot { padding: 10px 12px; flex-wrap: wrap; }
+  .modal__count { flex: 1 1 100%; }
+  .modal__foot .btn { flex: 1 1 auto; }
+
+  .foot { height: 32px; padding: 0 12px; gap: 10px; }
+  .foot__wordmark { display: none; }
+  .foot__bit:not(.foot__bit--keep) { display: none; }
+  /* the separator belongs to a sibling that is no longer there */
+  .foot__bit + .foot__bit--keep::before { content: none; }
+  .toast { left: 12px; right: 12px; bottom: 14px; transform: none; text-align: center; }
+}
+
+/* The tree, the folder tiles and the list rows all repaint on :hover. On a
+   touch screen that repaint eats the first tap — the second one is what
+   actually opens the album. */
+@media (hover: none) {
+  .tree__row:hover { background: none; color: var(--text-dim); }
+  .foldertile:hover { background: var(--surface); border-color: var(--line); }
+  .pickitem:hover { border-left-color: var(--line-strong); }
+  .cell:hover { border-color: var(--line); }
 }
 
 @media (prefers-reduced-motion: reduce) {

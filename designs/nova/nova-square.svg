@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+  <defs>
+    <linearGradient id="pfpBase" gradientUnits="userSpaceOnUse" x1="-102" y1="219.2" x2="1102" y2="780.8">
+      <stop offset="0" stop-color="#4034c0"></stop>
+      <stop offset="0.14" stop-color="#221b6a"></stop>
+      <stop offset="0.4" stop-color="#0b0a18"></stop>
+      <stop offset="0.72" stop-color="#07070d"></stop>
+      <stop offset="1" stop-color="#0a0a12"></stop>
+    </linearGradient>
+    <linearGradient id="pfpShardViolet" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7869f0" stop-opacity="0.8"></stop>
+      <stop offset="0.72" stop-color="#3c32af" stop-opacity="0.22"></stop>
+      <stop offset="1" stop-color="#14103c" stop-opacity="0"></stop>
+    </linearGradient>
+    <linearGradient id="pfpShardGrey" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a0a2b0" stop-opacity="0.16"></stop>
+      <stop offset="0.65" stop-color="#4e4f5c" stop-opacity="0.05"></stop>
+      <stop offset="1" stop-color="#2a2a33" stop-opacity="0"></stop>
+    </linearGradient>
+    <linearGradient id="pfpShardVioletSoft" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6e60e1" stop-opacity="0.28"></stop>
+      <stop offset="0.7" stop-color="#322a96" stop-opacity="0.08"></stop>
+      <stop offset="1" stop-color="#0f0c32" stop-opacity="0"></stop>
+    </linearGradient>
+    <linearGradient id="pfpLineViolet" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6a5cf5" stop-opacity="0"></stop>
+      <stop offset="0.26" stop-color="#6a5cf5" stop-opacity="1"></stop>
+      <stop offset="0.6" stop-color="#8b7dff" stop-opacity="1"></stop>
+      <stop offset="0.92" stop-color="#8b7dff" stop-opacity="0"></stop>
+    </linearGradient>
+    <linearGradient id="pfpLineSilver" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c6c8d7" stop-opacity="0"></stop>
+      <stop offset="0.42" stop-color="#c6c8d7" stop-opacity="0.6"></stop>
+      <stop offset="0.95" stop-color="#c6c8d7" stop-opacity="0"></stop>
+    </linearGradient>
+    <radialGradient id="pfpGlow" gradientUnits="userSpaceOnUse" cx="220" cy="180" r="820">
+      <stop offset="0" stop-color="#100e1e"></stop>
+      <stop offset="0.48" stop-color="#08080f"></stop>
+      <stop offset="1" stop-color="#05050a"></stop>
+    </radialGradient>
+    <radialGradient id="pfpVignette" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#040408" stop-opacity="0.94"></stop>
+      <stop offset="0.46" stop-color="#05050a" stop-opacity="0.7"></stop>
+      <stop offset="0.84" stop-color="#05050a" stop-opacity="0"></stop>
+    </radialGradient>
+    <pattern id="pfpDots" patternUnits="userSpaceOnUse" x="0" y="0" width="3" height="3">
+      <circle cx="1.5" cy="1.5" r="0.5" fill="#ffffff"></circle>
+    </pattern>
+  </defs>
+
+  <rect id="Hintergrund" x="0" y="0" width="1000" height="1000" fill="url(#pfpGlow)"></rect>
+  <rect id="Basis-Verlauf" x="0" y="0" width="1000" height="1000" fill="url(#pfpBase)"></rect>
+
+  <polygon id="Shard-Violett-Gross" fill="url(#pfpShardViolet)" points="-246.16,-328.82 106.16,-471.18 780.46,1197.74 428.14,1340.10"></polygon>
+  <polygon id="Shard-Grau" fill="url(#pfpShardGrey)" points="154.00,-379.40 256.00,-420.60 930.30,1248.32 828.30,1289.52"></polygon>
+  <polygon id="Shard-Violett-Weich" fill="url(#pfpShardVioletSoft)" points="529.47,-351.30 770.53,-448.70 1444.83,1220.22 1203.77,1317.62"></polygon>
+
+  <polygon id="Linie-Violett" fill="url(#pfpLineViolet)" points="230.00,-80.00 232.78,-81.12 584.91,790.43 582.13,791.55"></polygon>
+  <polygon id="Linie-Silber" fill="url(#pfpLineSilver)" points="700.00,120.00 701.85,119.25 971.57,786.82 969.72,787.57"></polygon>
+
+  <ellipse id="Vignette" cx="560" cy="540" rx="620" ry="620" fill="url(#pfpVignette)"></ellipse>
+  <rect id="Punktraster" x="0" y="0" width="1000" height="1000" fill="url(#pfpDots)" opacity="0.05"></rect>
+</svg>
