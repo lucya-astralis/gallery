@@ -279,12 +279,29 @@
   --glass-hi:   rgba(22, 22, 29, .74);   /* the lifted, read step */
   --scrim:      rgba(4, 4, 8, .46);      /* chips laid ON artwork */
   --scrim-hi:   rgba(6, 6, 10, .64);
-  --pane:       rgba(6, 6, 10, .72);     /* the app bar */
   --overlay:    rgba(10, 10, 14, .82);   /* menus and dialogs */
+
+  /* --pane is DEEP BLACK, and it is the one surface with a stated reason not
+     to take the top of the blur ladder. Two things put colour into a bar: a
+     hue in the fill itself, and saturation in the blur behind it. --pane was
+     rgba(6,6,10,.72) on --blur-3 (saturate 165%) and got both -- 6,6,10 is a
+     blue step, which rule 1 does not allow in the ground ramp anyway, and 28%
+     of a re-saturated backdrop is enough to tint the bar. THREE bars here read
+     this token -- .nav, the pane's sticky header and the save bar -- so a
+     tinted --pane frames the whole tool in the artwork's colour (user,
+     2026-09-07: "header bars sollen tiefschwarz bleiben, da andere Farben hier
+     einfach was kaputt machen").
+
+     So: neutral black at .86, over --blur-1. Still glass -- nova moves behind
+     it -- but it reads black. --pane-scrolled is the deeper step for a bar
+     with content under it; that is a STATE cue, not the legibility fix rule 3
+     forbids. */
+  --pane:          rgba(0, 0, 0, .86);   /* the app bar */
+  --pane-scrolled: rgba(0, 0, 0, .94);
 
   --glass-blur:   var(--blur-2);
   --scrim-blur:   var(--blur-1);
-  --pane-blur:    var(--blur-3);
+  --pane-blur:    var(--blur-1);
   --overlay-blur: var(--blur-3);
 
   /* elevation: two shadows and one glow, for the things that genuinely
@@ -383,8 +400,9 @@ html.fx-lite {
      the wallpaper is behind a card, but the FORM scrolls behind the app bar
      and under a menu. Translucency without a blur to average it is not
      glass, it is a smear. */
-  --pane:       #04040a;
-  --overlay:    #0a0a0e;
+  --pane:          #000000;
+  --pane-scrolled: #000000;
+  --overlay:       #0a0a0e;
   --blur-1: none; --blur-2: none; --blur-3: none;
 }
 
@@ -396,8 +414,9 @@ html.fx-lite {
     --glass-hi:   rgba(36, 36, 44, .96);
     --scrim:      rgba(0, 0, 0, .88);
     --scrim-hi:   rgba(6, 6, 10, .94);
-    --pane:       #04040a;
-    --overlay:    #0a0a0e;
+    --pane:          #000000;
+    --pane-scrolled: #000000;
+    --overlay:       #0a0a0e;
     --blur-1: none; --blur-2: none; --blur-3: none;
   }
 }
@@ -533,8 +552,10 @@ body {
 
 /* Brightens once the pane under it is scrolled, exactly as the gallery's
    .nav--scrolled does — the bar is floating over content at that point and
-   the signature edge is what says so. */
+   the signature edge is what says so. The bar itself goes to --pane-scrolled
+   with it, same as over there. */
 .nav--scrolled::after { opacity: .85; }
+.nav--scrolled { background-color: var(--pane-scrolled); }
 
 .nav__inner {
   height: 100%;
@@ -907,6 +928,9 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .pane.is-scrolled .head__title { font-size:var(--fs-text-lg); }
 .pane.is-scrolled .pane__top {
   padding-top: 10px;
+  /* the same state cue the gallery's .nav--scrolled carries: the bar goes to
+     --pane-scrolled and casts a shadow once there is content under it */
+  background-color: var(--pane-scrolled);
   box-shadow: 0 12px 24px -18px rgba(0, 0, 0, .95);
 }
 

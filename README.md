@@ -491,7 +491,9 @@ in `app/static/style.css` is one of them:
    picture), `--pane` (the app bar), `--overlay` (menus) — each with a step off
    the `--blur-1..3` ladder. A surface that needs to read better gets more blur
    or the `-hi` step, never a darker fill. A pane is a fill, a blur and a
-   hairline: no bevel, no gloss.
+   hairline: no bevel, no gloss. `--pane` is the one exception to the ladder:
+   **deep black**, no hue in the fill and `--blur-1` behind it, so the bar
+   framing every screen never picks up an album's colour.
 4. **The mono, tracked, uppercase voice marks the chrome *around* a photo
    grid** — section labels, counts, measured values, the meta line. Everything
    a person actually reads is Space Grotesk in sentence case. The display face

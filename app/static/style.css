@@ -555,12 +555,28 @@
   --glass-hi:   rgba(22,22,29,.74);
   --scrim:      rgba(4,4,8,.46);
   --scrim-hi:   rgba(6,6,10,.64);
-  --pane:       rgba(6,6,10,.72);
-  --overlay:    rgba(10,10,14,.82);
+  /* --pane is DEEP BLACK, and it is the one surface with a stated reason not
+     to take the top of the blur ladder. Two things put colour into a bar:
+     a hue in the fill itself, and saturation in the blur behind it. --pane
+     was rgba(6,6,10,.72) on --blur-3 (saturate 165%) and got both -- 6,6,10
+     is a blue step, which rule 1 does not allow in the ground ramp anyway,
+     and 28% of a re-saturated wallpaper is enough to tint the bar an album's
+     colour. The bar spans the viewport on every screen and is the frame the
+     whole page is read inside; a frame that changes colour per album is not
+     furniture any more (user, 2026-09-07: "header bars sollen tiefschwarz
+     bleiben, da andere Farben hier einfach was kaputt machen").
+
+     So: neutral black at .86, over --blur-1. Still glass -- the wallpaper
+     moves behind it -- but it reads black at every album and under every
+     accent. --pane-scrolled is the deeper step for a bar that has content
+     under it; that is a STATE cue, not the legibility fix rule 3 forbids. */
+  --pane:          rgba(0,0,0,.86);
+  --pane-scrolled: rgba(0,0,0,.94);
+  --overlay:       rgba(10,10,14,.82);
 
   --glass-blur:   var(--blur-2);
   --scrim-blur:   var(--blur-1);
-  --pane-blur:    var(--blur-3);
+  --pane-blur:    var(--blur-1);
   --overlay-blur: var(--blur-3);
 
   /* ---- elevation -------------------------------------------------------
@@ -671,8 +687,9 @@ html.fx-lite{
      Translucency without a blur to average it is not glass, it is a smear -
      at .96 the hero title still ghosted through the bar, because 4% of white
      over near-black is visible. */
-  --pane:       #04040a;
-  --overlay:    #0a0a0e;
+  --pane:          #000000;
+  --pane-scrolled: #000000;
+  --overlay:       #0a0a0e;
   --blur-1: none; --blur-2: none; --blur-3: none;
 }
 
@@ -686,8 +703,9 @@ html.fx-lite{
     --glass-hi:   rgba(36,36,44,.96);
     --scrim:      rgba(0,0,0,.88);
     --scrim-hi:   rgba(6,6,10,.94);
-    --pane:       #04040a;
-    --overlay:    #0a0a0e;
+    --pane:          #000000;
+    --pane-scrolled: #000000;
+    --overlay:       #0a0a0e;
     --blur-1: none; --blur-2: none; --blur-3: none;
   }
 }
@@ -3188,8 +3206,9 @@ details[open] > summary::before{ content:"▾ "; }
     --glass-hi:   rgba(36,36,44,.94);
     --scrim:      rgba(0,0,0,.78);
     --scrim-hi:   rgba(6,6,10,.88);
-    --pane:       #04040a;
-    --overlay:    #0a0a0e;
+    --pane:          #000000;
+    --pane-scrolled: #000000;
+    --overlay:       #0a0a0e;
     --blur-1: none; --blur-2: none; --blur-3: none;
   }
 
@@ -5865,13 +5884,16 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__close,
 html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease .22s backwards; }
 
 /* ---- sticky nav: deepen once the page scrolls (class from app.js) ---- */
-/* The bar does NOT get a darker fill once the page scrolls: rule 3 says a
-   surface that needs to read better takes more blur or the -hi step, never
-   a darker fill, and --pane is already at the top of the blur ladder. What
-   says "this bar is floating over content now" is the accent hairline
-   brightening (.nav--scrolled::after, above) and the cast shadow. */
-.nav{ transition: box-shadow var(--dur-2) var(--ease); }
+/* Once the page scrolls under it the bar goes to --pane-scrolled and grows a
+   cast shadow, and its accent hairline brightens (.nav--scrolled::after,
+   above). This is NOT rule 3's forbidden move -- that one is reaching for a
+   darker fill because a surface will not READ, and the answer to that is
+   still more blur or the -hi step. This is a state cue on the one surface
+   the language holds to deep black on purpose, and it goes deeper, not
+   lighter, because black is the whole point of --pane. */
+.nav{ transition: background-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease); }
 .nav--scrolled{
+  background-color:var(--pane-scrolled);
   box-shadow:0 12px 32px -18px rgba(0,0,0,.85);
 }
 
