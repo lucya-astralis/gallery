@@ -475,22 +475,42 @@ Rules for the hand-picked welcome list:
 
 The look has a name, because two apps wear it: the gallery, and the
 [configurator](configurator/) that edits its config files. **Nebula**, after
-the accent it rations — `#5865F2`, "Nebula Blue". Four rules, and everything
+the accent it rations — `#5865F2`, "Nebula Blue". Six rules, and everything
 in `app/static/style.css` is one of them:
 
 1. **Black ground, grey furniture, one purple accent.** `--acc` marks *state*
    and nothing else — links, focus, active/selected/open, the featured mark.
    Furniture (labels, counts, hovers, HUD strokes) is `--chrome` or `--label`.
-   Before colouring something purple, ask whether it carries state.
+   Before colouring something purple, ask whether it carries state. The accent
+   never sits on its own tint, and reading copy bottoms out at `--text-dim` —
+   `--text-ghost` is a ghost, not a text colour.
 2. **Square corners, always.** `--radius: 0`. Only genuinely round things —
    the status dot — opt out with their own `border-radius`.
-3. **Depth comes from blur, not from darkness.** Panes float over the drained
-   wallpaper on `--glass` / `--scrim` and their blurs; a surface that needs to
-   read better gets more blur, not a darker fill.
+3. **Depth comes from blur, not from darkness.** Six surfaces float over the
+   drained wallpaper — `--glass`/`-hi` (panes), `--scrim`/`-hi` (chips on a
+   picture), `--pane` (the app bar), `--overlay` (menus) — each with a step off
+   the `--blur-1..3` ladder. A surface that needs to read better gets more blur
+   or the `-hi` step, never a darker fill. A pane is a fill, a blur and a
+   hairline: no bevel, no gloss.
 4. **The mono, tracked, uppercase voice marks the chrome *around* a photo
    grid** — section labels, counts, measured values, the meta line. Everything
    a person actually reads is Space Grotesk in sentence case. The display face
-   (Ethnocentric) is the wordmark's voice and is not a heading's.
+   (Ethnocentric) is the wordmark's voice and is not a heading's. The token
+   name carries the voice: `--fs-chrome-*` against `--fs-text-*`.
+5. **Measure is rationed like colour.** Every size, space, duration and blur
+   comes off a named scale — `--s-0..10`, `--fs-*`, `--tr-*`, `--dur-*`,
+   `--blur-*`. A raw `px` is the same mistake as a raw hex, and the check is a
+   grep: `grep -oE '(padding|gap|margin|font-size):[^;]*[0-9]+px' style.css`.
+6. **The environment can overrule the look.** Blur, translucency, motion and
+   hover are capabilities, not guarantees. Every fallback — `html.fx-lite`,
+   `prefers-reduced-transparency`, `prefers-contrast`, `forced-colors`,
+   `prefers-reduced-motion`, `hover: none` — is reached by *redefining tokens*,
+   never by overriding component rules.
+
+Rules 1–4 say what a thing looks like. Rules 5 and 6 are what make it a
+*language* rather than a look: a look is copied by eye and drifts the first
+time someone eyeballs a padding; a scale and a set of declared fallbacks can
+be inherited.
 
 An album can repaint the accent and dress the backdrop
 (`accent` / `wallpaper*`), and the operator can replace the display face —
@@ -502,6 +522,13 @@ The configurator carries the same tokens and the same controls rather than a
 lookalike of them; its README lists which of its objects comes from which of
 the gallery's. The two deploy as separate images and never share a mount, so
 a change to the language has to be made in **both** stylesheets.
+
+[`nebula/`](nebula/) is the language on its own, away from either app: an
+interactive specimen book (`index.html` — the component set, plus four
+switches that break one rule each so the page shows what a rule is *for*), a
+portable base sheet a third app can start from (`nebula.css`), and
+[`NEBULA.md`](nebula/NEBULA.md), the same content written as instructions to
+hand to Claude. Serve it with `python -m http.server 8123 --directory nebula`.
 
 ## API
 

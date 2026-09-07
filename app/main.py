@@ -1112,9 +1112,21 @@ ALBUM_WALLPAPER_DIM_RANGE = (0.25, 1.0)
 WALLPAPER_TINT_DEFAULT = 0.92
 WALLPAPER_DIM_DEFAULT = 0.72
 WALLPAPER_CONTRAST = 1.04
-# Contrast floor both accent readings are held to: --acc is small text on
-# black AND a face under black label text, so both want luminance.
+# Contrast floor both accent readings are held to: --acc is small text on a
+# PANEL and a face under black label text, so both want luminance.
 ACCENT_MIN_CONTRAST = 4.5
+# The ground --acc is measured against, and the one real bug this derivation
+# had. It used to measure against #000000 and stop the moment it cleared it —
+# but the accent is almost never ON #000. It is a link inside a panel, the
+# open row of a sort menu, the glyph in front of a section label, every one of
+# them on --surface or a step above. #5865F2 clears 4.56:1 on #000 and only
+# 4.19:1 on --surface, so the whole 4.5 margin was spent before the colour was
+# used. Measuring against the surface it actually sits on lifts the built-in
+# accent exactly one step, #5865F2 -> #616EF3, and that step is the difference
+# between a promise and a rounding error. Keep in step with --surface in
+# style.css (and with nebulaAccent() in nebula/showcase.js, which is a
+# byte-identical port of this function).
+ACCENT_SURFACE = (0x0E, 0x0E, 0x10)
 
 
 def _srgb_lum(rgb):
@@ -1155,7 +1167,7 @@ def _accent_shades(rgb: tuple[int, int, int]) -> dict:
     """The three faces style.css needs, derived from one colour by moving
     only LIGHTNESS along its own hue. Each answers a legibility question the
     sheet cannot answer for itself:
-      acc   small text on black AND a face under black label text — one
+      acc   small text on a PANEL and a face under black label text — one
             constraint either way, luminance, so a too-dark cfg colour is
             LIFTED rather than rendered unreadable (`lifted` says so, and the
             cfg checkers surface it)
@@ -1163,11 +1175,16 @@ def _accent_shades(rgb: tuple[int, int, int]) -> dict:
             goes the other way until white reads on it
       soft  the hover step above acc, again under black text
     Saturation is capped on `deep` alone: at full chroma a mid-lightness hue
-    turns electric, which none of the other shades of the same colour do."""
+    turns electric, which none of the other shades of the same colour do.
+
+    `acc` is measured against ACCENT_SURFACE, not against black — see the
+    note there. This is the whole reason an accent knob can be exposed to a
+    cfg file at all: a hand-typed hex lands with the same guarantees as the
+    built-in colour rather than as a raw value nobody checked."""
     h, l, sat = colorsys.rgb_to_hls(*[v / 255 for v in rgb])
     acc_l = l
     while (acc_l < 0.97
-           and _contrast(_hls_rgb(h, acc_l, sat), (0, 0, 0)) < ACCENT_MIN_CONTRAST):
+           and _contrast(_hls_rgb(h, acc_l, sat), ACCENT_SURFACE) < ACCENT_MIN_CONTRAST):
         acc_l += 0.02
     deep_s, deep_l = min(sat, 0.78), min(acc_l, 0.58)
     while (deep_l > 0.12

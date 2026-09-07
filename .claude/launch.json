@@ -42,6 +42,20 @@
         "warning"
       ],
       "port": 8090
+    },
+    {
+      "name": "nebula",
+      "runtimeExecutable": "C:\\Users\\deimi\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8123",
+        "--directory",
+        "nebula",
+        "--bind",
+        "127.0.0.1"
+      ],
+      "port": 8123
     }
   ]
 }

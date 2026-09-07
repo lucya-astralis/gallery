@@ -1,9 +1,11 @@
 /* ================================================================
    LUCYA.SYSTEMS  —  GALLERY CONFIGURATOR
 
-   NEBULA, the same design language the gallery is built in — its four
-   rules are written out at the top of app/static/style.css and they are
-   not restated here. What matters on this side: this is not a lookalike.
+   NEBULA, the same design language the gallery is built in — its six
+   rules are written out at the top of app/static/style.css, in full in
+   nebula/NEBULA.md, and as a portable sheet in nebula/nebula.css. They
+   are not restated here. What matters on this side: this is not a
+   lookalike.
    The tokens are the same tokens and the controls are the same controls,
    so when something here needs a face, go and find the gallery's rather
    than inventing one:
@@ -18,35 +20,93 @@
    so a change to the language has to be made in both sheets.
    ================================================================ */
 
+/* STATIC per-weight woff2 instances, and NO local() anywhere — the gallery's
+   rule, adopted whole (see the note above its own @font-face block). Two
+   measured costs, both paid on a page's first layout:
+
+     - instantiating a variable face is the single most expensive thing a
+       first layout does. This sheet used to ship both text families as
+       variable TTFs, which is also why it shipped 320 KB of font for four
+       weights where the static instances are 39 KB each and only the weights
+       actually drawn are fetched.
+     - every local() entry makes the browser search the installed system
+       fonts before it accepts the file, once per face. Nobody has these
+       faces installed, and an installed desktop copy of a different version
+       would only make the tool render differently from the gallery anyway.
+
+   Weight RANGES, not points, so a requested weight always lands on exactly
+   one file and never on a synthesised bold. The instances are built by
+   tools/build_font_instances.py in the repo root and copied here — the two
+   apps deploy separately and never share a mount. */
 @font-face {
   font-family: 'Space Grotesk';
-  src: local('Space Grotesk'),
-       url('/static/fonts/SpaceGrotesk-VariableFont_wght.ttf') format('truetype-variations');
-  font-weight: 300 700;
+  src: url('/static/fonts/SpaceGrotesk-400.woff2') format('woff2');
+  font-weight: 100 450;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/SpaceGrotesk-500.woff2') format('woff2');
+  font-weight: 451 550;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/SpaceGrotesk-600.woff2') format('woff2');
+  font-weight: 551 650;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/SpaceGrotesk-700.woff2') format('woff2');
+  font-weight: 651 900;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'JetBrains Mono';
-  src: local('JetBrains Mono'),
-       url('/static/fonts/JetBrainsMono-VariableFont_wght.ttf') format('truetype-variations');
-  font-weight: 100 800;
+  src: url('/static/fonts/JetBrainsMono-400.woff2') format('woff2');
+  font-weight: 100 450;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono-500.woff2') format('woff2');
+  font-weight: 451 550;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono-600.woff2') format('woff2');
+  font-weight: 551 650;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono-700.woff2') format('woff2');
+  font-weight: 651 900;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Ethnocentric';
-  src: local('Ethnocentric'),
-       url('/static/fonts/Ethnocentric-Regular.otf') format('opentype');
+  src: url('/static/fonts/Ethnocentric-Regular.otf') format('opentype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 :root {
   /* Mirrors the gallery's :root — the two apps deploy separately and can
-     never share a mount, so a palette change has to be made in both files.
-     Black ground, grey body, ONE purple accent; nothing in the grey ramp
-     carries a hue. See app/static/style.css for the reasoning. */
+     never share a mount, so a palette change has to be made in both files,
+     and a change to a RULE in nebula/nebula.css as well. Black ground, grey
+     body, ONE purple accent; nothing in the grey ramp carries a hue. See
+     app/static/style.css for the reasoning behind each block. */
   --bg:          #000000;
   --bg-2:        #08080a;
   --surface:     #0e0e10;
@@ -54,14 +114,25 @@
   --line:        rgba(255, 255, 255, .09);
   --line-strong: rgba(255, 255, 255, .20);
 
-  --text:        #f2f2f4;
-  --text-dim:    #a1a1a8;
-  --text-ghost:  #6b6b73;
+  /* The text ramp is measured against --surface, not --bg: fields, panels
+     and menus are all a step or two up from the floor, and that is where
+     text in this tool actually sits. Anything a person READS clears 4.5:1;
+     furniture that is not read as language clears 3:1.
+
+     --text-ghost is a GHOST — a placeholder, a disabled label, de-emphasised
+     furniture — and NOT a colour for text that has to be read; reading copy
+     bottoms out at --text-dim. It used to be #6b6b73, which was 3.65:1 on
+     --surface, under the floor everywhere it was used, and it was carrying
+     help text, placeholders and the UNSELECTED segments of every tab strip
+     and toggle in this tool. */
+  --text:        #f2f2f4;   /* 17.3:1 on --surface */
+  --text-dim:    #a1a1a8;   /*  7.5:1 */
+  --text-ghost:  #7d7d86;   /*  4.7:1 — the floor for read text */
 
   /* One step down from --text for a heading, and the two ends of the
      display-title gradient — the gallery's .section__slug .name reads these
      and so does the pane title here. */
-  --text-head:   #cdcdd4;
+  --text-head:   #cdcdd4;   /* 12.2:1 */
   --title-a:     #ffffff;
   --title-b:     #8b8b94;
 
@@ -69,25 +140,44 @@
      current selection, a key this file actually sets, the primary action.
      Everything that is merely furniture — labels, counts, button hovers,
      HUD strokes — takes --chrome or --label. This sheet used to paint both
-     groups purple, which is the thing the gallery's palette pass was for. */
-  --acc:           #5865f2;
-  --acc-rgb:       88, 101, 242;
-  --acc-deep:      #404ee7;
-  --acc-soft:      #9ea6f7;
-  --acc-soft-rgb:  158, 166, 247;
+     groups purple, which is the thing the gallery's palette pass was for.
+
+     #5865F2 is the BRAND hex and it is not used raw. It goes through the
+     derivation (_accent_shades() in the gallery's main.py, nebulaAccent()
+     in nebula/showcase.js) whose reference surface is --surface rather than
+     --bg, and comes out one step lifted: #5865F2 -> #616EF3. That step is
+     the difference between a promise and a rounding error — the brand hex
+     clears 4.56:1 on #000 and only 4.19:1 on --surface, and this tool has
+     no #000 anywhere a label sits.
+
+     THE ACCENT NEVER SITS ON ITS OWN TINT. On an accent fill or an
+     accent-tinted face the label is --on-acc or --text; the accent is
+     carried by the fill and the border instead. */
+  --acc-src:       #5865f2;   /* the brand hex, for reference only */
+  --acc:           #616ef3;   /* 4.6:1 on --surface */
+  --acc-rgb:       97, 110, 243;
+  --acc-deep:      #404ee7;   /* the one face that carries WHITE text */
+  --acc-soft:      #a4abf8;   /* the lifted step: hover faces under black */
+  --acc-soft-rgb:  164, 171, 248;
+  --on-acc:        #000000;   /* what goes ON TOP of an --acc fill */
 
   --chrome:      #e8e8ee;
   --chrome-rgb:  232, 232, 238;
   --label:       #b8b8c2;   /* the mono furniture voice */
   --label-rgb:   184, 184, 194;
 
-  /* Status, dulled the same way — same hexes, same names as the gallery. */
+  /* Status, dulled the same way — same hexes, same names as the gallery.
+     Each carries a -deep face for the rare fill that must hold WHITE text,
+     so a danger button is not the one control here with unchecked contrast. */
   --amb:         #d9a24a;
   --amb-rgb:     217, 162, 74;
+  --amb-deep:    #7a5410;
   --ok:          #58f298;
   --ok-rgb:      88, 242, 152;
+  --ok-deep:     #11723f;
   --red:         #e0625f;
   --red-rgb:     224, 98, 95;
+  --red-deep:    #97201d;
   /* the names this sheet grew up with, kept pointing at the shared ones */
   --acc-amb:     var(--amb);
   --acc-amb-rgb: var(--amb-rgb);
@@ -96,15 +186,119 @@
   --acc-red:     var(--red);
   --acc-red-rgb: var(--red-rgb);
 
-  /* Translucent surfaces, one scale for every floating pane — bars, fields,
-     buttons, menus. Legibility comes from blur, not from a darker slab. */
-  --glass:      rgba(26, 26, 30, .42);
-  --glass-hi:   rgba(40, 40, 45, .58);
-  --glass-blur: blur(18px) saturate(140%);
+  /* ================================================================
+     RULE 5 — MEASURE IS RATIONED LIKE COLOUR
+     ----------------------------------------------------------------
+     Every size, space, duration and blur comes off a named scale, the
+     same scale the gallery holds to. A raw px in an app sheet is the
+     same mistake as a raw hex, and the check is a grep:
+
+       grep -oE '(padding|gap|margin|font-size):[^;]*[0-9]+px' style.css
+
+     Before this block existed "the same as the gallery" was something
+     you had to remember rather than something you could reference, and
+     the two apps could only drift.
+     ================================================================ */
+
+  /* space: a 4px rhythm, eight steps roughly 1.5x apart. --s-0 is a BEZEL
+     (the inset of a tab track, the hairline gutter of a stack), not a
+     space; --s-9 / --s-10 are page rhythm. */
+  --s-0:  2px;
+  --s-1:  4px;
+  --s-2:  6px;
+  --s-3:  8px;
+  --s-4:  12px;
+  --s-5:  16px;
+  --s-6:  24px;
+  --s-7:  32px;
+  --s-8:  48px;
+  --s-9:  64px;
+  --s-10: 96px;
+
+  /* type: two voices, and the token name carries the voice. --fs-chrome-*
+     is the mono voice — uppercase, tracked, the furniture around the form.
+     --fs-text-* is Space Grotesk in sentence case, everything a person
+     reads. Reaching for the wrong one is then visible in the source. */
+  --fs-chrome-xs: 9.5px;
+  --fs-chrome-sm: 10.5px;
+  --fs-chrome-md: 12px;
+  --fs-chrome-lg: 14px;
+  --fs-chrome-xl: 20px;
+
+  --fs-text-sm:   12px;
+  --fs-text-md:   13px;
+  --fs-text-lg:   15px;
+  --fs-text-xl:   18px;
+  --fs-title:     clamp(22px, 2.7vw, 33px);
+
+  /* tracking, bound to size: it FALLS as size rises, because the reason to
+     track is optical and small caps need the air large caps do not. Every
+     --fs-chrome-* has exactly one --tr-chrome-* with the same suffix. */
+  --tr-chrome-xs: .24em;
+  --tr-chrome-sm: .18em;
+  --tr-chrome-md: .14em;
+  --tr-chrome-lg: .10em;
+  --tr-chrome-xl: .04em;
+  --tr-text:      .01em;
+  --tr-title:     .03em;
+  --tr-head:     -.005em;
+  --tr-num:       .06em;
+  --tr-display:   .14em;
+
+  --icon-sm:  10px;
+  --icon-md:  12px;
+  --fs-code:  .88em;
+
+  /* motion. Anything slower than --dur-3 is an animation and belongs behind
+     a gate, not in a transition. */
+  --dur-1:   .15s;
+  --dur-2:   .25s;
+  --dur-3:   .35s;
+  --ease:     cubic-bezier(.4, 0, .2, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+
+  /* ================================================================
+     RULE 3 — DEPTH COMES FROM BLUR, NOT FROM DARKNESS
+     ----------------------------------------------------------------
+     Six surfaces, each with a step off the blur ladder. It used to be
+     two, and .nav and every dropdown carried hand-typed fills and their
+     own backdrop-filter — which made the rule's central promise
+     (redefine the tokens and every surface retunes) false for the two
+     panes this tool shows on every screen. If a surface is not spelled
+     as a token, it is not in the system.
+
+     A surface that is not reading takes the -hi step or the next blur,
+     NEVER a darker fill. A pane is a fill, a blur and a hairline: no
+     bevel, no gloss gradient.
+     ================================================================ */
+  --blur-1: blur(10px) saturate(125%);
+  --blur-2: blur(20px) saturate(145%);
+  --blur-3: blur(32px) saturate(165%);
+
+  --glass:      rgba(30, 30, 38, .36);   /* panes over the page */
+  --glass-hi:   rgba(22, 22, 29, .74);   /* the lifted, read step */
+  --scrim:      rgba(4, 4, 8, .46);      /* chips laid ON artwork */
+  --scrim-hi:   rgba(6, 6, 10, .64);
+  --pane:       rgba(6, 6, 10, .72);     /* the app bar */
+  --overlay:    rgba(10, 10, 14, .82);   /* menus and dialogs */
+
+  --glass-blur:   var(--blur-2);
+  --scrim-blur:   var(--blur-1);
+  --pane-blur:    var(--blur-3);
+  --overlay-blur: var(--blur-3);
+
+  /* elevation: two shadows and one glow, for the things that genuinely
+     float ABOVE the page — a menu, a dialog. A card does not float. */
+  --shadow-1: 0 2px 10px rgba(0, 0, 0, .35);
+  --shadow-2: 0 18px 44px rgba(0, 0, 0, .55);
+  --glow-acc: 0 0 20px -6px rgba(var(--acc-rgb), .70);
+  --ring-acc: 0 0 0 1px rgba(var(--acc-rgb), .22);
 
   /* How the backdrop is treated before anything is laid over it. Both
      figures are retuned from the gallery's defaults, because those defaults
-     are set for a PHOTOGRAPH and this is not one:
+     are set for a PHOTOGRAPH and this is not one. This is what overriding
+     the language correctly looks like: four token VALUES, each with the
+     reason written next to it, and not one rule touched.
 
        tint OFF (no grayscale). The gallery drains its wallpaper because a
        photograph behind the page introduces a FOREIGN hue that every blurred
@@ -120,31 +314,121 @@
        and needs holding back; nova arrives dark by construction — its own
        gradient falls to #07070d — so the gallery's figure crushed it. */
   --wallpaper-filter: brightness(.95) contrast(1.04);
-  /* the one coloured thing laid back OVER that wallpaper */
+  /* the one coloured thing laid back OVER that wallpaper. It belongs to the
+     TINT, not to the dimming — with the tint off it would be the one
+     saturated wash left on a backdrop asked for in full colour, which is
+     why the gallery's `wallpaper_tint = off` sets it transparent too. Here
+     it stays, because nova IS the accent's own colour. */
   --wallpaper-bloom: rgba(var(--acc-rgb), .07);
+  /* The dim, as a pair. FLAT (.62 both ends) where the gallery ramps
+     .62 -> .82: that ramp exists to darken a photograph towards the footer
+     of a scrolling page, and nova already falls off downward on its own, so
+     the ramp landed on the artwork's own falloff and the bottom half went
+     black — "man sieht nur die obere Hälfte" (user, 2026-09-06). */
+  --wallpaper-shade-top: rgba(0, 0, 0, .62);
+  --wallpaper-shade-bot: rgba(0, 0, 0, .62);
+  --wallpaper-grid: rgba(255, 255, 255, .03);
 
   /* Square, everywhere: the one shape rule the gallery's whole surface
      language is built on. The handful of genuinely round things (the status
      dot) opt out on purpose. */
   --radius:      0;
+  --hair:        1px;      /* the one border width in the system */
   --nav-h:       60px;
   /* The pane's own gutter. Anything that has to bleed to the pane's edge --
      the sticky header, the save bar -- cancels it with a negative margin, so
      it lives in one place and the phone layout only has to change it once. */
   --pane-x:      28px;
   --pane-top:    18px;
+  /* The gutter the app bar holds to, character-for-character the gallery's,
+     so the two apps sit the same distance off the screen edge. */
+  --page-pad:    20px;
+  /* The one breakpoint the language owns. This sheet has others of its own
+     (the album tree collapses at 900px); it may not disagree about this one. */
+  --bp-narrow:   760px;
 
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
   /* The DISPLAY face is the brand voice of the chrome and nothing else — the
-     wordmark, and that is the whole list. A page heading is Space Grotesk
-     700 here exactly as it is over there; setting page titles in the display
-     face is what made this tool's headers read as a different product.
-     `--brand` is the old name for it and still works. */
+     wordmark, and that is the whole list. NEVER a heading: a page heading is
+     Space Grotesk 700 here exactly as it is over there, and setting page
+     titles in the display face is what made this tool's headers read as a
+     different product. `--brand` is the old name for it and still works. */
   --display-font: "Ethnocentric", "Space Grotesk", sans-serif;
+  --display-scale: 1;
   --brand: var(--display-font);
   /* Japanese in editable content: system faces only — see the note above. */
   --jp-text: "Yu Gothic", "Hiragino Sans", "Noto Sans CJK JP", "MS Gothic", sans-serif;
+}
+
+/* ==================================================================
+   RULE 6 — THE ENVIRONMENT CAN OVERRULE THE LOOK
+   ------------------------------------------------------------------
+   Blur, translucency, motion and hover are CAPABILITIES, not
+   guarantees. Every gate below reaches its fallback by REDEFINING
+   TOKENS, never by overriding component rules — which is the only
+   reason a component can be written once and still be correct on a
+   four-year-old phone, in Windows high-contrast mode, and for someone
+   who has asked the OS for less.
+   ================================================================== */
+
+/* --- weak hardware / data saver, set by script. No blur, so the panes lose
+   the one thing making them readable — pay for it in opacity instead. */
+html.fx-lite {
+  --glass:      rgba(22, 22, 27, .86);
+  --glass-hi:   rgba(36, 36, 44, .94);
+  --scrim:      rgba(0, 0, 0, .78);
+  --scrim-hi:   rgba(6, 6, 10, .88);
+  /* --pane and --overlay go FULLY opaque and the two glass steps do not:
+     the wallpaper is behind a card, but the FORM scrolls behind the app bar
+     and under a menu. Translucency without a blur to average it is not
+     glass, it is a smear. */
+  --pane:       #04040a;
+  --overlay:    #0a0a0e;
+  --blur-1: none; --blur-2: none; --blur-3: none;
+}
+
+/* --- the OS-level version of the same request. It lands BEFORE first
+   paint, which a script-set class never can. Same tokens. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass:      rgba(22, 22, 27, .92);
+    --glass-hi:   rgba(36, 36, 44, .96);
+    --scrim:      rgba(0, 0, 0, .88);
+    --scrim-hi:   rgba(6, 6, 10, .94);
+    --pane:       #04040a;
+    --overlay:    #0a0a0e;
+    --blur-1: none; --blur-2: none; --blur-3: none;
+  }
+}
+
+/* --- more contrast asked for: firm up every hairline and drop the ghost
+   step onto the read floor. The look does not change; the edges simply stop
+   being suggestions. */
+@media (prefers-contrast: more) {
+  :root {
+    --line:        rgba(255, 255, 255, .22);
+    --line-strong: rgba(255, 255, 255, .42);
+    --text-ghost:  #9a9aa4;
+    --text-dim:    #c2c2c9;
+  }
+}
+
+/* --- forced colours (Windows high contrast). The entire depth model here is
+   translucency plus hairlines, and the OS compositor discards both — a sheet
+   that says nothing about it renders as an unseparated wall of form fields.
+   So: a real border in a SYSTEM colour on every surface, and the OS owns the
+   palette. It asked for them; we did not. */
+@media (forced-colors: active) {
+  :root {
+    --line: CanvasText; --line-strong: CanvasText;
+    --glow-acc: none; --shadow-1: none; --shadow-2: none;
+  }
+  .nav, .pane, .field__control input, .field__control select,
+  .field__control textarea, .chip, .btn, .tab, .toggle, .navmenu,
+  .savebar, .sidebar, .modal__box, .foldertile, .cell, .asset {
+    border: var(--hair) solid CanvasText;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -155,9 +439,9 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
-  font-size: 14px;
+  font-size:var(--fs-text-lg);
   line-height: 1.55;
-  letter-spacing: .01em;
+  letter-spacing:var(--tr-text);
   /* dvh, not vh: a phone's collapsing address bar otherwise pushes the save
      bar and the footer under the bottom of the screen. */
   height: 100dvh;
@@ -209,10 +493,10 @@ body {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(to right, rgba(255, 255, 255, .03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, .03) 1px, transparent 1px),
+    linear-gradient(to right, var(--wallpaper-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--wallpaper-grid) 1px, transparent 1px),
     radial-gradient(ellipse at 78% 68%, var(--wallpaper-bloom) 0%, transparent 52%),
-    linear-gradient(rgba(0, 0, 0, .62), rgba(0, 0, 0, .62));
+    linear-gradient(var(--wallpaper-shade-top), var(--wallpaper-shade-bot));
   background-size: 32px 32px, 32px 32px, auto, auto;
   background-repeat: repeat, repeat, no-repeat, no-repeat;
 }
@@ -223,10 +507,14 @@ body {
   z-index: 100;
   height: var(--nav-h);
   flex: 0 0 auto;
-  background: rgba(0, 0, 0, .86);
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
-  border-bottom: 1px solid var(--line);
+  /* --pane: the one surface that spans the viewport and is always present.
+     It used to carry a hand-typed fill and its own backdrop-filter, which
+     made rule 3's promise — redefine the tokens and every surface retunes —
+     false for the bar this tool shows on every screen. */
+  background-color: var(--pane);
+  backdrop-filter: var(--pane-blur);
+  -webkit-backdrop-filter: var(--pane-blur);
+  border-bottom: var(--hair) solid var(--line);
 }
 
 /* the accent hairline riding the bottom border — the gallery's signature edge */
@@ -240,7 +528,7 @@ body {
     transparent 2%, rgba(var(--acc-rgb), .5) 30%,
     rgba(var(--acc-rgb), .45) 50%, rgba(var(--acc-rgb), .5) 70%, transparent 98%);
   opacity: .35;
-  transition: opacity .25s ease;
+  transition: opacity var(--dur-2) ease;
 }
 
 /* Brightens once the pane under it is scrolled, exactly as the gallery's
@@ -253,7 +541,7 @@ body {
   padding: 0 20px;
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: var(--s-6);
   min-width: 0;
 }
 
@@ -267,7 +555,7 @@ body {
   height: 34px;
   padding: 0;
   background: rgba(255, 255, 255, .04);
-  border: 1px solid var(--line-strong);
+  border: var(--hair) solid var(--line-strong);
   border-radius: var(--radius);
   cursor: pointer;
   position: relative;
@@ -287,7 +575,7 @@ body {
 
 .navmenu__bars { top: 50%; margin-top: -.75px; }
 .navmenu__bars::before { top: -5px; margin-left: 0; left: 0; }
-.navmenu__bars::after  { top:  5px; margin-left: 0; left: 0; }
+.navmenu__bars::after  { top:var(--s-2); margin-left: 0; left: 0; }
 
 body.drawer-open .navmenu { border-color: var(--acc); }
 body.drawer-open .navmenu__bars { background: var(--acc); }
@@ -297,7 +585,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .nav__brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--s-4);
   color: var(--text);
   white-space: nowrap;
   min-width: 0;
@@ -319,8 +607,8 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 
 .brand-name {
   font-family: var(--display-font);
-  font-size: 15px;
-  letter-spacing: .14em;
+  font-size:var(--fs-chrome-lg);
+  letter-spacing:var(--tr-chrome-md);
   text-transform: uppercase;
   color: var(--text);
 }
@@ -334,7 +622,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
    rendered width. */
 .brand-sub {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size:var(--fs-chrome-xs);
   letter-spacing: .28em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--acc-soft) 30%, var(--acc));
@@ -360,9 +648,10 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 }
 
 .sidebar {
-  border-right: 1px solid var(--line);
-  background: rgba(12, 12, 14, .72);
-  backdrop-filter: blur(6px);
+  border-right: var(--hair) solid var(--line);
+  background-color: var(--glass-hi);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -371,9 +660,9 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .sidebar__search {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px;
-  border-bottom: 1px solid var(--line);
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border-bottom: var(--hair) solid var(--line);
 }
 
 /* Only in the drawer: on desktop the sidebar is a column and has nothing to
@@ -386,8 +675,9 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   position: fixed;
   inset: var(--nav-h) 0 0;
   z-index: 140;
-  background: rgba(0, 0, 0, .6);
-  backdrop-filter: blur(2px);
+  background-color: var(--scrim-hi);
+  backdrop-filter: var(--scrim-blur);
+  -webkit-backdrop-filter: var(--scrim-blur);
 }
 
 .scrim[hidden] { display: none; }
@@ -411,10 +701,10 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 
 .pane__empty {
   color: var(--text-ghost);
-  padding: 56px 8px;
+  padding: 56px var(--s-3);
   text-align: center;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size:var(--fs-chrome-md);
   letter-spacing: .12em;
   text-transform: uppercase;
 }
@@ -423,7 +713,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .tree {
   list-style: none;
   margin: 0;
-  padding: 8px 0 28px;
+  padding: var(--s-3) 0 28px;
   overflow-y: auto;
   flex: 1 1 auto;
 }
@@ -434,19 +724,19 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   padding: 14px;
   color: var(--text-ghost);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size:var(--fs-chrome-sm);
 }
 
 .tree__row {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 12px 5px 0;
+  gap:var(--s-3);
+  padding: var(--s-2) var(--s-4) var(--s-2) 0;
   cursor: pointer;
   border-left: 2px solid transparent;
   color: var(--text-dim);
   user-select: none;
-  font-size: 13px;
+  font-size:var(--fs-text-md);
 }
 
 .tree__row:hover {
@@ -466,7 +756,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   text-align: center;
   color: var(--text-ghost);
   font-size: 9px;
-  transition: transform .12s ease;
+  transition: transform var(--dur-1) ease;
 }
 
 .tree__twisty.is-open { transform: rotate(90deg); }
@@ -481,10 +771,10 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 
 .tree__count {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size:var(--fs-chrome-sm);
   color: var(--text-ghost);
   flex: 0 0 auto;
-  letter-spacing: .04em;
+  letter-spacing:var(--tr-chrome-xl);
 }
 
 /* The album's own cover, so the tree reads as pictures rather than paths.
@@ -506,18 +796,18 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .tree__cover.has-err { box-shadow: inset 0 0 0 1px var(--acc-red), 0 0 6px rgba(var(--acc-red-rgb), .55); }
 
 /* Bigger rows now that each carries a picture. */
-.tree__row { padding: 3px 12px 3px 0; }
+.tree__row { padding: var(--s-1) var(--s-4) var(--s-1) 0; }
 
 .tree__row--gallery {
-  padding-left: 12px;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 6px;
+  padding-left: var(--s-4);
+  border-bottom: var(--hair) solid var(--line);
+  margin-bottom: var(--s-2);
   color: var(--text);
 }
 
 .tree__row--gallery .tree__name {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing: .16em;
   text-transform: uppercase;
 }
@@ -533,10 +823,15 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   margin: 0 calc(var(--pane-x) * -1);
   padding: var(--pane-top) var(--pane-x) 0;
   padding-bottom: 14px;
-  background: linear-gradient(180deg, rgba(6, 6, 8, .96) 70%, rgba(6, 6, 8, .88));
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
-  border-bottom: 1px solid var(--line);
+  /* The same bar as .nav, so the same surface: a flat --pane fill, not a
+     gradient falling down its face. That wash was a GLOSS, and a gloss is
+     what makes translucency read as Aero — a raised, moulded sheet with a
+     thickness to it, which argues with the square corners underneath it. A
+     pane here is a fill, a blur and a hairline. */
+  background-color: var(--pane);
+  backdrop-filter: var(--pane-blur);
+  -webkit-backdrop-filter: var(--pane-blur);
+  border-bottom: var(--hair) solid var(--line);
 }
 
 /* Once it is floating over content it grows the nav's signature edge, the
@@ -548,7 +843,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   height: 1px;
   pointer-events: none;
   opacity: 0;
-  transition: opacity .25s ease;
+  transition: opacity var(--dur-2) ease;
   background: linear-gradient(90deg,
     transparent 2%, rgba(var(--acc-rgb), .5) 30%,
     rgba(var(--acc-rgb), .45) 50%, rgba(var(--acc-rgb), .5) 70%, transparent 98%);
@@ -560,10 +855,10 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 
 .head__crumb {
   font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: .1em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-lg);
   color: var(--text-ghost);
-  margin-bottom: 7px;
+  margin-bottom:var(--s-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -575,7 +870,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 8px 14px;
+  gap: var(--s-3) 14px;
 }
 
 /* The gallery's page title, to the letter: Space Grotesk 700, the same
@@ -589,7 +884,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   font-family: var(--sans);
   font-size: clamp(20px, 2.2vw, 28px);
   font-weight: 700;
-  letter-spacing: .03em;
+  letter-spacing:var(--tr-title);
   line-height: 1.06;
   min-width: 0;
   word-break: break-word;
@@ -603,13 +898,13 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 
 .head__title::selection { -webkit-text-fill-color: var(--text); }
 
-.head__meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.head__meta { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
 
 /* Past the first line of scroll the block sheds what it can: the file path
    goes, the title steps down. The tabs never move. */
 .pane.is-scrolled .head { margin-bottom: 10px; }
 .pane.is-scrolled .head__crumb { display: none; }
-.pane.is-scrolled .head__title { font-size: 16px; }
+.pane.is-scrolled .head__title { font-size:var(--fs-text-lg); }
 .pane.is-scrolled .pane__top {
   padding-top: 10px;
   box-shadow: 0 12px 24px -18px rgba(0, 0, 0, .95);
@@ -620,14 +915,14 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
    hairline in its own colour, no fill, no 2px stub down one side. */
 .pill {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size:var(--fs-chrome-xs);
   letter-spacing: .2em;
   text-transform: uppercase;
-  padding: 3px 8px;
+  padding: var(--s-1) var(--s-3);
   border-radius: var(--radius);
   background: none;
   color: var(--label);
-  border: 1px solid rgba(var(--label-rgb), .35);
+  border: var(--hair) solid rgba(var(--label-rgb), .35);
 }
 
 .pill--ok   { color: var(--ok);  border-color: rgba(var(--ok-rgb), .4); }
@@ -642,11 +937,11 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .tabs {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 3px;
+  gap: var(--s-0);
+  padding:var(--s-1);
   width: fit-content;
   max-width: 100%;
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   border-radius: var(--radius);
   background: var(--glass);
   backdrop-filter: var(--glass-blur);
@@ -665,21 +960,25 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   border-radius: var(--radius);
   color: var(--text-ghost);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing: .12em;
   text-transform: uppercase;
-  padding: 6px 12px;
+  padding: var(--s-2) var(--s-4);
   cursor: pointer;
   white-space: nowrap;
-  transition: color .15s ease, background .15s ease, box-shadow .15s ease;
+  transition: color var(--dur-1) ease, background var(--dur-1) ease, box-shadow var(--dur-1) ease;
 }
 
 .tab:hover { color: var(--text); background: rgba(255, 255, 255, .05); }
 
+/* The accent never sits on its own tint. The selected tab is marked by the
+   accent FILL and the accent ring; the label goes to --text. Accent on an
+   accent-tinted face was the lowest contrast in the sheet (4.14:1), and it
+   was on the controls that say which state you are in. */
 .tab.is-active {
-  color: var(--acc);
+  color: var(--text);
   background: rgba(var(--acc-rgb), .12);
-  box-shadow: inset 0 0 0 1px rgba(var(--acc-rgb), .35);
+  box-shadow: inset 0 0 0 var(--hair) rgba(var(--acc-rgb), .35);
 }
 
 .tabpanel { padding-top: 20px; padding-bottom: 36px; }
@@ -695,17 +994,17 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
      collapses the empty tracks and stretches that single tile across the
      whole pane — a toggle 1100px wide. */
   grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
   align-items: start;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 11px 13px;
-  border: 1px solid var(--line);
+  gap: var(--s-3);
+  padding:var(--s-4) var(--s-4);
+  border: var(--hair) solid var(--line);
   border-left: 2px solid var(--acc-soft);
   border-radius: var(--radius);
   background: var(--surface);
@@ -732,7 +1031,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .field__flag {
   flex: 0 0 auto;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size:var(--fs-chrome-xs);
   letter-spacing: .16em;
   text-transform: uppercase;
   color: var(--acc-amb);
@@ -746,12 +1045,12 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   100%    { box-shadow: 0 0 0 1px transparent, 0 0 0 0 transparent; }
 }
 
-.field__top { display: flex; align-items: center; gap: 8px; }
+.field__top { display: flex; align-items: center; gap: var(--s-3); }
 
 .field__label {
   flex: 1 1 auto;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size:var(--fs-chrome-sm);
   font-weight: 400;
   letter-spacing: .16em;
   text-transform: uppercase;
@@ -768,9 +1067,9 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   flex: 0 0 auto;
   background: none;
   border: 0;
-  padding: 2px 4px;
+  padding: var(--s-0) var(--s-1);
   color: var(--text-ghost);
-  font-size: 11px;
+  font-size:var(--fs-text-sm);
   line-height: 1;
   cursor: pointer;
 }
@@ -779,15 +1078,15 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 
 .field__help {
   color: var(--text-ghost);
-  font-size: 11px;
+  font-size:var(--fs-text-sm);
   line-height: 1.45;
 }
 
 /* The intro paragraph over a whole tab: the same voice as a field's help,
    so it answers to the same switch. */
 .tabnote {
-  border-left: 1px solid var(--line);
-  padding-left: 12px;
+  border-left: var(--hair) solid var(--line);
+  padding-left: var(--s-4);
   max-width: 92ch;
 }
 
@@ -799,17 +1098,17 @@ html.no-help .tabnote { display: none; }
 
 html.no-help .group__blurb { display: none; }
 
-.field__control { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.field__control { display: flex; flex-direction: column; gap: var(--s-3); min-width: 0; }
 
 /* ----- inputs ---------------------------------------------------------- */
 input[type="text"], input[type="search"], input[type="number"], select, textarea {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   border-radius: var(--radius);
   color: var(--text);
   font-family: var(--sans);
-  font-size: 13px;
-  padding: 8px 11px;
+  font-size:var(--fs-text-md);
+  padding: var(--s-3) var(--s-4);
   width: 100%;
 }
 
@@ -817,7 +1116,7 @@ textarea {
   /* Album descriptions can be any language; the JP fallback is the reader's
      system face, never the gallery's glyph subset. */
   font-family: var(--mono), var(--jp-text);
-  font-size: 13px;
+  font-size:var(--fs-chrome-lg);
   line-height: 1.65;
   resize: vertical;
   min-height: 160px;
@@ -841,15 +1140,15 @@ input:focus, select:focus, textarea:focus {
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size:var(--fs-chrome-md);
   letter-spacing: .08em;
-  padding: 9px 12px;
+  padding: var(--s-3) var(--s-4);
 }
 
 .fieldsearch::placeholder {
   color: var(--text-ghost);
-  font-size: 11px;
-  letter-spacing: .14em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-md);
   text-transform: uppercase;
 }
 
@@ -865,17 +1164,17 @@ select option { background: var(--surface); color: var(--text); }
   background: var(--glass);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   border-radius: var(--radius);
   color: var(--text-dim);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing: .16em;
   text-transform: uppercase;
-  padding: 7px 13px;
+  padding:var(--s-3) var(--s-4);
   cursor: pointer;
   white-space: nowrap;
-  transition: color .15s ease, border-color .15s ease, background .15s ease;
+  transition: color var(--dur-1) ease, border-color var(--dur-1) ease, background var(--dur-1) ease;
 }
 
 .btn:hover:not(:disabled) {
@@ -888,34 +1187,43 @@ select option { background: var(--surface); color: var(--text); }
 
 /* The one button that carries state — it writes the file — keeps the
    accent, and is the only thing in a row of buttons that does. */
+/* The one control in a row that COMMITS, and the site of the worst reading
+   in the old sheet: an --acc label on an --acc tint, 4.14:1, on the most
+   important button in the app. A white label on a violet-lit face reads
+   MORE primary, not less — the accent is carried by the fill and the
+   border, exactly as rule 1 says. */
 .btn--primary {
-  background: rgba(var(--acc-rgb), .14);
-  border-color: rgba(var(--acc-rgb), .55);
-  color: var(--acc);
+  background: rgba(var(--acc-rgb), .16);
+  border-color: rgba(var(--acc-rgb), .60);
+  color: var(--text);
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: rgba(var(--acc-rgb), .24);
+  background: rgba(var(--acc-rgb), .28);
   border-color: var(--acc);
-  color: var(--text);
-  box-shadow: 0 0 20px -6px rgba(var(--acc-rgb), .7);
+  color: #fff;
+  box-shadow: var(--glow-acc);
 }
 
 .btn--ghost { background: none; border-color: transparent; color: var(--text-ghost); }
 .btn--ghost:hover:not(:disabled) { background: rgba(255, 255, 255, .04); color: var(--text-dim); }
 
 .btn--danger:hover:not(:disabled) {
-  border-color: var(--acc-red);
-  color: var(--acc-red);
-  background: rgba(var(--acc-red-rgb), .08);
+  border-color: var(--red);
+  color: var(--red);
+  background: rgba(var(--red-rgb), .10);
 }
+/* No `.btn--danger.btn--primary` here: nebula carries that face, but this
+   tool's two destructive buttons are both `btn--ghost btn--danger`, and a
+   rule nothing matches is a mark that states no fact. --red-deep is in the
+   token block for the day one of them commits. */
 
-.btn--sm { padding: 4px 9px; font-size: 9.5px; }
+.btn--sm { padding: var(--s-1) var(--s-3); font-size: var(--fs-chrome-xs); }
 
 /* an icon-only button (the ✕ on a list row) keeps its glyph readable */
-.btn--icon { padding: 4px 8px; font-size: 12px; letter-spacing: 0; }
+.btn--icon { padding: var(--s-1) var(--s-3); font-size:var(--fs-chrome-md); letter-spacing: 0; }
 
-.row { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+.row { display: flex; gap:var(--s-3); align-items: center; flex-wrap: wrap; }
 
 /* ----- segmented toggle ------------------------------------------------ */
 /* Same segmented control as the tabs and the gallery's language selector —
@@ -923,10 +1231,10 @@ select option { background: var(--surface); color: var(--text); }
 .toggle {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 3px;
+  gap: var(--s-0);
+  padding:var(--s-1);
   background: var(--glass);
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   border-radius: var(--radius);
   width: fit-content;
   max-width: 100%;
@@ -940,20 +1248,20 @@ select option { background: var(--surface); color: var(--text); }
   border-radius: var(--radius);
   color: var(--text-ghost);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing: .12em;
   text-transform: uppercase;
-  padding: 6px 12px;
+  padding: var(--s-2) var(--s-4);
   cursor: pointer;
-  transition: color .15s ease, background .15s ease, box-shadow .15s ease;
+  transition: color var(--dur-1) ease, background var(--dur-1) ease, box-shadow var(--dur-1) ease;
 }
 
 .toggle button:hover:not(:disabled) { color: var(--text); background: rgba(255, 255, 255, .05); }
 
 .toggle button.is-on {
-  color: var(--acc);
+  color: var(--text);
   background: rgba(var(--acc-rgb), .12);
-  box-shadow: inset 0 0 0 1px rgba(var(--acc-rgb), .35);
+  box-shadow: inset 0 0 0 var(--hair) rgba(var(--acc-rgb), .35);
 }
 
 .toggle button:disabled { cursor: not-allowed; opacity: .45; }
@@ -963,8 +1271,8 @@ select option { background: var(--surface); color: var(--text); }
    number. The toggle picks which of the three, the slider only means
    anything in the third — so it is visibly dead in the other two rather
    than sitting there showing a value the file does not contain. */
-.ratio { display: flex; flex-direction: column; gap: 8px; }
-.ratio__dial { display: flex; align-items: center; gap: 12px; }
+.ratio { display: flex; flex-direction: column; gap: var(--s-3); }
+.ratio__dial { display: flex; align-items: center; gap: var(--s-4); }
 
 .ratio__dial input[type="range"] {
   appearance: none;
@@ -972,7 +1280,7 @@ select option { background: var(--surface); color: var(--text); }
   min-width: 0;
   height: 2px;
   background: var(--line-strong);
-  border-radius: 0;
+  border-radius: var(--radius);
   cursor: pointer;
 }
 .ratio__dial input[type="range"]:disabled { cursor: not-allowed; opacity: .35; }
@@ -995,7 +1303,7 @@ select option { background: var(--surface); color: var(--text); }
   flex: 0 0 auto;
   min-width: 4ch;
   text-align: right;
-  font-size: 11px;
+  font-size:var(--fs-text-sm);
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
@@ -1010,37 +1318,37 @@ select option { background: var(--surface); color: var(--text); }
   width: 34px; height: 30px;
   padding: 0;
   background: none;
-  border: 1px solid var(--line-strong);
+  border: var(--hair) solid var(--line-strong);
   border-radius: var(--radius);
   cursor: pointer;
 }
 .colorpick__swatch:disabled { cursor: not-allowed; opacity: .45; }
-.colorpick__swatch::-webkit-color-swatch-wrapper { padding: 2px; }
-.colorpick__swatch::-webkit-color-swatch { border: 0; border-radius: 0; }
-.colorpick__swatch::-moz-color-swatch { border: 0; border-radius: 0; }
+.colorpick__swatch::-webkit-color-swatch-wrapper { padding: var(--s-0); }
+.colorpick__swatch::-webkit-color-swatch { border: 0; border-radius: var(--radius); }
+.colorpick__swatch::-moz-color-swatch { border: 0; border-radius: var(--radius); }
 .colorpick__hex { flex: 1 1 14ch; min-width: 0; }
 .colorpick__bad {
   flex: 0 0 auto;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--acc-red);
 }
 
 /* ----- ordered lists (featured / order / welcome / album_order) --------- */
-.picklist { display: flex; flex-direction: column; gap: 5px; }
+.picklist { display: flex; flex-direction: column; gap:var(--s-2); }
 
 .pickitem {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap:var(--s-4);
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   border-left: 2px solid var(--line-strong);
   border-radius: var(--radius);
-  padding: 6px 9px;
-  transition: border-color .15s ease;
+  padding: var(--s-2) var(--s-3);
+  transition: border-color var(--dur-1) ease;
 }
 
 .pickitem:hover { border-left-color: var(--chrome); }
@@ -1062,7 +1370,7 @@ select option { background: var(--surface); color: var(--text); }
 .pickitem__label {
   flex: 1 1 auto;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size:var(--fs-chrome-md);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1082,7 +1390,7 @@ select option { background: var(--surface); color: var(--text); }
 
 .pickitem--group .pickitem__label b {
   color: var(--acc-amb);
-  letter-spacing: .14em;
+  letter-spacing:var(--tr-chrome-md);
   text-transform: uppercase;
 }
 
@@ -1094,7 +1402,7 @@ select option { background: var(--surface); color: var(--text); }
   height: 80px;
   object-fit: cover;
   border-radius: var(--radius);
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   background: var(--surface);
 }
 
@@ -1108,13 +1416,13 @@ select option { background: var(--surface); color: var(--text); }
 
 .cell {
   position: relative;
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
   cursor: pointer;
   background: var(--surface);
   aspect-ratio: 1;
-  transition: border-color .15s ease;
+  transition: border-color var(--dur-1) ease;
 }
 
 .cell:hover { border-color: var(--line-strong); }
@@ -1127,13 +1435,13 @@ select option { background: var(--surface); color: var(--text); }
    three lines across the photo on a tile this narrow. */
 .cell__roles {
   position: absolute;
-  top: 6px;
-  left: 32px;
-  right: 6px;
+  top: var(--s-2);
+  left: var(--s-7);
+  right: var(--s-2);
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 3px;
+  gap:var(--s-1);
   pointer-events: none;
 }
 
@@ -1141,15 +1449,15 @@ select option { background: var(--surface); color: var(--text); }
 
 .cell__role {
   max-width: 100%;
-  padding: 2px 5px;
+  padding: var(--s-0) var(--s-2);
   border-radius: var(--radius);
   background: rgba(var(--acc-rgb), .92);
   color: #050505;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size:var(--fs-chrome-xs);
   font-weight: 700;
   line-height: 1.4;
-  letter-spacing: .06em;
+  letter-spacing:var(--tr-num);
   text-transform: uppercase;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1165,14 +1473,14 @@ select option { background: var(--surface); color: var(--text); }
   flex-direction: column;
   gap: 1px;
   min-width: 0;
-  padding: 16px 7px 5px;
+  padding: var(--s-5) var(--s-3) var(--s-2);
   background: linear-gradient(transparent, rgba(0, 0, 0, .94) 45%);
   pointer-events: none;
 }
 
 .cell__name {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size:var(--fs-chrome-xs);
   color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1180,17 +1488,17 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 /* ----- issues ---------------------------------------------------------- */
-.issues { display: flex; flex-direction: column; gap: 6px; margin: 18px 0 0; }
+.issues { display: flex; flex-direction: column; gap: var(--s-2); margin: 18px 0 0; }
 
 .issue {
   display: flex;
-  gap: 12px;
+  gap: var(--s-4);
   align-items: baseline;
-  padding: 9px 13px;
+  padding:var(--s-3) var(--s-4);
   border-radius: var(--radius);
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   background: linear-gradient(180deg, rgba(255, 255, 255, .022), transparent);
-  font-size: 12.5px;
+  font-size:var(--fs-text-md);
 }
 
 .issue--error { border-left: 2px solid var(--acc-red); }
@@ -1198,7 +1506,7 @@ select option { background: var(--surface); color: var(--text); }
 
 .issue__key {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--text);
@@ -1207,7 +1515,7 @@ select option { background: var(--surface); color: var(--text); }
 
 .issue__where {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size:var(--fs-chrome-sm);
   color: var(--acc);
   flex: 0 0 auto;
   cursor: pointer;
@@ -1221,8 +1529,8 @@ select option { background: var(--surface); color: var(--text); }
   color: var(--text-ghost);
   padding: 18px 0;
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: .1em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-lg);
 }
 
 /* ----- sticky save bar -------------------------------------------------- */
@@ -1231,14 +1539,15 @@ select option { background: var(--surface); color: var(--text); }
   bottom: 0;
   z-index: 25;
   margin: 22px calc(var(--pane-x) * -1) 0;
-  padding: 11px var(--pane-x);
-  background: rgba(12, 12, 14, .94);
-  border-top: 1px solid var(--line);
+  padding: var(--s-4) var(--pane-x);
+  background-color: var(--pane);
+  border-top: var(--hair) solid var(--line);
   display: flex;
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
-  backdrop-filter: blur(8px);
+  backdrop-filter: var(--pane-blur);
+  -webkit-backdrop-filter: var(--pane-blur);
 }
 
 /* the nav's accent hairline, mirrored along the top edge */
@@ -1256,7 +1565,7 @@ select option { background: var(--surface); color: var(--text); }
 .savebar__note {
   color: var(--text-ghost);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing: .08em;
   flex: 1 1 auto;
   white-space: nowrap;
@@ -1271,9 +1580,9 @@ select option { background: var(--surface); color: var(--text); }
   flex: 1 1 240px;
   min-width: 0;
   display: flex;
-  gap: 5px;
+  gap:var(--s-2);
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding-bottom: var(--s-0);
   scrollbar-width: thin;
 }
 
@@ -1285,7 +1594,7 @@ select option { background: var(--surface); color: var(--text); }
   appearance: none;
   background: none;
   border: 0;
-  padding: 3px 2px 3px 9px;
+  padding: var(--s-1) var(--s-0) var(--s-1) var(--s-3);
   font: inherit;
   color: var(--text);
   cursor: pointer;
@@ -1297,14 +1606,14 @@ select option { background: var(--surface); color: var(--text); }
 .savebar.is-dirty::before { opacity: 1; }
 
 /* ----- assets ---------------------------------------------------------- */
-.assets { display: flex; flex-direction: column; gap: 6px; }
+.assets { display: flex; flex-direction: column; gap: var(--s-2); }
 
 .asset {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 9px 11px;
-  border: 1px solid var(--line);
+  gap: var(--s-4);
+  padding:var(--s-3) var(--s-4);
+  border: var(--hair) solid var(--line);
   border-left: 2px solid var(--line-strong);
   border-radius: var(--radius);
   background: var(--surface);
@@ -1325,35 +1634,35 @@ select option { background: var(--surface); color: var(--text); }
 
 .asset__icon img { max-width: 24px; max-height: 24px; }
 
-.asset__name { flex: 1 1 auto; font-family: var(--mono); font-size: 11.5px; }
+.asset__name { flex: 1 1 auto; font-family: var(--mono); font-size:var(--fs-chrome-md); }
 
 .asset__meta {
   color: var(--text-ghost);
   font-family: var(--mono);
-  font-size: 10px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing: .08em;
 }
 
 .dropzone {
-  border: 1px dashed var(--line-strong);
+  border: var(--hair) dashed var(--line-strong);
   border-radius: var(--radius);
   padding: 22px;
   text-align: center;
   color: var(--text-ghost);
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: .06em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-num);
   cursor: pointer;
-  transition: border-color .15s ease, color .15s ease;
+  transition: border-color var(--dur-1) ease, color var(--dur-1) ease;
 }
 
 .dropzone:hover { border-color: var(--line-strong); color: var(--text-dim); }
-.dropzone.is-over { border-color: var(--acc); color: var(--acc); background: rgba(var(--acc-rgb), .06); }
+.dropzone.is-over { border-color: var(--acc); color: var(--text); background: rgba(var(--acc-rgb), .06); }
 
 .fontsample {
-  margin-top: 4px;
-  padding: 16px 18px;
-  border: 1px solid var(--line);
+  margin-top: var(--s-1);
+  padding: var(--s-5) 18px;
+  border: var(--hair) solid var(--line);
   border-left: 2px solid var(--acc-soft);
   border-radius: var(--radius);
   background: var(--surface);
@@ -1371,33 +1680,37 @@ select option { background: var(--surface); color: var(--text); }
 .modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; }
 .modal[hidden] { display: none; }
 
-.modal__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .78); }
+.modal__backdrop { position: absolute; inset: 0; background-color: var(--scrim-hi); backdrop-filter: var(--scrim-blur); -webkit-backdrop-filter: var(--scrim-blur); }
 
 .modal__box {
   position: relative;
   width: min(1120px, 92vw);
   height: min(780px, 88vh);
-  background: var(--bg-2);
-  border: 1px solid var(--line-strong);
+  /* --overlay, the sixth surface: a dialog has to read over ANY content
+     underneath it, so it is the one step that goes opaque when the blur does. */
+  background-color: var(--overlay);
+  backdrop-filter: var(--overlay-blur);
+  -webkit-backdrop-filter: var(--overlay-blur);
+  border: var(--hair) solid var(--line-strong);
   border-radius: var(--radius);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .9);
+  box-shadow: var(--shadow-2);
 }
 
 .modal__head {
   display: flex;
   gap: 14px;
   align-items: center;
-  padding: 13px 18px;
-  border-bottom: 1px solid var(--line);
+  padding:var(--s-4) 18px;
+  border-bottom: var(--hair) solid var(--line);
 }
 
 .modal__head h2 {
   margin: 0;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size:var(--fs-chrome-sm);
   font-weight: 600;
   letter-spacing: .2em;
   text-transform: uppercase;
@@ -1413,17 +1726,17 @@ select option { background: var(--surface); color: var(--text); }
 
 .modal__foot {
   display: flex;
-  gap: 11px;
+  gap:var(--s-4);
   align-items: center;
-  padding: 13px 18px;
-  border-top: 1px solid var(--line);
+  padding:var(--s-4) 18px;
+  border-top: var(--hair) solid var(--line);
 }
 
 .modal__count {
   flex: 1 1 auto;
   color: var(--text-ghost);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing: .08em;
 }
 
@@ -1434,14 +1747,14 @@ select option { background: var(--surface); color: var(--text); }
   left: 50%;
   transform: translateX(-50%);
   z-index: 300;
-  padding: 11px 20px;
+  padding:var(--s-4) 20px;
   border-radius: var(--radius);
   background: var(--surface-2);
-  border: 1px solid var(--line-strong);
+  border: var(--hair) solid var(--line-strong);
   border-left: 2px solid var(--acc);
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: .1em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-lg);
   text-transform: uppercase;
   color: var(--text);
   box-shadow: 0 14px 40px -12px rgba(0, 0, 0, .85);
@@ -1459,15 +1772,15 @@ select option { background: var(--surface); color: var(--text); }
    read as an instrument. */
 .foot {
   flex: 0 0 auto;
-  border-top: 1px solid var(--line);
+  border-top: var(--hair) solid var(--line);
   background: #050505;
   padding: 0 20px;
   height: 38px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  font-size: 12px;
-  letter-spacing: .01em;
+  gap: var(--s-5);
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
   color: var(--text-ghost);
 }
 
@@ -1497,7 +1810,7 @@ select option { background: var(--surface); color: var(--text); }
 .kv__key {
   flex: 0 0 34%;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size:var(--fs-chrome-md);
 }
 
 .kv__sep {
@@ -1518,17 +1831,17 @@ select option { background: var(--surface); color: var(--text); }
   flex-wrap: wrap;
   margin-bottom: 22px;
   padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hair) solid var(--line);
 }
 
 .stoolbar__find { flex: 1 1 260px; min-width: 0; }
-.stoolbar__switches { display: flex; gap: 6px; flex: 0 0 auto; flex-wrap: wrap; }
+.stoolbar__switches { display: flex; gap: var(--s-2); flex: 0 0 auto; flex-wrap: wrap; }
 
 .stoolbar__count {
   flex: 0 0 auto;
   font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: .14em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-md);
   text-transform: uppercase;
   color: var(--text-ghost);
 }
@@ -1537,23 +1850,23 @@ select option { background: var(--surface); color: var(--text); }
 .chipbtn {
   appearance: none;
   background: rgba(255, 255, 255, .03);
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   border-radius: var(--radius);
   color: var(--text-ghost);
   font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: .14em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-md);
   text-transform: uppercase;
-  padding: 7px 11px;
+  padding:var(--s-3) var(--s-4);
   cursor: pointer;
   white-space: nowrap;
-  transition: color .15s ease, border-color .15s ease, background .15s ease;
+  transition: color var(--dur-1) ease, border-color var(--dur-1) ease, background var(--dur-1) ease;
 }
 
 .chipbtn.is-on {
   background: rgba(var(--acc-rgb), .16);
   border-color: var(--acc);
-  color: var(--acc);
+  color: var(--text);
 }
 
 /* ----- setting groups --------------------------------------------------- */
@@ -1566,14 +1879,14 @@ select option { background: var(--surface); color: var(--text); }
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 8px;
-  margin-bottom: 4px;
+  border-bottom: var(--hair) solid var(--line);
+  padding-bottom: var(--s-3);
+  margin-bottom: var(--s-1);
   cursor: pointer;
   user-select: none;
 }
 
-.group__head:focus-visible { outline: 1px solid var(--acc); outline-offset: 3px; }
+.group__head:focus-visible { outline: var(--hair) solid var(--acc); outline-offset: 3px; }
 
 /* Same glyph and same turn as the album tree's twisty — one idiom for
    "there is more under this". */
@@ -1584,7 +1897,7 @@ select option { background: var(--surface); color: var(--text); }
   font-size: 9px;
   line-height: 2;
   transform: rotate(90deg);
-  transition: transform .12s ease;
+  transition: transform var(--dur-1) ease;
 }
 
 .group.is-folded .group__twisty { transform: none; }
@@ -1596,8 +1909,8 @@ select option { background: var(--surface); color: var(--text); }
 .group__count {
   flex: 0 0 auto;
   font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: .18em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-sm);
   color: var(--text-ghost);
   padding-top: 1px;
   white-space: nowrap;
@@ -1614,16 +1927,16 @@ select option { background: var(--surface); color: var(--text); }
 .group__title {
   margin: 0;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size:var(--fs-chrome-sm);
   font-weight: 400;
-  letter-spacing: .24em;
+  letter-spacing:var(--tr-chrome-xs);
   text-transform: uppercase;
   color: var(--label);
 }
 
 .group__blurb {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: var(--s-1) 0 0;
+  font-size:var(--fs-text-sm);
   color: var(--text-ghost);
   max-width: 88ch;
 }
@@ -1633,11 +1946,11 @@ select option { background: var(--surface); color: var(--text); }
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-2);
   margin-bottom: 14px;
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: .06em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-num);
 }
 
 .crumbs__sep { color: var(--text-ghost); }
@@ -1646,7 +1959,7 @@ select option { background: var(--surface); color: var(--text); }
   appearance: none;
   background: none;
   border: 0;
-  padding: 2px 0;
+  padding: var(--s-0) 0;
   font: inherit;
   color: var(--acc);
   cursor: pointer;
@@ -1671,14 +1984,14 @@ select option { background: var(--surface); color: var(--text); }
   padding: 0;
   text-align: left;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   border-left: 2px solid var(--acc-soft);
   border-radius: var(--radius);
   color: var(--text);
   font: inherit;
   cursor: pointer;
   overflow: hidden;
-  transition: border-color .15s ease, background .15s ease;
+  transition: border-color var(--dur-1) ease, background var(--dur-1) ease;
 }
 
 .foldertile:hover { background: var(--surface-2); border-color: var(--chrome); }
@@ -1695,7 +2008,7 @@ select option { background: var(--surface); color: var(--text); }
 .foldertile__body { display: flex; flex-direction: column; min-width: 0; padding-right: 10px; }
 
 .foldertile__name {
-  font-size: 12.5px;
+  font-size:var(--fs-text-md);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1703,8 +2016,8 @@ select option { background: var(--surface); color: var(--text); }
 
 .foldertile__count {
   font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: .1em;
+  font-size:var(--fs-chrome-xs);
+  letter-spacing:var(--tr-chrome-lg);
   color: var(--text-ghost);
   text-transform: uppercase;
 }
@@ -1737,7 +2050,7 @@ select option { background: var(--surface); color: var(--text); }
 .browser__count {
   flex: 1 1 auto;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--text-ghost);
@@ -1748,7 +2061,7 @@ select option { background: var(--surface); color: var(--text); }
   position: sticky;
   top: 0;
   background: var(--bg-2);
-  border: 1px solid var(--line-strong);
+  border: var(--hair) solid var(--line-strong);
   border-radius: var(--radius);
   overflow: hidden;
 }
@@ -1757,21 +2070,21 @@ select option { background: var(--surface); color: var(--text); }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--line);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: var(--hair) solid var(--line);
 }
 
 .detail__name {
   flex: 1 1 auto;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size:var(--fs-chrome-md);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .detail__body {
-  padding: 12px 14px;
+  padding: var(--s-4) 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1782,14 +2095,14 @@ select option { background: var(--surface); color: var(--text); }
 .detail__thumb {
   width: 100%;
   border-radius: var(--radius);
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   background: var(--surface);
 }
 
 .detail__sub {
-  margin: 2px 0 0;
+  margin: var(--s-0) 0 0;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size:var(--fs-chrome-sm);
   font-weight: 600;
   letter-spacing: .2em;
   text-transform: uppercase;
@@ -1801,37 +2114,37 @@ select option { background: var(--surface); color: var(--text); }
   margin: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 3px 12px;
-  font-size: 12px;
+  gap: var(--s-1) var(--s-4);
+  font-size:var(--fs-text-sm);
 }
 
 .facts dt {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--text-ghost);
-  padding-top: 2px;
+  padding-top: var(--s-0);
 }
 
 .facts dd { margin: 0; color: var(--text-dim); }
 
 /* ----- tag chips -------------------------------------------------------- */
-.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chips { display: flex; flex-wrap: wrap; gap:var(--s-2); }
 
 /* A tag is the gallery's .tag, down to the tracking — same object, same
    face. The green stub down one side said nothing: a tag is not a state. */
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 5px 4px 10px;
-  border: 1px solid var(--line);
+  gap:var(--s-2);
+  padding: var(--s-1) var(--s-2) var(--s-1) 10px;
+  border: var(--hair) solid var(--line);
   border-radius: var(--radius);
   background: var(--glass);
   color: var(--text-dim);
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing: .12em;
   text-transform: uppercase;
 }
@@ -1845,7 +2158,7 @@ select option { background: var(--surface); color: var(--text); }
   color: var(--text-ghost);
   cursor: pointer;
   font-size: 10px;
-  padding: 0 2px;
+  padding: 0 var(--s-0);
 }
 
 .chip__x:hover { color: var(--acc-red); }
@@ -1853,7 +2166,7 @@ select option { background: var(--surface); color: var(--text); }
 .cell__tags {
   color: var(--acc);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size:var(--fs-chrome-xs);
   font-weight: 700;
   letter-spacing: .02em;
   overflow: hidden;
@@ -1863,7 +2176,7 @@ select option { background: var(--surface); color: var(--text); }
 
 .cell.is-detail { box-shadow: 0 0 0 2px var(--acc-soft); border-color: var(--acc-soft); }
 
-.cover-preview__side { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.cover-preview__side { display: flex; flex-direction: column; gap:var(--s-3); min-width: 0; }
 
 img.is-broken { opacity: .2; }
 
@@ -1872,19 +2185,19 @@ img.is-broken { opacity: .2; }
    being noise across a full grid. */
 .cell__pick {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: var(--s-2);
+  left: var(--s-2);
   width: 20px;
   height: 20px;
   padding: 0;
-  border: 1px solid var(--line-strong);
+  border: var(--hair) solid var(--line-strong);
   border-radius: var(--radius);
-  background: rgba(0, 0, 0, .72);
+  background-color: var(--scrim);
   color: transparent;
   font: 700 11px/1 var(--mono);
   cursor: pointer;
   opacity: 0;
-  transition: opacity .12s ease;
+  transition: opacity var(--dur-1) ease;
 }
 
 .cell__pick:focus-visible { opacity: 1; }
@@ -1921,10 +2234,10 @@ img.is-broken { opacity: .2; }
 
 .aside-empty {
   padding: 14px;
-  border: 1px dashed var(--line);
+  border: var(--hair) dashed var(--line);
   border-radius: var(--radius);
   color: var(--text-ghost);
-  font-size: 12px;
+  font-size:var(--fs-text-sm);
   line-height: 1.5;
 }
 
@@ -1940,9 +2253,9 @@ img.is-broken { opacity: .2; }
   height: 52px;
   object-fit: contain;
   background: var(--bg-2);
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   border-radius: var(--radius);
-  padding: 7px;
+  padding:var(--s-3);
 }
 /* the album's page backdrop, previewed at the shape it is actually seen in:
    wide and cropped, not a contained thumbnail — a wallpaper that reads fine
@@ -1954,9 +2267,9 @@ img.is-broken { opacity: .2; }
   aspect-ratio: 16 / 9;
   object-fit: cover;
   background: var(--bg-2);
-  border: 1px solid var(--line);
+  border: var(--hair) solid var(--line);
   border-radius: var(--radius);
-  margin-top: 8px;
+  margin-top: var(--s-3);
 }
 
 /* ----- scrollbars ------------------------------------------------------ */
@@ -1984,10 +2297,11 @@ img.is-broken { opacity: .2; }
     left: 0;
     width: min(330px, 86vw);
     z-index: 150;
-    border-right: 1px solid var(--line-strong);
-    background: rgba(10, 10, 12, .98);
+    /* the drawer is a menu over the whole page, so it is --overlay */
+    border-right: var(--hair) solid var(--line-strong);
+    background-color: var(--overlay);
     transform: translateX(-101%);
-    transition: transform .18s ease;
+    transition: transform var(--dur-1) ease;
   }
 
   body.drawer-open .sidebar {
@@ -1998,8 +2312,8 @@ img.is-broken { opacity: .2; }
   .navmenu { display: block; }
   .sidebar__close { display: inline-flex; }
 
-  .nav__inner { gap: 12px; padding: 0 12px; }
-  .nav__actions { gap: 6px; }
+  .nav__inner { gap: var(--s-4); padding: 0 var(--s-4); }
+  .nav__actions { gap: var(--s-2); }
 
   .fields { grid-template-columns: 1fr; }
 
@@ -2007,12 +2321,12 @@ img.is-broken { opacity: .2; }
      column beside it — stacked underneath, tagging forty photos meant
      scrolling past all forty to reach the panel that tags them. They still
      never cover the grid, which is the point the side column was making. */
-  .photos { grid-template-columns: 1fr; gap: 12px; }
+  .photos { grid-template-columns: 1fr; gap: var(--s-4); }
   .photos__aside { position: static; order: -1; }
   .detail__body { max-height: 52vh; }
   .bulk .detail__body { max-height: 40vh; }
 
-  .stoolbar { gap: 8px; }
+  .stoolbar { gap: var(--s-3); }
   .stoolbar__find { flex: 1 1 100%; }
   .stoolbar__count { margin-left: auto; }
 }
@@ -2025,7 +2339,7 @@ img.is-broken { opacity: .2; }
     --pane-top: 12px;
   }
 
-  body { font-size: 14px; }
+  body { font-size:var(--fs-text-lg); }
 
   /* The wordmark goes; the mark stays. Two lines of brand text plus a menu
      handle plus two buttons do not fit across 375px, and the pane's own
@@ -2033,37 +2347,39 @@ img.is-broken { opacity: .2; }
   .nav__brand img { height: 24px; }
   .brand-text { display: none; }
   .u-wide-only { display: none; }
-  .btn { padding: 9px 11px; }
-  .nav__actions .btn { padding: 8px 9px; font-size: 9.5px; letter-spacing: .1em; }
+  .btn { padding:var(--s-3) var(--s-4); }
+  .nav__actions .btn { padding: var(--s-3) var(--s-3); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-lg); }
 
   /* 16px is the threshold under which iOS zooms the page on focus, which then
-     leaves the layout scrolled sideways with no way back. */
+     leaves the layout scrolled sideways with no way back. A raw px on
+     purpose: this is a BEHAVIOUR, not a type size, so it does not come off
+     rule 5's scale -- --fs-text-lg is 15px and would re-arm the zoom. */
   input[type="text"], input[type="search"], input[type="number"], select, textarea {
     font-size: 16px;
-    padding: 10px 11px;
+    padding:10px var(--s-4);
   }
 
-  .head__title { font-size: 17px; }
-  .pane.is-scrolled .head__title { font-size: 14px; }
-  .head__crumb { font-size: 9.5px; }
+  .head__title { font-size:var(--fs-text-xl); }
+  .pane.is-scrolled .head__title { font-size:var(--fs-text-lg); }
+  .head__crumb { font-size: var(--fs-chrome-xs); }
 
   /* Five tabs do not fit across a phone, and a strip that scrolls sideways
      hides the last two behind an edge with nothing to say they are there.
      Wrapped, every tab is visible and reachable with one thumb. */
   .tabs { flex-wrap: wrap; width: 100%; overflow: visible; }
-  .tab { flex: 1 1 auto; padding: 9px 10px; font-size: 10px; letter-spacing: .1em; }
+  .tab { flex: 1 1 auto; padding:var(--s-3) 10px; font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-lg); }
 
   /* Everything you tap gets a finger-sized box. */
   .toggle button { padding: 10px 14px; }
-  .btn--sm { padding: 8px 10px; font-size: 9.5px; }
-  .btn--icon { padding: 8px 11px; }
-  .chipbtn { padding: 9px 11px; }
-  .chip__x { padding: 4px 6px; }
-  .field__unset { padding: 6px 8px; font-size: 13px; }
+  .btn--sm { padding: var(--s-3) 10px; font-size: var(--fs-chrome-xs); }
+  .btn--icon { padding: var(--s-3) var(--s-4); }
+  .chipbtn { padding:var(--s-3) var(--s-4); }
+  .chip__x { padding: var(--s-1) var(--s-2); }
+  .field__unset { padding: var(--s-2) var(--s-3); font-size:var(--fs-text-md); }
 
-  .field { padding: 12px; }
+  .field { padding: var(--s-4); }
   .group { margin-bottom: 22px; }
-  .group__blurb { font-size: 11.5px; }
+  .group__blurb { font-size:var(--fs-text-sm); }
 
   .stoolbar__switches { flex: 1 1 100%; }
   .stoolbar__switches .chipbtn { flex: 1 1 auto; text-align: center; }
@@ -2071,7 +2387,7 @@ img.is-broken { opacity: .2; }
 
   /* The save bar is the one thing that must never need horizontal hunting on
      a phone: label and chips take the first line, the buttons the second. */
-  .savebar { gap: 8px; padding: 10px var(--pane-x) 12px; }
+  .savebar { gap: var(--s-3); padding: 10px var(--pane-x) var(--s-4); }
   .savebar__note { flex: 1 1 100%; white-space: normal; font-size: 10px; }
   /* Idle, the settings bar has nothing to say that is worth two lines at the
      bottom of a phone — the Save button alone is the state. It speaks up
@@ -2081,21 +2397,21 @@ img.is-broken { opacity: .2; }
   .savebar__acts { flex: 1 1 100%; margin-left: 0; }
   .savebar__acts .btn { flex: 1 1 auto; }
 
-  .grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
-  .folders { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-  .cell__pick { width: 26px; height: 26px; font-size: 13px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: var(--s-3); }
+  .folders { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s-3); }
+  .cell__pick { width: 26px; height: 26px; font-size:var(--fs-text-md); }
   .cell__roles { left: 38px; }
 
   /* the drawer is a touch target list, not a dense desktop tree */
-  .tree__row { padding: 7px 12px 7px 0; font-size: 13.5px; }
-  .sidebar__search { padding: 10px 12px; }
+  .tree__row { padding: var(--s-3) var(--s-4) var(--s-3) 0; font-size:var(--fs-text-md); }
+  .sidebar__search { padding: 10px var(--s-4); }
 
-  .pickitem { gap: 8px; padding: 6px; }
+  .pickitem { gap: var(--s-3); padding: var(--s-2); }
   .pickitem__thumb { width: 38px; height: 38px; flex-basis: 38px; }
   .kv__key { flex: 0 0 40%; }
 
   .cover-preview { flex-direction: column; }
-  .fontsample { font-size: 24px; padding: 12px; }
+  .fontsample { font-size: 24px; padding: var(--s-4); }
   .wallpreview { max-width: 100%; }
 
   .desc-langs { flex-wrap: wrap; }
@@ -2108,23 +2424,23 @@ img.is-broken { opacity: .2; }
     height: 100dvh;
     max-width: none;
     border: 0;
-    border-radius: 0;
+    border-radius: var(--radius);
   }
 
-  .modal__head { padding: 10px 12px; gap: 8px 10px; }
+  .modal__head { padding: 10px var(--s-4); gap: var(--s-3) 10px; }
   .modal__head input { flex: 1 1 100%; order: 2; }
   .modal__x { order: 0; margin-left: auto; }
-  .modal__body { padding: 12px; }
-  .modal__foot { padding: 10px 12px; flex-wrap: wrap; }
+  .modal__body { padding: var(--s-4); }
+  .modal__foot { padding: 10px var(--s-4); flex-wrap: wrap; }
   .modal__count { flex: 1 1 100%; }
   .modal__foot .btn { flex: 1 1 auto; }
 
-  .foot { height: 32px; padding: 0 12px; gap: 10px; }
+  .foot { height: 32px; padding: 0 var(--s-4); gap: 10px; }
   .foot__wordmark { display: none; }
   .foot__bit:not(.foot__bit--keep) { display: none; }
   /* the separator belongs to a sibling that is no longer there */
   .foot__bit + .foot__bit--keep::before { content: none; }
-  .toast { left: 12px; right: 12px; bottom: 14px; transform: none; text-align: center; }
+  .toast { left: var(--s-4); right: var(--s-4); bottom: 14px; transform: none; text-align: center; }
 }
 
 /* The tree, the folder tiles and the list rows all repaint on :hover. On a

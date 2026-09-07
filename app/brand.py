@@ -47,7 +47,7 @@ PRODUCT = f"{NAME} gallery"
 
 # The gallery's own release version, shown in the nav and the footer.
 # Distinct from API_VERSION (main.py), which versions the JSON API contract.
-VERSION = "7.0"
+VERSION = "7.1"
 
 # One-line form, shared by <meta name="generator">, the X-Powered-By header
 # and the EXIF `Software` tag so all three can never drift apart.

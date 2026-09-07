@@ -3,17 +3,39 @@
 
    NEBULA — the design language this sheet carries, and the one the
    configurator carries too (configurator/app/static/style.css). Named
-   after the accent it rations: #5865F2, "Nebula Blue". Four rules, and
-   every decision in here is one of them:
+   after the accent it rations: #5865F2, "Nebula Blue". SIX rules, and
+   every decision in here is one of them. The language is written out in
+   full in nebula/NEBULA.md, and nebula/nebula.css is it as a portable
+   sheet — this file and the configurator's are its two production
+   instances, so a change to a RULE is made in three places and a change
+   to a VALUE in two.
 
      1. Black ground, grey furniture, ONE purple accent. --acc marks
         STATE and nothing else; furniture is --chrome or --label. Before
-        colouring something purple, ask whether it carries state.
+        colouring something purple, ask whether it carries state. The
+        accent never sits on its own tint, and reading copy bottoms out
+        at --text-dim: --text-ghost is a ghost, not a text colour.
      2. Square corners, always. --radius: 0.
      3. Depth comes from blurred translucency over a drained wallpaper,
-        never from darker fills. --glass / --scrim and their blurs.
+        never from darker fills. SIX surfaces — --glass/-hi, --scrim/-hi,
+        --pane (the bar), --overlay (menus) — each with a step off the
+        --blur-1..3 ladder. A pane that does not read gets more blur or
+        the -hi step. A pane is a fill, a blur and a hairline: NO bevel,
+        NO gloss gradient — that is Aero, and it argues with rule 2.
      4. Mono, uppercase, tracked = the chrome AROUND a photo grid.
-        Space Grotesk, sentence case = everything a person reads.
+        Space Grotesk, sentence case = everything a person reads. The
+        token name carries the voice: --fs-chrome-* vs --fs-text-*.
+     5. MEASURE IS RATIONED LIKE COLOUR. Every size, space, duration and
+        blur comes off a named scale (--s-*, --fs-*, --tr-*, --dur-*,
+        --blur-*). A raw px is the same mistake as a raw hex.
+     6. THE ENVIRONMENT CAN OVERRULE THE LOOK. Blur, translucency, motion
+        and hover are capabilities, not guarantees. Every fallback is
+        reached by REDEFINING TOKENS, never by overriding rules.
+
+   Rules 1–4 say what a thing looks like. Rules 5 and 6 are what make it
+   a language rather than a look: a look is copied by eye and drifts the
+   first time someone eyeballs a padding; a scale and a set of declared
+   fallbacks can be inherited.
 
    The colours, the wordmark and the logo belong to whoever runs the
    gallery (gallery.cfg); this file and the software under it do not.
@@ -260,14 +282,34 @@
   --line:       rgba(255,255,255,0.09);
   --line-strong:rgba(255,255,255,0.20);
 
-  --text:       #f2f2f4;
-  --text-dim:   #a1a1a8;
-  --text-ghost: #6b6b73;
+  /* ---- the text ramp, measured rather than picked ----------------------
+     Every value carries a stated contrast floor against --surface (#0e0e10)
+     - not against --bg, because that is what text in this system actually
+     sits on: panels, cards, fields and menus are all a step or two up from
+     the floor, and once they float on glass the ground under reading text
+     is whatever the wallpaper happens to be there. --glass-hi is opaque
+     enough to bound that drift, and the two references are held within a
+     step of each other on purpose.
+
+       4.5:1  anything a person READS - body, help, empty states, and the
+              label of any control that can be operated
+       3.0:1  furniture that is not read as language - hairlines, disabled
+              states, decorative marks
+
+     --text-ghost is a GHOST: a placeholder, a disabled label, de-emphasised
+     furniture. It is not a colour for text that has to be read; reading copy
+     bottoms out at --text-dim. It used to be #6b6b73, which was 3.65:1 on
+     --surface and 3.42:1 on --surface-2 - under the floor everywhere it was
+     used, and it was carrying help text, placeholders and the UNSELECTED
+     segments of every segmented control. */
+  --text:       #f2f2f4;   /* 17.3:1 on --surface */
+  --text-dim:   #a1a1a8;   /*  7.5:1 */
+  --text-ghost: #7d7d86;   /*  4.7:1 - the floor for read text */
   /* Section headings used to sit at full --text alongside the page title, the
      card names and every bold number, so a screen was a field of identical
      white with no way in. This is one step down: still clearly a heading,
      but it stops competing with the title above it and the photos below. */
-  --text-head:  #cdcdd4;
+  --text-head:  #cdcdd4;   /* 12.2:1 */
   /* the two ends of the display-title gradient (see .section__slug .name) */
   --title-a:    #ffffff;
   --title-b:    #8b8b94;
@@ -275,48 +317,73 @@
   /* ---- the one accent, and the grey that replaced the old one ---------
      Purple marks MEANING and nothing else: links and focus, the current /
      selected / open state, the featured mark, live counters. Everything
-     that is merely furniture — section labels, counts, corner brackets,
-     button hovers, HUD chrome — takes --chrome, a neutral near-white.
+     that is merely furniture - section labels, counts, corner brackets,
+     button hovers, HUD chrome - takes --chrome, a neutral near-white.
      That split IS the design: the earlier sheet painted both groups the
      same accent colour, which is why "es ist etwas viel" (user, 2026-09-01).
      Before colouring something purple, ask whether it carries state. If it
      doesn't, it is --chrome.
 
-     The hue is picked, not derived: #5865F2 ("Nebula Blue"), handed over by
-     the user on 2026-09-01 after two rounds of "etwas mehr blau". It reads
-     blue-violet rather than violet, which is the point — the shade was never
-     the problem, how MANY things wore it was.
+     #5865F2 ("Nebula Blue", handed over by the user on 2026-09-01 after two
+     rounds of "etwas mehr blau") is the BRAND hex - the value gallery.cfg
+     supplies and the colour the wordmark is drawn in. It is not used raw:
+     like any hand-typed accent it goes through _accent_shades() in main.py
+     and comes out one step lifted, because the derivation's reference
+     surface is --surface and not --bg.
 
-     The three shades are one colour under three constraints, and an album's
-     own `accent = #hex` is put through the same derivation server-side
-     (_accent_shades in main.py) — so a per-album accent lands with the same
-     guarantees rather than as a raw hex nobody checked:
-       --acc       small text on black AND a fill under black label text;
+     That reference was the one real bug the derivation had. It measured
+     against #000000 and stopped the moment it cleared it - but the accent is
+     almost never ON #000. It is a link inside a panel, the open row of a
+     sort menu, the glyph in front of a section label, all of them on
+     --surface or a step above. #5865F2 clears 4.56:1 on #000 and only
+     4.19:1 on --surface, so the whole 4.5 margin was spent before the
+     colour was used:
+
+       #5865F2  (brand, gallery.cfg value)  ->  #616EF3  (--acc, in use)
+
+     Three faces, one colour under three constraints, and an album's own
+     `accent = #hex` is put through the same derivation server-side - so a
+     per-album accent lands with the same guarantees rather than as a raw hex
+     nobody checked:
+       --acc       small text on a PANEL and a fill under black label text;
                    both readings want luminance, so it is lifted if a cfg
                    hands over something too dark to read
        --acc-deep  the one face that carries WHITE text (the hero CTA), so
                    it is darkened until that reads
-       --acc-soft  the lifted step, for hover faces under black text */
-  --acc:        #5865f2;
-  --acc-rgb:    88,101,242;
-  --acc-deep:   #404ee7;   /* the only face that carries white text */
-  --acc-soft:   #9ea6f7;   /* hover face, black text on it */
+       --acc-soft  the lifted step, for hover faces under black text
+       --on-acc    what goes ON TOP of an --acc fill. Today the same value
+                   as --bg; not the same IDEA, so it is spelled separately.
+
+     THE ACCENT NEVER SITS ON ITS OWN TINT. On an accent fill or an
+     accent-tinted face the label is --on-acc or --text, and the accent is
+     carried by the fill and the border instead. Accent-on-accent-tint was
+     the lowest contrast in the whole sheet (4.14:1) and it was on the
+     primary action, the most important control in any row. */
+  --acc-src:    #5865f2;   /* the brand hex, for reference only */
+  --acc:        #616ef3;   /* 4.6:1 on --surface, 5.0:1 on --bg */
+  --acc-rgb:    97,110,243;
+  --acc-deep:   #404ee7;   /* the only face that carries white text - 6.1:1 */
+  --acc-soft:   #a4abf8;   /* hover face, black text on it - 9.0:1 */
+  --on-acc:     #000000;   /* what goes on top of an --acc fill */
 
   /* ---- the trip module, deliberately OUTSIDE the accent system --------
      The trip band, its countdown, its timeline and its map keep the palette
      they had before the black/grey pass, and they keep it independent of
      --acc. Two reasons, both from the user (2026-09-01: "das trip ui soll so
-     wie vorher farbig sein … und soll nicht beeinflusst von der neuen farb
+     wie vorher farbig sein ... und soll nicht beeinflusst von der neuen farb
      funktion sein"): the colours there MEAN something a single accent cannot
-     say — upcoming vs. live vs. done — and an album's own `accent = …` must
-     not repaint a timeline that reads as an instrument.
+     say - upcoming vs. live vs. done - and an album's own `accent = ...` must
+     not repaint a timeline that reads as an instrument. This is the
+     language's QUARANTINE CLAUSE, and this module is the only thing in the
+     site that has it.
      What the rebuild changed is not the palette but its REACH. These three
      now paint the STATE MARKS only: the status stamp, the leg dots, the day
      chip, the progress fill, the active leg's name, and the map's dots,
      regions and route legs. Frames, grounds, countdown digits, labels,
      hovers and the weather readout are grey furniture like everywhere else
-     on the site — the full rule is written out above .trip in this sheet.
-     Nothing outside .trip* / .trip-map* may use these. */
+     on the site - the full rule is written out above .trip in this sheet.
+     Nothing outside .trip* / .trip-map* may use these, and nothing inside
+     them may use --acc / --chrome / --label. */
   --trip:          #5b8aff;   /* a leg still ahead */
   --trip-rgb:      91,138,255;
   --trip-live:     #a594ff;   /* the leg you are on */
@@ -326,7 +393,7 @@
   /* The weather readout's own two, for the condition glyph only (sun/storm
      warm, snow cool; rain borrows --trip, night --trip-live). The glyph is
      four characters wide and it is the one place on the page where a colour
-     is read before the word next to it — worth keeping. */
+     is read before the word next to it - worth keeping. */
   --trip-warm:     #ffb547;   /* sun / storm */
   --trip-cool:     #9fd8ff;   /* snow */
 
@@ -337,59 +404,200 @@
   --label-rgb:  184,184,194;
 
   /* Status, deliberately dulled: neon mint/amber on a black-and-grey page
-     reads as an alarm, not as information, and it fought the accent. */
+     reads as an alarm, not as information, and it fought the accent. --ok is
+     the one bright exception, picked off the same swatch as the accent. Each
+     carries a -deep face for the rare fill that must hold WHITE text - the
+     same guarantee --acc-deep gives, so a danger button is not the one
+     control in the app with unchecked contrast. */
   --amb:        #d9a24a;
   --amb-rgb:    217,162,74;
+  --amb-deep:   #7a5410;
   --ok:         #58f298;
   --ok-rgb:     88,242,152;
+  --ok-deep:    #11723f;
   --red:        #e0625f;
   --red-rgb:    224,98,95;
+  --red-deep:   #97201d;
 
-  /* ---- translucent surfaces ------------------------------------------
+  /* ================================================================
+     RULE 5 - MEASURE IS RATIONED LIKE COLOUR
+     ----------------------------------------------------------------
+     Every size, space, duration and blur comes off a named scale. A
+     raw px in this sheet is the same mistake as a raw hex, and the
+     check is a grep the same way rule 1's is a count:
+
+       grep -oE '(padding|gap|margin|font-size):[^;]*[0-9]+px' style.css
+
+     Before this block existed the sheet carried 23 distinct paddings,
+     13 gaps, 13 font sizes and 14 tracking values, every one of them
+     hand-typed - so "the same as the configurator" was something you
+     had to remember rather than something you could reference, and the
+     two apps could only drift.
+     ================================================================ */
+
+  /* ---- space: a 4px rhythm, eight steps roughly 1.5x apart ------------
+     Two adjacent values are always visibly different. If a layout wants
+     something between two steps, the layout is wrong, not the scale.
+       1  hairline gaps, chip padding      5  panel padding
+       2  tight inner padding              6  the gap BETWEEN components
+       3  the default gap between things   7  block separation
+       4  control padding                  8  section separation
+     --s-0 is the sub-step, and it is a BEZEL, not a space: the inset of a
+     segmented track, the hairline gutter of a stack. Anything a person
+     would call "distance between two things" starts at --s-1. --s-9/--s-10
+     are page rhythm - the scale stopped at 48 and the page kept reaching
+     past it, which is how off-scale values get typed even by someone
+     holding to the rule. */
+  --s-0:  2px;
+  --s-1:  4px;
+  --s-2:  6px;
+  --s-3:  8px;
+  --s-4:  12px;
+  --s-5:  16px;
+  --s-6:  24px;
+  --s-7:  32px;
+  --s-8:  48px;
+  --s-9:  64px;
+  --s-10: 96px;
+
+  /* ---- type: two voices, and the token name carries the voice ---------
+     --fs-chrome-* is rule 4's mono voice - uppercase, tracked, the
+     furniture around the photographs. --fs-text-* is Space Grotesk in
+     sentence case, everything a person reads. Reaching for the wrong one
+     is then visible in the source and not only on screen.
+
+     The sheet used to hold ten sizes between 9px and 15px. 10px and 10.5px
+     are not a hierarchy anyone perceives; they are noise that reads as
+     inconsistency and lets two apps diverge invisibly. */
+  --fs-chrome-xs: 9.5px;   /* card index, badge, menu head */
+  --fs-chrome-sm: 10.5px;  /* the workhorse: buttons, tags, meta lines */
+  --fs-chrome-md: 12px;    /* field labels, menu rows, search */
+  --fs-chrome-lg: 14px;    /* a measured value with its own line */
+  --fs-chrome-xl: 20px;    /* a headline number: a stat tile, a count */
+
+  --fs-text-sm:   12px;    /* help text, footer, key/value */
+  --fs-text-md:   13px;    /* inputs, panel body */
+  --fs-text-lg:   15px;    /* base body size, leads */
+  --fs-text-xl:   18px;    /* a panel heading that leads a screen */
+  --fs-title:     clamp(22px, 2.7vw, 33px);
+
+  /* ---- tracking, bound to size ----------------------------------------
+     One formula, not fourteen opinions: tracking FALLS as size rises,
+     because the reason to track is optical and small caps need the air that
+     large caps do not. Every --fs-chrome-* has exactly one --tr-chrome-*
+     that goes with it, same suffix. */
+  --tr-chrome-xs: .24em;
+  --tr-chrome-sm: .18em;
+  --tr-chrome-md: .14em;
+  --tr-chrome-lg: .10em;
+  --tr-chrome-xl: .04em;
+  --tr-text:      .01em;
+  --tr-title:     .03em;
+  --tr-head:     -.005em;  /* a sans heading tightens, it never tracks */
+  --tr-num:       .06em;   /* mono digits in a value column */
+  --tr-display:   .14em;   /* the display face, which inks its own em */
+
+  /* Icons are sized off the type scale but are not type: a glyph at the
+     same px as its label reads a size too large, because it has no
+     x-height to sit under. */
+  --icon-sm:  10px;
+  --icon-md:  12px;
+  --fs-code:  .88em;   /* code is relative: it sits inside running text */
+
+  /* ---- motion ---------------------------------------------------------
+     Three durations. Anything slower than --dur-3 is an animation and
+     belongs behind the fx gate, not in a transition. */
+  --dur-1:   .15s;   /* colour, border - a state change */
+  --dur-2:   .25s;   /* movement, a pane appearing */
+  --dur-3:   .35s;   /* an image settling, a scale */
+  --ease:     cubic-bezier(.4, 0, .2, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+
+  /* ================================================================
+     RULE 3 - DEPTH COMES FROM BLUR, NOT FROM DARKNESS
+     ----------------------------------------------------------------
      Every box here floats over the ambient wallpaper or straight over a
-     photo. Legibility comes from BLUR, not from painting the box darker:
-     a lightly tinted pane over a blurred backdrop stays bright and keeps
-     the wallpaper readable through it, where an opaque slab just turns
-     the page into a stack of dark rectangles. Four values are the whole
-     scale, so a legibility change is one edit instead of sixty:
-       --glass / --glass-hi   panes over the page background: bars, fields,
-                              buttons, menus, cards
+     photograph. Legibility comes from BLUR: a lightly tinted pane over a
+     blurred backdrop stays bright and keeps the wallpaper readable through
+     it, where an opaque slab just turns the page into a stack of dark
+     rectangles - "nicht zu dunkle Hintergruende" (user).
+
+     The blur is a LADDER, so "give it more blur" is an actual move rather
+     than advice. Saturation climbs with it on purpose: blur averages the
+     backdrop towards grey, and pulling saturation back up is what keeps a
+     heavy pane looking like glass over a picture instead of like fog.
+     ================================================================ */
+  --blur-1: blur(10px) saturate(125%);
+  --blur-2: blur(20px) saturate(145%);
+  --blur-3: blur(32px) saturate(165%);
+
+  /* ---- the six surfaces -----------------------------------------------
+     Four of these were tokens already; .nav and every dropdown carried
+     hand-typed fills and their own backdrop-filter, which made this rule's
+     central promise - redefine the tokens and every surface retunes,
+     nothing else has to know - FALSE for the two panes the site shows on
+     every screen. On weak hardware the bar and the sort menu kept their
+     blur. If a surface is not spelled as a token, it is not in the system.
+
+       --glass / --glass-hi   panes over the page: fields, buttons, cards
        --scrim / --scrim-hi   chips laid ON a photo, where the backdrop is
                               whatever the picture happens to be there
-     Where blur is unavailable — phones and html.fx-lite, both of which
-     switch backdrop-filter off for the GPU cost — the same tokens are
-     redefined more opaque, because there the backdrop is not softened and
-     opacity is the only thing left doing the work.
-     Gradient shades that fade INTO a photo (card captions, hero overlays)
-     stay hand-tuned — being see-through at one end is their whole job. */
-  --glass:      rgba(26,26,30,.42);
-  --glass-hi:   rgba(40,40,45,.58);
-  --scrim:      rgba(0,0,0,.52);
-  --scrim-hi:   rgba(6,6,7,.70);
-  --glass-blur: blur(18px) saturate(140%);
-  --scrim-blur: blur(14px) saturate(130%);
+       --pane                 the app bar: spans the viewport, always there
+       --overlay              menus and dialogs: they must read over ANY
+                              content underneath
 
-  /* The DISPLAY face: the brand voice of the chrome, and nothing else — the
-     wordmark, the welcome screen's one big word, the 404. A token for the
-     same reason --wallpaper-filter and --acc are: gallery.cfg's `font = …`
-     replaces it site-wide through the generated /site-font.css sheet, which
-     puts the archive's own face in front of this stack and leaves it behind
-     as the fallback. Every rule that sets display type reads the token, so
-     none of them has to know whether a face is configured.
+     A surface that is not reading takes the -hi step or the next blur -
+     NEVER a darker fill. A pane is a fill, a blur and a hairline: no
+     bevel, no gloss gradient. Gradient shades that fade INTO a photo (card
+     captions, hero overlays) stay hand-tuned - being see-through at one
+     end is their whole job. */
+  --glass:      rgba(30,30,38,.36);
+  --glass-hi:   rgba(22,22,29,.74);
+  --scrim:      rgba(4,4,8,.46);
+  --scrim-hi:   rgba(6,6,10,.64);
+  --pane:       rgba(6,6,10,.72);
+  --overlay:    rgba(10,10,14,.82);
+
+  --glass-blur:   var(--blur-2);
+  --scrim-blur:   var(--blur-1);
+  --pane-blur:    var(--blur-3);
+  --overlay-blur: var(--blur-3);
+
+  /* ---- elevation -------------------------------------------------------
+     Two shadows and one glow, instead of nine hand-typed one-offs (this
+     sheet once spent three different values on what was meant to be the
+     same accent glow). Shadows are for things that genuinely float ABOVE
+     the page - a menu, the lightbox. A card does not float. */
+  --shadow-1: 0 2px 10px rgba(0,0,0,.35);
+  --shadow-2: 0 18px 44px rgba(0,0,0,.55);
+  --glow-acc: 0 0 20px -6px rgba(var(--acc-rgb),.70);
+  --ring-acc: 0 0 0 1px rgba(var(--acc-rgb),.22);
+
+  /* The DISPLAY face: the brand voice of the chrome, and nothing else - the
+     wordmark, the welcome screen's one big word, the 404. NEVER a heading.
+     A token for the same reason --wallpaper-filter and --acc are:
+     gallery.cfg's `font = ...` replaces it site-wide through the generated
+     /site-font.css sheet, which puts the archive's own face in front of this
+     stack and leaves it behind as the fallback. Every rule that sets display
+     type reads the token, so none of them has to know whether a face is
+     configured.
 
      --display-scale rides along on that same sheet (gallery.cfg
-     `font_scale = …`) and is why those rules wrap their size in a calc():
+     `font_scale = ...`) and is why those rules wrap their size in a calc():
      display faces disagree wildly about how much of the em they ink, so the
      archive that brings the face also says how to size it. At the stock 1
-     the calc() is the plain size. Note this is the SITE face — an album's
+     the calc() is the plain size. Note this is the SITE face - an album's
      hero title has its own key and its own token (--album-title-font). */
   --display-font: "Ethnocentric","Space Grotesk", sans-serif;
   --display-scale: 1;
 
   /* How the wallpaper behind the page is treated before anything is laid
-     over it — see .bg-still/.bg-video. A token, because an album.cfg can
+     over it - see .bg-still/.bg-video. The wallpaper is ATMOSPHERE, not
+     content: drained so the only saturated things on a screen are the
+     photographs and the accent. Not fully grey - a trace of hue keeps it
+     from looking like a broken image. A token, because an album.cfg can
      retune it per album (`wallpaper_tint` / `wallpaper_dim`) through the
-     generated /album-theme.css sheet — and gallery.cfg can retune the site's
+     generated /album-theme.css sheet - and gallery.cfg can retune the site's
      own the same way, one tier down; nothing else in the sheet has to know
      which of the three it is looking at. */
   --wallpaper-filter: grayscale(.92) brightness(.72) contrast(1.04);
@@ -398,11 +606,21 @@
      it transparent, because a backdrop asked for in full colour that still
      had an accent wash sitting on it was not actually untinted. */
   --wallpaper-bloom: rgba(var(--acc-rgb),0.07);
+  /* The dim laid over the picture, as a PAIR, because the two ends are a
+     real decision and the two apps disagree about it. This ramp is for a
+     PHOTOGRAPH: it darkens towards the footer of a scrolling page, where the
+     picture is still at full strength. Artwork that already falls off
+     downward (nova, which the configurator wears) wants both ends flat, or
+     the ramp lands on the art's own falloff and the bottom half goes black. */
+  --wallpaper-shade-top: rgba(0,0,0,0.62);
+  --wallpaper-shade-bot: rgba(0,0,0,0.82);
+  --wallpaper-grid: rgba(255,255,255,.03);
 
   /* square, everywhere: the one shape rule the whole surface language is
      built on. Kept as a token so the handful of pills that are genuinely
      round (status dot, lightbox buttons) have to opt out on purpose. */
   --radius:     0;
+  --hair:       1px;      /* the one border width in the system */
   --nav-h:      60px;
   /* The mono face, spelled once. Every label, readout and HUD string on the
      site reads this, and it is character-for-character the configurator's
@@ -412,18 +630,95 @@
      is actually on screen, and `monospace` alone resolves to a face some 6
      percent narrower than `ui-monospace` does. */
   --mono:       "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
-  /* The gutter every band on the page holds to — the nav, the sections, the
+  --sans:       "Space Grotesk", system-ui, sans-serif;
+  /* The gutter every band on the page holds to - the nav, the sections, the
      footer and the welcome hero's HUD all read this, which is what keeps the
-     logo, the content and the footer mark on one vertical line.
-
-     Flat 20px, matching the configurator's own header inset (`.nav__inner`
-     there is a plain `padding: 0 20px`), so the two apps sit the same
-     distance off the screen edge at every width. It used to grow with the
-     viewport — clamp(20px, 2.6vw, 56px) — which was invisible on a laptop
-     but pushed the wordmark almost three times as far in on a wide monitor,
-     where the welcome hero runs nearly edge to edge behind it. */
+     logo, the content and the footer mark on one vertical line. Shared with
+     the configurator, so the two apps sit the same distance off the screen
+     edge at every width. */
   --page-pad:   20px;
   --page-max:   2000px;
+  /* The one breakpoint the language owns. Below it the site is a single
+     column, the bar sheds its middle and touch targets grow. The sheet may
+     add its own; it may not disagree about this one. */
+  --bp-narrow:  760px;
+}
+
+/* ==================================================================
+   RULE 6 - THE ENVIRONMENT CAN OVERRULE THE LOOK
+   ------------------------------------------------------------------
+   Blur, translucency, motion and hover are CAPABILITIES, not
+   guarantees. Every gate below reaches its fallback by REDEFINING
+   TOKENS, never by overriding component rules - which is the only
+   reason a component can be written once and still be correct on a
+   four-year-old phone, in Windows high-contrast mode, and for a
+   visitor who has asked the OS for less.
+   ================================================================== */
+
+/* --- lite: JS-detected weak hardware / data saver / reduced motion (see
+   allowHeavyFx() in app.js). No blur, so the panes lose the one thing
+   making them readable - pay for it in opacity instead. Nothing else
+   changes, because there is nothing else: a pane is a fill and a hairline,
+   and the blur was the only part the hardware could not afford. */
+html.fx-lite{
+  --glass:      rgba(22,22,27,.86);
+  --glass-hi:   rgba(36,36,44,.94);
+  --scrim:      rgba(0,0,0,.78);
+  --scrim-hi:   rgba(6,6,10,.88);
+  /* --pane and --overlay go FULLY opaque here and the two glass steps do
+     not. The difference is what is behind them: the wallpaper is behind a
+     card, but PAGE CONTENT scrolls behind the nav and under a menu.
+     Translucency without a blur to average it is not glass, it is a smear -
+     at .96 the hero title still ghosted through the bar, because 4% of white
+     over near-black is visible. */
+  --pane:       #04040a;
+  --overlay:    #0a0a0e;
+  --blur-1: none; --blur-2: none; --blur-3: none;
+}
+
+/* --- the OS-level version of the same request. html.fx-lite is set by
+   script and can therefore never run before first paint; this one does, so a
+   visitor who has asked for less transparency never sees a frame of the
+   glass build. Same tokens, so nothing else changes. */
+@media (prefers-reduced-transparency: reduce){
+  :root{
+    --glass:      rgba(22,22,27,.92);
+    --glass-hi:   rgba(36,36,44,.96);
+    --scrim:      rgba(0,0,0,.88);
+    --scrim-hi:   rgba(6,6,10,.94);
+    --pane:       #04040a;
+    --overlay:    #0a0a0e;
+    --blur-1: none; --blur-2: none; --blur-3: none;
+  }
+}
+
+/* --- more contrast asked for: firm up every hairline and drop the ghost
+   step onto the read floor. The look does not change; the edges simply stop
+   being suggestions. */
+@media (prefers-contrast: more){
+  :root{
+    --line:        rgba(255,255,255,0.22);
+    --line-strong: rgba(255,255,255,0.42);
+    --text-ghost:  #9a9aa4;
+    --text-dim:    #c2c2c9;
+  }
+}
+
+/* --- forced colours (Windows high contrast). The entire depth model here is
+   translucency plus hairlines, and both are discarded by the OS compositor -
+   a page that says nothing about this renders as unseparated text on one flat
+   ground. So: give every surface a real border in a SYSTEM colour and let the
+   OS own the palette. This is the one place the language hands over its
+   colours, and it should: the visitor asked the OS for them, not us. */
+@media (forced-colors: active){
+  :root{
+    --line: CanvasText; --line-strong: CanvasText;
+    --glow-acc: none; --shadow-1: none; --shadow-2: none;
+  }
+  .nav, .sort__menu, .card, .panel, .field, .tag, .btn-link, .nav__search,
+  .lightbox__bar, .stage__loader, .vf__meta, .fhero__bar{
+    border:var(--hair) solid CanvasText;
+  }
 }
 
 *{ box-sizing:border-box; }
@@ -434,7 +729,7 @@ body{
   color:var(--text);
   background:var(--bg);
   font-family:"Space Grotesk", system-ui, sans-serif;
-  font-size:15px;
+  font-size:var(--fs-text-lg);
   line-height:1.55;
   /* clip (not hidden) the horizontal overflow: `overflow-x:hidden` forces
      `overflow-y` to compute to `auto`, turning <body> into a scroll container —
@@ -444,7 +739,7 @@ body{
      the sole scroller and the backdrops stay fixed. */
   overflow-x:hidden;   /* fallback for engines without overflow:clip */
   overflow-x:clip;
-  letter-spacing:.01em;
+  letter-spacing:var(--tr-text);
   isolation:isolate;
   min-height:100vh;
   display:flex; flex-direction:column;
@@ -494,11 +789,11 @@ body > .foot{ flex-shrink:0; }
   content:"";
   position:absolute; inset:0;
   background-image:
-    linear-gradient(to right, rgba(255,255,255,.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,.03) 1px, transparent 1px),
+    linear-gradient(to right, var(--wallpaper-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--wallpaper-grid) 1px, transparent 1px),
     radial-gradient(ellipse at 78% 68%, var(--wallpaper-bloom) 0%, transparent 52%),
-    linear-gradient(rgba(0,0,0,0.62), rgba(0,0,0,0.82));
-  background-size: 32px 32px, 32px 32px, auto, auto;
+    linear-gradient(var(--wallpaper-shade-top), var(--wallpaper-shade-bot));
+  background-size: var(--s-7) var(--s-7), var(--s-7) var(--s-7), auto, auto;
   background-repeat: repeat, repeat, no-repeat, no-repeat;
 }
 
@@ -509,17 +804,11 @@ body > .foot{ flex-shrink:0; }
 @media (prefers-reduced-motion: reduce){
   .bg-video{ display:none; }
 }
-/* No blur on weak hardware, so the panes lose the one thing that was making
-   them readable — pay for it in opacity instead. Redefining the tokens once
-   retunes every surface that uses them; nothing else has to know. */
-.fx-lite{
-  --glass:      rgba(22,22,25,.80);
-  --glass-hi:   rgba(36,36,40,.90);
-  --scrim:      rgba(0,0,0,.76);
-  --scrim-hi:   rgba(6,6,7,.88);
-  --glass-blur: none;
-  --scrim-blur: none;
-}
+/* The surface fallback for lite mode is a token redefinition and it lives
+   with the other rule-6 gates, next to :root — see html.fx-lite up there.
+   It used to be repeated here with only four of the six surfaces, which is
+   how the nav and the sort menu kept their blur on hardware that had just
+   said it could not afford one. */
 
 /* Phones never load the ambient clip (app.js only wires it up at ≥761px) and
    most are flagged fx-lite anyway, so what they see is the <picture>'s mobile
@@ -540,7 +829,7 @@ body > .foot{ flex-shrink:0; }
    (liveGo() flushes style with the class still on the new markup so the
    return has a from-state at all.) */
 [data-live]{
-  transition:opacity .12s ease;
+  transition:opacity var(--dur-1) ease;
 }
 .is-live-loading [data-live]{
   opacity:.55;
@@ -552,12 +841,12 @@ body > .foot{ flex-shrink:0; }
    given longer than going out: the blur-out happens under the visitor's own
    tap and wants to be immediate, the return is the answer arriving. */
 html.fx-anim [data-live]{
-  transition:opacity .16s ease, filter .26s ease;
+  transition:opacity var(--dur-1) ease, filter var(--dur-2) ease;
 }
 html.fx-anim.is-live-loading [data-live]{
   opacity:.7;
   filter:blur(4px) saturate(.6);
-  transition:opacity .16s ease, filter .16s ease;
+  transition:opacity var(--dur-1) ease, filter var(--dur-1) ease;
 }
 @media (prefers-reduced-motion: reduce){
   [data-live]{ transition:none; }
@@ -574,14 +863,14 @@ img{ user-select:none; -webkit-user-drag:none; }
 .mono{ font-family:var(--mono); letter-spacing:0; }
 .jp  { font-family:"Noto Sans JP", "Space Grotesk", sans-serif; }
 .dim { color:var(--text-dim); }
-.small{ font-size:12px; }
+.small{ font-size:var(--fs-text-sm); }
 
 code{
   font-family:var(--mono);
   font-size:.88em;
   background:rgba(255,255,255,.05);
-  border:1px solid var(--line);
-  padding:1px 6px;
+  border:var(--hair) solid var(--line);
+  padding:1px var(--s-2);
   color:var(--text);
 }
 
@@ -589,13 +878,19 @@ code{
 /* ================================================================
    NAV
    ================================================================ */
+/* The app bar is --pane: the one surface that spans the viewport and is
+   always present, so it is the one that may sit lower than the glass steps.
+   It used to carry a hand-typed rgba() fill and its own backdrop-filter,
+   which made rule 3's central promise — redefine the tokens and every
+   surface retunes — false for the bar the site shows on every screen: in
+   fx-lite the whole page dropped its blur and the nav kept it. */
 .nav{
   position:sticky; top:0; z-index:100;
   height:var(--nav-h);
-  background: rgba(0,0,0,.86);
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
-  border-bottom:1px solid var(--line);
+  background-color:var(--pane);
+  backdrop-filter:var(--pane-blur);
+  -webkit-backdrop-filter:var(--pane-blur);
+  border-bottom:var(--hair) solid var(--line);
 }
 /* accent hairline riding on the bottom border; brightens once scrolled
    (.nav--scrolled) so the floating bar picks up a signature edge */
@@ -607,7 +902,7 @@ code{
     transparent 2%, rgba(var(--acc-rgb),.5) 30%,
     rgba(var(--acc-rgb),.45) 50%, rgba(var(--acc-rgb),.5) 70%, transparent 98%);
   opacity:.35;
-  transition:opacity .25s ease;
+  transition:opacity var(--dur-2) ease;
 }
 .nav--scrolled::after{ opacity:.85; }
 .nav__inner{
@@ -615,11 +910,11 @@ code{
   margin:0 auto;
   height:100%;
   padding:0 var(--page-pad);
-  display:flex; align-items:center; gap:24px;
+  display:flex; align-items:center; gap:var(--s-6);
   min-width:0;
 }
 .nav__brand{
-  display:flex; align-items:center; gap:12px;
+  display:flex; align-items:center; gap:var(--s-4);
   color:var(--text);
   white-space:nowrap;
   min-width:0;
@@ -638,8 +933,8 @@ code{
 }
 .nav__brand .brand-name{
   font-family:var(--display-font);
-  font-size:calc(15px * var(--display-scale));
-  letter-spacing:.14em;
+  font-size:calc(var(--fs-text-lg) * var(--display-scale));
+  letter-spacing:var(--tr-chrome-md);
   text-transform:uppercase;
   color:var(--text);
 }
@@ -658,7 +953,7 @@ code{
    so an album accent still repaints it. */
 .nav__brand .brand-sub{
   font-family:var(--mono);
-  font-size:9.5px;
+  font-size:var(--fs-chrome-xs);
   letter-spacing:.28em;
   text-transform:uppercase;
   color:color-mix(in srgb, var(--acc-soft) 30%, var(--acc));
@@ -666,11 +961,11 @@ code{
 .nav__brand .jp{
   font-family:"Noto Sans JP", sans-serif;
   color:var(--text-ghost);
-  font-size:10px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing:.3em;
   align-self:center;
-  border-left:1px solid var(--line);
-  padding-left:12px;
+  border-left:var(--hair) solid var(--line);
+  padding-left:var(--s-4);
 }
 
 /* capped + auto-margined: the field sits centered in the leftover space
@@ -681,13 +976,13 @@ code{
   max-width:560px;
   margin-inline:auto;
   display:flex; align-items:center;
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
   border-radius:var(--radius);
   background:var(--glass);
   backdrop-filter:var(--glass-blur);
   -webkit-backdrop-filter:var(--glass-blur);
-  padding:0 12px;
-  transition: border-color .15s, background .15s, box-shadow .15s;
+  padding:0 var(--s-4);
+  transition: border-color var(--dur-1), background var(--dur-1), box-shadow var(--dur-1);
 }
 .nav__search:focus-within{
   border-color:var(--acc);
@@ -703,23 +998,23 @@ code{
   border:0; outline:0;
   color:var(--text);
   font-family:var(--mono);
-  font-size:12px;
+  font-size:var(--fs-chrome-md);
   letter-spacing:.08em;
-  padding:9px 0;
+  padding:var(--s-3) 0;
 }
-.nav__search input::placeholder{ color:var(--text-ghost); letter-spacing:.14em; text-transform:uppercase; font-size:11px; }
+.nav__search input::placeholder{ color:var(--text-ghost); letter-spacing:var(--tr-chrome-md); text-transform:uppercase; font-size:var(--fs-chrome-sm); }
 
 /* language selector (top right; the only interactive chrome in the nav
    besides search, and the only one that stays on mobile).
    Boxed as a segmented control so it reads as one deliberate module
    instead of loose text links hanging off a divider. */
 .nav__lang{
-  display:flex; align-items:center; gap:2px;
+  display:flex; align-items:center; gap:var(--s-0);
   font-family:var(--mono);
-  font-size:11px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing:.12em;
-  padding:3px;
-  border:1px solid var(--line);
+  padding:var(--s-1);
+  border:var(--hair) solid var(--line);
   border-radius:var(--radius);
   background:var(--glass);
   backdrop-filter:var(--glass-blur);
@@ -728,15 +1023,19 @@ code{
 }
 .nav__lang-opt{
   color:var(--text-ghost);
-  padding:4px 8px;
+  padding:var(--s-1) var(--s-3);
   border-radius:var(--radius);
-  transition:color .15s, background .15s, box-shadow .15s;
+  transition:color var(--dur-1), background var(--dur-1), box-shadow var(--dur-1);
 }
 .nav__lang-opt:hover{ color:var(--text); background:rgba(255,255,255,.05); }
+/* The accent never sits on its own tint: the selected segment is marked by
+   the accent FILL and the accent ring, and its label goes to --text. Accent
+   on an accent-tinted face was the lowest contrast in the sheet (4.14:1),
+   and it was on the controls that say which state you are in. */
 .nav__lang-opt.is-active{
-  color:var(--acc);
+  color:var(--text);
   background:rgba(var(--acc-rgb),.12);
-  box-shadow:inset 0 0 0 1px rgba(var(--acc-rgb),.35);
+  box-shadow:inset 0 0 0 var(--hair) rgba(var(--acc-rgb),.35);
 }
 
 /* ================================================================
@@ -767,35 +1066,35 @@ section{
   display:flex;
   flex-wrap:wrap;
   align-items:baseline;
-  gap:5px 18px;
+  gap:var(--s-2) 18px;
   margin:0 0 18px;
   font-family:var(--mono);
-  font-size:10.5px;
-  letter-spacing:.18em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-sm);
   text-transform:uppercase;
   color:var(--text-dim);
 }
 .section__doc > span{
-  display:inline-flex; align-items:baseline; gap:6px;
+  display:inline-flex; align-items:baseline; gap:var(--s-2);
   min-width:0;
   overflow-wrap:anywhere;
 }
-.section__doc b{ color:var(--text); font-weight:400; letter-spacing:.14em; }
+.section__doc b{ color:var(--text); font-weight:400; letter-spacing:var(--tr-chrome-md); }
 /* the qualifiers — sub-album, featured, collection, active tag filter — are
    marks on the line, not stamps: a hairline outline and the accent colour,
    no dashed "sticker" border and no shouting */
 .section__doc-mark{
   color:var(--label);
-  border:1px solid rgba(var(--label-rgb),.35);
-  padding:3px 8px;
-  font-size:9.5px;
+  border:var(--hair) solid rgba(var(--label-rgb),.35);
+  padding:var(--s-1) var(--s-3);
+  font-size:var(--fs-chrome-xs);
   letter-spacing:.2em;
 }
 .section__doc-mark.is-original{ color:var(--ok); border-color:rgba(var(--ok-rgb),.4); }
 .section__doc-in{ color:var(--text-ghost); }
 
 .section__head{
-  margin-bottom:24px;
+  margin-bottom:var(--s-6);
 }
 .section__slug{
   display:flex; align-items:baseline; gap:14px;
@@ -812,7 +1111,7 @@ section{
      under it and read as a different site's headline. */
   font-size:clamp(22px, 2.7vw, 33px);
   font-weight:700;
-  letter-spacing:.03em;
+  letter-spacing:var(--tr-title);
   line-height:1.06;
   word-break:break-word;
   /* Weight instead of colour: the title fades from white at the cap line
@@ -847,17 +1146,17 @@ section{
 .search-group{ margin:0 0 34px; padding:0; }
 .search-group__label{
   display:flex; align-items:baseline; gap:10px;
-  margin:0 0 12px; padding-bottom:8px;
-  border-bottom:1px solid var(--line);
+  margin:0 0 var(--s-4); padding-bottom:var(--s-3);
+  border-bottom:var(--hair) solid var(--line);
   font-family:var(--mono);
-  font-size:11px; font-weight:400; letter-spacing:.24em;
+  font-size:var(--fs-chrome-sm); font-weight:400; letter-spacing:var(--tr-chrome-xs);
   text-transform:uppercase;
   color:var(--label);
 }
 .search-group__label i{ color:var(--text-ghost); }
 .search-group__n{
   margin-left:auto;
-  font-size:10px; letter-spacing:.18em; color:var(--text-dim);
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-sm); color:var(--text-dim);
 }
 /* the photo half is capped (SEARCH_PHOTO_LIMIT); say so under the grid
    instead of silently showing a truncated result */
@@ -866,13 +1165,13 @@ section{
    viewport now that the pathbar "‹ Back to <parent>" button is always shown —
    the inline link would just duplicate it. */
 .section__slug .section__parent{
-  display:none; align-items:center; gap:6px;
+  display:none; align-items:center; gap:var(--s-2);
   align-self:center;
   font-family:var(--mono);
-  font-size:13px;
-  letter-spacing:.04em;
+  font-size:var(--fs-chrome-lg);
+  letter-spacing:var(--tr-chrome-xl);
   color:var(--text-dim);
-  transition: color .15s;
+  transition: color var(--dur-1);
 }
 .section__slug .section__parent:hover{ color:var(--acc); }
 .section__parent-ico{
@@ -880,14 +1179,14 @@ section{
   font-size:14px;
   line-height:1;
 }
-.section__parent-name{ border-bottom:1px solid transparent; padding-bottom:1px; }
+.section__parent-name{ border-bottom:var(--hair) solid transparent; padding-bottom:1px; }
 .section__parent:hover .section__parent-name{ border-bottom-color:currentColor; }
 .section__parent-slash{ color:var(--text-ghost); }
 
 .crumb{
-  font-size:13px;
+  font-size:var(--fs-text-md);
   color:var(--text-ghost);
-  display:flex; align-items:center; gap:7px;
+  display:flex; align-items:center; gap:var(--s-3);
   /* wrap to a new line instead of overflowing when the trail is long */
   flex-wrap:wrap;
   margin-bottom:18px;
@@ -898,9 +1197,9 @@ section{
   color:var(--acc);
   text-decoration:underline;
   text-decoration-color:rgba(var(--acc-rgb),.45);
-  text-underline-offset:3px;
-  padding:2px 0;
-  transition:color .15s, text-decoration-color .15s;
+  text-underline-offset:var(--s-1);
+  padding:var(--s-0) 0;
+  transition:color var(--dur-1), text-decoration-color var(--dur-1);
 }
 .crumb a:hover{ color:var(--acc); text-decoration-color:var(--acc); }
 .crumb b{ color:var(--text); font-weight:500; }
@@ -930,7 +1229,7 @@ section{
 .album-ico--lg{ width:1.15em; height:1.15em; }
 /* mark and label are one flex item (.crumb__seg) so they stay glued
    together while the trail's own gap keeps its distance to the `/`. */
-.crumb__seg{ display:inline-flex; align-items:center; gap:5px; min-width:0; }
+.crumb__seg{ display:inline-flex; align-items:center; gap:var(--s-2); min-width:0; }
 .crumb__ico{ flex:0 0 auto; width:1.35em; height:1.35em; margin-right:0; }
 
 /* ---- route line: back link, then the trail beside it. It used to be a
@@ -941,7 +1240,7 @@ section{
    like a button to do it. */
 .pathbar{
   display:flex; flex-flow:row wrap; align-items:center;
-  gap:6px 14px; margin-bottom:20px; min-width:0;
+  gap:var(--s-2) 14px; margin-bottom:20px; min-width:0;
 }
 /* the trail's own pane. `fit-content` (not `100%`) is what makes it hug the
    path: the row is a flex line, so once the trail wraps onto a line of its
@@ -953,8 +1252,8 @@ section{
   width:fit-content;
   max-width:100%;
   min-width:0;
-  padding:6px 12px;
-  border:1px solid var(--line);
+  padding:var(--s-2) var(--s-4);
+  border:var(--hair) solid var(--line);
   background:var(--glass);
   backdrop-filter:var(--glass-blur);
   -webkit-backdrop-filter:var(--glass-blur);
@@ -962,16 +1261,16 @@ section{
 .pathbar__back{
   display:inline-flex;
   align-items:center;
-  gap:8px;
+  gap:var(--s-3);
   flex:0 0 auto;
   max-width:100%;
   min-height:40px;
-  padding:8px 0;
+  padding:var(--s-3) 0;
   color:var(--acc);
-  font-size:13.5px;
+  font-size:var(--fs-text-md);
   font-weight:500;
   line-height:1;
-  transition:color .15s;
+  transition:color var(--dur-1);
 }
 /* Gated on a real hovering pointer, and this one matters more than most:
    the back button is the single control on the site a phone visitor reaches
@@ -1004,15 +1303,15 @@ section{
        ends up being. */
     align-self:stretch;
     min-height:0;
-    padding:6px 12px;
-    gap:7px;
-    font-size:12.5px;
+    padding:var(--s-2) var(--s-4);
+    gap:var(--s-3);
+    font-size:var(--fs-text-md);
     line-height:1.5;
-    border:1px solid var(--line);
+    border:var(--hair) solid var(--line);
     background:var(--glass);
     backdrop-filter:var(--glass-blur);
     -webkit-backdrop-filter:var(--glass-blur);
-    transition:color .15s, border-color .15s, background .15s;
+    transition:color var(--dur-1), border-color var(--dur-1), background var(--dur-1);
   }
   /* the parent's name alone carries it; "Back to" would double the width */
   .pathbar__back .pathbar__back-lbl{ display:none; }
@@ -1020,7 +1319,7 @@ section{
   .pathbar__back:hover .pathbar__back-txt{ text-decoration:none; }
 }
 @media (hover: hover){
-  .pathbar__back:hover .pathbar__back-txt{ text-decoration:underline; text-underline-offset:3px; }
+  .pathbar__back:hover .pathbar__back-txt{ text-decoration:underline; text-underline-offset:var(--s-1); }
 }
 /* a square flex box, so the chevron is centred by layout rather than by the
    glyph's bearing inside its em box — that left it visibly high on phones,
@@ -1060,21 +1359,21 @@ section{
 /* dark chip (same recipe as .fhero__chip) so the tag reads on any cover */
 .album-hero__kicker{
   align-self:flex-start;
-  padding:3px 8px;
-  border:1px solid var(--line-strong);
+  padding:var(--s-1) var(--s-3);
+  border:var(--hair) solid var(--line-strong);
   background:var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
   font-family:inherit;
-  font-size:12px; letter-spacing:.01em;
+  font-size:var(--fs-text-sm); letter-spacing:var(--tr-text);
   color:var(--label);
 }
 .album-hero__title{
   margin:0;
-  display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+  display:flex; align-items:baseline; gap:var(--s-4); flex-wrap:wrap;
   font-family:"Space Grotesk", sans-serif;
   font-size:30px; font-weight:700; line-height:1.02;
-  letter-spacing:.01em; color:var(--text);
+  letter-spacing:var(--tr-text); color:var(--text);
   min-width:0; overflow-wrap:anywhere;
 }
 /* the album's mark leading its hero title — a flex item here (the title is
@@ -1088,7 +1387,7 @@ section{
 }
 .album-hero__jp{
   font-family:"Noto Sans JP", sans-serif;
-  font-size:13px; font-weight:400;
+  font-size:var(--fs-chrome-lg); font-weight:400;
   letter-spacing:.3em;
   color:var(--text-dim);
 }
@@ -1099,9 +1398,9 @@ section{
   .album-hero__jp--deco{ display:none; }
 }
 .album-hero__facts{
-  display:flex; flex-wrap:wrap; gap:3px 14px;
+  display:flex; flex-wrap:wrap; gap:var(--s-1) 14px;
   font-family:inherit;
-  font-size:12px; letter-spacing:.01em;
+  font-size:var(--fs-text-sm); letter-spacing:var(--tr-text);
   font-variant-numeric:tabular-nums;
   color:var(--text-dim);
 }
@@ -1111,15 +1410,15 @@ section{
    text this small needs the backdrop under ~.15 luminance to stay readable,
    and the shade can't guarantee that this far up the frame without blacking
    out the picture (the same reason the old facts line never worked here). */
-.album-hero__tags{ display:flex; flex-wrap:wrap; gap:5px; }
+.album-hero__tags{ display:flex; flex-wrap:wrap; gap:var(--s-2); }
 .album-hero__tag{
-  padding:2px 7px;
-  border:1px solid var(--line-strong);
+  padding:var(--s-0) var(--s-3);
+  border:var(--hair) solid var(--line-strong);
   background:var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
   font-family:inherit;
-  font-size:12px; letter-spacing:.01em;
+  font-size:var(--fs-text-sm); letter-spacing:var(--tr-text);
   /* --text, not --text-dim: dim only clears ~2.4:1 against the brightest
      slides even through the chip, where --text lands ~4.7:1 */
   color:var(--text);
@@ -1131,8 +1430,8 @@ section{
     display:flex; flex-direction:column; justify-content:flex-end;
     aspect-ratio:3/2;
     max-height:58vh;
-    margin:0 0 16px;
-    border:1px solid var(--line-strong);
+    margin:0 0 var(--s-5);
+    border:var(--hair) solid var(--line-strong);
     background:#050505;
     overflow:hidden;
     isolation:isolate;
@@ -1155,8 +1454,8 @@ section{
   }
   .album-hero__body{
     position:relative; z-index:2;
-    display:flex; flex-direction:column; gap:7px;
-    padding:0 16px 15px;
+    display:flex; flex-direction:column; gap:var(--s-3);
+    padding:0 var(--s-5) var(--s-5);
     min-width:0;
     text-shadow:0 1px 8px rgba(0,0,0,.6);
   }
@@ -1167,7 +1466,7 @@ section{
      status bar STAYS on every viewport — it reads as the module's system
      line docked on top of the hero (see .has-album-hero .section__doc in
      the hero-reel section). */
-  .has-album-hero .pathbar{ margin-bottom:12px; }
+  .has-album-hero .pathbar{ margin-bottom:var(--s-4); }
   .has-album-hero .section__head{ display:none; }
 }
 @media (max-width:480px){
@@ -1181,21 +1480,21 @@ section{
    TAGS
    ================================================================ */
 .tag-bar{
-  display:flex; flex-wrap:wrap; gap:6px;
+  display:flex; flex-wrap:wrap; gap:var(--s-2);
   margin-bottom:18px;
 }
 .tag{
   font-family:var(--mono);
-  font-size:10.5px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing:.16em;
   text-transform:uppercase;
   color:var(--text-dim);
-  padding:5px 10px;
-  border:1px solid var(--line);
+  padding:var(--s-2) 10px;
+  border:var(--hair) solid var(--line);
   background:var(--glass);
   backdrop-filter:var(--glass-blur);
   -webkit-backdrop-filter:var(--glass-blur);
-  transition: border-color .15s, color .15s, background .15s;
+  transition: border-color var(--dur-1), color var(--dur-1), background var(--dur-1);
 }
 .tag:hover{
   color:var(--text);
@@ -1203,11 +1502,11 @@ section{
   background:var(--glass-hi);
 }
 .tag.active{
-  color:var(--bg);
+  color:var(--on-acc);
   background:var(--acc);
   border-color:var(--acc);
 }
-.tag.active:hover{ color:var(--bg); background:var(--acc); }
+.tag.active:hover{ color:var(--on-acc); background:var(--acc); }
 
 /* ================================================================
    FEATURED STRIP (in-album showcased photos)
@@ -1242,7 +1541,7 @@ section{
   overflow:hidden;
   isolation:isolate;
   background:#050505;
-  border:1px solid var(--line-strong);
+  border:var(--hair) solid var(--line-strong);
   width:100%;
   max-width:1280px;
   margin-inline:0;
@@ -1271,7 +1570,7 @@ section{
 .fhero__slide.is-on:nth-child(even) img{ animation-name: vf-drift-b; }
 .fx-lite .fhero__slide img{ animation:none !important; transform:none; }
 @media (prefers-reduced-motion: reduce){
-  .fhero__slide{ transition:opacity .2s linear; }
+  .fhero__slide{ transition:opacity var(--dur-2) linear; }
   .fhero__slide img{ animation:none !important; transform:none; }
 }
 /* legibility shade: darken the top chips row and the control bar zone */
@@ -1282,16 +1581,16 @@ section{
     rgba(0,0,0,.42) 0%, transparent 22%, transparent 55%, rgba(0,0,0,.78) 100%);
 }
 .fhero__chip{
-  position:absolute; top:12px; z-index:4;
+  position:absolute; top:var(--s-4); z-index:4;
   font-family:inherit;
-  font-size:12px;
+  font-size:var(--fs-chrome-md);
   letter-spacing:.2em;
   color:var(--text);
   background:var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
-  border:1px solid var(--line-strong);
-  padding:3px 8px;
+  border:var(--hair) solid var(--line-strong);
+  padding:var(--s-1) var(--s-3);
   pointer-events:none;
 }
 .fhero__chip--star{
@@ -1313,9 +1612,9 @@ section{
   background:var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
-  border:1px solid var(--line);
-  padding:6px 10px;
-  transition:border-color .15s, background .15s;
+  border:var(--hair) solid var(--line);
+  padding:var(--s-2) 10px;
+  transition:border-color var(--dur-1), background var(--dur-1);
 }
 .fhero__file:hover{
   border-color:var(--chrome);
@@ -1323,14 +1622,14 @@ section{
   color:var(--text);
 }
 .fhero__file-name{
-  font-size:11px;
-  letter-spacing:.06em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-num);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   min-width:0;
 }
 .fhero__file-open{
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
   color:var(--label);
   white-space:nowrap;
 }
@@ -1338,22 +1637,22 @@ section{
 .fhero__bar{
   position:absolute; left:0; right:0; bottom:0; z-index:5;
   display:flex; align-items:center; gap:10px;
-  padding:9px 12px 10px;
-  border-top:1px solid rgba(255,255,255,.1);
+  padding:var(--s-3) var(--s-4) 10px;
+  border-top:var(--hair) solid rgba(255,255,255,.1);
   background:linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.7));
-  backdrop-filter:blur(8px) saturate(120%);
-  -webkit-backdrop-filter:blur(8px) saturate(120%);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
 }
 .fhero__nav{
   font-family:inherit;
-  font-size:13px;
+  font-size:var(--fs-text-md);
   line-height:1.2;
-  padding:3px 10px;
+  padding:var(--s-1) 10px;
   background:transparent;
-  border:1px solid var(--line-strong);
+  border:var(--hair) solid var(--line-strong);
   color:var(--text-dim);
   cursor:pointer;
-  transition:color .15s, border-color .15s, background .15s, scale .14s ease;
+  transition:color var(--dur-1), border-color var(--dur-1), background var(--dur-1), scale var(--dur-1) ease;
 }
 .fhero__nav:hover{
   color:var(--chrome);
@@ -1362,10 +1661,10 @@ section{
 }
 .fhero__nav:focus-visible,
 .fhero__seg:focus-visible{
-  outline:1px solid var(--acc);
+  outline:var(--hair) solid var(--acc);
   outline-offset:2px;
 }
-.fhero__track{ flex:1; display:flex; gap:6px; min-width:0; }
+.fhero__track{ flex:1; display:flex; gap:var(--s-2); min-width:0; }
 .fhero__seg{
   flex:1 1 0;
   min-width:6px;
@@ -1381,7 +1680,7 @@ section{
   position:absolute; left:0; right:0; top:50%; height:3px;
   transform:translateY(-50%);
   background:rgba(255,255,255,.16);
-  transition:background .2s;
+  transition:background var(--dur-2);
 }
 .fhero__seg:hover::before{ background:rgba(255,255,255,.34); }
 .fhero__seg::after{            /* fill */
@@ -1417,10 +1716,10 @@ section{
 @media (max-width:760px){
   .fhero{ margin-bottom:22px; }
   .fhero__frame{ aspect-ratio:3/2; min-height:220px; max-height:60vh; }
-  .fhero__bar{ padding:8px 10px 9px; gap:8px; }
-  .fhero__file{ left:10px; bottom:46px; padding:5px 8px; gap:8px; }
-  .fhero__file-name{ font-size:12px; }
-  .fhero__chip{ font-size:12px; padding:2px 6px; }
+  .fhero__bar{ padding:var(--s-3) 10px var(--s-3); gap:var(--s-3); }
+  .fhero__file{ left:10px; bottom:46px; padding:var(--s-2) var(--s-3); gap:var(--s-3); }
+  .fhero__file-name{ font-size:var(--fs-text-sm); }
+  .fhero__chip{ font-size:var(--fs-chrome-md); padding:var(--s-0) var(--s-2); }
   .fhero__chip--star{ left:10px; }
   .fhero__chip--frm{ right:10px; }
 }
@@ -1433,7 +1732,7 @@ section{
 .fhero__ov{
   position:absolute; left:14px; right:14px; bottom:50px;
   z-index:4;
-  display:flex; flex-direction:column; gap:7px;
+  display:flex; flex-direction:column; gap:var(--s-3);
   min-width:0;
   pointer-events:none;   /* clicks fall through to the slide link */
   text-shadow:0 1px 8px rgba(0,0,0,.6);
@@ -1443,11 +1742,11 @@ section{
 /* a little air between the status bar and the hero on every album — it used
    to dock flush onto the hero; the small gap (base border kept, so it stays a
    closed panel) reads cleaner */
-.has-album-hero .section__doc{ margin-bottom:12px; }
+.has-album-hero .section__doc{ margin-bottom:var(--s-4); }
 /* the filename chip clears the overlay corner: top-center on wide screens
    (between the mode and FRM chips), off on phones — the slide itself links */
 .fhero--hero .fhero__file{
-  bottom:auto; top:12px;
+  bottom:auto; top:var(--s-4);
   left:50%; transform:translateX(-50%);
   max-width:44%;
 }
@@ -1488,25 +1787,25 @@ section{
 }
 @media (max-width:760px){
   .fhero--hero .fhero__file{ display:none; }
-  .fhero__ov{ left:11px; right:11px; bottom:46px; gap:6px; }
-  .fhero--single .fhero__ov{ bottom:12px; }
+  .fhero__ov{ left:var(--s-4); right:var(--s-4); bottom:46px; gap:var(--s-2); }
+  .fhero--single .fhero__ov{ bottom:var(--s-4); }
 }
 
 /* showcase / folder badge on album + showcase cards */
 .album-card__badge{
   position:absolute;
-  top:8px; right:8px;
+  top:var(--s-3); right:var(--s-3);
   z-index:3;
   font-family:var(--mono);
-  font-size:9px;
+  font-size:var(--fs-chrome-xs);
   letter-spacing:.22em;
   text-transform:uppercase;
   color:var(--label);
   background: var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
-  border:1px solid var(--label);
-  padding:3px 7px;
+  border:var(--hair) solid var(--label);
+  padding:var(--s-1) var(--s-3);
   pointer-events:none;
 }
 
@@ -1517,25 +1816,25 @@ section{
    `margin:0 auto` (which, inside the welcome intro's flex column, shrink-
    wrapped + centred the box). margin:0 keeps it full-width & left-aligned
    with the doc bar / album grid / intro text. */
-.showcase{ margin:0 0 32px; padding:0; }
+.showcase{ margin:0 0 var(--s-7); padding:0; }
 .showcase__head{
   display:flex; align-items:center; gap:10px;
   margin-bottom:14px;
-  padding-bottom:8px;
-  border-bottom:1px dashed var(--line);
+  padding-bottom:var(--s-3);
+  border-bottom:var(--hair) dashed var(--line);
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
   color:var(--text-ghost);
 }
-.showcase__label{ color:var(--label); letter-spacing:.01em; }
+.showcase__label{ color:var(--label); letter-spacing:var(--tr-text); }
 .showcase__more{
   margin-left:auto;
   color:var(--text-dim);
   letter-spacing:.2em;
-  border:1px solid var(--line);
-  padding:3px 9px;
-  transition: color .15s, border-color .15s, background .15s;
+  border:var(--hair) solid var(--line);
+  padding:var(--s-1) var(--s-3);
+  transition: color var(--dur-1), border-color var(--dur-1), background var(--dur-1);
 }
 .showcase__more:hover{
   color:var(--chrome);
@@ -1549,12 +1848,12 @@ section{
 
 /* showcase indicator on individual photo tiles */
 .image-tile--showcase a{
-  outline: 1px solid rgba(var(--acc-rgb),.5);
+  outline: var(--hair) solid rgba(var(--acc-rgb),.5);
   outline-offset: -2px;
 }
 .image-tile__star{
   position:absolute;
-  top:6px; left:6px;
+  top:var(--s-2); left:var(--s-2);
   z-index:3;
   width:22px; height:22px;
   display:flex; align-items:center; justify-content:center;
@@ -1564,7 +1863,7 @@ section{
   background: var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
-  border:1px solid var(--acc);
+  border:var(--hair) solid var(--acc);
   border-radius:var(--radius);
   pointer-events:none;
   text-shadow: 0 0 6px rgba(var(--acc-rgb),.6);
@@ -1577,7 +1876,7 @@ section{
   display:flex;
   align-items:flex-start;
   justify-content:space-between;
-  gap:12px;
+  gap:var(--s-4);
   margin-bottom:18px;
   flex-wrap:wrap;
 }
@@ -1600,16 +1899,16 @@ section{
   background:var(--glass);
   backdrop-filter:var(--glass-blur);
   -webkit-backdrop-filter:var(--glass-blur);
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
   color:var(--text-dim);
   font-family:var(--mono);
-  font-size:10.5px;
-  letter-spacing:.18em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-sm);
   text-transform:uppercase;
-  padding:7px 12px;
+  padding:var(--s-3) var(--s-4);
   cursor:pointer;
-  display:inline-flex; align-items:center; gap:8px;
-  transition: color .15s, border-color .15s, background .15s;
+  display:inline-flex; align-items:center; gap:var(--s-3);
+  transition: color var(--dur-1), border-color var(--dur-1), background var(--dur-1);
 }
 /* the button reads as one sentence — MARK · "SORT BY" · the current order —
    with the caret pushed to the far edge. Only the value may lose width, so
@@ -1637,36 +1936,40 @@ section{
   top:calc(100% + 4px);
   right:0;
   min-width:240px;
-  background:rgba(0,0,0,.96);
-  border:1px solid var(--line-strong);
-  box-shadow: 0 18px 44px rgba(0,0,0,.55);
-  padding:4px 0;
+  /* --overlay, the sixth surface: a menu has to read over ANY content
+     underneath it, so it is the one step that goes opaque when the blur
+     goes. It used to be a hand-typed fill with its own blur, which is
+     exactly the hole rule 3 grew --pane and --overlay to close. */
+  background-color:var(--overlay);
+  border:var(--hair) solid var(--line-strong);
+  box-shadow:var(--shadow-2);
+  padding:var(--s-1) 0;
   z-index:40;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter:var(--overlay-blur);
+  -webkit-backdrop-filter:var(--overlay-blur);
 }
 .sort__menu[hidden]{ display:none; }
 .sort__head{
-  padding:8px 14px 6px;
+  padding:var(--s-3) 14px var(--s-2);
   font-family:var(--mono);
-  font-size:9.5px;
-  letter-spacing:.24em;
+  font-size:var(--fs-chrome-xs);
+  letter-spacing:var(--tr-chrome-xs);
   text-transform:uppercase;
   color:var(--text-ghost);
-  border-bottom:1px solid var(--line);
-  margin-bottom:4px;
+  border-bottom:var(--hair) solid var(--line);
+  margin-bottom:var(--s-1);
 }
 .sort__option{
-  display:flex; align-items:center; gap:8px;
-  padding:9px 14px;
+  display:flex; align-items:center; gap:var(--s-3);
+  padding:var(--s-3) 14px;
   font-family:var(--mono);
-  font-size:11px;
-  letter-spacing:.14em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-md);
   text-transform:uppercase;
   color:var(--text-dim);
   cursor:pointer;
   border-left:2px solid transparent;
-  transition: color .15s, background .15s, border-color .15s;
+  transition: color var(--dur-1), background var(--dur-1), border-color var(--dur-1);
   text-decoration:none;
   white-space:nowrap;
 }
@@ -1675,8 +1978,11 @@ section{
   background:rgba(var(--chrome-rgb),.06);
   border-left-color:var(--chrome);
 }
+/* The open row is marked on its LEADING EDGE and by the tint under it; the
+   label itself is --text. Accent text on an accent tint is the one pairing
+   rule 1 forbids outright. */
 .sort__option.is-active{
-  color:var(--acc);
+  color:var(--text);
   background:rgba(var(--acc-rgb),.08);
   border-left-color:var(--acc);
   font-weight:600;
@@ -1689,7 +1995,7 @@ section{
   z-index:200;
   opacity:0;
   pointer-events:none;
-  transition: opacity .2s ease;
+  transition: opacity var(--dur-2) ease;
 }
 .sort__backdrop.is-open{ opacity:1; pointer-events:auto; }
 
@@ -1700,7 +2006,7 @@ section{
   .sort__btn{
     width:100%;
     padding:10px 14px;
-    font-size:11px;
+    font-size:var(--fs-chrome-md);
   }
   .sort__menu{
     position:fixed;
@@ -1711,22 +2017,22 @@ section{
     min-width:0;
     width:100%;
     margin:0;
-    padding:6px 0 max(env(safe-area-inset-bottom, 0px), 10px);
+    padding:var(--s-2) 0 max(env(safe-area-inset-bottom, 0px), 10px);
     border-bottom:0;
     border-left:0;
     border-right:0;
-    border-top:1px solid var(--acc);
+    border-top:var(--hair) solid var(--acc);
     box-shadow: 0 -22px 60px rgba(0,0,0,.65);
     z-index:300;
     animation: sort-sheet-in .22s ease;
   }
   .sort__head{
     padding:14px 18px 10px;
-    font-size:10px;
+    font-size:var(--fs-chrome-sm);
   }
   .sort__option{
     padding:14px 18px;
-    font-size:12px;
+    font-size:var(--fs-chrome-md);
     letter-spacing:.12em;
   }
   /* and back down the way it came — sortCloseMenu() holds the node for the
@@ -1753,7 +2059,7 @@ section{
    (pathbar, doc bar, title row, featured bar). Each carried margins meant
    for pages where it is the only header, so the stack ate the top third of
    the viewport. Tightened here only — every other page keeps the default. */
-.page-albums .pathbar{ margin-bottom:13px; }
+.page-albums .pathbar{ margin-bottom:var(--s-4); }
 .page-albums .section__doc{ margin-bottom:10px; }
 .page-albums .section__head{ margin-bottom:18px; }
 
@@ -1763,18 +2069,18 @@ section{
    the same mono/tracked face as the section labels below them, so the header
    hands off to the chrome instead of switching typeface halfway down. */
 .section__stat{
-  margin:9px 0 0;
+  margin:var(--s-3) 0 0;
   font-family:var(--mono);
-  font-size:10.5px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing:.2em;
   text-transform:uppercase;
   color:var(--text-ghost);
 }
 .section__stat b{ color:var(--label); font-weight:400; }
-.section__stat-sep{ margin:0 6px; opacity:.6; }
+.section__stat-sep{ margin:0 var(--s-2); opacity:.6; }
 /* the search query is the user's own text, not a label — the subline's
    uppercase must not restyle it (same rule as the album name in the title) */
-.section__stat-q{ color:var(--text); text-transform:none; letter-spacing:.06em; }
+.section__stat-q{ color:var(--text); text-transform:none; letter-spacing:var(--tr-num); }
 
 /* ---- featured rail: showcase albums as large poster cards. Nested
    <section>: cancel the global section padding/centring (same trick
@@ -1788,11 +2094,11 @@ section{
    filled strip. */
 .feat__head{
   display:flex; align-items:baseline; gap:14px;
-  margin-bottom:13px;
-  padding-bottom:8px;
-  border-bottom:1px solid var(--line);
+  margin-bottom:var(--s-4);
+  padding-bottom:var(--s-3);
+  border-bottom:var(--hair) solid var(--line);
   font-family:var(--mono);
-  font-size:10.5px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing:.22em;
   text-transform:uppercase;
   color:var(--text-ghost);
@@ -1800,9 +2106,9 @@ section{
 .feat__label{
   margin:0;
   font-family:inherit;
-  font-size:11px;
+  font-size:var(--fs-chrome-sm);
   font-weight:400;
-  letter-spacing:.24em;
+  letter-spacing:var(--tr-chrome-xs);
   color:var(--label);
 }
 .feat__count{ margin-left:auto; }
@@ -1818,9 +2124,9 @@ section{
   position:relative;
   margin:0;
   background:var(--surface);
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
   /* scale: see the note on .album-card */
-  transition: border-color .2s, transform .2s ease, scale .2s ease;
+  transition: border-color var(--dur-2), transform var(--dur-2) ease, scale var(--dur-2) ease;
 }
 .feat-card:hover{ border-color:var(--line-strong); transform:translateY(-2px); }
 /* corner brackets — same hover signature as .album-card */
@@ -1829,11 +2135,11 @@ section{
   content:"";
   position:absolute;
   width:16px; height:16px;
-  border:1px solid var(--chrome);
+  border:var(--hair) solid var(--chrome);
   opacity:0;
   pointer-events:none;
   z-index:5;
-  transition: opacity .2s ease;
+  transition: opacity var(--dur-2) ease;
 }
 .feat-card::before{ top:-1px; left:-1px; border-right:0; border-bottom:0; }
 .feat-card::after{ bottom:-1px; right:-1px; border-left:0; border-top:0; }
@@ -1843,7 +2149,7 @@ section{
 .feat-card:focus-within::after{ opacity:1; }
 .feat-card a{ display:block; color:var(--text); }
 .feat-card a:hover{ color:var(--text); }
-.feat-card a:focus-visible{ outline:1px solid var(--acc); outline-offset:-2px; }
+.feat-card a:focus-visible{ outline:var(--hair) solid var(--acc); outline-offset:-2px; }
 .feat-card__img{
   position:relative;
   aspect-ratio:16/9;
@@ -1861,7 +2167,7 @@ section{
   object-fit:cover;
   display:block;
   filter:saturate(.94) brightness(.88);
-  transition: transform .5s ease, filter .35s ease;
+  transition: transform .5s ease, filter var(--dur-3) ease;
 }
 .feat-card:hover .feat-card__img > img{
   transform:scale(1.04);
@@ -1879,50 +2185,50 @@ section{
   top:10px; left:10px;
   z-index:3;
   font-family:var(--mono);
-  font-size:9px;
+  font-size:var(--fs-chrome-xs);
   letter-spacing:.2em;
   color:var(--text);
   background:var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
-  border:1px solid var(--line-strong);
-  padding:2px 6px;
+  border:var(--hair) solid var(--line-strong);
+  padding:var(--s-0) var(--s-2);
   pointer-events:none;
 }
 .feat-card__cap{
   position:absolute;
   left:0; right:0; bottom:0;
   z-index:2;
-  padding:16px 16px 15px;
-  display:flex; flex-direction:column; gap:5px;
+  padding:var(--s-5) var(--s-5) var(--s-5);
+  display:flex; flex-direction:column; gap:var(--s-2);
   pointer-events:none;
 }
 .feat-card__name{
   font-size:clamp(16px, 1.6vw, 19px);
   font-weight:600;
-  letter-spacing:.03em;
+  letter-spacing:var(--tr-title);
   line-height:1.2;
   word-break:break-word;
   text-shadow:0 1px 10px rgba(0,0,0,.6);
 }
 .feat-card__meta{
   font-family:var(--mono);
-  font-size:10px;
-  letter-spacing:.18em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-sm);
   text-transform:uppercase;
   color:var(--label);
   text-shadow:0 1px 6px rgba(0,0,0,.7);
 }
 .feat-card__cta{
   font-family:var(--mono);
-  font-size:9.5px;
+  font-size:var(--fs-chrome-xs);
   letter-spacing:.22em;
   text-transform:uppercase;
   color:var(--text);
   opacity:0;
   max-height:0;
   transform:translateY(4px);
-  transition: opacity .2s ease, transform .2s ease, max-height .2s ease;
+  transition: opacity var(--dur-2) ease, transform var(--dur-2) ease, max-height var(--dur-2) ease;
 }
 .feat-card:hover .feat-card__cta,
 .feat-card a:focus-visible .feat-card__cta{
@@ -1953,9 +2259,9 @@ section{
   .feat-card{ scroll-snap-align:start; }
   .feat-card:hover{ transform:none; }
   .feat-card__img{ aspect-ratio:3/2; max-height:none; }
-  .feat-card__cap{ padding:12px; gap:4px; }
-  .feat-card__name{ font-size:15px; }
-  .feat-card__meta{ font-size:9px; letter-spacing:.14em; }
+  .feat-card__cap{ padding:var(--s-4); gap:var(--s-1); }
+  .feat-card__name{ font-size:var(--fs-text-lg); }
+  .feat-card__meta{ font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-md); }
   .feat-card__cta{ display:none; }
 }
 
@@ -1963,11 +2269,11 @@ section{
 .archive-head{
   display:flex; align-items:center; gap:10px 14px;
   flex-wrap:wrap;
-  margin-bottom:13px;
-  padding-bottom:8px;
-  border-bottom:1px solid var(--line);
+  margin-bottom:var(--s-4);
+  padding-bottom:var(--s-3);
+  border-bottom:var(--hair) solid var(--line);
   font-family:var(--mono);
-  font-size:10.5px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing:.22em;
   text-transform:uppercase;
   color:var(--text-ghost);
@@ -1975,9 +2281,9 @@ section{
 .archive-head__label{
   margin:0;
   font-family:inherit;
-  font-size:11px;
+  font-size:var(--fs-chrome-sm);
   font-weight:400;
-  letter-spacing:.24em;
+  letter-spacing:var(--tr-chrome-xs);
   color:var(--label);
 }
 .archive-head .sort{ margin-left:auto; }
@@ -1993,7 +2299,7 @@ section{
 }
 .album-card{
   background:var(--surface);
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
   margin:0;
   position:relative;
   /* `scale` is in the list on purpose: the press feedback and the departure
@@ -2002,18 +2308,18 @@ section{
      listed here does not transition at all. Without it the card jumped to
      its pressed size in one frame while the ENTER overlay over it faded in
      over .2s — one gesture, two speeds, and the jump is the one you feel. */
-  transition: background .2s, border-color .2s, transform .2s ease, scale .2s ease;
+  transition: background var(--dur-2), border-color var(--dur-2), transform var(--dur-2) ease, scale var(--dur-2) ease;
 }
 .album-card::before,
 .album-card::after{
   content:"";
   position:absolute;
   width:14px; height:14px;
-  border:1px solid var(--chrome);
+  border:var(--hair) solid var(--chrome);
   opacity:0;
   pointer-events:none;
   z-index:5;
-  transition: opacity .2s ease;
+  transition: opacity var(--dur-2) ease;
 }
 .album-card::before{ top:-1px; left:-1px; border-right:0; border-bottom:0; }
 .album-card::after{ bottom:-1px; right:-1px; border-left:0; border-top:0; }
@@ -2033,7 +2339,7 @@ section{
 }
 .album-card a:hover{ color:var(--text); }
 .album-card a:focus-visible{
-  outline:1px solid var(--acc);
+  outline:var(--hair) solid var(--acc);
   outline-offset:-2px;
 }
 .album-card__img{
@@ -2046,7 +2352,7 @@ section{
   width:100%; height:100%;
   object-fit:cover;
   display:block;
-  transition: transform .35s ease, filter .35s ease;
+  transition: transform var(--dur-3) ease, filter var(--dur-3) ease;
   filter:saturate(.85) brightness(.9);
 }
 .album-card:hover .album-card__img img{
@@ -2060,17 +2366,17 @@ section{
 }
 .album-card__idx{
   position:absolute;
-  top:8px; left:8px;
+  top:var(--s-3); left:var(--s-3);
   z-index:3;
   font-family:var(--mono);
-  font-size:9px;
-  letter-spacing:.18em;
+  font-size:var(--fs-chrome-xs);
+  letter-spacing:var(--tr-chrome-sm);
   color:var(--text-dim);
   background: var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
-  border:1px solid var(--line);
-  padding:2px 6px;
+  border:var(--hair) solid var(--line);
+  padding:var(--s-0) var(--s-2);
   pointer-events:none;
 }
 .album-card__hover{
@@ -2080,22 +2386,22 @@ section{
   opacity:0;
   background:linear-gradient(to top,
     rgba(0,0,0,.5) 0%, rgba(0,0,0,.1) 45%, transparent 75%);
-  transition: opacity .2s ease;
+  transition: opacity var(--dur-2) ease;
   pointer-events:none;
 }
 .album-card__hover span{
   font-family:var(--mono);
-  font-size:10px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing:.28em;
   text-transform:uppercase;
   color:var(--chrome);
-  border:1px solid var(--chrome);
+  border:var(--hair) solid var(--chrome);
   background: var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
-  padding:8px 16px;
+  padding:var(--s-3) var(--s-5);
   transform:translateY(6px);
-  transition: transform .25s ease;
+  transition: transform var(--dur-2) ease;
 }
 .album-card:hover .album-card__hover,
 .album-card:focus-within .album-card__hover{ opacity:1; }
@@ -2111,19 +2417,19 @@ section{
   display:flex; align-items:center; justify-content:center;
   color:var(--text-ghost);
   font-family:var(--mono);
-  font-size:11px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing:.22em;
   text-transform:uppercase;
 }
 .album-card__cap{
-  padding:11px 13px 13px;
-  display:flex; flex-direction:column; gap:6px;
-  border-top:1px solid var(--line);
+  padding:var(--s-4) var(--s-4) var(--s-4);
+  display:flex; flex-direction:column; gap:var(--s-2);
+  border-top:var(--hair) solid var(--line);
 }
 .album-card__name{
-  font-size:14.5px;
+  font-size:var(--fs-text-lg);
   font-weight:600;
-  letter-spacing:.03em;
+  letter-spacing:var(--tr-title);
   line-height:1.25;
   color:var(--text);
   word-break:break-word;
@@ -2132,7 +2438,7 @@ section{
   display:flex; align-items:baseline; gap:10px;
   justify-content:space-between;
   font-family:var(--mono);
-  font-size:10px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing:.16em;
   color:var(--text-dim);
   text-transform:uppercase;
@@ -2161,18 +2467,18 @@ section{
    it, so the cards mis-align and resize vs the main albums view. */
 .sub-albums{ margin:0 0 30px; padding:0; }
 .sub-albums__head{
-  display:flex; align-items:baseline; gap:12px;
-  margin-bottom:12px; padding-bottom:8px;
-  border-bottom:1px solid var(--line);
+  display:flex; align-items:baseline; gap:var(--s-4);
+  margin-bottom:var(--s-4); padding-bottom:var(--s-3);
+  border-bottom:var(--hair) solid var(--line);
   font-family:var(--mono);
   text-transform:uppercase;
 }
 .sub-albums__head--photos{ margin-top:30px; }
 .sub-albums__label{
-  font-size:11px; letter-spacing:.24em; color:var(--label);
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-xs); color:var(--label);
 }
 .sub-albums__count{
-  font-size:10px; letter-spacing:.18em; color:var(--text-dim);
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-sm); color:var(--text-dim);
 }
 
 /* ---- curated group frames: `#label` markers in gallery.cfg album_order
@@ -2184,11 +2490,11 @@ section{
 }
 .album-group{
   position:relative;
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
   background:var(--glass);
   backdrop-filter:var(--glass-blur);
   -webkit-backdrop-filter:var(--glass-blur);
-  padding:12px 12px 14px;
+  padding:var(--s-4) var(--s-4) 14px;
   /* it's a nested <section>: undo the page-container margin (auto margins
      would also stop the flex column from stretching it) and width cap */
   margin:0;
@@ -2202,27 +2508,27 @@ section{
   content:"";
   position:absolute;
   width:14px; height:14px;
-  border:1px solid var(--chrome);
+  border:var(--hair) solid var(--chrome);
   opacity:.55;
   pointer-events:none;
 }
 .album-group::before{ top:-1px; left:-1px; border-right:0; border-bottom:0; }
 .album-group::after{ bottom:-1px; right:-1px; border-left:0; border-top:0; }
 .album-group__head{
-  display:flex; align-items:baseline; gap:8px 10px; flex-wrap:wrap;
-  margin-bottom:12px;
-  padding-bottom:8px;
-  border-bottom:1px solid var(--line);
+  display:flex; align-items:baseline; gap:var(--s-3) 10px; flex-wrap:wrap;
+  margin-bottom:var(--s-4);
+  padding-bottom:var(--s-3);
+  border-bottom:var(--hair) solid var(--line);
   font-family:var(--mono);
   text-transform:uppercase;
 }
 .album-group__name{
-  font-size:11px; letter-spacing:.24em;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-xs);
   color:var(--label);
 }
 .album-group__count{
   margin-left:auto;
-  font-size:9.5px; letter-spacing:.18em;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm);
   color:var(--text-ghost);
 }
 
@@ -2230,28 +2536,28 @@ section{
    archive on screen at once. This block lives AFTER the base grid/card
    rules on purpose: same specificity, so source order has to win. */
 @media (max-width:560px){
-  .album-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); gap:9px; }
+  .album-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); gap:var(--s-3); }
 
-  .album-card__cap{ padding:9px 10px 11px; gap:4px; }
-  .album-card__name{ font-size:12px; letter-spacing:.02em; }
-  .album-card__meta{ font-size:8.5px; letter-spacing:.1em; gap:6px; flex-wrap:wrap; }
-  .album-card__badge{ font-size:8px; padding:2px 5px; letter-spacing:.14em; }
-  .album-card__idx{ font-size:8px; padding:2px 5px; }
+  .album-card__cap{ padding:var(--s-3) 10px var(--s-4); gap:var(--s-1); }
+  .album-card__name{ font-size:var(--fs-text-sm); letter-spacing:.02em; }
+  .album-card__meta{ font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-lg); gap:var(--s-2); flex-wrap:wrap; }
+  .album-card__badge{ font-size:8px; padding:var(--s-0) var(--s-2); letter-spacing:var(--tr-chrome-md); }
+  .album-card__idx{ font-size:8px; padding:var(--s-0) var(--s-2); }
 
   .album-groups{ gap:14px; }
   /* the frame is back, so its inset has to come back down too — 12px of
      padding on each side of a 2-up phone grid is a whole card column */
-  .album-group{ padding:9px 8px 10px; }
-  .album-group__head{ margin-bottom:9px; }
+  .album-group{ padding:var(--s-3) var(--s-3) 10px; }
+  .album-group__head{ margin-bottom:var(--s-3); }
 
-  .day-groups{ gap:16px; }
-  .day-group{ padding-left:9px; }
-  .day-group__head{ margin-bottom:8px; gap:6px 8px; }
+  .day-groups{ gap:var(--s-5); }
+  .day-group{ padding-left:var(--s-3); }
+  .day-group__head{ margin-bottom:var(--s-3); gap:var(--s-2) var(--s-3); }
   .day-group__n,
-  .day-group__date{ font-size:10px; letter-spacing:.14em; }
+  .day-group__date{ font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-md); }
   .day-group__wd,
   .day-group__stop,
-  .day-group__count{ font-size:8.5px; letter-spacing:.12em; }
+  .day-group__count{ font-size:var(--fs-chrome-xs); letter-spacing:.12em; }
 }
 
 /* ================================================================
@@ -2274,7 +2580,7 @@ section{
 @media (min-width:1000px){
   .album-body--with-desc{
     grid-template-columns:minmax(0, 1fr) 340px;
-    gap:32px;
+    gap:var(--s-7);
     align-items:start;
   }
   .album-body--with-desc > .album-body__main{ grid-column:1; grid-row:1; }
@@ -2324,7 +2630,7 @@ section{
 @media (min-width:1000px){
   .album-top{
     grid-template-columns:minmax(0, 2.5fr) minmax(0, 1fr);
-    gap:32px;
+    gap:var(--s-7);
     align-items:start;   /* description keeps its natural (content) height */
   }
 }
@@ -2332,7 +2638,7 @@ section{
 .album-desc{
   display:flex; flex-direction:column;
   min-width:0;
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
   border-top:2px solid var(--acc);
   background:
     linear-gradient(180deg, rgba(var(--acc-rgb),.05), transparent 38%),
@@ -2341,20 +2647,20 @@ section{
 .album-desc__head{
   display:flex; align-items:center; justify-content:space-between; gap:10px;
   padding:10px 14px;
-  border-bottom:1px dashed var(--line);
+  border-bottom:var(--hair) dashed var(--line);
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
 }
-.album-desc__label{ color:var(--label); letter-spacing:.01em; }
+.album-desc__label{ color:var(--label); letter-spacing:var(--tr-text); }
 .album-desc__file{
   color:var(--text-ghost);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   min-width:0;
 }
 .album-desc__body{
-  padding:14px 16px 18px;
-  font-size:14px;
+  padding:14px var(--s-5) 18px;
+  font-size:var(--fs-text-lg);
   line-height:1.62;
   color:var(--text-dim);
   overflow-wrap:anywhere;
@@ -2369,22 +2675,22 @@ section{
   font-family:"Space Grotesk", sans-serif;
   color:var(--text);
   line-height:1.25;
-  letter-spacing:.01em;
+  letter-spacing:var(--tr-text);
   margin:1.15em 0 .5em;
 }
-.album-desc__body h1{ font-size:19px; }
-.album-desc__body h2{ font-size:16px; }
+.album-desc__body h1{ font-size:var(--fs-text-xl); }
+.album-desc__body h2{ font-size:var(--fs-text-lg); }
 .album-desc__body h3{
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
   color:var(--text-head);
   margin:1.2em 0 .5em;
 }
 .album-desc__body p{ margin:.6em 0; }
 .album-desc__body a{
   color:var(--acc);
-  border-bottom:1px solid rgba(var(--acc-rgb),.35);
+  border-bottom:var(--hair) solid rgba(var(--acc-rgb),.35);
 }
 .album-desc__body a:hover{ border-bottom-color:var(--acc); }
 .album-desc__body strong{ color:var(--text); font-weight:600; }
@@ -2398,56 +2704,56 @@ section{
   font-family:var(--mono);
   font-size:.86em;
   background:rgba(255,255,255,.05);
-  border:1px solid var(--line);
-  padding:1px 5px;
+  border:var(--hair) solid var(--line);
+  padding:1px var(--s-2);
 }
 .album-desc__body pre{
   background:rgba(0,0,0,.4);
-  border:1px solid var(--line);
-  padding:10px 12px;
+  border:var(--hair) solid var(--line);
+  padding:10px var(--s-4);
   overflow:auto;
-  font-size:12px;
+  font-size:var(--fs-text-sm);
   line-height:1.5;
 }
 .album-desc__body pre code{ background:none; border:0; padding:0; }
 .album-desc__body blockquote{
   margin:.7em 0;
-  padding:3px 0 3px 12px;
+  padding:var(--s-1) 0 var(--s-1) var(--s-4);
   border-left:2px solid var(--acc);
   color:var(--text);
   background:linear-gradient(90deg, rgba(var(--acc-rgb),.05), transparent 60%);
 }
-.album-desc__body hr{ border:0; border-top:1px dashed var(--line); margin:1.1em 0; }
-.album-desc__body img{ max-width:100%; height:auto; border:1px solid var(--line); }
+.album-desc__body hr{ border:0; border-top:var(--hair) dashed var(--line); margin:1.1em 0; }
+.album-desc__body img{ max-width:100%; height:auto; border:var(--hair) solid var(--line); }
 
 /* stats block under the description — HUD-style KEY / VALUE readouts.
    Two groups: editorial (album.cfg loc/stat) then the auto EXIF/size
    capture readouts, split by a dashed divider. */
 .album-desc__stats{
-  padding:12px 16px 15px;
-  border-top:1px dashed var(--line);
+  padding:var(--s-4) var(--s-5) var(--s-5);
+  border-top:var(--hair) dashed var(--line);
 }
 .album-stats{ margin:0; }
 .album-stats + .album-stats{
-  margin-top:9px; padding-top:9px;
-  border-top:1px dashed var(--line);
+  margin-top:var(--s-3); padding-top:var(--s-3);
+  border-top:var(--hair) dashed var(--line);
 }
 .album-stat{
   display:flex; align-items:baseline; justify-content:space-between; gap:14px;
-  padding:4px 0;
+  padding:var(--s-1) 0;
   font-family:inherit;
 }
-.album-stat + .album-stat{ border-top:1px solid var(--line); }
+.album-stat + .album-stat{ border-top:var(--hair) solid var(--line); }
 .album-stat__key{
   flex:0 0 auto;
   color:var(--text-ghost);
-  font-size:13px;
+  font-size:var(--fs-text-md);
   white-space:nowrap;
 }
 .album-stat__key:empty{ display:none; }
 .album-stat__val{
   color:var(--text);
-  font-size:13px; line-height:1.4;
+  font-size:var(--fs-text-md); line-height:1.4;
   text-align:right;
   overflow-wrap:anywhere;
 }
@@ -2468,7 +2774,7 @@ section{
   /* nested <section>: undo the page-container margin + width cap */
   margin:0; max-width:none;
   padding-left:14px;
-  border-left:1px solid var(--line);
+  border-left:var(--hair) solid var(--line);
 }
 /* tick at the head of the rail — marks the day boundary */
 .day-group::before{
@@ -2478,34 +2784,34 @@ section{
   background:var(--label); opacity:.7;
 }
 .day-group__head{
-  display:flex; align-items:baseline; gap:8px 12px; flex-wrap:wrap;
-  margin-bottom:12px;
-  padding-bottom:8px;
-  border-bottom:1px dashed var(--line);
+  display:flex; align-items:baseline; gap:var(--s-3) var(--s-4); flex-wrap:wrap;
+  margin-bottom:var(--s-4);
+  padding-bottom:var(--s-3);
+  border-bottom:var(--hair) dashed var(--line);
   font-family:inherit;
 }
 .day-group__n{
-  font-size:11px; letter-spacing:.24em;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-xs);
   color:var(--label);
 }
 .day-group__date{
-  font-size:11px; letter-spacing:.14em;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-md);
   color:var(--text);
 }
 .day-group__wd{
-  font-size:9.5px; letter-spacing:.18em;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm);
   color:var(--text-ghost);
 }
 /* the leg this day belongs to on a trip album (Kansai / Hokkaido / …) */
 .day-group__stop{
-  font-size:9px; letter-spacing:.18em;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm);
   color:var(--acc);
-  border:1px solid var(--line-strong);
-  padding:2px 6px;
+  border:var(--hair) solid var(--line-strong);
+  padding:var(--s-0) var(--s-2);
 }
 .day-group__count{
   margin-left:auto;
-  font-size:9.5px; letter-spacing:.18em;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm);
   color:var(--text-ghost);
 }
 /* photos without an EXIF date land in one trailing, unnumbered section */
@@ -2527,9 +2833,9 @@ section{
 .image-tile{
   margin:0;
   background:var(--surface);
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
   position:relative;
-  transition: border-color .2s, transform .2s ease, scale .2s ease;
+  transition: border-color var(--dur-2), transform var(--dur-2) ease, scale var(--dur-2) ease;
   /* Off-screen tiles skip style, layout and paint entirely: a 400-photo
      album laid out ~6700 boxes on every relayout (fonts arriving, an image
      landing, a class flip), which on a phone blocked the main thread for
@@ -2554,11 +2860,11 @@ section{
   content:"";
   position:absolute;
   width:12px; height:12px;
-  border:1px solid var(--chrome);
+  border:var(--hair) solid var(--chrome);
   opacity:0;
   pointer-events:none;
   z-index:5;
-  transition: opacity .2s ease;
+  transition: opacity var(--dur-2) ease;
 }
 .image-tile::before{ top:-1px; left:-1px; border-right:0; border-bottom:0; }
 .image-tile::after{ bottom:-1px; right:-1px; border-left:0; border-top:0; }
@@ -2576,7 +2882,7 @@ section{
   width:100%; height:100%;
   object-fit:cover;
   display:block;
-  transition: transform .35s ease, filter .35s ease;
+  transition: transform var(--dur-3) ease, filter var(--dur-3) ease;
   filter:saturate(.85) brightness(.9);
 }
 .image-tile a:hover img{
@@ -2586,16 +2892,16 @@ section{
 .image-tile__overlay{
   position:absolute; inset:0;
   display:flex; align-items:flex-end; justify-content:flex-end;
-  padding:10px 12px;
+  padding:10px var(--s-4);
   opacity:0;
   background:linear-gradient(to top, rgba(0,0,0,.7) 0%, transparent 60%);
-  transition: opacity .2s;
+  transition: opacity var(--dur-2);
   pointer-events:none;
 }
 .image-tile__overlay span{
   font-family:var(--mono);
-  font-size:9.5px;
-  letter-spacing:.18em;
+  font-size:var(--fs-chrome-xs);
+  letter-spacing:var(--tr-chrome-sm);
   text-transform:uppercase;
   color:var(--chrome);
 }
@@ -2633,7 +2939,7 @@ section{
      local z. */
   z-index:1500;
   background:#000;
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
   overflow:hidden;
   display:flex; align-items:center; justify-content:center;
   min-height:320px;
@@ -2650,16 +2956,16 @@ section{
 .stage__corner{
   position:absolute;
   z-index:4;
-  font-size:12px;
+  font-size:var(--fs-text-sm);
   color:var(--text-ghost);
   background:var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
-  padding:3px 7px;
-  border:1px solid var(--line);
+  padding:var(--s-1) var(--s-3);
+  border:var(--hair) solid var(--line);
   pointer-events:none;
 }
-.stage__corner--br{ bottom:8px; right:8px; }
+.stage__corner--br{ bottom:var(--s-3); right:var(--s-3); }
 
 .nav-arrow{
   position:absolute;
@@ -2673,8 +2979,8 @@ section{
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
   color:var(--text);
-  border:1px solid var(--line-strong);
-  transition: all .15s;
+  border:var(--hair) solid var(--line-strong);
+  transition: all var(--dur-1);
   z-index:3;
 }
 .nav-arrow:hover{
@@ -2682,34 +2988,34 @@ section{
   border-color:var(--chrome);
   background:var(--scrim-hi);
 }
-.nav-arrow.prev{ left:8px; }
-.nav-arrow.next{ right:8px; }
+.nav-arrow.prev{ left:var(--s-3); }
+.nav-arrow.next{ right:var(--s-3); }
 
 .sidebar{
   display:flex; flex-direction:column;
   gap:1px;
   background:var(--line);
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
   width:100%;
   min-width:0;
   box-sizing:border-box;
 }
 .panel{
   background:var(--surface);
-  padding:16px 18px;
+  padding:var(--s-5) 18px;
   width:100%;
   box-sizing:border-box;
   min-width:0;
 }
 .panel h2{
-  margin:0 0 12px;
+  margin:0 0 var(--s-4);
   font-family:inherit;
-  font-size:15px;
+  font-size:var(--fs-text-lg);
   font-weight:600;
   letter-spacing:-.005em;
   color:var(--text-head);
-  border-bottom:1px solid var(--line);
-  padding-bottom:9px;
+  border-bottom:var(--hair) solid var(--line);
+  padding-bottom:var(--s-3);
   /* flex-start, not space-between: the leading icon is a flex item of its
      own, and space-between would fling it to one edge and strand the label
      in the middle. */
@@ -2718,16 +3024,16 @@ section{
 .kv{
   display:grid;
   grid-template-columns: 100px minmax(0, 1fr);
-  gap:6px 14px;
+  gap:var(--s-2) 14px;
   margin:0;
-  font-size:13px;
+  font-size:var(--fs-text-md);
   word-break:break-word;
   overflow-wrap:anywhere;
 }
 .kv dt{
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
   color:var(--text-ghost);
   align-self:center;
   /* .kv sets overflow-wrap:anywhere so long VALUES (lens strings, paths)
@@ -2751,24 +3057,24 @@ section{
   margin:0;
   color:var(--text);
   font-family:inherit;
-  font-size:12px;
+  font-size:var(--fs-text-sm);
 }
 /* German label column. Measured against the longest label the EXIF panel
    can produce — "Belichtungsprogramm", 142px at the desktop dt size with
    the tightened tracking below — so every German label fits on one line
    without breaking or overflowing. EN and JP keep the shared 100px. */
 html[lang="de"] .kv{ grid-template-columns: 148px minmax(0, 1fr); }
-html[lang="de"] .kv dt{ letter-spacing:.1em; }
+html[lang="de"] .kv dt{ letter-spacing:var(--tr-chrome-lg); }
 .kv dd a{ color:var(--acc); }
 .kv dd a:hover{ text-decoration:underline; }
 
 details > summary{
   cursor:pointer;
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
   color:var(--text-dim);
-  padding:8px 0 0;
+  padding:var(--s-3) 0 0;
   list-style:none;
 }
 details > summary::marker{ content:""; }
@@ -2776,15 +3082,15 @@ details > summary::before{
   content:"▸ ";
   color:var(--label);
   display:inline-block;
-  transition: transform .2s;
+  transition: transform var(--dur-2);
 }
 details[open] > summary::before{ content:"▾ "; }
 .raw-exif{
   background:rgba(0,0,0,.4);
-  border:1px solid var(--line);
-  padding:10px 12px;
+  border:var(--hair) solid var(--line);
+  padding:10px var(--s-4);
   font-family:var(--mono);
-  font-size:11px;
+  font-size:var(--fs-chrome-sm);
   line-height:1.5;
   max-height:340px;
   overflow:auto;
@@ -2795,19 +3101,19 @@ details[open] > summary::before{ content:"▾ "; }
 }
 
 .tag-list{
-  display:flex; flex-wrap:wrap; gap:5px;
+  display:flex; flex-wrap:wrap; gap:var(--s-2);
 }
 
 .description{
   margin:0;
   font-family:"Space Grotesk", system-ui, sans-serif;
-  font-size:13.5px;
+  font-size:var(--fs-text-md);
   line-height:1.55;
   color:var(--text);
   white-space:pre-wrap;
   word-break:break-word;
   border-left:2px solid var(--acc);
-  padding:4px 0 4px 12px;
+  padding:var(--s-1) 0 var(--s-1) var(--s-4);
   background:linear-gradient(90deg, rgba(var(--acc-rgb),.05), transparent 60%);
 }
 
@@ -2815,33 +3121,33 @@ details[open] > summary::before{ content:"▾ "; }
    EMPTY / NOTES
    ================================================================ */
 .empty{
-  border:1px dashed var(--line-strong);
+  border:var(--hair) dashed var(--line-strong);
   background:
     repeating-linear-gradient(45deg,
       rgba(255,255,255,.015) 0 8px,
       transparent 8px 16px);
-  padding:60px 24px;
+  padding:60px var(--s-6);
   text-align:center;
   color:var(--text-dim);
 }
 .empty .stamp{
   display:inline-block;
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
   color:var(--amb);
-  border:1px dashed rgba(var(--amb-rgb),.5);
-  padding:3px 10px;
+  border:var(--hair) dashed rgba(var(--amb-rgb),.5);
+  padding:var(--s-1) 10px;
   margin-bottom:14px;
 }
 .empty p{ margin:.5em 0; }
 
 .note{
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
   color:var(--text-ghost);
-  margin-top:12px;
+  margin-top:var(--s-4);
 }
 
 /* ================================================================
@@ -2850,16 +3156,16 @@ details[open] > summary::before{ content:"▾ "; }
 @media (max-width:760px){
   /* keep the compact bar height on phones (desktop grew to 60px) */
   :root{ --nav-h:56px; }
-  .nav__inner{ gap:12px; }
+  .nav__inner{ gap:var(--s-4); }
   .nav__brand .jp{ display:none; }
-  .nav__brand .brand-name{ font-size:13px; }
+  .nav__brand .brand-name{ font-size:calc(var(--fs-text-md) * var(--display-scale)); }
   .nav__brand img{ height:24px; }
   /* search field and language selector share one height so the two controls
      read as a matched pair; the option pills stretch to fill the taller box,
      which also gives them bigger tap targets */
   .nav__search, .nav__lang{ height:38px; }
-  .nav__lang{ padding:3px; gap:1px; font-size:10px; align-items:stretch; }
-  .nav__lang-opt{ display:flex; align-items:center; padding:0 7px; }
+  .nav__lang{ padding:var(--s-1); gap:1px; font-size:var(--fs-chrome-sm); align-items:stretch; }
+  .nav__lang-opt{ display:flex; align-items:center; padding:0 var(--s-3); }
   /* iOS Safari auto-zooms when a focused input's font-size is < 16px. Keep the
      typed text at 16px so tapping search never zooms the page; the placeholder
      can stay small (its size doesn't affect the zoom trigger). */
@@ -2869,35 +3175,36 @@ details[open] > summary::before{ content:"▾ "; }
      backdrop blurs — use slightly more opaque solids instead so text over them
      stays legible. */
   .bg-video{ display:none; }
-  /* phones pay for backdrop-filter in scroll jank, so the whole surface scale
-     switches to the unblurred, more opaque variant here — same reasoning as
-     .fx-lite above, and one redefinition covers every pane instead of the
-     rule-by-rule overrides that follow. */
+  /* Phones pay for backdrop-filter in scroll jank, so the whole surface
+     scale switches to the unblurred, more opaque variant here — the same
+     six tokens html.fx-lite redefines, and the same reason: rule 6 reaches
+     every fallback by redefining tokens, never by overriding rules. The
+     four per-component `backdrop-filter:none` lines this replaced are what
+     a rule-level override costs — each one was a surface that had to be
+     remembered, and .nav and .sort__menu were remembered wrong (they kept
+     a hand-typed fill AND their own blur, so neither gate reached them). */
   :root{
-    --glass:      rgba(22,22,25,.80);
-    --glass-hi:   rgba(36,36,40,.90);
-    --scrim:      rgba(0,0,0,.76);
-    --scrim-hi:   rgba(6,6,7,.88);
-    --glass-blur: none;
-    --scrim-blur: none;
+    --glass:      rgba(22,22,27,.86);
+    --glass-hi:   rgba(36,36,44,.94);
+    --scrim:      rgba(0,0,0,.78);
+    --scrim-hi:   rgba(6,6,10,.88);
+    --pane:       #04040a;
+    --overlay:    #0a0a0e;
+    --blur-1: none; --blur-2: none; --blur-3: none;
   }
-  .nav{ background:rgba(0,0,0,0.92); backdrop-filter:none; -webkit-backdrop-filter:none; }
-  .stage__loader{ backdrop-filter:none; -webkit-backdrop-filter:none; background:rgba(0,0,0,.94); }
-  .lightbox__bar{ backdrop-filter:none; -webkit-backdrop-filter:none; }
-  .sort__menu{ backdrop-filter:none; -webkit-backdrop-filter:none; }
 
   /* tighter vertical rhythm on phones: content first, less dead space */
   section{ padding-top:22px; padding-bottom:30px; }
   .sub-albums{ margin-bottom:22px; }
   .sub-albums__head--photos{ margin-top:22px; }
-  .showcase{ margin-bottom:24px; }
-  .foot{ margin-top:32px; }
+  .showcase{ margin-bottom:var(--s-6); }
+  .foot{ margin-top:var(--s-7); }
 
   /* the meta line just gets smaller here; a long album or file name still
      ellipsises rather than pushing the line off the screen */
   .section__doc{
-    gap:3px 13px;
-    font-size:9.5px;
+    gap:var(--s-1) var(--s-4);
+    font-size:var(--fs-chrome-xs);
     letter-spacing:.13em;
   }
   .section__doc b{
@@ -2915,12 +3222,13 @@ details[open] > summary::before{ content:"▾ "; }
     display:inline-flex;
     min-height:36px;
     padding:0 14px;
-    gap:8px;
-    border:1px solid rgba(var(--acc-rgb),.38);
+    gap:var(--s-3);
+    border:var(--hair) solid rgba(var(--acc-rgb),.38);
     background:linear-gradient(180deg, rgba(var(--acc-rgb),.20), rgba(var(--acc-rgb),.08));
-    color:var(--acc);
+    /* the accent is carried by the fill and the border; the label is --text */
+    color:var(--text);
     font-weight:600;
-    transition:background .15s, border-color .15s, box-shadow .15s;
+    transition:background var(--dur-1), border-color var(--dur-1), box-shadow var(--dur-1);
   }
   /* :active is the press — it must fire on touch. :hover is split off and
      gated, because on a phone the "hover" IS the first tap (see the note at
@@ -2928,39 +3236,39 @@ details[open] > summary::before{ content:"▾ "; }
   .pathbar__back:active{
     background:linear-gradient(180deg, rgba(var(--acc-rgb),.30), rgba(var(--acc-rgb),.14));
     border-color:var(--acc);
-    color:var(--acc);
+    color:var(--text);
   }
   @media (hover: hover){
     .pathbar__back:hover{
       background:linear-gradient(180deg, rgba(var(--acc-rgb),.30), rgba(var(--acc-rgb),.14));
       border-color:var(--acc);
-      color:var(--acc);
+      color:var(--text);
     }
   }
   /* a button label does not underline on press */
   .pathbar__back:hover .pathbar__back-txt{ text-decoration:none; }
   .pathbar__back-ico{ font-size:14px; }
-  .section__head{ margin-bottom:16px; }
+  .section__head{ margin-bottom:var(--s-5); }
 
   /* pathbar on phones: the button takes the first row on its own, the trail
      always breaks onto the next one. `flex-basis:auto` (not 100%) so the
      pane still hugs the path — a forced full-width basis would float
      "Start / Alben" inside a bar the width of the screen. It reaches the
      content edge only when the path is genuinely that long. */
-  .pathbar{ margin-bottom:16px; }
+  .pathbar{ margin-bottom:var(--s-5); }
   .pathbar .crumb{ flex:0 1 auto; }
 
   /* the albums index is title-first on a phone: nothing above it but the
      route line, and the title gets the full width. The index number and the
      kanji ornament it used to share that row with are gone. */
-  .page-albums .pathbar{ margin-bottom:12px; }
+  .page-albums .pathbar{ margin-bottom:var(--s-4); }
   .page-albums .section__head{ margin-bottom:18px; }
   .page-albums .section__slug .name{
     font-size:clamp(30px, 9vw, 38px);
     line-height:1.04;
   }
-  .page-albums .feat__head{ margin-bottom:11px; }
-  .page-albums .archive-head{ margin-bottom:11px; }
+  .page-albums .feat__head{ margin-bottom:var(--s-4); }
+  .page-albums .archive-head{ margin-bottom:var(--s-4); }
   .detail{ gap:14px; }
   .stage{ min-height:240px; }
   .stage img{ max-height:62vh; }
@@ -2970,32 +3278,32 @@ details[open] > summary::before{ content:"▾ "; }
      size are in the .section__doc chip row directly above the stage, and the
      filename repeats in the FILE META panel below it. */
   .stage__corner{ display:none; }
-  .panel{ padding:13px 14px; }
-  .panel h2{ font-size:10px; margin-bottom:10px; padding-bottom:7px; }
-  .kv{ grid-template-columns: 86px minmax(0, 1fr); gap:5px 10px; font-size:12px; }
+  .panel{ padding:var(--s-4) 14px; }
+  .panel h2{ font-size:10px; margin-bottom:10px; padding-bottom:var(--s-3); }
+  .kv{ grid-template-columns: 86px minmax(0, 1fr); gap:var(--s-2) 10px; font-size:var(--fs-text-sm); }
   html[lang="de"] .kv{ grid-template-columns: 122px minmax(0, 1fr); }
-  .kv dt{ font-size:12px; }
-  .kv dd{ font-size:11.5px; }
-  .raw-exif{ font-size:10px; max-height:240px; padding:8px 10px; }
+  .kv dt{ font-size:var(--fs-text-sm); }
+  .kv dd{ font-size:var(--fs-text-sm); }
+  .raw-exif{ font-size:var(--fs-chrome-sm); max-height:240px; padding:var(--s-3) 10px; }
   /* breadcrumb link styling is shared with the base now; on small screens just
      shrink the type and tighten the gaps. */
-  .crumb{ font-size:12.5px; gap:5px 7px; flex-wrap:wrap; }
+  .crumb{ font-size:var(--fs-text-md); gap:var(--s-2) var(--s-3); flex-wrap:wrap; }
 }
 @media (max-width:480px){
   .nav__brand .brand-text{ display:none; }
-  .nav__search-ico{ margin-right:6px; font-size:11px; }
+  .nav__search-ico{ margin-right:var(--s-2); font-size:11px; }
   /* stay at 16px to prevent iOS focus-zoom (see 760px block); just tighten padding */
-  .nav__search input{ padding:8px 0; }
-  .image-grid{ grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:6px; }
+  .nav__search input{ padding:var(--s-3) 0; }
+  .image-grid{ grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:var(--s-2); }
   .nav-arrow{ width:34px; height:48px; font-size:18px; }
-  .section__doc{ font-size:9px; gap:3px 11px; letter-spacing:.11em; }
+  .section__doc{ font-size:var(--fs-chrome-xs); gap:var(--s-1) var(--s-4); letter-spacing:.11em; }
   .stage{ min-height:200px; }
   .stage img{ max-height:55vh; }
-  .panel{ padding:11px 12px; }
-  .kv{ grid-template-columns: 74px minmax(0, 1fr); gap:4px 8px; }
-  .kv dt{ font-size:12px; }
-  .kv dd{ font-size:12.5px; }
-  .crumb{ font-size:12px; }
+  .panel{ padding:var(--s-4) var(--s-4); }
+  .kv{ grid-template-columns: 74px minmax(0, 1fr); gap:var(--s-1) var(--s-3); }
+  .kv dt{ font-size:var(--fs-text-sm); }
+  .kv dd{ font-size:var(--fs-text-md); }
+  .crumb{ font-size:var(--fs-text-sm); }
 }
 
 /* ================================================================
@@ -3003,20 +3311,21 @@ details[open] > summary::before{ content:"▾ "; }
    ================================================================ */
 .stage__loader{
   position:absolute;
-  bottom:8px; left:50%;
+  bottom:var(--s-3); left:50%;
   transform:translateX(-50%);
   display:flex; align-items:center; gap:0;
-  background:rgba(0,0,0,.82);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border:1px solid var(--line-strong);
+  /* laid ON the photograph, so it is --scrim, not --glass */
+  background-color:var(--scrim-hi);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
+  border:var(--hair) solid var(--line-strong);
   padding:0;
   /* must beat .stage (z:1500), otherwise this sibling loader gets hidden
      behind the stage. */
   z-index:1600;
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
   max-width: calc(100% - 16px);
 }
 .stage__loader button,
@@ -3024,12 +3333,12 @@ details[open] > summary::before{ content:"▾ "; }
   background:transparent;
   border:0;
   color:var(--text);
-  padding:9px 14px;
+  padding:var(--s-3) 14px;
   cursor:pointer;
   font:inherit;
   letter-spacing:inherit;
   text-transform:inherit;
-  transition: color .15s, background .15s, scale .14s ease;
+  transition: color var(--dur-1), background var(--dur-1), scale var(--dur-1) ease;
   text-decoration:none;
   display:inline-flex; align-items:center;
   white-space:nowrap;
@@ -3051,7 +3360,7 @@ details[open] > summary::before{ content:"▾ "; }
   .stage__loader{
     position:static;
     transform:none;
-    margin-top:6px;
+    margin-top:var(--s-2);
     width:100%;
     max-width:100%;
     justify-content:space-between;
@@ -3061,19 +3370,19 @@ details[open] > summary::before{ content:"▾ "; }
   .stage__loader button,
   .stage__loader .loader-link{
     flex:1 1 0;
-    padding:12px 6px;
+    padding:var(--s-4) var(--s-2);
     justify-content:center;
-    font-size:10px;
-    letter-spacing:.14em;
+    font-size:var(--fs-chrome-sm);
+    letter-spacing:var(--tr-chrome-md);
     min-width:0;
   }
 }
 @media (max-width:380px){
   .stage__loader button,
   .stage__loader .loader-link{
-    font-size:9px;
-    letter-spacing:.1em;
-    padding:11px 4px;
+    font-size:var(--fs-chrome-xs);
+    letter-spacing:var(--tr-chrome-lg);
+    padding:var(--s-4) var(--s-1);
   }
 }
 
@@ -3084,7 +3393,7 @@ details[open] > summary::before{ content:"▾ "; }
    is skipped (tiny box, no 2d context, load error) .px-wait comes off with
    nothing underneath to cover the step, and a bare class removal there was
    the photo blinking on */
-.stage img{ transition: filter .5s ease, opacity .22s ease; }
+.stage img{ transition: filter .5s ease, opacity var(--dur-2) ease; }
 
 /* prev / next in flight: the photo dims and nudges a few px AWAY from the
    direction of travel (the new one arrives from the other side, see the
@@ -3092,7 +3401,7 @@ details[open] > summary::before{ content:"▾ "; }
    the fetch takes longer than 300 ms — a warm neighbour never shows one */
 .stage.is-spa-loading img{
   opacity:.45;
-  transition: opacity .18s ease, transform .22s ease;
+  transition: opacity var(--dur-1) ease, transform var(--dur-2) ease;
 }
 html.fx-anim .stage.is-spa-loading.is-leaving-next img{ transform:translate3d(-18px,0,0); }
 html.fx-anim .stage.is-spa-loading.is-leaving-prev img{ transform:translate3d(18px,0,0); }
@@ -3136,7 +3445,7 @@ body.lightbox-open{ overflow:hidden; }
   flex:1 1 auto;
   width:100%;
   display:flex; align-items:center; justify-content:center;
-  padding:64px 80px 84px;
+  padding:var(--s-9) 80px 84px;
   min-height:0;
   cursor:default;
 }
@@ -3150,7 +3459,7 @@ body.lightbox-open{ overflow:hidden; }
   -webkit-user-drag:none;
   /* let the browser handle pinch on the image itself */
   touch-action: pinch-zoom;
-  transition: opacity .15s ease;
+  transition: opacity var(--dur-1) ease;
   cursor:zoom-in;
 }
 .lightbox.is-loading .lightbox__img{ opacity:.35; }
@@ -3164,7 +3473,7 @@ body.lightbox-open{ overflow:hidden; }
   border-radius:50%;
   opacity:0;
   pointer-events:none;
-  transition: opacity .15s ease;
+  transition: opacity var(--dur-1) ease;
 }
 .lightbox.is-loading .lightbox__spinner{
   opacity:1;
@@ -3182,7 +3491,7 @@ body.lightbox-open{ overflow:hidden; }
 .lightbox__close,
 .lightbox__nav,
 .lightbox__bar{
-  transition: opacity .35s ease, color .15s, border-color .15s, background .15s, transform .15s, scale .15s;
+  transition: opacity var(--dur-3) ease, color var(--dur-1), border-color var(--dur-1), background var(--dur-1), transform var(--dur-1), scale var(--dur-1);
 }
 
 .lightbox__close{
@@ -3194,12 +3503,12 @@ body.lightbox-open{ overflow:hidden; }
   background:var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
-  border:1px solid var(--line-strong);
+  border:var(--hair) solid var(--line-strong);
   color:var(--text);
   font-family:inherit;
   font-size:16px;
   cursor:pointer;
-  transition: color .15s, border-color .15s, background .15s, scale .14s ease;
+  transition: color var(--dur-1), border-color var(--dur-1), background var(--dur-1), scale var(--dur-1) ease;
 }
 .lightbox__close:hover{
   color:var(--red);
@@ -3217,12 +3526,12 @@ body.lightbox-open{ overflow:hidden; }
   background:var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
-  border:1px solid var(--line-strong);
+  border:var(--hair) solid var(--line-strong);
   color:var(--text);
   font-family:inherit;
   font-size:30px;
   cursor:pointer;
-  transition: color .15s, border-color .15s, background .15s, scale .14s ease;
+  transition: color var(--dur-1), border-color var(--dur-1), background var(--dur-1), scale var(--dur-1) ease;
 }
 .lightbox__nav:hover{
   color:var(--chrome);
@@ -3242,19 +3551,19 @@ body.lightbox-open{ overflow:hidden; }
   transform:translateX(-50%);
   display:flex; align-items:stretch; gap:0;
   background:var(--scrim-hi);
-  border:1px solid var(--line-strong);
+  border:var(--hair) solid var(--line-strong);
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
   color:var(--text);
   z-index:5;
   max-width: calc(100% - 28px);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
 }
 .lightbox__count{
-  padding:9px 14px;
-  border-right:1px solid var(--line);
+  padding:var(--s-3) 14px;
+  border-right:var(--hair) solid var(--line);
   color:var(--label);
   white-space:nowrap;
   display:inline-flex; align-items:center;
@@ -3265,8 +3574,8 @@ body.lightbox-open{ overflow:hidden; }
    below its text at all — a flex item's default `min-width:auto` is exactly
    what used to push the bar past the edge of the screen. */
 .lightbox__title{
-  padding:9px 14px;
-  border-right:1px solid var(--line);
+  padding:var(--s-3) 14px;
+  border-right:var(--hair) solid var(--line);
   color:var(--text-dim);
   max-width:38vw;
   min-width:0;
@@ -3284,10 +3593,10 @@ body.lightbox-open{ overflow:hidden; }
   text-overflow:ellipsis;
 }
 .lightbox__btn{
-  padding:9px 14px;
+  padding:var(--s-3) 14px;
   flex:none;
   border:0;
-  border-right:1px solid var(--line);
+  border-right:var(--hair) solid var(--line);
   background:transparent;
   color:var(--text);
   font:inherit;
@@ -3297,7 +3606,7 @@ body.lightbox-open{ overflow:hidden; }
   text-decoration:none;
   white-space:nowrap;
   display:inline-flex; align-items:center;
-  transition: color .15s, background .15s, scale .14s ease;
+  transition: color var(--dur-1), background var(--dur-1), scale var(--dur-1) ease;
 }
 .lightbox__btn:last-child{ border-right:0; }
 .lightbox__btn:hover{ color:var(--chrome); background:rgba(var(--chrome-rgb),.08); }
@@ -3305,16 +3614,16 @@ body.lightbox-open{ overflow:hidden; }
 .lightbox__bar.is-full .lightbox__btn#lb-full{ display:none; }
 
 @media (max-width:760px){
-  .lightbox__stage{ padding:56px 8px 76px; }
+  .lightbox__stage{ padding:56px var(--s-3) 76px; }
   .lightbox__nav{ width:38px; height:60px; font-size:22px; }
-  .lightbox__nav--prev{ left:6px; }
-  .lightbox__nav--next{ right:6px; }
-  .lightbox__close{ width:36px; height:36px; font-size:14px; top:8px; right:8px; }
+  .lightbox__nav--prev{ left:var(--s-2); }
+  .lightbox__nav--next{ right:var(--s-2); }
+  .lightbox__close{ width:36px; height:36px; font-size:14px; top:var(--s-3); right:var(--s-3); }
   .lightbox__bar{
-    bottom:8px;
+    bottom:var(--s-3);
     flex-wrap:wrap;
-    font-size:12px;
-    letter-spacing:.01em;
+    font-size:var(--fs-text-sm);
+    letter-spacing:var(--tr-text);
     max-width: calc(100% - 16px);
   }
   /* phones: the bar wraps into two rows — the file name gets the top one to
@@ -3324,12 +3633,12 @@ body.lightbox-open{ overflow:hidden; }
     order:-1;
     flex:1 1 100%;
     max-width:none;
-    padding:7px 10px;
+    padding:var(--s-3) 10px;
     border-right:0;
-    border-bottom:1px solid var(--line);
+    border-bottom:var(--hair) solid var(--line);
   }
-  .lightbox__count{ padding:7px 10px; }
-  .lightbox__btn{ padding:7px 10px; }
+  .lightbox__count{ padding:var(--s-3) 10px; }
+  .lightbox__btn{ padding:var(--s-3) 10px; }
 }
 
 /* trigger affordance on stage image */
@@ -3340,8 +3649,8 @@ body.lightbox-open{ overflow:hidden; }
    ================================================================ */
 .foot{
   position:relative; z-index:10;
-  margin-top:48px;
-  border-top:1px solid var(--line);
+  margin-top:var(--s-8);
+  border-top:var(--hair) solid var(--line);
   background:#050505;
 }
 .foot__inner{
@@ -3349,11 +3658,11 @@ body.lightbox-open{ overflow:hidden; }
   margin:0 auto;
   padding:22px var(--page-pad);
   display:flex; align-items:center; justify-content:space-between;
-  gap:24px;
+  gap:var(--s-6);
   flex-wrap:wrap;
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
   color:var(--text-ghost);
 }
 .foot__brand{ display:flex; align-items:center; gap:10px; color:var(--text-dim); }
@@ -3361,8 +3670,8 @@ body.lightbox-open{ overflow:hidden; }
 .foot__links{ display:flex; gap:18px; align-items:center; }
 .foot__links a{
   color:var(--text-dim);
-  transition: color .15s;
-  border-bottom:1px solid transparent;
+  transition: color var(--dur-1);
+  border-bottom:var(--hair) solid transparent;
   padding-bottom:1px;
 }
 .foot__links a:hover{ color:var(--acc); border-bottom-color:var(--acc); }
@@ -3372,7 +3681,7 @@ body.lightbox-open{ overflow:hidden; }
    colophon and not a piece of navigation: it keeps the ghost weight of the
    text around it and only lifts to the hover chrome, so it never competes
    with the real footer links two cells over. */
-.foot__meta a{ color:inherit; transition: color .15s; }
+.foot__meta a{ color:inherit; transition: color var(--dur-1); }
 .foot__meta a:hover{ color:var(--text-dim); }
 
 /* classic 88x31 web buttons */
@@ -3382,7 +3691,7 @@ body.lightbox-open{ overflow:hidden; }
   width:88px; height:31px;
   /* content-box: keep the badge art at exactly 88x31, hairline sits outside */
   box-sizing:content-box;
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
 }
 
 /* Operator card — who's behind this archive: the portrait and link from
@@ -3390,23 +3699,23 @@ body.lightbox-open{ overflow:hidden; }
    is a URL to point at, so this whole block can be absent. */
 .foot__op{
   display:flex; align-items:center; gap:10px;
-  padding:5px 14px 5px 6px;
-  border:1px solid var(--line);
+  padding:var(--s-2) 14px var(--s-2) var(--s-2);
+  border:var(--hair) solid var(--line);
   background:var(--glass);
   backdrop-filter:var(--glass-blur);
   -webkit-backdrop-filter:var(--glass-blur);
-  transition: border-color .15s, background .15s;
+  transition: border-color var(--dur-1), background var(--dur-1);
 }
 .foot__op:hover{ border-color:var(--chrome); background:rgba(var(--chrome-rgb),.06); }
 .foot__op-pfp{
   display:block;
   width:34px; height:34px;
-  border:1px solid var(--line-strong);
+  border:var(--hair) solid var(--line-strong);
   border-radius:var(--radius);
 }
-.foot__op-txt{ display:flex; flex-direction:column; gap:3px; }
+.foot__op-txt{ display:flex; flex-direction:column; gap:var(--s-1); }
 .foot__op-key{ color:var(--text-ghost); font-size:9px; }
-.foot__op-val{ color:var(--text-dim); transition: color .15s; }
+.foot__op-val{ color:var(--text-dim); transition: color var(--dur-1); }
 .foot__op:hover .foot__op-val{ color:var(--chrome); }
 
 /* Phones: the desktop row can't just be tipped on its side — one block per
@@ -3438,9 +3747,9 @@ body.lightbox-open{ overflow:hidden; }
     grid-template-columns:auto auto;
     justify-content:space-between;
     align-items:center;
-    gap:0 12px;
-    padding:16px var(--page-pad) 18px;
-    font-size:11px;
+    gap:0 var(--s-4);
+    padding:var(--s-5) var(--page-pad) 18px;
+    font-size:var(--fs-text-sm);
   }
   /* DOM order is brand, operator, links, badges, meta; the tile row wants
      operator + badges, so every cell is placed by hand. Row 2 is the rule
@@ -3452,7 +3761,7 @@ body.lightbox-open{ overflow:hidden; }
     grid-area:2 / 1 / 3 / 3;
     height:1px;
     background:var(--line);
-    margin:15px 0 14px;
+    margin:var(--s-5) 0 14px;
   }
   .foot__op    { grid-area:1 / 1; justify-self:start; }
   .foot__badges{ grid-area:1 / 2; justify-self:stretch; justify-content:flex-end; }
@@ -3464,8 +3773,8 @@ body.lightbox-open{ overflow:hidden; }
      ("Statistiken" / Datenschutz / Impressum) it wrapped, left "Impressum"
      hanging alone and shoved the stamp down a line. Across both columns all
      three sit on one line down to a 320px phone. */
-  .foot__links { grid-area:4 / 1 / 5 / 3; justify-self:end; padding-top:12px; }
-  .foot__links{ flex-wrap:wrap; justify-content:flex-end; align-items:baseline; gap:6px 14px; }
+  .foot__links { grid-area:4 / 1 / 5 / 3; justify-self:end; padding-top:var(--s-4); }
+  .foot__links{ flex-wrap:wrap; justify-content:flex-end; align-items:baseline; gap:var(--s-2) 14px; }
 
   /* The card and the badges have to make one row together, and the three
      tiles do not fit at their desktop sizes on any phone. The card is trimmed
@@ -3474,16 +3783,16 @@ body.lightbox-open{ overflow:hidden; }
      evenly into their track — 75px wide at 375, 71 at 360, still side by side
      on a 320px phone. `height:auto` keeps the art's own ratio, so they stay
      unmistakably web buttons at every size, which stacking them would not. */
-  .foot__badges{ flex-wrap:nowrap; min-width:0; gap:7px; }
+  .foot__badges{ flex-wrap:nowrap; min-width:0; gap:var(--s-3); }
   .foot__badges img{
     box-sizing:border-box;   /* so the hairline is inside the flex basis */
     flex:0 1 88px;
     width:auto; height:auto;
     min-width:0;
   }
-  .foot__op{ padding:4px 10px 4px 4px; gap:8px; min-width:0; }
+  .foot__op{ padding:var(--s-1) 10px var(--s-1) var(--s-1); gap:var(--s-3); min-width:0; }
   .foot__op-pfp{ width:28px; height:28px; }
-  .foot__op-txt{ min-width:0; gap:2px; }
+  .foot__op-txt{ min-width:0; gap:var(--s-0); }
   .foot__op-val{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 }
 
@@ -3512,7 +3821,7 @@ body.page-welcome{ --page-max: 2400px; }
   overflow:hidden;
   isolation:isolate;
   background:#000;
-  border-bottom:1px solid var(--line-strong);
+  border-bottom:var(--hair) solid var(--line-strong);
   /* leave a sliver of the readout band visible below the fold as a
      scroll affordance. svh so the mobile URL bar can't jump the hero. */
   height: calc(100vh - var(--nav-h) - 44px);
@@ -3525,8 +3834,8 @@ body.page-welcome{ --page-max: 2400px; }
 @media (min-width: 2401px){
   .vf,
   .arc{
-    border-left:1px solid var(--line-strong);
-    border-right:1px solid var(--line-strong);
+    border-left:var(--hair) solid var(--line-strong);
+    border-right:var(--hair) solid var(--line-strong);
   }
 }
 
@@ -3560,7 +3869,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .fx-lite .vf__frame img{ animation:none !important; transform:none; }
 @media (prefers-reduced-motion: reduce){
-  .vf__frame{ transition:opacity .2s linear; }
+  .vf__frame{ transition:opacity var(--dur-2) linear; }
   .vf__frame img{ animation:none !important; transform:none; }
 }
 
@@ -3580,12 +3889,12 @@ body.page-welcome{ --page-max: 2400px; }
    subject rather than a coat of paint on a text page. Don't lift these
    patterns into the album/image/search chrome. */
 /* ends above the deck strip so corners + thirds don't run under it */
-.vf__hud{ position:absolute; inset:0 0 48px 0; z-index:4; pointer-events:none; }
+.vf__hud{ position:absolute; inset:0 0 var(--s-8) 0; z-index:4; pointer-events:none; }
 .vf--empty .vf__hud{ inset:0; }
 .vf__corner{
   position:absolute;
   width:26px; height:26px;
-  border:1px solid rgba(var(--chrome-rgb),.75);
+  border:var(--hair) solid rgba(var(--chrome-rgb),.75);
   opacity:.9;
 }
 .vf__corner--tl{ top:14px; left:14px; border-right:0; border-bottom:0; }
@@ -3608,9 +3917,9 @@ body.page-welcome{ --page-max: 2400px; }
   position:absolute; left:50%; top:50%;
   width:58px; height:58px;
   transform: translate(-50%, -50%);
-  border:1px solid rgba(255,255,255,.22);
+  border:var(--hair) solid rgba(255,255,255,.22);
   opacity:.55;
-  transition: border-color .25s, opacity .25s, box-shadow .25s;
+  transition: border-color var(--dur-2), opacity var(--dur-2), box-shadow var(--dur-2);
 }
 .vf__reticle::before,
 .vf__reticle::after{
@@ -3633,16 +3942,16 @@ body.page-welcome{ --page-max: 2400px; }
   max-width:var(--page-max);
   margin:0 auto;
   padding:20px var(--page-pad) 0;
-  display:flex; align-items:center; gap:16px;
+  display:flex; align-items:center; gap:var(--s-5);
   font-family:var(--mono);
-  font-size:10px;
+  font-size:var(--fs-chrome-sm);
   letter-spacing:.2em;
   text-transform:uppercase;
   color:var(--text-dim);
   pointer-events:none;
 }
 .vf__rec{
-  display:inline-flex; align-items:center; gap:8px;
+  display:inline-flex; align-items:center; gap:var(--s-3);
   color:#e8908e;
   text-shadow:0 0 10px rgba(var(--red-rgb),.4);
 }
@@ -3660,7 +3969,7 @@ body.page-welcome{ --page-max: 2400px; }
 .vf__hudchip b{ color:var(--label); font-weight:400; }
 .vf__hudright{
   margin-left:auto;
-  display:inline-flex; align-items:center; gap:16px;
+  display:inline-flex; align-items:center; gap:var(--s-5);
 }
 .vf__frm b{
   color:var(--text);
@@ -3669,7 +3978,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .vf__frm-of{ color:var(--text-ghost); }
 .vf__af{
-  display:inline-flex; align-items:center; gap:7px;
+  display:inline-flex; align-items:center; gap:var(--s-3);
   color:var(--text-dim);
 }
 .vf__af i{
@@ -3692,7 +4001,7 @@ body.page-welcome{ --page-max: 2400px; }
   pointer-events:none;
 }
 .vf__intro{
-  display:flex; flex-direction:column; gap:13px;
+  display:flex; flex-direction:column; gap:var(--s-4);
   min-width:0;
   pointer-events:auto;
 }
@@ -3701,7 +4010,7 @@ body.page-welcome{ --page-max: 2400px; }
   font-family:var(--display-font);
   font-size:calc(clamp(30px, 5.4vw, 72px) * var(--display-scale));
   line-height:1.06;
-  letter-spacing:.04em;
+  letter-spacing:var(--tr-chrome-xl);
   color:var(--text);
   /* No text-shadow. It used to carry `0 2px 26px rgba(0,0,0,.7)` — an
      OFFSET drop, which is what made the word look extruded off the photo
@@ -3724,30 +4033,30 @@ body.page-welcome{ --page-max: 2400px; }
 .vf__lead{
   margin:0;
   color:rgba(240,240,244,.82);
-  font-size:14.5px;
+  font-size:var(--fs-text-lg);
   line-height:1.6;
   max-width:44ch;
   text-shadow:0 1px 10px rgba(0,0,0,.7);
 }
 .vf__actions{
   display:flex; flex-wrap:wrap; gap:10px;
-  margin-top:8px;
+  margin-top:var(--s-3);
 }
 /* flex items stretch to one row height; inline-flex keeps each label
    vertically centered even next to the taller about-me button */
 .vf__actions .btn-link{ display:inline-flex; align-items:center; }
 .vf .btn-link{
   background:var(--glass);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
 }
 .btn-link--primary{
-  color:var(--bg);
+  color:var(--on-acc);
   background:var(--acc);
   border-color:var(--acc);
 }
 .btn-link--primary:hover{
-  color:var(--bg);
+  color:var(--on-acc);
   background:var(--acc-soft);
   border-color:var(--acc-soft);
 }
@@ -3775,31 +4084,31 @@ body.page-welcome{ --page-max: 2400px; }
   box-shadow:0 0 24px rgba(var(--acc-rgb),.35);
 }
 .vf .btn-link--primary:hover{
-  color:var(--bg);
+  color:var(--on-acc);
   background:var(--acc);
   border-color:var(--acc);
   box-shadow:0 0 30px rgba(var(--acc-rgb),.5);
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference){
-  .vf .btn-link--primary{ transition:background .18s, border-color .18s, box-shadow .18s, transform .15s ease; }
-  .btn-link__go{ transition:transform .22s ease; }
+  .vf .btn-link--primary{ transition:background var(--dur-1), border-color var(--dur-1), box-shadow var(--dur-1), transform var(--dur-1) ease; }
+  .btn-link__go{ transition:transform var(--dur-2) ease; }
   .btn-link--primary:hover .btn-link__go{ transform:translateX(3px); }
 }
 
 /* file meta block (bottom right) links to the current frame */
 .vf__meta{
   pointer-events:auto;
-  display:flex; flex-direction:column; align-items:flex-end; gap:5px;
+  display:flex; flex-direction:column; align-items:flex-end; gap:var(--s-2);
   text-align:right;
   font-family:inherit;
-  padding:12px 14px;
-  border:1px solid rgba(255,255,255,.14);
+  padding:var(--s-4) 14px;
+  border:var(--hair) solid rgba(255,255,255,.14);
   border-right:2px solid var(--acc);
   background:var(--glass);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
   max-width:min(44ch, 40vw);
-  transition: border-color .2s, background .2s;
+  transition: border-color var(--dur-2), background var(--dur-2);
 }
 .vf__meta:hover{
   color:inherit;
@@ -3808,14 +4117,14 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .vf__meta-key{
   font-family:var(--mono);
-  font-size:9px;
+  font-size:var(--fs-chrome-xs);
   letter-spacing:.3em;
   text-transform:uppercase;
   color:var(--text-ghost);
 }
 .vf__meta-file{
   font-family:inherit;
-  font-size:13px;
+  font-size:var(--fs-text-md);
   color:var(--text);
   word-break:break-word;
 }
@@ -3824,26 +4133,26 @@ body.page-welcome{ --page-max: 2400px; }
 .vf__deck{
   position:absolute; z-index:7;
   left:0; right:0; bottom:0;
-  display:flex; align-items:center; gap:12px;
-  padding:12px var(--page-pad) 14px;
-  border-top:1px solid rgba(255,255,255,.1);
+  display:flex; align-items:center; gap:var(--s-4);
+  padding:var(--s-4) var(--page-pad) 14px;
+  border-top:var(--hair) solid rgba(255,255,255,.1);
   background:linear-gradient(180deg, rgba(0,0,0,.4), rgba(0,0,0,.72));
-  backdrop-filter: blur(8px) saturate(120%);
-  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  backdrop-filter:var(--scrim-blur);
+  -webkit-backdrop-filter:var(--scrim-blur);
 }
 .vf__nav,
 .vf__tune{
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
   background:transparent;
-  border:1px solid var(--line-strong);
+  border:var(--hair) solid var(--line-strong);
   color:var(--text-dim);
   cursor:pointer;
-  transition: color .15s, border-color .15s, background .15s;
+  transition: color var(--dur-1), border-color var(--dur-1), background var(--dur-1);
 }
-.vf__nav{ padding:4px 12px; font-size:14px; line-height:1.2; }
-.vf__tune{ padding:6px 12px; white-space:nowrap; }
+.vf__nav{ padding:var(--s-1) var(--s-4); font-size:var(--fs-text-lg); line-height:1.2; }
+.vf__tune{ padding:var(--s-2) var(--s-4); white-space:nowrap; }
 .vf__nav:hover,
 .vf__tune:hover{
   color:var(--chrome);
@@ -3853,13 +4162,13 @@ body.page-welcome{ --page-max: 2400px; }
 .vf__nav:focus-visible,
 .vf__tune:focus-visible,
 .vf__seg:focus-visible{
-  outline:1px solid var(--acc);
+  outline:var(--hair) solid var(--acc);
   outline-offset:2px;
 }
 .vf__track{
   flex:1;
   display:flex;
-  gap:6px;
+  gap:var(--s-2);
   min-width:0;
 }
 .vf__seg{
@@ -3877,7 +4186,7 @@ body.page-welcome{ --page-max: 2400px; }
   position:absolute; left:0; right:0; top:50%; height:3px;
   transform:translateY(-50%);
   background:rgba(255,255,255,.16);
-  transition:background .2s;
+  transition:background var(--dur-2);
 }
 .vf__seg:hover::before{ background:rgba(255,255,255,.34); }
 .vf__seg::after{            /* fill */
@@ -3905,7 +4214,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .vf__auto{
   font-family:inherit;
-  font-size:12px;
+  font-size:var(--fs-chrome-md);
   letter-spacing:.2em;
   text-transform:uppercase;
   color:var(--text-ghost);
@@ -3925,10 +4234,10 @@ body.page-welcome{ --page-max: 2400px; }
 .vf__empty{
   display:flex; flex-direction:column; align-items:center; gap:20px;
   text-align:center;
-  padding:64px var(--page-pad);
+  padding:var(--s-9) var(--page-pad);
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
 }
 .vf__empty .empty{ margin:0; }
 
@@ -3948,36 +4257,36 @@ body.page-welcome{ --page-max: 2400px; }
   max-width:var(--page-max);
   margin:0 auto;
   padding:0;
-  border-bottom:1px solid var(--line);
+  border-bottom:var(--hair) solid var(--line);
   background:var(--bg-2);
 }
 .arc__inner{
   max-width:var(--page-max);
   margin:0 auto;
-  padding:20px var(--page-pad) 24px;
+  padding:20px var(--page-pad) var(--s-6);
   display:flex; flex-direction:column; gap:14px;
 }
 .arc__head{
   display:flex; align-items:baseline; justify-content:space-between;
-  gap:8px 20px; flex-wrap:wrap;
+  gap:var(--s-3) 20px; flex-wrap:wrap;
 }
 /* the doc-line voice: this is a caption on the row below it, not a heading
    competing with the hero title above */
 .arc__label{
   margin:0;
   font-family:var(--mono);
-  font-size:10.5px; font-weight:400;
-  letter-spacing:.18em; text-transform:uppercase;
+  font-size:var(--fs-chrome-sm); font-weight:400;
+  letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
   color:var(--text-dim);
 }
 .arc__more{
   display:inline-flex; align-items:center;
   font-family:var(--mono);
-  font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
   color:var(--acc);
-  border-bottom:1px solid rgba(var(--acc-rgb),.35);
-  padding-bottom:3px;
-  transition:color .15s, border-color .15s;
+  border-bottom:var(--hair) solid rgba(var(--acc-rgb),.35);
+  padding-bottom:var(--s-1);
+  transition:color var(--dur-1), border-color var(--dur-1);
 }
 .arc__more:hover{ color:var(--chrome); border-bottom-color:var(--chrome); }
 
@@ -3997,7 +4306,7 @@ body.page-welcome{ --page-max: 2400px; }
   grid-template-columns:repeat(2, minmax(0,1fr));
   gap:1px;
   background:var(--line);
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
 }
 @media (min-width:761px){
   .arc__cells{
@@ -4007,14 +4316,14 @@ body.page-welcome{ --page-max: 2400px; }
   }
 }
 .arc__cell{
-  display:flex; flex-direction:column; gap:9px;
+  display:flex; flex-direction:column; gap:var(--s-3);
   min-width:0;
-  padding:14px 16px 16px;
+  padding:14px var(--s-5) var(--s-5);
   background:var(--bg-2);
 }
 .arc__key{
   font-family:var(--mono);
-  font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
   color:var(--text-dim);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
@@ -4023,7 +4332,7 @@ body.page-welcome{ --page-max: 2400px; }
   font-family:"Space Grotesk", sans-serif;
   font-size:clamp(26px, 3.1vw, 40px);
   font-weight:700; line-height:1;
-  letter-spacing:.01em;
+  letter-spacing:var(--tr-text);
   font-variant-numeric:tabular-nums;
   font-feature-settings:"tnum";
   /* the page title's fall (see .section__slug .name): the numbers read as
@@ -4074,7 +4383,7 @@ body.page-welcome{ --page-max: 2400px; }
   .vf__corner--tr{ top:10px; right:10px; }
   .vf__corner--bl{ bottom:10px; left:10px; }
   .vf__corner--br{ bottom:10px; right:10px; }
-  .vf__hudtop{ padding-top:14px; gap:10px; font-size:9px; letter-spacing:.16em; }
+  .vf__hudtop{ padding-top:14px; gap:10px; font-size:var(--fs-chrome-xs); letter-spacing:.16em; }
   .vf__auto{ display:none; }
   .vf .doc-min-hide,
   .arc .doc-min-hide{ display:none; }
@@ -4082,18 +4391,18 @@ body.page-welcome{ --page-max: 2400px; }
   /* stacked title: always break between the words on small screens — two
      short lines allow much larger type than one squeezed line */
   .vf__title{ letter-spacing:.02em; font-size:calc(clamp(30px, 9.5vw, 52px) * var(--display-scale)); }
-  .vf__lead{ font-size:13.5px; }
-  .vf__deck{ gap:8px; padding:10px var(--deck-pad) 12px; }
-  .vf__nav{ padding:5px 12px; }
-  .vf__tune{ padding:6px 9px; }
+  .vf__lead{ font-size:var(--fs-text-md); }
+  .vf__deck{ gap:var(--s-3); padding:10px var(--deck-pad) var(--s-4); }
+  .vf__nav{ padding:var(--s-2) var(--s-4); }
+  .vf__tune{ padding:var(--s-2) var(--s-3); }
   .vf__auto{ display:none; }
-  .vf__track{ gap:4px; }
-  .arc__inner{ padding:16px var(--deck-pad) 18px; gap:11px; }
-  .arc__cell{ padding:11px 12px 13px; gap:7px; }
+  .vf__track{ gap:var(--s-1); }
+  .arc__inner{ padding:var(--s-5) var(--deck-pad) 18px; gap:var(--s-4); }
+  .arc__cell{ padding:var(--s-4) var(--s-4) var(--s-4); gap:var(--s-3); }
   /* .18em tracking is a lot of width for an 11-character key: let it wrap
      rather than ellipsize away half of "LETZTES UPDATE" */
-  .arc__key{ white-space:normal; letter-spacing:.14em; }
-  .arc__val--date{ font-size:16px; }
+  .arc__key{ white-space:normal; letter-spacing:var(--tr-chrome-md); }
+  .arc__val--date{ font-size:var(--fs-text-lg); }
   .showcase-page{ padding-top:26px; }
 }
 
@@ -4117,8 +4426,8 @@ body.page-welcome{ --page-max: 2400px; }
    ================================================================ */
 .st-lead{
   max-width:74ch;
-  margin:0 0 24px;
-  font-size:13.5px;
+  margin:0 0 var(--s-6);
+  font-size:var(--fs-text-md);
   line-height:1.65;
   color:var(--text-dim);
 }
@@ -4150,7 +4459,7 @@ body.page-welcome{ --page-max: 2400px; }
   grid-template-columns:1fr;
   gap:1px;
   background:var(--line);
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
 }
 @media (min-width:900px){
   .st-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); }
@@ -4159,7 +4468,7 @@ body.page-welcome{ --page-max: 2400px; }
 .st-card{
   display:flex; flex-direction:column; gap:14px;
   min-width:0;
-  padding:16px 18px 20px;
+  padding:var(--s-5) 18px 20px;
   background:var(--bg-2);
   /* a chart card is a <section>, so the page-level `section` rule reaches
      it — and its `margin:0 auto` on a GRID ITEM does not centre a stretched
@@ -4170,15 +4479,15 @@ body.page-welcome{ --page-max: 2400px; }
   max-width:none;
 }
 .st-card__head{
-  display:flex; align-items:baseline; gap:8px 14px; flex-wrap:wrap;
-  padding-bottom:9px;
-  border-bottom:1px solid var(--line);
+  display:flex; align-items:baseline; gap:var(--s-3) 14px; flex-wrap:wrap;
+  padding-bottom:var(--s-3);
+  border-bottom:var(--hair) solid var(--line);
 }
 .st-card__title{
   margin:0;
   font-family:var(--mono);
-  font-size:11px; font-weight:400;
-  letter-spacing:.24em; text-transform:uppercase;
+  font-size:var(--fs-chrome-sm); font-weight:400;
+  letter-spacing:var(--tr-chrome-xs); text-transform:uppercase;
   color:var(--label);
 }
 /* The qualifier that keeps a chart honest — a rolling window, a unit, how
@@ -4195,9 +4504,9 @@ body.page-welcome{ --page-max: 2400px; }
 .st-card__note{
   margin:0; margin-left:auto;
   max-width:46ch;
-  font-size:11.5px;
+  font-size:var(--fs-text-sm);
   line-height:1.5;
-  letter-spacing:.01em;
+  letter-spacing:var(--tr-text);
   color:var(--text-dim);
   text-align:right;
 }
@@ -4210,14 +4519,14 @@ body.page-welcome{ --page-max: 2400px; }
 .st-foot{
   margin:20px 0 0;
   font-family:var(--mono);
-  font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-md); text-transform:uppercase;
   color:var(--text-dim);
 }
 
 /* ---- ranked horizontal bars ---- */
 .ch-bars{
   list-style:none; margin:0; padding:0;
-  display:flex; flex-direction:column; gap:7px;
+  display:flex; flex-direction:column; gap:var(--s-3);
 }
 .ch-bar{
   display:grid;
@@ -4226,17 +4535,17 @@ body.page-welcome{ --page-max: 2400px; }
      narrow card shrinks it instead of overflowing. */
   grid-template-columns:minmax(0, 9.5em) minmax(0,1fr) auto;
   align-items:center;
-  gap:12px;
+  gap:var(--s-4);
 }
 .ch-bar__label{
   min-width:0;
-  font-size:12.5px;
+  font-size:var(--fs-text-md);
   color:var(--text-dim);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 /* an album bar links into the album it measures, so the chart doubles as
    navigation — the same job the trip timeline's leg cards do */
-.ch-bar__label--link{ color:var(--text-dim); transition:color .15s; }
+.ch-bar__label--link{ color:var(--text-dim); transition:color var(--dur-1); }
 .ch-bar__label--link:hover{ color:var(--acc); }
 .ch-bar__meter{
   display:block; min-width:0;
@@ -4250,7 +4559,7 @@ body.page-welcome{ --page-max: 2400px; }
 .ch-bar.is-peak .ch-bar__label{ color:var(--text); }
 .ch-bar__val{
   font-family:var(--mono);
-  font-size:11.5px; letter-spacing:.06em;
+  font-size:var(--fs-chrome-md); letter-spacing:var(--tr-num);
   color:var(--text);
   font-variant-numeric:tabular-nums;
   font-feature-settings:"tnum";
@@ -4260,19 +4569,19 @@ body.page-welcome{ --page-max: 2400px; }
 /* ---- vertical columns ---- */
 .ch-cols{
   list-style:none; margin:0; padding:0;
-  display:flex; align-items:flex-end; gap:4px;
+  display:flex; align-items:flex-end; gap:var(--s-1);
   /* the axis the columns stand on — a hairline in CSS, not a drawn line
      inside the SVG, so it stays one device pixel at any width */
-  border-bottom:1px solid var(--line-strong);
-  padding-bottom:7px;
+  border-bottom:var(--hair) solid var(--line-strong);
+  padding-bottom:var(--s-3);
 }
 .ch-col{
   flex:1 1 0; min-width:0;
-  display:flex; flex-direction:column; align-items:stretch; gap:5px;
+  display:flex; flex-direction:column; align-items:stretch; gap:var(--s-2);
 }
 .ch-col__n{
   font-family:var(--mono);
-  font-size:9.5px; letter-spacing:.04em;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xl);
   color:var(--text-dim);
   font-variant-numeric:tabular-nums;
   text-align:center;
@@ -4295,7 +4604,7 @@ body.page-welcome{ --page-max: 2400px; }
 .ch-col__label,
 .ch-col__tick{
   font-family:var(--mono);
-  font-size:9.5px; letter-spacing:.08em; text-transform:uppercase;
+  font-size:var(--fs-chrome-xs); letter-spacing:.08em; text-transform:uppercase;
   text-align:center;
   white-space:nowrap;
   overflow:hidden;
@@ -4316,9 +4625,9 @@ body.page-welcome{ --page-max: 2400px; }
    The page body must never scroll sideways, so the overflow is owned here
    by the chart that causes it. */
 .ch-scroll{ overflow-x:auto; }
-.ch-cols--dense{ gap:2px; }
+.ch-cols--dense{ gap:var(--s-0); }
 .ch-cols--dense .ch-col__bar{ height:84px; }
-.ch-cols--dense .ch-col__label{ font-size:9px; letter-spacing:.02em; }
+.ch-cols--dense .ch-col__label{ font-size:var(--fs-chrome-xs); letter-spacing:.02em; }
 
 /* ---- the magnitude ramp, shared by every chart ----
    One hue, four steps. The step comes from the VALUE against the series
@@ -4381,7 +4690,7 @@ body.page-welcome{ --page-max: 2400px; }
 .ch-dial__spoke.is-peak{ stroke:var(--acc-soft); }
 .ch-dial__tick{
   font-family:var(--mono);
-  font-size:11px; letter-spacing:.08em;
+  font-size:var(--fs-chrome-sm); letter-spacing:.08em;
   fill:var(--text-dim);
 }
 /* the reading the shape alone cannot give: which hour wins, and by how much */
@@ -4392,7 +4701,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .ch-dial__peak-n{
   font-family:var(--mono);
-  font-size:11px; letter-spacing:.16em;
+  font-size:var(--fs-chrome-sm); letter-spacing:.16em;
   fill:var(--label);
 }
 
@@ -4420,7 +4729,7 @@ body.page-welcome{ --page-max: 2400px; }
 .ch-stack__seg.is-s4{ fill:rgba(var(--acc-rgb),.85); }
 .ch-stack__legend{
   list-style:none; margin:0; padding:0;
-  display:flex; flex-direction:column; gap:7px;
+  display:flex; flex-direction:column; gap:var(--s-3);
 }
 .ch-stack__key{
   display:grid;
@@ -4441,13 +4750,13 @@ body.page-welcome{ --page-max: 2400px; }
 .ch-stack__swatch.is-s4{ background:rgba(var(--acc-rgb),.85); }
 .ch-stack__name{
   min-width:0;
-  font-size:12.5px; color:var(--text-dim);
+  font-size:var(--fs-text-md); color:var(--text-dim);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .ch-stack__share,
 .ch-stack__n{
   font-family:var(--mono);
-  font-size:11.5px; letter-spacing:.06em;
+  font-size:var(--fs-chrome-md); letter-spacing:var(--tr-num);
   font-variant-numeric:tabular-nums;
   font-feature-settings:"tnum";
   white-space:nowrap;
@@ -4469,12 +4778,12 @@ body.page-welcome{ --page-max: 2400px; }
 }
 
 @media (max-width:760px){
-  .st-lead{ font-size:12.5px; margin-bottom:18px; }
+  .st-lead{ font-size:var(--fs-text-md); margin-bottom:18px; }
   .st-figs{ margin-bottom:18px; }
-  .st-card{ padding:13px 13px 16px; gap:11px; }
-  .st-card__note{ margin-left:0; flex-basis:100%; max-width:none; text-align:left; font-size:11px; }
-  .ch-bar{ grid-template-columns:minmax(0, 7em) minmax(0,1fr) auto; gap:9px; }
-  .ch-bar__label{ font-size:12px; }
+  .st-card{ padding:var(--s-4) var(--s-4) var(--s-5); gap:var(--s-4); }
+  .st-card__note{ margin-left:0; flex-basis:100%; max-width:none; text-align:left; font-size:var(--fs-text-sm); }
+  .ch-bar{ grid-template-columns:minmax(0, 7em) minmax(0,1fr) auto; gap:var(--s-3); }
+  .ch-bar__label{ font-size:var(--fs-text-sm); }
   .ch-col__bar{ height:78px; }
   .ch-cols--dense .ch-col__bar{ height:62px; }
   /* the long axis gets its designed density back and the card scrolls to it */
@@ -4486,7 +4795,7 @@ body.page-welcome{ --page-max: 2400px; }
      so the axis still says what it is */
   .ch-cols--dense .ch-col__label{ visibility:hidden; }
   .ch-cols--dense .ch-col:nth-child(6n+1) .ch-col__label{ visibility:visible; }
-  .ch-col__tick{ font-size:9px; }
+  .ch-col__tick{ font-size:var(--fs-chrome-xs); }
 }
 
 /* ================================================================
@@ -4496,8 +4805,8 @@ body.page-welcome{ --page-max: 2400px; }
 .notfound__body{
   display:grid;
   grid-template-columns: minmax(0, 1fr);
-  gap:32px;
-  padding:48px 0 32px;
+  gap:var(--s-7);
+  padding:var(--s-8) 0 var(--s-7);
   align-items:center;
   justify-items:center;
   text-align:center;
@@ -4511,9 +4820,9 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .notfound__code{
   display:flex; flex-direction:column;
-  align-items:center; gap:6px;
-  padding:24px 32px;
-  border:1px solid var(--line-strong);
+  align-items:center; gap:var(--s-2);
+  padding:var(--s-6) var(--s-7);
+  border:var(--hair) solid var(--line-strong);
   background:
     repeating-linear-gradient(45deg,
       rgba(var(--red-rgb),.05) 0 8px,
@@ -4525,21 +4834,21 @@ body.page-welcome{ --page-max: 2400px; }
 .notfound__code::after{
   content:""; position:absolute;
   width:16px; height:16px;
-  border:1px solid var(--red);
+  border:var(--hair) solid var(--red);
 }
 .notfound__code::before{ top:-1px; left:-1px; border-right:0; border-bottom:0; }
 .notfound__code::after{ bottom:-1px; right:-1px; border-left:0; border-top:0; }
 .notfound__big{
   font-family:var(--display-font);
   font-size:calc(clamp(64px, 12vw, 120px) * var(--display-scale));
-  letter-spacing:.06em;
+  letter-spacing:var(--tr-num);
   line-height:1;
   color:var(--red);
   text-shadow: 0 0 28px rgba(var(--red-rgb),.4);
 }
 .notfound__jp{
   font-family:"Noto Sans JP", sans-serif;
-  font-size:13px;
+  font-size:var(--fs-chrome-lg);
   letter-spacing:.4em;
   color:var(--text-ghost);
   text-transform:none;
@@ -4548,29 +4857,29 @@ body.page-welcome{ --page-max: 2400px; }
 .notfound__title{
   font-family:var(--display-font);
   font-size:calc(clamp(22px, 2.6vw, 32px) * var(--display-scale));
-  letter-spacing:.04em;
+  letter-spacing:var(--tr-chrome-xl);
   margin:0 0 14px;
   color:var(--text);
 }
 .notfound__lead{
-  font-size:14px;
+  font-size:var(--fs-text-lg);
   color:var(--text-dim);
-  margin:0 0 12px;
+  margin:0 0 var(--s-4);
   word-break:break-all;
 }
 .notfound__actions{ margin-top:22px; }
 .btn-link{
   display:inline-block;
   font-family:inherit;
-  font-size:12px;
-  letter-spacing:.01em;
-  padding:9px 16px;
-  border:1px solid var(--line-strong);
+  font-size:var(--fs-text-sm);
+  letter-spacing:var(--tr-text);
+  padding:var(--s-3) var(--s-5);
+  border:var(--hair) solid var(--line-strong);
   color:var(--text);
   background:var(--glass);
   backdrop-filter:var(--glass-blur);
   -webkit-backdrop-filter:var(--glass-blur);
-  transition: border-color .15s, color .15s, background .15s;
+  transition: border-color var(--dur-1), color var(--dur-1), background var(--dur-1);
 }
 .btn-link:hover{
   color:var(--chrome);
@@ -4578,11 +4887,11 @@ body.page-welcome{ --page-max: 2400px; }
   background:rgba(var(--chrome-rgb),.06);
 }
 /* about-me action: btn-link carrying the tiny operator pfp */
-.btn-link--about{ gap:9px; }
+.btn-link--about{ gap:var(--s-3); }
 .btn-link__pfp{
   display:block;
   width:18px; height:18px;
-  border:1px solid var(--line-strong);
+  border:var(--hair) solid var(--line-strong);
   border-radius:var(--radius);
 }
 
@@ -4624,7 +4933,7 @@ body.page-welcome{ --page-max: 2400px; }
      widget whose bar/body bring their own padding; the page rule would just
      add dead height inside the box */
   padding:0;
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
   /* the one place the frame itself states the phase: a 2px rule along the
      top edge, so the module announces its state before anything is read */
   border-top:2px solid var(--line-strong);
@@ -4652,12 +4961,12 @@ body.page-welcome{ --page-max: 2400px; }
    count and date span; the identity in display type belongs to the hero
    right underneath and is not repeated here. */
 .trip__bar{
-  display:flex; align-items:baseline; gap:6px 18px; flex-wrap:wrap;
-  padding:11px 14px;
-  border-bottom:1px solid var(--line);
+  display:flex; align-items:baseline; gap:var(--s-2) 18px; flex-wrap:wrap;
+  padding:var(--s-4) 14px;
+  border-bottom:var(--hair) solid var(--line);
   font-family:var(--mono);
-  font-size:10.5px;
-  letter-spacing:.18em;
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-sm);
   text-transform:uppercase;
   color:var(--text-dim);
 }
@@ -4667,18 +4976,18 @@ body.page-welcome{ --page-max: 2400px; }
 .trip--transit .trip__tag,
 .trip--active .trip__tag{ color:var(--trip-live); }
 .trip--done .trip__tag{ color:var(--trip-done); }
-.trip__name{ color:var(--text); letter-spacing:.14em; }
+.trip__name{ color:var(--text); letter-spacing:var(--tr-chrome-md); }
 .trip__legs b{ color:var(--text); font-weight:400; }
-.trip__span{ color:var(--text-ghost); letter-spacing:.1em; font-variant-numeric:tabular-nums; }
+.trip__span{ color:var(--text-ghost); letter-spacing:var(--tr-chrome-lg); font-variant-numeric:tabular-nums; }
 /* the state stamp — one of the four marks on this page allowed a colour.
    A hairline outline, like .section__doc-mark, not a filled badge. */
 .trip__status{
   margin-left:auto;
-  padding:3px 9px;
-  font-size:9.5px; letter-spacing:.2em;
+  padding:var(--s-1) var(--s-3);
+  font-size:var(--fs-chrome-xs); letter-spacing:.2em;
   white-space:nowrap;
   color:var(--label);
-  border:1px solid rgba(var(--label-rgb),.35);
+  border:var(--hair) solid rgba(var(--label-rgb),.35);
 }
 .trip--pre .trip__status{ color:var(--trip); border-color:rgba(var(--trip-rgb),.45); }
 .trip--transit .trip__status,
@@ -4688,7 +4997,7 @@ body.page-welcome{ --page-max: 2400px; }
    Named place + zone code around the time, so the reading is unambiguous:
    "JAPAN TIME 16:20:16 JST". */
 .trip__clock{
-  display:inline-flex; align-items:baseline; gap:7px;
+  display:inline-flex; align-items:baseline; gap:var(--s-3);
   color:var(--text-ghost);
   font-variant-numeric:tabular-nums; white-space:nowrap;
 }
@@ -4699,7 +5008,7 @@ body.page-welcome{ --page-max: 2400px; }
 /* ---- body layout ---- */
 .trip__main{
   display:flex; flex-direction:column; gap:18px;
-  padding:18px 16px 20px;
+  padding:18px var(--s-5) 20px;
 }
 /* Desktop layout (countdown on the left + legs as a left→right row of compact
    cards to its right) lives at the end of this section — it overrides the base
@@ -4710,12 +5019,12 @@ body.page-welcome{ --page-max: 2400px; }
    grid swaps it for a right-hand divider (see ≥1100px below) */
 .trip__cd{
   display:flex; flex-direction:column; gap:10px; min-width:0;
-  padding-bottom:16px; border-bottom:1px solid var(--line);
+  padding-bottom:var(--s-5); border-bottom:var(--hair) solid var(--line);
 }
 .trip__cd-label{
-  display:flex; align-items:center; gap:8px;
+  display:flex; align-items:center; gap:var(--s-3);
   font-family:var(--mono);
-  font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
   color:var(--text-dim);
 }
 /* leading state marker — the module's phase, in four pixels */
@@ -4734,7 +5043,7 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__cd-clock{
   position:relative;
   display:flex; align-items:stretch;
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
   background:var(--bg-2);
 }
 /* phase hairline riding the panel's top edge, fading out to the right. The
@@ -4754,9 +5063,9 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__cd-unit{
   position:relative;
   flex:1 1 0; min-width:0;
-  display:flex; flex-direction:column; align-items:center; gap:6px;
-  padding:12px 6px 10px;
-  border-right:1px solid var(--line);
+  display:flex; flex-direction:column; align-items:center; gap:var(--s-2);
+  padding:var(--s-4) var(--s-2) 10px;
+  border-right:var(--hair) solid var(--line);
 }
 .trip__cd-unit:last-child{ border-right:0; }
 /* the page title's fall, and the same face — a countdown is the biggest
@@ -4767,7 +5076,7 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__cd-unit b{
   font-family:"Space Grotesk", sans-serif;
   font-weight:700; font-size:clamp(28px, 5.4vw, 42px); line-height:1;
-  letter-spacing:.01em;
+  letter-spacing:var(--tr-text);
   font-variant-numeric:tabular-nums;
   font-feature-settings:"tnum";
   color:var(--title-a);
@@ -4780,16 +5089,16 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__cd-unit b::selection{ -webkit-text-fill-color:var(--text); }
 .trip__cd-unit i{
   font-family:var(--mono);
-  font-style:normal; font-size:9.5px; letter-spacing:.2em; text-transform:uppercase;
+  font-style:normal; font-size:var(--fs-chrome-xs); letter-spacing:.2em; text-transform:uppercase;
   color:var(--text-ghost);
 }
 .trip__cd-sep{ display:none; }
 .trip__cd-target{
-  display:inline-flex; align-self:flex-start; align-items:center; gap:7px;
-  padding:3px 9px;
-  border:1px solid var(--line);
+  display:inline-flex; align-self:flex-start; align-items:center; gap:var(--s-3);
+  padding:var(--s-1) var(--s-3);
+  border:var(--hair) solid var(--line);
   font-family:var(--mono);
-  font-size:9.5px; letter-spacing:.2em; text-transform:uppercase;
+  font-size:var(--fs-chrome-xs); letter-spacing:.2em; text-transform:uppercase;
   color:var(--text-ghost);
 }
 .trip__cd-target b{ color:var(--text); font-weight:400; }
@@ -4801,14 +5110,14 @@ body.page-welcome{ --page-max: 2400px; }
    pairs the live weather block with the day counter. ---- */
 .trip__line{
   list-style:none; margin:0; padding:0;
-  display:flex; flex-direction:column; gap:9px;
+  display:flex; flex-direction:column; gap:var(--s-3);
 }
 .trip__stop{
   position:relative; margin:0; min-width:0;
-  border:1px solid var(--line);
+  border:var(--hair) solid var(--line);
   background:var(--bg-2);
   isolation:isolate;
-  transition:border-color .2s ease, box-shadow .2s ease;
+  transition:border-color var(--dur-2) ease, box-shadow var(--dur-2) ease;
 }
 .trip__stop.is-active{
   border-color:rgba(var(--trip-live-rgb),.55);
@@ -4824,7 +5133,7 @@ body.page-welcome{ --page-max: 2400px; }
   left:50%; top:-9px; margin-left:-7px;
   width:14px; height:9px;
   display:flex; align-items:center; justify-content:center;
-  font-family:var(--mono); font-size:9px; line-height:1;
+  font-family:var(--mono); font-size:var(--fs-chrome-xs); line-height:1;
   color:var(--text-ghost);
 }
 /* Hover reads on the whole card, in --chrome like every other hover on the
@@ -4840,7 +5149,7 @@ body.page-welcome{ --page-max: 2400px; }
   position:relative;
   display:flex; flex-direction:column;
   min-height:96px; min-width:0;
-  padding:11px 13px 13px;
+  padding:var(--s-4) var(--s-4) var(--s-4);
   text-decoration:none; color:inherit;
 }
 
@@ -4850,7 +5159,7 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__stop-media img{
   width:100%; height:100%; object-fit:cover; display:block;
   filter:saturate(.8) brightness(.7) contrast(1.05);
-  transition:filter .25s ease, transform .6s ease;
+  transition:filter var(--dur-2) ease, transform .6s ease;
 }
 @media (hover: hover){
   a.trip__stop-link:hover .trip__stop-media img{
@@ -4867,11 +5176,11 @@ body.page-welcome{ --page-max: 2400px; }
 
 .trip__stop-body{
   position:relative; z-index:2;
-  display:flex; flex-direction:column; gap:7px;
+  display:flex; flex-direction:column; gap:var(--s-3);
   flex:1 1 auto; min-width:0;
   text-shadow:0 1px 6px rgba(0, 0, 0, .55);
 }
-.trip__stop-head{ display:flex; align-items:center; gap:8px; min-width:0; }
+.trip__stop-head{ display:flex; align-items:center; gap:var(--s-3); min-width:0; }
 /* civic emblem of the destination, leading the region name — the region
    album's own `icon = …` (album.cfg), like everywhere else the album is
    named (.album-ico). The drop-shadow keeps the coloured marks legible over
@@ -4883,21 +5192,21 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip__stop-city{
   font-family:"Space Grotesk", sans-serif; font-weight:600;
-  font-size:15px; letter-spacing:.02em; color:var(--text);
+  font-size:var(--fs-text-lg); letter-spacing:.02em; color:var(--text);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 /* "you are here", said in the name itself — the one leg whose label is
    allowed a colour */
 .trip__stop.is-active .trip__stop-city{ color:var(--trip-live); }
 .trip__stop-jp{
-  font-family:"Noto Sans JP", sans-serif; font-size:11px; color:var(--text-ghost);
+  font-family:"Noto Sans JP", sans-serif; font-size:var(--fs-text-sm); color:var(--text-ghost);
   white-space:nowrap; flex:0 0 auto;
 }
 /* state LED leading the head row */
 .trip__stop-dot{
   align-self:center; flex:0 0 auto;
   width:8px; height:8px;
-  border:1px solid var(--text-ghost); background:var(--bg);
+  border:var(--hair) solid var(--text-ghost); background:var(--bg);
   transform:rotate(45deg);
 }
 .trip__stop.is-upcoming .trip__stop-dot{ border-color:var(--trip); }
@@ -4908,7 +5217,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip__stop-dates{
   font-family:var(--mono);
-  font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-md); text-transform:uppercase;
   color:var(--text-dim);
   font-variant-numeric:tabular-nums;
 }
@@ -4918,7 +5227,7 @@ body.page-welcome{ --page-max: 2400px; }
 
 /* footer: weather (live) left, day counter right */
 .trip__stop-foot{
-  margin-top:auto; padding-top:9px;
+  margin-top:auto; padding-top:var(--s-3);
   display:flex; align-items:flex-end; gap:10px; min-width:0;
 }
 /* live weather: a small readout with its own left rule — glyph,
@@ -4928,14 +5237,14 @@ body.page-welcome{ --page-max: 2400px; }
    beat the display below. */
 .trip__stop-wx[hidden]{ display:none; }
 .trip__stop-wx{
-  display:flex; flex-direction:column; gap:3px; min-width:0;
-  padding-left:9px;
-  border-left:1px solid var(--line-strong);
+  display:flex; flex-direction:column; gap:var(--s-1); min-width:0;
+  padding-left:var(--s-3);
+  border-left:var(--hair) solid var(--line-strong);
 }
 .trip__stop-wx-now{
-  display:inline-flex; align-items:center; gap:6px;
+  display:inline-flex; align-items:center; gap:var(--s-2);
   font-family:var(--mono); font-weight:500;
-  font-size:14px; letter-spacing:.02em; color:var(--text);
+  font-size:var(--fs-chrome-lg); letter-spacing:.02em; color:var(--text);
   font-variant-numeric:tabular-nums; white-space:nowrap;
 }
 .trip__stop-wx-ico{ font-style:normal; font-size:1.05em; color:var(--label); line-height:1; }
@@ -4953,27 +5262,27 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__stop-wx-range[hidden]{ display:none; }
 .trip__stop-wx-range{
   flex:0 0 auto;
-  font-size:.62em; font-weight:400; letter-spacing:.04em;
+  font-size:.62em; font-weight:400; letter-spacing:var(--tr-chrome-xl);
   color:var(--text-ghost); font-variant-numeric:tabular-nums;
 }
 .trip__stop-wx-sub{
   display:flex; align-items:baseline; min-width:0;
   font-family:var(--mono);
-  font-size:9.5px; letter-spacing:.16em; text-transform:uppercase;
+  font-size:var(--fs-chrome-xs); letter-spacing:.16em; text-transform:uppercase;
   color:var(--text-ghost);
 }
 .trip__stop-wx-cond{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .trip__stop-side{
-  display:flex; align-items:center; gap:9px;
+  display:flex; align-items:center; gap:var(--s-3);
   flex:0 0 auto; margin-left:auto; text-align:right;
 }
 /* day counter as a hairline chip — a state badge, so it takes the state
    colour, in the same outlined form as .section__doc-mark */
 .trip__stop-meta{
-  padding:3px 8px;
-  border:1px solid rgba(var(--label-rgb),.3);
+  padding:var(--s-1) var(--s-3);
+  border:var(--hair) solid rgba(var(--label-rgb),.3);
   font-family:var(--mono);
-  font-size:9.5px; letter-spacing:.18em; text-transform:uppercase;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
   color:var(--text-dim); white-space:nowrap;
 }
 .trip__stop.is-active .trip__stop-meta{ color:var(--trip-live); border-color:rgba(var(--trip-live-rgb),.45); }
@@ -5009,8 +5318,8 @@ body.page-welcome{ --page-max: 2400px; }
   /* fills its column (full-width panels on mobile, the sidebar on desktop),
      capped so it never grows unwieldy on tablet widths */
   margin:0 auto; width:100%; max-width:360px;
-  padding:10px 10px 12px;
-  border:1px solid var(--line);
+  padding:10px 10px var(--s-4);
+  border:var(--hair) solid var(--line);
   position:relative;
   /* solid panel (no see-through to the page bg) with a faint blueprint grid
      over it — grid lines are the only translucent part, and they are
@@ -5022,9 +5331,9 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip-map::after{
   content:"日本 / ROUTE";
-  position:absolute; right:9px; bottom:7px;
+  position:absolute; right:var(--s-3); bottom:var(--s-3);
   font-family:"Noto Sans JP", var(--mono);
-  font-size:10px; letter-spacing:.12em; color:var(--text-ghost);
+  font-size:var(--fs-chrome-sm); letter-spacing:.12em; color:var(--text-ghost);
   pointer-events:none;
 }
 .trip-map svg{ display:block; width:100%; height:auto; }
@@ -5067,8 +5376,8 @@ body.page-welcome{ --page-max: 2400px; }
 .trip-map__city.is-active .trip-map__ring{ opacity:.75; animation:trip-map-spin 16s linear infinite; }
 
 .trip-map__lbl{
-  font-family:var(--mono); font-size:11px;
-  letter-spacing:.1em; fill:var(--text-dim);
+  font-family:var(--mono); font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-lg); fill:var(--text-dim);
 }
 .trip-map__city.is-active .trip-map__lbl{ fill:var(--trip-live); }
 .trip-map__city.is-done   .trip-map__lbl{ fill:rgba(var(--trip-done-rgb),.7); }
@@ -5095,20 +5404,20 @@ body.page-welcome{ --page-max: 2400px; }
 @media (min-width:1100px){
   .trip__main{
     display:grid; grid-template-columns:auto minmax(0,1fr);
-    gap:26px; align-items:stretch; padding:16px 16px 18px;
+    gap:26px; align-items:stretch; padding:var(--s-5) var(--s-5) 18px;
   }
   .trip__cd{
-    gap:9px; justify-content:center;
-    padding:0 26px 0 4px; border-bottom:0;
-    border-right:1px solid var(--line);
+    gap:var(--s-3); justify-content:center;
+    padding:0 26px 0 var(--s-1); border-bottom:0;
+    border-right:var(--hair) solid var(--line);
   }
-  .trip__cd-unit{ padding:10px 10px 8px; }
+  .trip__cd-unit{ padding:10px 10px var(--s-3); }
   .trip__cd-unit b{ font-size:32px; }
   /* legs run side by side, sharing the column width equally; the gap is
      wide enough to carry the route chevron between two cards */
   .trip__line{ flex-direction:row; gap:14px; }
   .trip__stop{ flex:1 1 0; }
-  .trip__stop-link{ min-height:126px; padding:13px 15px 15px; }
+  .trip__stop-link{ min-height:126px; padding:var(--s-4) var(--s-5) var(--s-5); }
   .trip__stop + .trip__stop::before{
     content:"▸";
     left:-14px; top:50%; margin:-7px 0 0;
@@ -5123,37 +5432,37 @@ body.page-welcome{ --page-max: 2400px; }
    city / kanji / state dot, the date span in miniature, live temp in the
    foot. */
 @media (max-width:760px){
-  .trip__bar{ padding:9px 12px; gap:5px 12px; font-size:9.5px; letter-spacing:.14em; }
+  .trip__bar{ padding:var(--s-3) var(--s-4); gap:var(--s-2) var(--s-4); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-md); }
   /* three wrapped rows of meta above a countdown is too much preamble on a
      phone; the leg cards carry the dates anyway */
   .trip .doc-min-hide{ display:none; }
   .trip__main{ gap:14px; }
-  .trip__line{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:7px; }
-  .trip__stop-link{ min-height:148px; padding:9px 10px 10px; }
+  .trip__line{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:var(--s-3); }
+  .trip__stop-link{ min-height:148px; padding:var(--s-3) 10px 10px; }
   /* narrow portrait tile: swap the left-heavy readability shade for a
      bottom-heavy one so the text block anchors to the foot of the tile */
   .trip__stop-shade{
     background:linear-gradient(0deg,
       rgba(0,0,0,.94) 0%, rgba(0,0,0,.55) 46%, rgba(0,0,0,.2) 100%);
   }
-  .trip__stop-body{ gap:4px; justify-content:flex-end; }
-  .trip__stop-head{ flex-wrap:wrap; gap:2px 6px; align-items:center; }
+  .trip__stop-body{ gap:var(--s-1); justify-content:flex-end; }
+  .trip__stop-head{ flex-wrap:wrap; gap:var(--s-0) var(--s-2); align-items:center; }
   .trip__stop + .trip__stop::before{ display:none; }
-  .trip__stop-city{ font-size:13.5px; }
-  .trip__stop-jp{ font-size:11px; }
-  .trip__stop-dates{ font-size:9px; letter-spacing:.06em; line-height:1.5; white-space:normal; }
-  .trip__stop-foot{ padding-top:6px; gap:8px; }
+  .trip__stop-city{ font-size:var(--fs-text-md); }
+  .trip__stop-jp{ font-size:var(--fs-text-sm); }
+  .trip__stop-dates{ font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-num); line-height:1.5; white-space:normal; }
+  .trip__stop-foot{ padding-top:var(--s-2); gap:var(--s-3); }
   /* the tile is too narrow for the readout's rule + sub-line: temperature
      only, flush with the rest of the text column */
   .trip__stop-wx{ padding-left:0; border-left:0; }
-  .trip__stop-wx-now{ font-size:12px; gap:5px; }
+  .trip__stop-wx-now{ font-size:var(--fs-chrome-md); gap:var(--s-2); }
   .trip__stop-wx-sub, .trip__stop-wx-range{ display:none; }
   .trip__stop-meta{ display:none; }
 }
 
 @media (max-width:420px){
-  .trip__main{ padding:12px; gap:12px; }
-  .trip__bar{ padding:8px 11px; row-gap:5px; }
+  .trip__main{ padding:var(--s-4); gap:var(--s-4); }
+  .trip__bar{ padding:var(--s-3) var(--s-4); row-gap:var(--s-2); }
   .trip__tag, .trip__name, .trip__legs{ white-space:nowrap; }
   /* the stamp and the clock both want the right edge on a line that no
      longer has one — let them take a row of their own */
@@ -5343,7 +5652,7 @@ html.fx-anim .section__head.rv-in::after{
 html.fx-anim img.img-fade{ opacity:0; }
 html.fx-anim img.img-fade.img-in{
   opacity:1;
-  transition: opacity .45s ease, transform .35s ease, filter .35s ease;
+  transition: opacity .45s ease, transform var(--dur-3) ease, filter var(--dur-3) ease;
 }
 
 /* ---- stage pixel-in (opening a photo; wired in app.js) ---- */
@@ -5364,7 +5673,7 @@ html.fx-anim img.px-wait{ opacity:0; }
   filter:saturate(.92) brightness(.96);
   /* the mosaic is faded off the finished photo rather than deleted out from
      over it — see finish() in __stagePixelIn */
-  transition: opacity .22s ease;
+  transition: opacity var(--dur-2) ease;
 }
 .px-canvas.px-gone{ opacity:0; }
 
@@ -5545,7 +5854,7 @@ html.fx-anim .lightbox.is-closing{ animation: lb-out .32s ease forwards; pointer
   to  { opacity:0; }
 }
 .lightbox__img.is-flip{
-  transition: transform .42s cubic-bezier(.19,.66,.28,.99), opacity .15s ease;
+  transition: transform .42s cubic-bezier(.19,.66,.28,.99), opacity var(--dur-1) ease;
   will-change:transform;
 }
 html.fx-anim .lightbox__img.lb-slide-next{ animation: stage-in-next .3s cubic-bezier(.19,.66,.28,.99); }
@@ -5556,9 +5865,13 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__close,
 html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease .22s backwards; }
 
 /* ---- sticky nav: deepen once the page scrolls (class from app.js) ---- */
-.nav{ transition: background .25s ease, box-shadow .25s ease; }
+/* The bar does NOT get a darker fill once the page scrolls: rule 3 says a
+   surface that needs to read better takes more blur or the -hi step, never
+   a darker fill, and --pane is already at the top of the blur ladder. What
+   says "this bar is floating over content now" is the accent hairline
+   brightening (.nav--scrolled::after, above) and the cast shadow. */
+.nav{ transition: box-shadow var(--dur-2) var(--ease); }
 .nav--scrolled{
-  background:rgba(0,0,0,.94);
   box-shadow:0 12px 32px -18px rgba(0,0,0,.85);
 }
 
@@ -5566,7 +5879,7 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease
    rather than the JS fx-anim class) ---- */
 @media (prefers-reduced-motion: no-preference){
   /* back button: chevron leans into "back" */
-  .pathbar__back-ico{ transition:transform .18s ease; }
+  .pathbar__back-ico{ transition:transform var(--dur-1) ease; }
   .pathbar__back:hover .pathbar__back-ico{ transform:translateX(-3px); }
 
   /* stage arrows lean into their direction */
@@ -5574,9 +5887,9 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease
   .nav-arrow.next:hover{ transform:translateY(-50%) translateX(2px); }
 
   /* tags + button links: 1px lift, gentle press */
-  .tag{ transition:border-color .15s, color .15s, background .15s, transform .15s ease; }
+  .tag{ transition:border-color var(--dur-1), color var(--dur-1), background var(--dur-1), transform var(--dur-1) ease; }
   .tag:hover{ transform:translateY(-1px); }
-  .btn-link{ transition:border-color .15s, color .15s, background .15s, transform .15s ease; }
+  .btn-link{ transition:border-color var(--dur-1), color var(--dur-1), background var(--dur-1), transform var(--dur-1) ease; }
   .btn-link:hover{ transform:translateY(-1px); }
   .btn-link:active,
   .pathbar__back:active,
@@ -5737,62 +6050,62 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
    ================================================================ */
 @media (min-width:761px){
   /* page title row */
-  .section__slug .ix{ font-size:15px; }
+  .section__slug .ix{ font-size:var(--fs-text-lg); }
   .section__slug .name{ font-size:clamp(26px, 3.2vw, 40px); line-height:1.05; }
-  .section__slug .jp{ font-size:13px; }
+  .section__slug .jp{ font-size:var(--fs-text-md); }
 
   /* section headings (grey mono eyebrows above each block) */
   .showcase__label,
   .feat__label,
   .archive-head__label,
-  .sub-albums__label{ font-size:13.5px; font-weight:600; }
-  .album-desc__label{ font-size:13px; font-weight:600; }
+  .sub-albums__label{ font-size:var(--fs-chrome-lg); font-weight:600; }
+  .album-desc__label{ font-size:var(--fs-chrome-lg); font-weight:600; }
   /* curated group frames: one step below the ARCHIVE eyebrow above them */
-  .album-group__name{ font-size:12px; font-weight:600; }
-  .album-group__count{ font-size:10.5px; }
+  .album-group__name{ font-size:var(--fs-chrome-md); font-weight:600; }
+  .album-group__count{ font-size:var(--fs-chrome-sm); }
 
   /* image-page sidebar: panel titles join the grey heading signature,
      key/value labels step up from ghost to dim */
-  .panel h2{ font-size:13px; font-weight:600; color:var(--text-head); }
-  .kv dt{ font-size:11.5px; color:var(--text-dim); }
-  details > summary{ font-size:11.5px; }
-  .sort__head{ font-size:10.5px; }
+  .panel h2{ font-size:var(--fs-text-md); font-weight:600; color:var(--text-head); }
+  .kv dt{ font-size:var(--fs-text-sm); color:var(--text-dim); }
+  details > summary{ font-size:var(--fs-text-sm); }
+  .sort__head{ font-size:var(--fs-chrome-sm); }
 
   /* card titles */
-  .album-card__name{ font-size:16px; }
+  .album-card__name{ font-size:var(--fs-text-lg); }
   .feat-card__name{ font-size:clamp(17px, 1.9vw, 22px); }
 
   /* markdown headings in the album description sidebar */
   .album-desc__body h1{ font-size:21px; }
-  .album-desc__body h2{ font-size:17px; }
-  .album-desc__body h3{ font-size:12px; }
+  .album-desc__body h2{ font-size:var(--fs-text-xl); }
+  .album-desc__body h3{ font-size:var(--fs-text-sm); }
 
   /* welcome archive readout: the keys above the values */
-  .arc__key{ font-size:10px; color:var(--text-dim); }
+  .arc__key{ font-size:var(--fs-chrome-sm); color:var(--text-dim); }
 
   /* trip meta line: one size for the whole row, since every part of it now
      shares the .section__doc mono voice rather than each carrying its own */
-  .trip__bar{ font-size:11px; }
-  .trip__cd-label{ font-size:11px; }
+  .trip__bar{ font-size:var(--fs-chrome-md); }
+  .trip__cd-label{ font-size:var(--fs-chrome-md); }
 
   /* trip itinerary cards: readable at arm's length — the compact base
      sizes are for phones. Same specificity as the base rules, so keep
      this block last (source order wins). */
-  .trip__stop-city{ font-size:17px; }
-  .trip__stop-jp{ font-size:12.5px; }
-  .trip__stop-dates{ font-size:10.5px; }
-  .trip__stop-wx-now{ font-size:16px; }
-  .trip__stop-wx-sub{ font-size:10px; }
-  .trip__stop-meta{ font-size:10px; }
-  .trip__cd-unit i{ font-size:10px; }
-  .trip__cd-target{ font-size:10px; }
+  .trip__stop-city{ font-size:var(--fs-text-xl); }
+  .trip__stop-jp{ font-size:var(--fs-text-md); }
+  .trip__stop-dates{ font-size:var(--fs-chrome-sm); }
+  .trip__stop-wx-now{ font-size:var(--fs-chrome-lg); }
+  .trip__stop-wx-sub{ font-size:var(--fs-chrome-sm); }
+  .trip__stop-meta{ font-size:var(--fs-chrome-sm); }
+  .trip__cd-unit i{ font-size:var(--fs-chrome-sm); }
+  .trip__cd-target{ font-size:var(--fs-chrome-sm); }
 
   /* hero-reel identity overlay: poster-sized on wide screens */
   .album-hero__kicker{ font-size:10px; }
   .album-hero__title{ font-size:clamp(32px, 3.4vw, 44px); }
-  .album-hero__jp{ font-size:15px; }
-  .album-hero__facts{ font-size:11px; gap:3px 18px; }
-  .fhero__ov{ left:18px; right:18px; bottom:56px; gap:9px; }
+  .album-hero__jp{ font-size:var(--fs-text-lg); }
+  .album-hero__facts{ font-size:var(--fs-text-sm); gap:var(--s-1) 18px; }
+  .fhero__ov{ left:18px; right:18px; bottom:56px; gap:var(--s-3); }
 }
 
 /* ---- Album's own hero title face (album.cfg `font = ...`) -------------- */
@@ -5947,9 +6260,9 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
 .nav__search-ico{
   color:var(--text-ghost);
   font-size:12px;
-  margin-right:9px;
+  margin-right:var(--s-3);
   flex:none;
-  transition:color .15s;
+  transition:color var(--dur-1);
 }
 .nav__search:focus-within .nav__search-ico{ color:var(--acc); }
 
@@ -5973,7 +6286,7 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
 .sort__btn-caret{ margin-left:auto; padding-left:.2em; color:var(--text-ghost); }
 .sort__btn[aria-expanded="true"] .sort__btn-caret{ transform:rotate(180deg); }
 @media (prefers-reduced-motion: no-preference){
-  .sort__btn-caret{ transition:transform .18s ease; }
+  .sort__btn-caret{ transition:transform var(--dur-1) ease; }
 }
 
 /* --- album tree: the up-arrow to the parent album ---------------------- */
@@ -6019,6 +6332,6 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
 .album-card__hover span > .fa,
 .feat-card__cta > .fa{ margin-left:.7em; font-size:.85em; }
 @media (hover: hover) and (prefers-reduced-motion: no-preference){
-  .album-card__hover span > .fa{ transition:transform .25s ease; }
+  .album-card__hover span > .fa{ transition:transform var(--dur-2) ease; }
   .album-card:hover .album-card__hover span > .fa{ transform:translateX(3px); }
 }
