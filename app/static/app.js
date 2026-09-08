@@ -881,24 +881,64 @@ function scrollReveal(root = document) {
 
   const STEP_MS = 45;
   const MAX_DELAY_MS = 315;
+  // Does an element's entrance PLAY where the observer arms it, or only once
+  // the reader has scrolled to it?
+  //
+  // `content-visibility: auto` — the photo tiles carry it, see .image-tile
+  // in style.css — lets the browser skip an off-screen element's rendering
+  // entirely, and a skipped element runs no animations. Its entrance
+  // therefore begins at the moment it is scrolled INTO view, which is the
+  // one moment a staggered fade must not begin. Measured on a 439-photo
+  // album: every scroll stop left most of a screenful invisible for ~600 ms
+  // and then popped it in as a block.
+  //
+  // Asked of the computed style rather than of a list of selectors, so it
+  // stays true by construction when the stylesheet changes its mind about
+  // which elements are skipped. The same line answers a browser that has
+  // never heard of the property correctly: it skips nothing, so its
+  // animations do run off screen, so its elements cascade as before.
+  const playsWhereArmed = (el) => getComputedStyle(el).contentVisibility !== 'auto';
+  // The cascade belongs to the ARRIVAL of this content. Once the reader has
+  // started scrolling they are not watching an entrance any more, they are
+  // looking for photographs — and a tile they scroll onto must be there.
+  let entranceOver = false;
+  window.addEventListener('scroll', () => { entranceOver = true; }, { once: true, passive: true });
   const io = new IntersectionObserver((entries, obs) => {
     let batch = 0;
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
     entries.forEach((en) => {
       if (!en.isIntersecting) return;
       const el = en.target;
-      // stagger within this batch; CSSOM assignment is CSP-safe
-      el.style.animationDelay = Math.min(batch * STEP_MS, MAX_DELAY_MS) + 'ms';
-      batch++;
+      // Two ways to earn the cascade: the entrance runs off screen and is
+      // over before the reader gets there (section heads, the trip module,
+      // the description card), or the element is part of the screenful that
+      // was already there when the page arrived. Everything else — every
+      // tile scrolled onto from below — is simply THERE, with no delay and
+      // no fade of its own; its photograph still arrives on its own terms
+      // (.img-fade). An entrance that plays where somebody is already
+      // looking is not an entrance, it is a hole.
+      const box = en.boundingClientRect;
+      const onScreen = !!box && box.top < vh && box.bottom > 0;
+      if (playsWhereArmed(el) || (onScreen && !entranceOver)) {
+        // stagger within this batch; CSSOM assignment is CSP-safe
+        el.style.animationDelay = Math.min(batch * STEP_MS, MAX_DELAY_MS) + 'ms';
+        batch++;
+      } else {
+        el.style.animationDelay = '0ms';
+        el.classList.add('rv-now');
+      }
       el.classList.add('rv-in');
       obs.unobserve(el);
     });
-    // A positive bottom margin arms a block just BEFORE it reaches the fold
+    // A positive bottom margin arms a block BEFORE it reaches the fold
     // instead of after: the old -6% / 5%-visible pair meant an element had to
     // be almost fully scrolled in before it was allowed to appear, which the
     // archive readout under the welcome hero showed off worst — its head sat
     // there with an empty box under it until you had scrolled past most of
-    // the box itself.
-  }, { rootMargin: '0px 0px 10% 0px', threshold: 0 });
+    // the box itself. Two thirds of a viewport is the room the cascade needs
+    // to actually play out ahead of the reader at a normal scrolling pace —
+    // at 10% it was still finishing on screen.
+  }, { rootMargin: '0px 0px 66% 0px', threshold: 0 });
 
   targets.forEach((el) => {
     el.classList.add('rv');

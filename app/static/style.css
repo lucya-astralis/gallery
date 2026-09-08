@@ -5610,6 +5610,16 @@ html.fx-anim .rv.rv-in{
   animation: rv-lift .55s cubic-bezier(.19,.66,.28,.99) backwards,
              rv-fade .55s cubic-bezier(.33,.04,.4,1) backwards;
 }
+/* No entrance at all. app.js sets .rv-now on an element whose animation
+   could only start under the reader's eyes: one that content-visibility
+   keeps from rendering (and therefore from animating) until it is scrolled
+   to. It is simply there, and its photograph still fades in on its own as
+   it loads (.img-fade). An entrance that plays where somebody is already
+   looking is not an entrance, it is a hole in the page. */
+html.fx-anim .rv.rv-in.rv-now{
+  animation: none;
+  opacity: 1;
+}
 @media print{ html.fx-anim .rv{ opacity:1; } }
 
 /* ---- album hero reel: the frame exposes like the welcome viewfinder —
