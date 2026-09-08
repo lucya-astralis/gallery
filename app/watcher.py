@@ -49,12 +49,16 @@ class _Handler(FileSystemEventHandler):
         for d in (self.thumbs_dir, self.previews_dir, self.fulls_dir):
             if d is None:
                 continue
-            f = (d / rel).with_suffix(".jpg")
-            try:
-                if f.exists():
-                    f.unlink()
-            except OSError:
-                pass
+            # every format a tier may have been written in, not just the one
+            # it is written in today — a gallery that has served JPEG thumbs
+            # before the WebP switch still has those files on disk
+            for ext in scanner.DERIVATIVE_EXTS:
+                f = (d / rel).with_suffix(ext)
+                try:
+                    if f.exists():
+                        f.unlink()
+                except OSError:
+                    pass
 
     def _is_meta(self, path: Path) -> bool:
         """True for anything in an album's `.album/` folder — descriptions,
@@ -116,10 +120,10 @@ class _Handler(FileSystemEventHandler):
                 try:
                     scanner.index_image(self.photos_dir, fp)
                     rel = fp.relative_to(self.photos_dir).as_posix()
-                    thumb_dst = (self.thumbs_dir / rel).with_suffix(".jpg")
+                    thumb_dst = (self.thumbs_dir / rel).with_suffix(scanner.THUMB_EXT)
                     scanner.make_thumbnail(fp, thumb_dst, self.thumb_size)
                     if self.previews_dir is not None:
-                        prev_dst = (self.previews_dir / rel).with_suffix(".jpg")
+                        prev_dst = (self.previews_dir / rel).with_suffix(scanner.PREVIEW_EXT)
                         scanner.make_thumbnail(fp, prev_dst, self.preview_size)
                     log.info("indexed %s", rel)
                 except Exception as e:

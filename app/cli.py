@@ -176,13 +176,24 @@ def _effective_mtime(rel: str) -> float | None:
         return mtime
 
 
+def _derivative_files(d: Path):
+    """Every generated file under one derivative directory, in any format the
+    gallery has ever written there (scanner.DERIVATIVE_EXTS). The sweeps that
+    use this look for files no photo maps to any more — which after a tier
+    changes format includes that tier's own leftovers, e.g. the JPEG thumbs a
+    gallery built before the WebP switch. `thumbs --prune --apply` is what
+    clears them."""
+    for ext in scanner.DERIVATIVE_EXTS:
+        yield from d.rglob("*" + ext)
+
+
 def _derivatives(rel: str) -> dict[str, Path]:
     """Where the generated files for one photo live. `full` only applies to
     formats the browser cannot show (HEIC/HEIF), which are converted on
     demand — see scanner.ensure_full_jpeg."""
     paths = {
-        "thumb": (gallery.THUMBS_DIR / rel).with_suffix(".jpg"),
-        "preview": (gallery.PREVIEWS_DIR / rel).with_suffix(".jpg"),
+        "thumb": (gallery.THUMBS_DIR / rel).with_suffix(scanner.THUMB_EXT),
+        "preview": (gallery.PREVIEWS_DIR / rel).with_suffix(scanner.PREVIEW_EXT),
     }
     if scanner.needs_jpeg_conversion(gallery.PHOTOS_DIR / rel):
         paths["full"] = (gallery.FULLS_DIR / rel).with_suffix(".jpg")
@@ -804,7 +815,7 @@ def cmd_doctor(args) -> int:
         for d in derivative_dirs:
             if not d.is_dir():
                 continue
-            for f in d.rglob("*.jpg"):
+            for f in _derivative_files(d):
                 # FULLS_DIR sits inside PREVIEWS_DIR by default — don't report
                 # its contents twice, or as orphans of the previews tree
                 if d is gallery.PREVIEWS_DIR and gallery.FULLS_DIR in f.parents:
@@ -915,7 +926,7 @@ def cmd_thumbs(args) -> int:
         for d in (gallery.THUMBS_DIR, gallery.PREVIEWS_DIR, gallery.FULLS_DIR):
             if not d.is_dir():
                 continue
-            for f in d.rglob("*.jpg"):
+            for f in _derivative_files(d):
                 if d is gallery.PREVIEWS_DIR and gallery.FULLS_DIR in f.parents:
                     continue
                 if f not in expected:

@@ -118,6 +118,104 @@ function allowHeavyFx() {
   return !prefersReducedMotion() && !__mqReduceData.matches && !isLowEndDevice();
 }
 window.__allowHeavyFx = allowHeavyFx;
+
+// Is this link worth spending unasked-for megabytes on?
+//
+// A SEPARATE question from allowHeavyFx(), which asks about the device and
+// about what the visitor asked for. A fast phone on a hotel connection in
+// another hemisphere passes every check up there and still waits half a
+// minute for a page whose bytes went on a slideshow it never scrolled to.
+// Anything the visitor did not ask for — the ambient clip, reel frames past
+// the one on screen, neighbour prefetch — asks THIS instead.
+//
+// `effectiveType` is the browser's own verdict on the connection, measured
+// from throughput AND round-trip time, so it also catches the case that
+// started this: a perfectly fat line to a server on the other side of the
+// planet, where every request costs a quarter second before the first byte.
+// Where there is no such verdict — Safari and Firefox ship no Network
+// Information API — the page's own resource timings answer instead, see
+// measuredSlowLink(). Neither knowing anything counts as fast: most
+// connections are, and this is an optimisation, not a promise.
+//
+// `minMbps` is what the caller needs the link to be worth. The default 1.5
+// is "reading ahead by one 300 KB preview is not going to hurt"; the ambient
+// clip asks for a great deal more, because it is 6 MB and it is scenery.
+const LINK_MIN_MBPS = 1.5;
+function hasFastLink(minMbps) {
+  const need = minMbps || LINK_MIN_MBPS;
+  if (__mqReduceData.matches) return false;
+  try {
+    const c = navigator.connection;
+    if (c) {
+      if (c.saveData) return false;
+      if (c.effectiveType && c.effectiveType !== '4g') return false;
+      // `downlink` is a floor, not a measurement: Chrome answers 1.6 Mbit
+      // whenever it has nothing better to say, so it is trusted to condemn a
+      // link (below the baseline) and never to vouch for one above it.
+      if (typeof c.downlink === 'number' && c.downlink > 0 && c.downlink < LINK_MIN_MBPS) return false;
+    }
+  } catch (e) {}
+  // whether the link clears a HIGHER bar is a question only the clock can
+  // answer — see measuredSlowLink()
+  return !measuredSlowLink(need);
+}
+window.__hasFastLink = hasFastLink;
+
+// The same question asked of the clock. This is the whole answer for the
+// browsers that will not answer it directly — Safari and Firefox ship no
+// Network Information API, and an iPhone abroad is the exact visitor this
+// gate exists for — and it is the deciding half everywhere, because a
+// declared `downlink` cannot tell "fast" from "unmeasured".
+//
+// Two signals, both already paid for by the time this runs:
+//   * TTFB on the document. The page itself renders in single-digit
+//     milliseconds, so what is left is distance. Half a second means the
+//     server is a long way away, whatever the bandwidth is.
+//   * The best throughput observed on anything sizeable that actually came
+//     over the network (the stylesheet, a font, the hero). BEST, not
+//     average: parallel downloads share the pipe, so the fastest one is the
+//     honest estimate of what a single request would get. Cache hits are
+//     skipped — `transferSize` is 0 for those, and a file that never left
+//     the disk would otherwise "measure" at gigabits.
+// No sample big enough yet means no verdict, and no verdict never defers
+// anything: a page with nothing to measure has nothing to protect either.
+// Re-measured at most every couple of seconds — a visitor who walks out of
+// a bad cell gets the full experience without reloading, and a page that
+// starts fast and degrades stops reading ahead.
+const __LINK_RECHECK_MS = 2000;
+let __linkMbps = null;
+let __linkFar = false;
+let __linkAt = 0;
+function measuredSlowLink(need) {
+  const now = Date.now();
+  if (__linkMbps !== null && now - __linkAt < __LINK_RECHECK_MS) {
+    return __linkFar || __linkMbps < need;
+  }
+  __linkAt = now;
+  let slow = false;
+  try {
+    const nav = performance.getEntriesByType('navigation')[0];
+    if (nav && nav.responseStart > 0 && nav.requestStart > 0
+        && nav.responseStart - nav.requestStart > 600) {
+      slow = true;
+    }
+    __linkFar = slow;
+    let best = null;
+    for (const r of performance.getEntriesByType('resource')) {
+      const size = r.transferSize || 0;   // 0 -> came out of the cache
+      const secs = (r.responseEnd - r.responseStart) / 1000;
+      if (size < 25000 || !(secs > 0)) continue;   // too small to measure with
+      const mbps = (size * 8) / secs / 1e6;
+      if (best === null || mbps > best) best = mbps;
+    }
+    // nothing big enough has finished yet: no verdict, so no deferral
+    __linkMbps = best === null ? Infinity : best;
+  } catch (e) {
+    __linkMbps = Infinity;   // no timing API: assume the connection is fine
+    __linkFar = false;
+  }
+  return __linkFar || __linkMbps < need;
+}
 // Bridge capability detection to CSS: html.fx-lite kills the continuous
 // full-screen scanline animation and other ambient motion on weak devices.
 if (!allowHeavyFx()) document.documentElement.classList.add('fx-lite');
@@ -211,15 +309,32 @@ window.addEventListener('pageshow', (e) => { if (e.persisted) navProgress.reset(
 // ---------- BACKGROUND VIDEO (opt-in) --------------------------
 // The <video> ships with no src and preload="none", so by default nothing is
 // fetched. We only wire up the 6 MB clip on capable, desktop-sized screens.
+const BG_VIDEO_MIN_MBPS = 4;
 (function bgVideo() {
   const v = document.querySelector('[data-bg-video]');
   if (!v || !v.dataset.src) return;
   const bigScreen = window.matchMedia('(min-width: 761px)').matches;
   if (!bigScreen || !allowHeavyFx()) return; // keep the static gradient backdrop
-  v.src = v.dataset.src;
-  v.load();
-  const p = v.play();
-  if (p && typeof p.catch === 'function') p.catch(() => {}); // autoplay blocked → ignore
+  // …and not on a slow or distant link: the clip is 6 MB of decoration, and
+  // it competes with the thumbnails for the whole visit (it used to start on
+  // any laptop with enough RAM, however thin the pipe to it was). It asks a
+  // higher bar than everything else for the same reason it is the biggest
+  // file on the site: at 4 Mbit it is still thirteen seconds of somebody's
+  // connection, and it is the one thing on the page nobody came for.
+  // Even on a fast one it waits: started during load it takes bandwidth from
+  // the first screenful of tiles, which is the thing the visitor came for.
+  // Waiting also buys the better verdict — by `load` the browsers with no
+  // Network Information API have a page's worth of resource timings to be
+  // judged on, instead of the empty slate this line would see now.
+  const start = () => {
+    if (!hasFastLink(BG_VIDEO_MIN_MBPS)) return;
+    v.src = v.dataset.src;
+    v.load();
+    const p = v.play();
+    if (p && typeof p.catch === 'function') p.catch(() => {}); // autoplay blocked → ignore
+  };
+  if (document.readyState === 'complete') whenIdle(start);
+  else window.addEventListener('load', () => whenIdle(start), { once: true });
 })();
 
 // ---------- SHARED HELPERS -------------------------------------
@@ -250,18 +365,37 @@ function hydrateSlide(slides, idx) {
 }
 
 // the frame being shown plus both neighbours — covers auto-advance, the
-// prev button and a swipe back
-function warmSlides(slides, idx) {
+// prev button and a swipe back. On a slow or distant link only the frame
+// that is actually on screen: a preview is ~320 KB, and a reel that reads
+// ahead by two costs two thirds of a megabyte before anybody has touched it.
+function warmSlides(slides, idx, dir) {
   hydrateSlide(slides, idx);
-  hydrateSlide(slides, idx + 1);
-  hydrateSlide(slides, idx - 1);
+  if (hasFastLink()) {
+    hydrateSlide(slides, idx + 1);
+    hydrateSlide(slides, idx - 1);
+    return;
+  }
+  // slow link: read one ahead only once the visitor is actually moving
+  // through the reel, and only the way they are going
+  if (dir) hydrateSlide(slides, idx + dir);
 }
 
 // Someone reaching for the controls will very likely jump around, and a
 // segment click lands on a frame no prefetch anticipated. Once there is
-// intent, load the lot — passive visitors still never pay for it.
+// intent, load the lot — passive visitors still never pay for it. On a slow
+// link intent buys the neighbours, not the whole reel; the rest still
+// arrives, one frame per press, as they actually go through it.
 function warmAllSlidesOnIntent(root, slides) {
-  const all = () => slides.forEach((_, i) => hydrateSlide(slides, i));
+  const all = () => {
+    if (!hasFastLink()) {
+      // intent, but no bandwidth to speak of: both neighbours of the frame
+      // they are looking at, so the first press has something to show
+      hydrateSlide(slides, 1);
+      hydrateSlide(slides, -1);
+      return;
+    }
+    slides.forEach((_, i) => hydrateSlide(slides, i));
+  };
   ['pointerdown', 'keydown', 'focusin'].forEach((ev) =>
     root.addEventListener(ev, all, { once: true, passive: true }));
 }
@@ -386,7 +520,10 @@ document.addEventListener('DOMContentLoaded', () => {
   vf.style.setProperty('--vf-auto-ms', AUTO_MS + 'ms');
 
   let current = 0;
-  const autoOk = allowHeavyFx() && frames.length > 1;
+  // hasFastLink(): each turn of the carousel is another ~320 KB preview, so
+  // on a slow or distant line the hero holds its first frame and the controls
+  // do the driving (the HUD says MANUAL, and nothing else changes).
+  const autoOk = allowHeavyFx() && hasFastLink() && frames.length > 1;
 
   function syncFrame(idx) {
     const f = frames[idx];
@@ -411,9 +548,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function goTo(idx) {
+  function goTo(idx, dir) {
     const target = ((idx % frames.length) + frames.length) % frames.length;
-    warmSlides(frames, target);   // the one after this is already on its way
+    warmSlides(frames, target, dir);   // the one after this is already on its way
     if (target !== current) {
       frames[current].classList.remove('is-on');
       frames[current].setAttribute('aria-hidden', 'true');
@@ -427,8 +564,8 @@ document.addEventListener('DOMContentLoaded', () => {
     paintSegs();
   }
 
-  const advance = () => goTo(current + 1);
-  const regress = () => goTo(current - 1);
+  const advance = () => goTo(current + 1, 1);
+  const regress = () => goTo(current - 1, -1);
 
   // init: make sure frame 0, counter and links agree
   frames.forEach((f, i) => {
@@ -519,8 +656,19 @@ document.addEventListener('DOMContentLoaded', () => {
           f.dataset.filename = item.filename;
           const img = f.querySelector('img');
           if (img) {
-            img.src = '/preview/' + item.rel_path;
+            // Same contract as the server-rendered feed: only the frame
+            // that will be ON SCREEN gets a src, the rest are handed a
+            // data-src for warmSlides to hydrate. Assigning all eight at
+            // once pulled ~2.5 MB on a single button press, most of it for
+            // frames the visitor never reached.
             img.alt = item.filename;
+            if (i === 0) {
+              img.removeAttribute('data-src');
+              img.src = '/preview/' + item.rel_path;
+            } else {
+              img.removeAttribute('src');
+              img.dataset.src = '/preview/' + item.rel_path;
+            }
           }
         });
         frames.forEach((f, i) => {
@@ -530,6 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
         current = 0;
         syncFrame(current);
         paintSegs();
+        warmSlides(frames, current);   // …and read ahead again from the top
       } catch (e) {
         // ignore — keep the current feed
       } finally {
@@ -571,7 +720,10 @@ document.addEventListener('DOMContentLoaded', () => {
   hero.style.setProperty('--fhero-auto-ms', AUTO_MS + 'ms');
 
   let current = 0;
-  const autoOk = allowHeavyFx() && slides.length > 1;
+  // see the viewfinder's copy of this line: auto-advance keeps pulling
+  // previews for frames nobody asked to see, which on a thin pipe is the
+  // whole page's bandwidth spent on decoration
+  const autoOk = allowHeavyFx() && hasFastLink() && slides.length > 1;
 
   function sync(idx) {
     const s = slides[idx];
@@ -593,9 +745,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function goTo(idx) {
+  function goTo(idx, dir) {
     const target = ((idx % slides.length) + slides.length) % slides.length;
-    warmSlides(slides, target);   // the one after this is already on its way
+    warmSlides(slides, target, dir);   // the one after this is already on its way
     if (target !== current) {
       slides[current].classList.remove('is-on');
       slides[current].setAttribute('aria-hidden', 'true');
@@ -606,8 +758,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     paintSegs();
   }
-  const advance = () => goTo(current + 1);
-  const regress = () => goTo(current - 1);
+  const advance = () => goTo(current + 1, 1);
+  const regress = () => goTo(current - 1, -1);
 
   sync(current);
   // slide 0 came with its src; fetch its neighbour once the page has settled
@@ -1381,10 +1533,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const img = new Image();
     img.src = '/preview/' + m[1];
   };
+  // On a thin or distant link hovering is not enough of a promise: a guess
+  // that misses costs ~320 KB the grid still needs. Pressing is not a guess,
+  // so that half stays on every connection.
+  const guessOk = hasFastLink();
   document.querySelectorAll('.image-tile a').forEach((a) => {
     let t = null;
-    a.addEventListener('mouseenter', () => { t = setTimeout(() => warm(a), 65); }, { passive: true });
-    a.addEventListener('mouseleave', () => { if (t) clearTimeout(t); }, { passive: true });
+    if (guessOk) {
+      a.addEventListener('mouseenter', () => { t = setTimeout(() => warm(a), 65); }, { passive: true });
+      a.addEventListener('mouseleave', () => { if (t) clearTimeout(t); }, { passive: true });
+    }
     a.addEventListener('pointerdown', () => warm(a), { passive: true });
   });
 });
@@ -1545,8 +1703,9 @@ function initImagePage() {
     });
   });
 
-  // warm the cache for neighbours so SPA nav feels instant
-  document.querySelectorAll('.nav-arrow.prev, .nav-arrow.next').forEach(a => {
+  // warm the cache for neighbours so SPA nav feels instant — same trade as
+  // the lightbox: only where the bytes are not the scarce thing
+  if (hasFastLink()) document.querySelectorAll('.nav-arrow.prev, .nav-arrow.next').forEach(a => {
     try {
       const u = new URL(a.href, location.href);
       const m = u.pathname.match(/^\/image\/(.+)$/);
@@ -1899,9 +2058,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (prevBtn) prevBtn.disabled = (index <= 0);
     if (nextBtn) nextBtn.disabled = (index >= total - 1);
 
-    // preload neighbours
-    if (index + 1 < total) preload(rels[index + 1]);
-    if (index - 1 >= 0) preload(rels[index - 1]);
+    // preload neighbours — both of them are another ~640 KB, which on a slow
+    // link is bandwidth taken from the photo being looked at right now
+    if (hasFastLink()) {
+      if (index + 1 < total) preload(rels[index + 1]);
+      if (index - 1 >= 0) preload(rels[index - 1]);
+    }
 
     // update URL bar to reflect the currently-viewed image (keep sort etc.)
     try { history.replaceState(null, '', '/image/' + rel + initialSearch); } catch(e){}

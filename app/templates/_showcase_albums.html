@@ -10,7 +10,16 @@
       <a href="/album/{{ a.album }}" aria-label="{{ a.name }} — {{ a.count }} {% if a.count == 1 %}{{ t('unit.image_one') }}{% else %}{{ t('unit.image_many') }}{% endif %}">
         <div class="feat-card__img">
           {% if a.cover %}
+            {# Two tiers, one picture: a poster card is between a third and a
+               half of the page wide, so on an ordinary desktop screen the
+               480 px grid tile IS the right file and the 1600 px preview was
+               ten times the bytes for the same pixels. `sizes` describes the
+               rail's real layout (full width on phones, thirds on a wide
+               page) and the browser picks — a dense phone screen still gets
+               the preview, because there it genuinely needs it. #}
             <img src="/preview/{{ a.cover }}" alt="{{ a.name }}"
+                 srcset="/thumb/{{ a.cover }} 480w, /preview/{{ a.cover }} 1600w"
+                 sizes="(max-width: 760px) 100vw, (max-width: 1100px) 50vw, 33vw"
                  loading="{% if loop.index0 < (feat_eager | default(0)) %}eager{% else %}lazy{% endif %}" decoding="async">
           {% else %}
             <div class="album-card__cover-empty">{{ t('card.no_cover') }}</div>

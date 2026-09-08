@@ -17,10 +17,10 @@
 
      Skipped when gallery.cfg brings a face of its own: base.html has then
      already preloaded THAT file, the hero is set in it, and Ethnocentric is
-     only the fallback behind it — fetching a 68 KB face nothing paints would
+     only the fallback behind it — fetching a whole face nothing paints would
      be spending the hero's own head start on it. #}
   {% if not site_font() %}
-  <link rel="preload" href="/static/fonts/Ethnocentric-Regular.otf" as="font" type="font/otf" crossorigin>
+  <link rel="preload" href="/static/fonts/Ethnocentric-Regular.woff2" as="font" type="font/woff2" crossorigin>
   {% endif %}
 {% endblock %}
 {% block meta %}

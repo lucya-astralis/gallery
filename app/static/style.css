@@ -73,7 +73,14 @@
    falls through to the next FAMILY for Latin — that is how the site once
    lost its mono face), which the shared RANGES table guarantees. The
    fixed-weight families (Ethnocentric, Chakra Petch) deliberately get no
-   alias: their texts are HUD/brand chrome and never Japanese. */
+   alias: their texts are HUD/brand chrome and never Japanese.
+
+   Those two have no variable source to instantiate — they are shipped as
+   the .otf/.ttf the foundry made — but they are still served as woff2, by
+   tools/build_display_faces.py, which only re-containers them. Ethnocentric
+   draws the wordmark, so it is on the first paint of every page: 67 KB as
+   OpenType, 31 KB as woff2, same outlines. Change the source file and run
+   that script; nothing here changes but the bytes on the wire. */
 @font-face {
   font-family: 'Space Grotesk';
   src: url('/static/fonts/SpaceGrotesk-400.woff2') format('woff2');
@@ -241,28 +248,28 @@
 }
 @font-face {
   font-family: 'Ethnocentric';
-  src: url('/static/fonts/Ethnocentric-Regular.otf') format('opentype');
+  src: url('/static/fonts/Ethnocentric-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Chakra Petch';
-  src: url('/static/fonts/ChakraPetch-Regular.ttf') format('truetype');
+  src: url('/static/fonts/ChakraPetch-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Chakra Petch';
-  src: url('/static/fonts/ChakraPetch-Medium.ttf') format('truetype');
+  src: url('/static/fonts/ChakraPetch-Medium.woff2') format('woff2');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Chakra Petch';
-  src: url('/static/fonts/ChakraPetch-Bold.ttf') format('truetype');
+  src: url('/static/fonts/ChakraPetch-Bold.woff2') format('woff2');
   font-weight: 700;
   font-style: normal;
   font-display: swap;

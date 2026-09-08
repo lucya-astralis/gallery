@@ -7,7 +7,7 @@ A lean, read-only web image gallery with folder-based albums, EXIF display, side
 - **Folder = album:** every subfolder in `photos/` is automatically an album. Drop an image in → it appears in the album.
 - **Your name on it:** the wordmark, logo, favicon, operator card, legal links and footer badges all come out of `gallery.cfg`; the assets live in `photos/.gallery/`. Nothing is hard-coded, and an unconfigured gallery calls itself “Gallery” behind a neutral mark.
 - **Fully automatic indexing:** filesystem watcher (local) and/or periodic rescan (for SMB/NFS). No manual buttons in the web UI.
-- **Two-tier images:** `/thumb/...` (480 px) for grids, `/preview/...` (1600 px) for the detail view stage. The original (`/full/...`) only loads when you click *Load original*.
+- **Two-tier images:** `/thumb/...` (480 px WebP) for grids, `/preview/...` (1600 px JPEG) for the detail view stage. The original (`/full/...`) only loads when you click *Load original*. The grid tier is WebP because an album page asks for hundreds of tiles and they are what a visitor on a slow line actually waits for (a third to a half smaller than the same JPEG: 42 KB → 26 KB average here); the preview tier stays JPEG because it is what `og:image` hands to link unfurlers. The URL never names the format, so nothing outside the server changes when a tier does.
 - **EXIF:** camera, lens, exposure, ISO, focal length, … on the detail page. GPS coordinates are stripped by default (privacy).
 - **Tags:** per-album ones come from `album.cfg` and label the album in its hero; per-photo ones are sidecar files (e.g. `IMG_0001.jpg.tags` containing `holiday, beach, sunset`) — click one in the album view to filter.
 - **Showcase:** flag photos (`featured = …`) or a whole album (`showcase = true`) in the album's `album.cfg` to surface them on the welcome screen, on the album overview, and via `/api/showcase` JSON for embedding on other sites.
@@ -222,6 +222,16 @@ or adding a weight to the stylesheet, run:
 
 ```bash
 python tools/build_font_instances.py
+```
+
+**Display faces:** Ethnocentric and Chakra Petch have no variable source to
+instantiate — they ship as the foundry's `.otf`/`.ttf` — but they are still
+served as woff2, which is the same outlines in a smaller container (Ethnocentric
+draws the wordmark on every page: 67 KB → 31 KB). After replacing one of those
+source files, run:
+
+```bash
+python tools/build_display_faces.py   # needs: pip install fonttools brotli
 ```
 
 **Logo raster:** the terminal CLI can draw the real logo as a picture (see
@@ -449,7 +459,7 @@ config, and reaches a visitor through eight independent channels:
 | `<meta name="generator">` | `lucya.systems gallery 7.0`, outside the overridable `meta` block |
 | `X-Powered-By` | on **every** response — pages, JSON, stylesheets, and image bytes, including originals served untouched |
 | `/api` | `product`, `product_version`, `vendor`, `vendor_url`, kept separate from the archive's own `name` |
-| EXIF `Software` | written into every derived JPEG — thumbnails, previews, converted fulls |
+| EXIF `Software` | written into every derivative — thumbnails (WebP), previews and converted fulls (JPEG) |
 | `style.css` / `app.js` | a banner at the top of both files, which an operator serves verbatim |
 | CLI masthead | `python -m app.cli` is the vendor's tool, not the operator's site |
 
@@ -1061,6 +1071,13 @@ python -m app.cli featured japan_2026
 # after changing THUMB_SIZE
 python -m app.cli thumbs --rebuild --all
 
+# after an upgrade that changes a tier's FORMAT (the grid tier became WebP):
+# build what is missing, then clear the files of the old format, which the
+# orphan sweep reports because no photo maps to them any more
+python -m app.cli thumbs --rebuild
+python -m app.cli thumbs --prune            # look first
+python -m app.cli thumbs --prune --apply    # then delete
+
 # nightly health check (exits 1 when it finds something)
 python -m app.cli doctor --json
 
@@ -1076,6 +1093,72 @@ python -m app.cli gps
 # snapshot every hand-written file (config, text, icons, fonts)
 python -m app.cli export --out backups/config.tar.gz
 ```
+
+## Performance
+
+The gallery is fast to *render* — pages come out of the server in 2–5 ms warm —
+so everything that makes a visit feel slow is on the wire. Two things decide
+that: how many bytes a page asks for, and how far away the visitor is.
+
+**What a page is allowed to fetch before it is needed.** Nothing the visitor
+has not asked for is downloaded on a link that cannot afford it. `app.js` asks
+`hasFastLink()`, which reads Save-Data and `prefers-reduced-data`, then the
+browser's `effectiveType` where there is one (it is derived from throughput
+*and* round-trip time, so it also catches a fat line to a server on another
+continent), and then — because a declared `downlink` cannot tell "fast" from
+"not measured yet", and because Safari and Firefox declare nothing at all —
+the page's own resource timings: the best throughput actually observed on
+something that came over the network. On a "no", the following do not happen:
+
+| Deferred on a slow link | What it costs otherwise |
+|---|---|
+| The ambient backdrop clip | 6.3 MB, decoration only (already desktop-only) |
+| Reel / viewfinder auto-advance | ~320 KB per turn, for frames nobody scrolled to |
+| Reading ahead in the reel | 2 previews (~640 KB) before the first interaction |
+| Hover-prefetch of a grid photo | ~320 KB per guess; pressing still prefetches |
+| Lightbox + prev/next neighbour warming | ~640 KB per photo viewed |
+
+On a fast connection every one of those still happens exactly as before. The
+clip additionally waits for `load` + idle, so it never competes with the first
+screenful of tiles.
+
+**Sized for where it is shown.** A file the config names is served at the size
+the page draws it at, not at whatever size it happens to be: the operator
+portrait is a 34 px avatar and was a 539x539 PNG, 350 KB on every page of the
+archive, now a 128 px WebP of 4 KB (`_brand_render`). Showcase covers carry a
+`srcset` across the two photo tiers, so a card that is a third of the page wide
+takes the grid tile rather than the 1600 px preview.
+
+**Tiers and formats.** `/thumb/` (480 px WebP) is what an album page asks for
+hundreds of times; `/preview/` (1600 px JPEG) is one image on a photo page and
+the reel's current frame. The reel ships only its first slide with a `src` —
+crossfade slides all stack at one spot, so `loading="lazy"` defers nothing
+there — and the grid relies on real lazy loading plus `content-visibility`,
+which on a 439-photo album means 12 tiles fetched instead of 452.
+
+**Measured** (headless Chrome over CDP, Fast-3G profile, cold cache, 30 s
+window, `/album/japan_2026` — 439 photos):
+
+| | before | after |
+|---|---|---|
+| desktop 1440 px, total | 5.65 MB | **1.14 MB** |
+| … reel previews | 2.9 MB (8 files) | 0.27 MB (1 file) |
+| … backdrop clip | 1.8 MB, still going | none |
+| … grid thumbnails | 0.39 MB (12 tiles) | 0.28 MB (12 tiles) |
+| … `load` event | 21.2 s | 6.3 s |
+| phone 390 px, total | 3.57 MB | **0.87 MB** |
+| `/albums`, total | 3.74 MB | **0.86 MB** |
+
+On an unthrottled connection the same page still fetches all of it — 8.8 MB,
+clip and full reel included — which is the point: nothing was removed, it was
+made conditional.
+
+**Distance.** HTML is `no-store` (it is per-visitor: language cookie, live
+counts) so a page render always comes from the origin, but *every* asset URL
+is immutable and stamped — put them all in the edge cache, including the
+generated ones, or a visitor far from the server pays the round trip for the
+wordmark and the album's title face too. See the Cloudflare notes under
+[Security / hosting](#security--hosting).
 
 ## Security / hosting
 
@@ -1102,6 +1185,17 @@ The app is fully **read-only** by design:
 - **Bot Fight Mode** on
 - **Rate Limiting** on `/full/*` if you want to cap bandwidth on originals
 - **Cache Rules** for `/thumb/*`, `/preview/*`, `/static/*` (long TTL — those URLs are content-addressed and immutable)
+- **A Cache Rule for the generated-asset routes too** — `/brand/*`,
+  `/album-icon/*`, `/album-font/*`, `/album-font.css/*`, `/site-font*`,
+  `/album-theme.css/*`, `/site-theme.css`, `/album-wallpaper/*`,
+  `/site-wallpaper/*`. They all send `Cache-Control: public, max-age=31536000`
+  and all carry a `?v=` stamp, but Cloudflare decides what to cache by *file
+  extension* by default and none of those paths has one, so without a rule
+  marking them "eligible for cache" every visitor fetches the wordmark, the
+  operator portrait, the album's title face and its theme sheet from the
+  origin. That is the difference between a nearby edge and a server on
+  another continent on the first page view — the case this matters in is
+  exactly the one where it hurts (see [Performance](#performance))
 
 ## Endpoints
 

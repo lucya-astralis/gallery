@@ -1726,6 +1726,18 @@ BRAND_ASSET_TYPES = ALBUM_ICON_TYPES
 # URL slot -> cfg key. Also the whitelist /brand/{slot} validates against,
 # so the route has no notion of a key that isn't one of these three.
 BRAND_SLOTS = {"logo": "logo", "favicon": "favicon", "pfp": "operator_pfp"}
+# How large a raster mark may actually arrive at the browser, per slot: the
+# longest edge the page ever draws it at, times three for a dense phone
+# screen. A cfg names a FILE, and there is nothing in a folder to stop that
+# file from being a 539x539 PNG worn as a 34px avatar — which is what
+# `operator_pfp` was, 350 KB on every single page of the archive. Anything
+# bigger is served as a capped WebP copy instead (see _brand_render); the
+# file on disk is never touched. The favicon is deliberately absent: the
+# browser wants exactly what the cfg names there, at its own size.
+BRAND_RASTER_CAP = {"logo": 256, "pfp": 128}
+# where those copies live — beside the database, not in the photo derivative
+# trees, so a `thumbs --prune` sweep never has an opinion about them
+BRAND_CACHE_DIR = DATA_DIR / "brand"
 BRAND_DEFAULT_NAME = "Gallery"
 # the unbranded mark, shipped so a gallery that names no logo still has one
 BRAND_DEFAULT_LOGO = "logo/gallery-mark.svg"
@@ -1754,6 +1766,30 @@ def _brand_asset(slot: str, cfg: dict[str, list[str]]) -> dict | None:
         return None
     return {"url": f"/brand/{slot}?v={_gallery_asset_stamp(path)}",
             "type": BRAND_ASSET_TYPES[path.suffix.lower()]}
+
+
+def _brand_render(slot: str, path: Path) -> Path | None:
+    """A capped copy of an oversized raster mark, built once and cached, or
+    None when the file the cfg names is already sensible and should be served
+    as it is.
+
+    Left alone on purpose: SVG (resolution-free by definition), GIF (the
+    footer badges animate, and a resize would freeze them) and every slot
+    with no cap in BRAND_RASTER_CAP. A cached copy older than its source is
+    rebuilt, so editing the picture in .gallery/ is enough — the `?v=` stamp
+    on the URL already changed with the mtime, so nobody is served the old
+    one out of a cache either."""
+    cap = BRAND_RASTER_CAP.get(slot)
+    if cap is None or path.suffix.lower() in (".svg", ".gif"):
+        return None
+    dst = BRAND_CACHE_DIR / f"{slot}.webp"
+    if not scanner.needs_rebuild(dst, path):
+        return dst
+    edge = scanner.max_edge(path)
+    if edge is None or edge <= cap:
+        # unreadable, or already small — either way the raw file speaks for itself
+        return None
+    return dst if scanner.make_brand_thumb(path, dst, cap) else None
 
 
 def _brand_badge_names(cfg: dict[str, list[str]]) -> list[str]:
@@ -4253,6 +4289,9 @@ def serve_brand_asset(slot: str):
     path = _brand_file((_cfg_first(cfg, BRAND_SLOTS[slot]) or "").strip())
     if path is None:
         raise HTTPException(404, "not found")
+    small = _brand_render(slot, path)
+    if small is not None:
+        return FileResponse(str(small), media_type="image/webp", headers=IMMUTABLE)
     return FileResponse(str(path), media_type=BRAND_ASSET_TYPES[path.suffix.lower()],
                         headers=IMMUTABLE)
 
@@ -4275,35 +4314,47 @@ def serve_album_wallpaper(variant: str, album: str):
                         headers=IMMUTABLE)
 
 
-def _serve_derivative(album: str, filename: str, out_dir: Path, size: int, kind: str):
-    """A downscaled JPEG off the photo at album/filename, built on demand.
+# What comes out of each derivative route. The URL never names a format —
+# `/thumb/foo.png` is the address of "the grid tile for foo.png", whatever it
+# is encoded in — so switching a tier's format is a server-side decision and
+# no template, JSON link or bookmark changes with it. See scanner.THUMB_EXT
+# for why the two tiers differ.
+DERIVATIVE_MIME = {".jpg": "image/jpeg", ".webp": "image/webp"}
+
+
+def _serve_derivative(album: str, filename: str, out_dir: Path, size: int, kind: str,
+                      ext: str = scanner.PREVIEW_EXT):
+    """A downscaled copy of the photo at album/filename, built on demand.
 
     The two sizes the gallery serves — the grid thumbnail and the stage
-    preview — differ in nothing but their output directory and their long
-    edge, so they share this. A derivative that is missing or older than its
-    source is (re)built here rather than being left to the next scan: a photo
-    dropped in seconds ago is already linked from the page that asked for it."""
+    preview — differ in nothing but their output directory, their long edge
+    and their format, so they share this. A derivative that is missing or
+    older than its source is (re)built here rather than being left to the next
+    scan: a photo dropped in seconds ago is already linked from the page that
+    asked for it."""
     rel = _safe_rel(album, filename).as_posix()
     src = PHOTOS_DIR / rel
     if not src.exists():
         raise HTTPException(404, "not found")
-    dst = (out_dir / rel).with_suffix(".jpg")
+    dst = (out_dir / rel).with_suffix(ext)
     if scanner.needs_rebuild(dst, src):
-        built = scanner.ensure_thumb(PHOTOS_DIR, out_dir, rel, size)
+        built = scanner.ensure_thumb(PHOTOS_DIR, out_dir, rel, size, ext)
         if not built:
             raise HTTPException(500, f"{kind} generation failed")
         dst = built
-    return FileResponse(str(dst), media_type="image/jpeg", headers=IMMUTABLE)
+    return FileResponse(str(dst), media_type=DERIVATIVE_MIME[ext], headers=IMMUTABLE)
 
 
 @app.get("/thumb/{album}/{filename:path}")
 def serve_thumb(album: str, filename: str):
-    return _serve_derivative(album, filename, THUMBS_DIR, THUMB_SIZE, "thumb")
+    return _serve_derivative(album, filename, THUMBS_DIR, THUMB_SIZE, "thumb",
+                             scanner.THUMB_EXT)
 
 
 @app.get("/preview/{album}/{filename:path}")
 def serve_preview(album: str, filename: str):
-    return _serve_derivative(album, filename, PREVIEWS_DIR, PREVIEW_SIZE, "preview")
+    return _serve_derivative(album, filename, PREVIEWS_DIR, PREVIEW_SIZE, "preview",
+                             scanner.PREVIEW_EXT)
 
 
 @app.get("/full/{album}/{filename:path}")

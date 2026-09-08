@@ -52,6 +52,17 @@ except ImportError:
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif", ".heic", ".heif"}
 JPEG_CONVERT_EXTS = {".heic", ".heif"}
 
+# The format each derivative tier is written in. The grid thumbnail is WebP:
+# an album page asks for hundreds of them and they are the one tier a visitor
+# on a slow line waits for, and WebP is a third to a half smaller than the
+# JPEG at the same quality (measured over this library: 42 KB -> 26 KB
+# average, 480 px tiles at q82 vs q76). The preview stays
+# JPEG on purpose — it is what `og:image` hands to link unfurlers, and not all
+# of those decode WebP.
+THUMB_EXT = ".webp"
+PREVIEW_EXT = ".jpg"
+DERIVATIVE_EXTS = (".jpg", ".webp")
+
 
 def is_image(p: Path) -> bool:
     return p.suffix.lower() in IMAGE_EXTS
@@ -306,7 +317,7 @@ def needs_rebuild(dst: Path, src: Path) -> bool:
         return True
 
 
-def _jpeg_exif(credit: str | None) -> bytes:
+def _derivative_exif(credit: str | None) -> bytes:
     """The EXIF block written into every derivative: which software made it,
     and — when gallery.cfg names one — who the photo belongs to. The
     originals keep their own EXIF; these files are generated here and would
@@ -337,11 +348,52 @@ def make_thumbnail(src: Path, dst: Path, size: int) -> bool:
                 img = bg
             elif img.mode != "RGB":
                 img = img.convert("RGB")
-            img.save(dst, "JPEG", quality=82, optimize=True, progressive=True,
-                     exif=_jpeg_exif(_credit()))
+            # The output format follows the destination's own suffix, so the
+            # tier decides (THUMB_EXT / PREVIEW_EXT) and every caller — scan,
+            # CLI rebuild, on-demand route — writes the same thing. `method`
+            # is the encoder's effort knob: 4 is the point where more time
+            # stops buying meaningful size on 480 px tiles.
+            if dst.suffix.lower() == ".webp":
+                img.save(dst, "WEBP", quality=76, method=4,
+                         exif=_derivative_exif(_credit()))
+            else:
+                img.save(dst, "JPEG", quality=82, optimize=True, progressive=True,
+                         exif=_derivative_exif(_credit()))
         return True
     except Exception as e:
         log.warning("thumb failed for %s: %s: %s", src, type(e).__name__, e)
+        return False
+
+
+def max_edge(p: Path) -> int | None:
+    """The longest edge of an image file, or None when it cannot be read.
+    Opening does not decode the pixels — PIL reads the header — so this is
+    cheap enough to ask on a request path."""
+    try:
+        with Image.open(p) as img:
+            return max(img.size)
+    except Exception:
+        return None
+
+
+def make_brand_thumb(src: Path, dst: Path, size: int) -> bool:
+    """A capped WebP copy of a branding image (the operator portrait, a logo).
+
+    Not make_thumbnail(): a mark may be transparent and must stay that way,
+    so this keeps the alpha channel instead of flattening it onto the tile
+    background, and it writes no credit EXIF — a logo is the operator's, not
+    a photo of theirs. Only ever called for raster marks; SVG has no business
+    here and is served untouched."""
+    try:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(src) as img:
+            img.thumbnail((size, size), Image.LANCZOS)
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGBA" if "A" in img.getbands() else "RGB")
+            img.save(dst, "WEBP", quality=82, method=4)
+        return True
+    except Exception as e:
+        log.warning("brand thumb failed for %s: %s: %s", src, type(e).__name__, e)
         return False
 
 
@@ -356,7 +408,7 @@ def make_full_jpeg(src: Path, dst: Path) -> bool:
             elif img.mode != "RGB":
                 img = img.convert("RGB")
             img.save(dst, "JPEG", quality=92, optimize=True, progressive=True,
-                     exif=_jpeg_exif(_credit()))
+                     exif=_derivative_exif(_credit()))
         return True
     except Exception as e:
         log.warning("full jpeg conversion failed for %s: %s: %s", src, type(e).__name__, e)
@@ -590,14 +642,14 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         try:
             if index_image(photos_dir, file, force=force):
                 added += 1
-            thumb_path = (thumbs_dir / rel).with_suffix(".jpg")
+            thumb_path = (thumbs_dir / rel).with_suffix(THUMB_EXT)
             if force or needs_rebuild(thumb_path, file):
                 if make_thumbnail(file, thumb_path, thumb_size):
                     thumbed += 1
                 else:
                     broken = True
             if previews_dir is not None:
-                preview_path = (previews_dir / rel).with_suffix(".jpg")
+                preview_path = (previews_dir / rel).with_suffix(PREVIEW_EXT)
                 if force or needs_rebuild(preview_path, file):
                     if make_thumbnail(file, preview_path, preview_size):
                         previewed += 1
@@ -640,11 +692,12 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
     }
 
 
-def ensure_thumb(photos_dir: Path, thumbs_dir: Path, rel_path: str, size: int) -> Path | None:
+def ensure_thumb(photos_dir: Path, thumbs_dir: Path, rel_path: str, size: int,
+                 ext: str = THUMB_EXT) -> Path | None:
     src = photos_dir / rel_path
     if not src.exists() or not is_image(src):
         return None
-    dst = (thumbs_dir / rel_path).with_suffix(".jpg")
+    dst = (thumbs_dir / rel_path).with_suffix(ext)
     if not needs_rebuild(dst, src):
         return dst
     if make_thumbnail(src, dst, size):
