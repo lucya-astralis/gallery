@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-read-only="{{ 1 if read_only else 0 }}">
+<html lang="en" data-read-only="{{ 1 if read_only else 0 }}" data-auth="{{ auth_mode }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -25,6 +25,21 @@
     </picture>
   </div>
 
+  {% if auth_mode == "open" %}
+  {# No password is configured. Aperture only allows this on a loopback bind
+     or with CONSOLE_ALLOW_OPEN=1 (see console/security.py), and where it is
+     allowed it is still worth saying out loud on every page. #}
+  <div class="openbar" role="status">
+    {# The bar has to stay one line on a phone: three wrapped lines of warning
+       above every screen is a banner people learn to stop seeing. The short
+       form carries the fact, the long form carries the consequence, and the
+       command is desktop-only because nobody fixes this from a phone. #}
+    <span>No password</span>
+    <span class="u-wide-only">— anyone who reaches this port can edit the gallery</span>
+    <code class="u-wide-only">python -m aperture.cli passwd</code>
+  </div>
+  {% endif %}
+
   <nav class="nav">
     <div class="nav__inner">
       <!-- Phone-only: the album tree is a drawer there, this is its handle. -->
@@ -47,6 +62,13 @@
         {% if read_only %}<span class="pill pill--warn" title="the photo mount is read-only — every write is disabled">read-only</span>{% endif %}
         <button type="button" class="btn" id="btn-check">Check<span class="u-wide-only"> all</span></button>
         <button type="button" class="btn" id="btn-reload">Reload</button>
+        {# Only shown when there IS a session to end. An open console has no
+           sign-out, and pretending otherwise would be the same lie as a
+           "READWRITE" lamp. #}
+        {% if auth_mode == "password" %}
+        <button type="button" class="btn btn--ghost" id="btn-signout"
+                title="End this session">Sign out</button>
+        {% endif %}
       </div>
     </div>
   </nav>

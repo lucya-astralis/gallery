@@ -29,8 +29,11 @@ docker compose up -d --build
 Then open <http://127.0.0.1:8090>. `CONSOLE_HOST` decides which host address
 that port appears on; see [Security / hosting](../../README.md#security--hosting).
 
-**The console has no authentication yet.** Until it has, the port is the only
-control — keep it off any network you do not trust.
+**Signing in.** The console asks for one operator password. Set it with
+`python -m aperture.cli passwd`. Without one it starts only on a loopback bind
+(with a red bar saying so) or with `CONSOLE_ALLOW_OPEN=1`; anywhere else it
+refuses to open the socket. Details in
+[Security / hosting](../../README.md#security--hosting).
 
 ## What it edits
 
@@ -288,6 +291,7 @@ here: `PHOTOS_DIR`, `THUMBS_DIR` and `DATA_DIR` are the app's, read once in
 | `BACKUPS` | `20` | versions kept per edited file, under `data/console/backups` |
 | `MAX_UPLOAD_MB` | `8` | cap on icon/font/wallpaper uploads |
 | `READ_ONLY` | `0` | `1` = browse and validate only; every write endpoint returns 403 and the UI disables its controls |
+| `CONSOLE_ALLOW_OPEN` | `0` | `1` = run without a password on a non-loopback bind. Say this only when the network boundary is somewhere else |
 
 ### Previews come from the gallery's thumbnails
 

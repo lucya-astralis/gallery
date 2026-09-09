@@ -90,13 +90,54 @@ function toast(message, kind = 'ok') {
   toast._t = setTimeout(() => { box.hidden = true; }, kind === 'err' ? 6000 : 2600);
 }
 
+/* ----- the session ------------------------------------------------------
+ * The console is cookie-authenticated, so a cross-site form could aim a write
+ * at it with the operator's own cookie attached. The server therefore wants a
+ * token that only a page which can READ this origin could know, and every
+ * mutating request carries it in a header. It is fetched once at start-up and
+ * refreshed whenever the server says it is stale.
+ *
+ * When there is no password configured the token is an empty string and the
+ * server does not ask for one — the origin check still applies. */
+let CSRF = '';
+
+async function refreshSession() {
+  try {
+    const res = await fetch('/api/session', { headers: { Accept: 'application/json' } });
+    if (!res.ok) return false;
+    const state = await res.json();
+    CSRF = state.csrf || '';
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/* A session that has timed out is not an error to report in a toast — it is a
+ * different page. Sending the operator back to the door beats a form that
+ * silently stops saving. */
+function toLogin() {
+  window.location.replace('/login');
+}
+
 async function api(path, options = {}) {
-  const res = await fetch(path, {
-    headers: options.body ? { 'Content-Type': 'application/json' } : {},
-    ...options,
-  });
+  const method = (options.method || 'GET').toUpperCase();
+  const headers = { ...(options.headers || {}) };
+  if (options.body && !(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (method !== 'GET' && method !== 'HEAD' && CSRF) {
+    headers['X-Aperture-CSRF'] = CSRF;
+  }
+  const res = await fetch(path, { ...options, method, headers });
+  if (res.status === 401) { toLogin(); throw new Error('signed out'); }
   let payload = null;
   try { payload = await res.json(); } catch (_) { /* empty body */ }
+  if (res.status === 403 && payload && /csrf/i.test(payload.detail || '')) {
+    /* The token rotated under us (the server restarted, or the password was
+     * changed). Fetch a fresh one and let the caller retry once. */
+    await refreshSession();
+  }
   if (!res.ok) {
     const detail = (payload && payload.detail) || res.statusText;
     throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
@@ -142,6 +183,8 @@ const isNarrow = () => window.matchMedia('(max-width: 900px)').matches;
 /* ----- boot ------------------------------------------------------------- */
 async function boot() {
   loadPrefs();
+  // Before anything else: the CSRF token every later write has to carry.
+  await refreshSession();
   try {
     state.meta = await api('/api/meta');
     await Promise.all([loadTree(), loadVocab()]);
@@ -157,6 +200,13 @@ async function boot() {
     toast('Reloaded');
   });
   $('#btn-check').addEventListener('click', () => { setDrawer(false); checkAll(); });
+  const signout = $('#btn-signout');
+  if (signout) {
+    signout.addEventListener('click', async () => {
+      try { await api('/api/session', { method: 'DELETE' }); } catch (_) { /* going anyway */ }
+      toLogin();
+    });
+  }
   $('#tree-filter').addEventListener('input', renderTree);
   $('#btn-menu').addEventListener('click', () => setDrawer(!drawerOpen()));
   $('#btn-menu-close').addEventListener('click', () => setDrawer(false));
@@ -1816,7 +1866,12 @@ function renderAssets() {
     form.append('scope', assetScope());
     form.append('file', file);
     try {
-      const res = await fetch('/api/asset', { method: 'POST', body: form });
+      const res = await fetch('/api/asset', {
+        method: 'POST',
+        body: form,
+        headers: CSRF ? { 'X-Aperture-CSRF': CSRF } : {},
+      });
+      if (res.status === 401) { toLogin(); return; }
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.detail || res.statusText);
       state.data.assets = payload.assets;

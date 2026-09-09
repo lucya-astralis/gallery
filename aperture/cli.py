@@ -2208,6 +2208,71 @@ def _picture_verdict(report: dict) -> str:
     return ui.state(text, "ok")
 
 
+def cmd_passwd(args) -> int:
+    """Set, change or clear the console's operator password.
+
+    The password is never an argument: argv lands in shell history, in `ps`
+    output and in a container's inspect JSON. It comes from a terminal prompt
+    that does not echo, or from stdin for the scripted case:
+
+        python -m aperture.cli passwd
+        printf '%s' "$SECRET" | python -m aperture.cli passwd --stdin
+        python -m aperture.cli passwd --clear
+    """
+    from .console import security
+
+    if args.clear:
+        existed = security.clear_password()
+        if args.json:
+            dump({"ok": True, "cleared": existed, "password_set": False})
+            return 0
+        with _screen("console password"):
+            if existed:
+                out(f"{ui.C.ye}Password cleared.{ui.C.off}")
+                out("")
+                out("The console now runs OPEN wherever it is allowed to run at all —")
+                out("loopback, or CONSOLE_ALLOW_OPEN=1. Anywhere else it will refuse")
+                out("to start until a password is set again.")
+            else:
+                out("No password was set.")
+        return 0
+
+    if args.stdin:
+        password = sys.stdin.readline().rstrip("\n")
+        confirm = password
+    else:
+        import getpass
+        try:
+            password = getpass.getpass("New console password: ")
+            confirm = getpass.getpass("Again: ")
+        except (EOFError, KeyboardInterrupt):
+            out("")
+            return 1
+
+    if password != confirm:
+        out(f"{ui.C.rd}The two entries do not match.{ui.C.off}")
+        return 1
+    try:
+        path = security.set_password(password)
+    except ValueError as exc:
+        out(f"{ui.C.rd}{exc}{ui.C.off}")
+        return 1
+
+    if args.json:
+        dump({"ok": True, "password_set": True, "file": str(path)})
+        return 0
+    with _screen("console password"):
+        out(f"{ui.C.gn}Password set.{ui.C.off}")
+        out("")
+        kv("stored in", str(path))
+        kv("hash", "scrypt (n=%d, r=%d, p=%d)"
+           % (security.SCRYPT["n"], security.SCRYPT["r"], security.SCRYPT["p"]))
+        out("")
+        out("Every open console session was ended. The console now asks for this")
+        out("password wherever it listens.")
+    return 0
+
+
 def cmd_term(args) -> int:
     """Why this terminal is (not) getting colours and a menu. The answer to
     "works on my machine, not on the server"."""
@@ -2303,6 +2368,14 @@ def build_parser() -> argparse.ArgumentParser:
     add("menu", cmd_menu, "Interactive console (needs a terminal).")
     add("help", cmd_help, "Command overview with the usage cheat sheet.")
     add("term", cmd_term, "What this terminal supports, and why colour / the menu are off.")
+
+    sp = add("passwd", cmd_passwd,
+             "Set, change or clear the console's operator password.")
+    sp.add_argument("--stdin", action="store_true",
+                    help="read the password from stdin instead of prompting")
+    sp.add_argument("--clear", action="store_true",
+                    help="remove the password; the console then only starts "
+                         "on loopback or with CONSOLE_ALLOW_OPEN=1")
 
     add("status", cmd_status, "Live state: server, pause, last scan, watcher queue, index counters.")
 
@@ -2400,6 +2473,7 @@ LOGO_MODES = ("auto", "kitty", "iterm", "blocks", "ascii", "off")
 # Commands whose output is wrapped in the shared frame by the dispatcher.
 # The rest draw their own screen (see _screen) or are pure JSON.
 FRAMED_COMMANDS = {"scan", "pause", "resume", "doctor", "thumbs", "featured",
+                   "passwd",
                    "cfg", "photo", "trip", "i18n",
                    "tags", "welcome", "gps", "album", "search", "export"}
 

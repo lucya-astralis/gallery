@@ -1246,10 +1246,16 @@ process serves both surfaces and the photo mount is writable.
 
 What replaces it:
 
-- **Where a write can land.** The console writes only inside an album's
-  `.album/` folder and inside `photos/.gallery/`. A photograph is not
-  addressable for writing by any route, and there is no delete outside those
-  metadata folders.
+- **Where a write can land.** One function decides — `writable_target()` in
+  `aperture/paths.py` — and it returns paths inside an album's `.album/`
+  folder or `photos/.gallery/`, and nowhere else. Per-photo tags are the third
+  and last case: a `.tags` sidecar sits *beside* its photo by the convention
+  the scanner reads, so `sidecar_target()` derives the name from a file that
+  must already exist and must be an image. A photograph is never a writable
+  target, and there is no delete outside those places. The resolver also
+  refuses traversal, absolute paths, reserved Windows device names, alternate
+  data streams, trailing dots and spaces, and any path reached through a
+  symlink.
 - **Where the console can be reached from.** Its port is published to a host
   address, not to every interface. `127.0.0.1` is the default; a LAN or VPN
   address puts it on exactly that network. It is not meant for the open
@@ -1263,10 +1269,40 @@ What replaces it:
 - **Not root.** The image runs as uid 10001; the compose service adds
   `read_only`, `cap_drop: ALL` and `no-new-privileges`.
 
-**Still open at 1.0** — the console has *no authentication yet*. Until it has,
-the port itself is the only control, so keep it off any network you do not
-trust. Session login, CSRF, login throttling and an audit log are the next
-milestone.
+### The console's door
+
+- **A password, not a port.** One operator password, hashed with `scrypt`
+  (stdlib — no new dependency), stored in `data/console/credentials` with mode
+  0600. Set it with `python -m aperture.cli passwd`, which prompts without
+  echoing or reads `--stdin`; it is never an argument, because argv lands in
+  shell history, `ps` output and a container's inspect JSON.
+- **Fail-closed at startup.** No password and a non-loopback bind ⇒ the
+  process refuses to open that socket and prints how to fix it. Inside a
+  container the bind is always `0.0.0.0`, so if your boundary is elsewhere
+  (the port is only published on `127.0.0.1`, or a firewall covers it) say so
+  with `CONSOLE_ALLOW_OPEN=1`. On loopback, no password runs open with a
+  warning on every start — and a red bar across the console saying so.
+- **Sessions.** Server-side, `HttpOnly` + `SameSite=Strict` cookie, `Secure`
+  where the browser would accept it, 30 minutes idle and 12 hours absolute.
+  Changing the password ends every open session.
+- **CSRF, three layers.** `SameSite=Strict`, an `Origin` check on every
+  mutating request, and a session-bound token in `X-Aperture-CSRF`. The
+  cross-site check applies even when the console runs open.
+- **Throttling.** Three free attempts per address, then exponential backoff
+  capped at five minutes; the answer becomes `429` with a `Retry-After`.
+- **Uploads.** Extension allowlist *and* a magic-byte check, so an HTML page
+  named `icon.png` is refused; 8 MB cap; a 64 MP ceiling on anything Pillow
+  decodes.
+- **An audit log.** `data/console/audit.log`, one JSON line per write: time,
+  address, session, the file relative to `photos/`, and its SHA-256 before and
+  after. Never the content — the rolling backups beside it are for that.
+
+Every bullet above has a test in `tests/test_security.py`, which is the point
+of writing them as bullets.
+
+**Still open** — TLS is yours to provide. A session over plain HTTP to a LAN
+address travels in clear, and the console says so in the log. Put it behind
+WireGuard, Tailscale or an SSH tunnel rather than exposing it.
 
 **Built-in security headers** (set by middleware in `aperture/main.py`):
 

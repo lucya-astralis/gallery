@@ -1125,7 +1125,8 @@ html.no-help .group__blurb { display: none; }
 .field__control { display: flex; flex-direction: column; gap: var(--s-3); min-width: 0; }
 
 /* ----- inputs ---------------------------------------------------------- */
-input[type="text"], input[type="search"], input[type="number"], select, textarea {
+input[type="text"], input[type="search"], input[type="number"],
+input[type="password"], select, textarea {
   background: var(--surface);
   border: var(--hair) solid var(--line);
   border-radius: var(--radius);
@@ -2479,4 +2480,114 @@ img.is-broken { opacity: .2; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
+}
+
+
+/* ============================================================
+   THE DOOR
+   ------------------------------------------------------------
+   One card on the same backdrop the app wears, because signing in is the
+   same room and not a lobby someone else built. Everything here is an
+   object that already exists — .site-bg, .btn--primary, the input reset,
+   the .brand-text lockup — so the page cost the language nothing new.
+
+   It is a separate DOCUMENT rather than an overlay on the console: nothing
+   of the tool, not the album tree, not the mount path, renders before there
+   is a session to render it for.
+   ============================================================ */
+.login-body {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--s-5);
+}
+
+.login { width: 100%; max-width: 420px; }
+
+.login__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: var(--hair) solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--s-6) var(--s-5) var(--s-5);
+}
+
+.login__mark {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+.login__mark img { width: 28px; height: 28px; }
+
+.login__title {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size:var(--fs-text-lg);
+  margin: 0;
+}
+
+.login__note {
+  color: var(--text-dim);
+  font-size:var(--fs-text-sm);
+  margin: 0 0 var(--s-3);
+}
+
+.login__label {
+  font-family: var(--mono);
+  font-size:var(--fs-chrome-sm);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+
+/* The one place in the tool where a message is an --acc-red: a refused
+   sign-in is a state the operator has to act on, not a note. */
+.login__error {
+  color: var(--acc-red);
+  font-size:var(--fs-text-sm);
+  margin: 0;
+}
+
+.login__submit { margin-top: var(--s-3); }
+
+.login__foot {
+  color: var(--text-ghost);
+  font-size:var(--fs-chrome-md);
+  margin: var(--s-4) 0 0;
+  padding-top: var(--s-4);
+  border-top: var(--hair) solid var(--line);
+}
+.login__foot code { font-family: var(--mono); color: var(--text-dim); }
+
+/* ----- the open console ------------------------------------------------
+   No password configured. The bar is not decoration: an unauthenticated
+   console must never be mistaken for an authenticated one, so it sits above
+   everything, in the one colour the tool reserves for "act on this". */
+.openbar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-4);
+  background: rgba(var(--acc-red-rgb), .14);
+  border-bottom: var(--hair) solid var(--acc-red);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size:var(--fs-chrome-sm);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.openbar > span:first-child { white-space: nowrap; }
+.openbar code {
+  font-family: var(--mono);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-dim);
 }

@@ -45,7 +45,14 @@ services:
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
       # ----- console -----
       - CONSOLE_ENABLED=${CONSOLE_ENABLED:-1}
+      # Always 0.0.0.0 INSIDE the container — a container's own loopback is
+      # reachable from nowhere. The boundary is the host address in `ports`
+      # above. Because this bind is not loopback, Aperture refuses to start
+      # the console without a password unless CONSOLE_ALLOW_OPEN says the
+      # boundary is handled here:
+      #   docker compose run --rm aperture python -m aperture.cli passwd
       - CONSOLE_BIND=0.0.0.0
+      - CONSOLE_ALLOW_OPEN=${CONSOLE_ALLOW_OPEN:-0}
       - READ_ONLY=${READ_ONLY:-0}
       - BACKUPS=${BACKUPS:-20}
       - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-8}

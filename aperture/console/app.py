@@ -29,13 +29,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .. import brand
+from ..paths import (PathRefused, relative_to_photos, sidecar_target,
+                     writable_target)
 from ..runtime import settings
-from . import cfgio, imagemeta, schema, validate
+from . import cfgio, imagemeta, schema, security, validate
 from .library import Library, asset_kinds, is_image
 
 # The console ships with the app now, so it carries the app's version rather
@@ -68,12 +70,93 @@ except Exception:  # pragma: no cover - depends on the wheel being installed
 
 from PIL import Image, ImageOps
 
+# A 64 MP ceiling on anything decoded here. Pillow's own default is ~89 MP and
+# only warns; a metadata folder holds icons and backdrops, so nothing
+# legitimate comes close and a crafted file should not get to allocate for it.
+Image.MAX_IMAGE_PIXELS = 64 * 1024 * 1024
+
 app = FastAPI(title=f"{brand.PRODUCT} console", docs_url=None, redoc_url=None,
               openapi_url=None)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 lib = Library(PHOTOS_DIR)
+
+# Authentication and CSRF for every route on this app, in one place. Declared
+# here rather than per-route so a route added later is closed by default: the
+# open list in security.py is a short, explicit set, and anything not on it
+# needs a session.
+app.middleware("http")(security.guard)
+
+
+@app.middleware("http")
+async def console_headers(request: Request, call_next):
+    """The gallery's header set, plus no-store on everything.
+
+    An operator surface has no business in a cache — not the browser's, not a
+    proxy's. The rest is the same policy the public side sends, because the
+    console is the same kind of document with more at stake.
+    """
+    response = await call_next(request)
+    response.headers.setdefault("Content-Security-Policy", CSP)
+    response.headers.setdefault("Cache-Control", "no-store")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+    return response
+
+
+# Same shape as the gallery's, with one addition: `sandbox` on nothing here,
+# but `media-src`/`font-src` are needed because the console previews the
+# wallpapers and title faces an operator uploads.
+CSP = (
+    "default-src 'self'; "
+    "img-src 'self' data:; "
+    "media-src 'self'; "
+    "font-src 'self'; "
+    "style-src 'self'; "
+    "script-src 'self'; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "frame-ancestors 'none'"
+)
+
+
+def _target(album: str | None, name: str, *, scope: str = "album",
+            allowed_exts: set[str] | None = None) -> Path:
+    """Every write in this module resolves its path here.
+
+    `lib.cfg_path()` and friends still say WHICH file a route means; this says
+    whether that file may be written, and it is the only thing that does. A
+    PathRefused becomes a 400 with the reason, because the reasons are things
+    an operator can act on ("that is a reserved device name") rather than
+    internal detail.
+    """
+    try:
+        return writable_target(PHOTOS_DIR, album, name, scope=scope,
+                               allowed_exts=allowed_exts)
+    except PathRefused as exc:
+        raise HTTPException(400, str(exc))
+
+
+def _cfg_target(album: str) -> Path:
+    return _target(album, schema.ALBUM_CFG_NAME)
+
+
+def _desc_target(album: str, lang: str) -> Path:
+    return _target(album, "album_%s.md" % lang)
+
+
+def _writes(request: Request, action: str, target: Path, before: str | None) -> None:
+    """Record one completed write. Called after the file is on disk, with the
+    hash it had beforehand, so the log says what changed and not merely that
+    something did."""
+    security.audit(request, action, relative_to_photos(PHOTOS_DIR, target),
+                   before=before, after=security.sha256_of(target))
 
 
 def _static_url(path: str) -> str:
@@ -191,6 +274,49 @@ async def _json_body(request: Request) -> dict:
     return body
 
 
+# ----- the door ---------------------------------------------------------
+@app.get("/login")
+def login_page(request: Request, next: str = "/"):
+    """The one page a signed-out visitor can see. Deliberately its own
+    document rather than a modal on the app: nothing of the console — not the
+    album tree, not the photo counts, not the mount path — renders before
+    there is a session."""
+    if security.open_access() or security.current(request):
+        return RedirectResponse("/", status_code=303)
+    return templates.TemplateResponse("login.html", {
+        "request": request,
+        "vendor": brand.CONTEXT,
+    })
+
+
+@app.get("/api/session")
+def api_session(request: Request):
+    """Who this browser is, and the CSRF token its next write must carry."""
+    return security.state(request)
+
+
+@app.post("/api/session")
+async def api_session_open(request: Request):
+    if security.open_access():
+        raise HTTPException(409, "this console has no password set")
+    body = await _json_body(request)
+    password = body.get("password")
+    if not isinstance(password, str) or not password:
+        raise HTTPException(400, "expected a `password`")
+    sid, sess = security.login(request, password)
+    response = JSONResponse({"ok": True, "csrf": sess.csrf})
+    security.issue_cookie(response, request, sid)
+    return response
+
+
+@app.delete("/api/session")
+def api_session_close(request: Request):
+    security.logout(request)
+    response = JSONResponse({"ok": True})
+    security.clear_cookie(response)
+    return response
+
+
 # ----- page -------------------------------------------------------------
 @app.get("/")
 def index(request: Request):
@@ -199,6 +325,10 @@ def index(request: Request):
         "photos_dir": PHOTOS_DIR.as_posix(),
         "read_only": READ_ONLY,
         "app_version": APP_VERSION,
+        # "open" means no password is configured. The UI says so out loud —
+        # an unauthenticated console should never look like an authenticated
+        # one (see security.assert_safe_binding).
+        "auth_mode": "open" if security.open_access() else "password",
     })
 
 
@@ -279,11 +409,13 @@ async def api_album_cfg(request: Request):
     body = await _json_body(request)
     album = _album_or_400(body.get("album", ""))
     updates = _updates_from(body.get("values", {}))
-    path = lib.cfg_path(album)
+    path = _cfg_target(album)
+    before = security.sha256_of(path)
     cfg_file = cfgio.CfgFile.load(path)
     cfg_file.apply(updates, schema.KEY_SPEC)
     _backup(path, "album")
     cfg_file.save(path)
+    _writes(request, "album.cfg", path, before)
     values = cfg_file.values()
     return {"ok": True, "values": values, "raw": cfg_file.text(),
             "issues": validate.check_album(lib, album, values)}
@@ -297,22 +429,26 @@ async def api_album_raw(request: Request):
     text = body.get("raw")
     if not isinstance(text, str):
         raise HTTPException(400, "expected a `raw` string")
-    path = lib.cfg_path(album)
+    path = _cfg_target(album)
+    before = security.sha256_of(path)
     _backup(path, "album")
     cfg_file = cfgio.CfgFile(text)
     cfg_file.save(path)
+    _writes(request, "album.cfg (raw)", path, before)
     values = cfg_file.values()
     return {"ok": True, "values": values, "raw": cfg_file.text(),
             "issues": validate.check_album(lib, album, values)}
 
 
 @app.delete("/api/album/cfg")
-def api_album_cfg_delete(path: str = ""):
+def api_album_cfg_delete(request: Request, path: str = ""):
     _guard_write()
     album = _album_or_400(path)
-    cfg_path = lib.cfg_path(album)
+    cfg_path = _cfg_target(album)
+    before = security.sha256_of(cfg_path)
     _backup(cfg_path, "album")
     cfg_path.unlink(missing_ok=True)
+    _writes(request, "album.cfg deleted", cfg_path, before)
     return {"ok": True}
 
 
@@ -327,8 +463,11 @@ async def api_album_description(request: Request):
     text = body.get("text")
     if not isinstance(text, str):
         raise HTTPException(400, "expected a `text` string")
-    _backup(lib.desc_path(album, lang), "desc")
+    target = _desc_target(album, lang)
+    before = security.sha256_of(target)
+    _backup(target, "desc")
     lib.write_desc(album, lang, text)
+    _writes(request, "description (%s)" % lang, target, before)
     return {"ok": True, "text": lib.read_desc(album, lang)}
 
 
@@ -354,11 +493,13 @@ async def api_gallery_cfg(request: Request):
     _guard_write()
     body = await _json_body(request)
     updates = _updates_from(body.get("values", {}))
-    path = lib.gallery_cfg_path()
+    path = _target(None, schema.GALLERY_CFG_NAME, scope="gallery")
+    before = security.sha256_of(path)
     cfg_file = cfgio.CfgFile.load(path, cfgio.GROUP_KEYS)
     cfg_file.apply(updates, schema.KEY_SPEC)
     _backup(path, "gallery")
     cfg_file.save(path)
+    _writes(request, "gallery.cfg", path, before)
     values = cfg_file.values()
     return {"ok": True, "values": values, "raw": cfg_file.text(),
             "issues": validate.check_gallery(lib, values),
@@ -372,10 +513,12 @@ async def api_gallery_raw(request: Request):
     text = body.get("raw")
     if not isinstance(text, str):
         raise HTTPException(400, "expected a `raw` string")
-    path = lib.gallery_cfg_path()
+    path = _target(None, schema.GALLERY_CFG_NAME, scope="gallery")
+    before = security.sha256_of(path)
     _backup(path, "gallery")
     cfg_file = cfgio.CfgFile(text, cfgio.GROUP_KEYS)
     cfg_file.save(path)
+    _writes(request, "gallery.cfg (raw)", path, before)
     values = cfg_file.values()
     return {"ok": True, "values": values, "raw": cfg_file.text(),
             "issues": validate.check_gallery(lib, values),
@@ -520,12 +663,13 @@ async def api_tags_write(request: Request):
     results: dict[str, list[str]] = {}
     for raw_rel in rels:
         rel = str(raw_rel).replace("\\", "/").strip().strip("/")
+        # sidecar_target proves the photo exists and IS a photograph, then
+        # builds the sidecar's name from it. Nothing about the file written
+        # here comes from the request except which picture it belongs to.
         try:
-            source = lib.safe(rel)
-        except ValueError:
-            raise HTTPException(400, "bad photo path: %r" % raw_rel)
-        if not source.is_file() or not is_image(source.name):
-            raise HTTPException(404, "no such photo: %r" % rel)
+            sidecar = sidecar_target(PHOTOS_DIR, rel, is_image=is_image)
+        except PathRefused as exc:
+            raise HTTPException(400, str(exc))
 
         if replace is not None:
             if not isinstance(replace, list):
@@ -539,8 +683,10 @@ async def api_tags_write(request: Request):
                 if tag.lower() not in have:
                     wanted.append(tag)
                     have.add(tag.lower())
-        _backup(lib.tags_path(rel), "tags")
+        before = security.sha256_of(sidecar)
+        _backup(sidecar, "tags")
         results[rel] = lib.write_tags(rel, wanted)
+        _writes(request, "tags", sidecar, before)
 
     return {"ok": True, "changed": len(results), "tags": results}
 
@@ -561,6 +707,61 @@ _ASSET_TYPES = {
 _MISSING_TYPES = (schema.ICON_EXTS | schema.FONT_EXTS | schema.WALLPAPER_EXTS
                   | schema.BRAND_EXTS) - set(_ASSET_TYPES)
 assert not _MISSING_TYPES, "no content type for %s" % sorted(_MISSING_TYPES)
+
+
+# ----- what a file claims to be, and what it is -------------------------
+# The extension allowlist says which KIND of file may land in a metadata
+# folder; these signatures say whether the bytes agree. Both are needed: an
+# HTML page named `icon.png` passes the first check and fails the second, and
+# it is the second that decides what a browser does with it.
+_SIGNATURES: dict[str, tuple[bytes, ...]] = {
+    ".png":   (bytes.fromhex("89504e470d0a1a0a"),),
+    ".jpg":   (bytes.fromhex("ffd8ff"),),
+    ".jpeg":  (bytes.fromhex("ffd8ff"),),
+    ".gif":   (b"GIF87a", b"GIF89a"),
+    ".otf":   (b"OTTO",),
+    ".ttf":   (bytes.fromhex("00010000"), b"true", b"ttcf"),
+    ".woff":  (b"wOFF",),
+    ".woff2": (b"wOF2",),
+    ".webm":  (bytes.fromhex("1a45dfa3"),),
+}
+# These carry their marker at a fixed offset rather than at the start.
+_TAGGED = {".webp": (b"RIFF", 8, b"WEBP"),
+           ".avif": (None, 4, b"ftyp"),
+           ".mp4":  (None, 4, b"ftyp")}
+
+
+def _sniff(name: str, payload: bytes) -> None:
+    """Refuse a file whose bytes do not match its extension.
+
+    SVG is the one that cannot be checked this way -- it is XML, so the test
+    is that it parses as one and starts with an SVG or XML element. That does
+    not make an SVG safe by itself; the CSP the console and the gallery both
+    send is what stops script inside one from running.
+    """
+    ext = Path(name).suffix.lower()
+    if not payload:
+        raise HTTPException(400, "the uploaded file is empty")
+
+    if ext == ".svg":
+        head = payload[:512].lstrip(bytes.fromhex("efbbbf")).lstrip()
+        if not (head.startswith(b"<?xml") or head.startswith(b"<svg")
+                or head.startswith(b"<!DOCTYPE svg")):
+            raise HTTPException(415, "that does not look like an SVG")
+        return
+
+    if ext in _TAGGED:
+        prefix, offset, marker = _TAGGED[ext]
+        ok = payload[offset:offset + len(marker)] == marker
+        if prefix is not None:
+            ok = ok and payload.startswith(prefix)
+        if not ok:
+            raise HTTPException(415, "the file's contents are not %s" % ext[1:].upper())
+        return
+
+    magic = _SIGNATURES.get(ext)
+    if magic and not any(payload.startswith(m) for m in magic):
+        raise HTTPException(415, "the file's contents are not %s" % ext[1:].upper())
 
 
 # Assets live in one of two folders, and every route below takes the same
@@ -609,44 +810,52 @@ _SCOPE_EXTS = {"album": _ASSET_EXTS, "gallery": schema.GALLERY_EXTS}
 
 
 @app.post("/api/asset")
-async def api_asset_upload(path: str = Form(""), file: UploadFile = File(...),
+async def api_asset_upload(request: Request, path: str = Form(""),
+                           file: UploadFile = File(...),
                            scope: str = Form("album")):
     """Drop an icon, a title font or a page wallpaper into an album's
     .album/ folder — or a logo, a portrait, a badge, or the site's own face
     or backdrop into the gallery's .gallery/."""
     _guard_write()
-    meta = _asset_dir(scope, path)
-    accepted = _SCOPE_EXTS[scope]
+    if scope not in _SCOPES:
+        raise HTTPException(400, "scope must be one of %s" % ", ".join(_SCOPES))
+    album = _album_or_400(path) if scope == "album" else None
+    # The filename is the only thing on this route that a client chooses, so
+    # it is the only thing that has to be proved. _target refuses a name that
+    # is a path, a device, an alternate data stream or the wrong kind of file,
+    # and refuses a destination reached through a symlink.
     name = Path(file.filename or "").name
-    ext = Path(name).suffix.lower()
-    if not name or ext not in accepted:
-        raise HTTPException(400, "only %s are accepted"
-                            % ", ".join(sorted(accepted)))
+    target = _target(album, name, scope=scope, allowed_exts=_SCOPE_EXTS[scope])
+
     payload = await file.read(MAX_UPLOAD + 1)
     if len(payload) > MAX_UPLOAD:
         raise HTTPException(413, "file is larger than %d MB" % (MAX_UPLOAD // 1048576))
-    meta.mkdir(parents=True, exist_ok=True)
-    target = meta / name
+    _sniff(name, payload)
+
+    before = security.sha256_of(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
     _backup(target, "asset")
     target.write_bytes(payload)
+    _writes(request, "asset uploaded", target, before)
     kinds = ["brand"] if scope == "gallery" else asset_kinds(name)
     return {"ok": True, "name": name, "kinds": kinds, "kind": kinds[0],
             "assets": _asset_listing(scope, path)}
 
 
 @app.delete("/api/asset")
-def api_asset_delete(path: str = "", name: str = "", scope: str = "album"):
+def api_asset_delete(request: Request, path: str = "", name: str = "",
+                     scope: str = "album"):
     _guard_write()
-    meta = _asset_dir(scope, path)
-    if Path(name).name != name:
-        raise HTTPException(400, "asset names are bare filenames")
-    if Path(name).suffix.lower() not in _SCOPE_EXTS[scope]:
-        raise HTTPException(400, "that is not a file this folder holds")
-    target = meta / name
+    if scope not in _SCOPES:
+        raise HTTPException(400, "scope must be one of %s" % ", ".join(_SCOPES))
+    album = _album_or_400(path) if scope == "album" else None
+    target = _target(album, name, scope=scope, allowed_exts=_SCOPE_EXTS[scope])
     if not target.is_file():
         raise HTTPException(404, "no such asset")
+    before = security.sha256_of(target)
     _backup(target, "asset")
     target.unlink()
+    _writes(request, "asset deleted", target, before)
     return {"ok": True, "assets": _asset_listing(scope, path)}
 
 
@@ -664,11 +873,19 @@ def api_validate():
 
 
 @app.get("/api/health")
-def api_health():
-    return {"ok": PHOTOS_DIR.is_dir(), "version": APP_VERSION,
-            "photos_dir": PHOTOS_DIR.as_posix(),
-            "shared_thumbs": THUMBS_DIR.is_dir(),
-            "read_only": READ_ONLY}
+def api_health(request: Request):
+    """A liveness probe, and the ONE route that answers without a session —
+    so it says only what a container orchestrator needs. The mount path, the
+    album counts and whether a thumbnail tree is shared used to be in here;
+    they are facts about the deployment and now live behind the door, in
+    /api/meta."""
+    payload = {"ok": PHOTOS_DIR.is_dir(), "version": APP_VERSION,
+               "auth": "open" if security.open_access() else "password"}
+    if security.current(request) or security.open_access():
+        payload.update(photos_dir=PHOTOS_DIR.as_posix(),
+                       shared_thumbs=THUMBS_DIR.is_dir(),
+                       read_only=READ_ONLY)
+    return payload
 
 
 @app.exception_handler(ValueError)
@@ -677,9 +894,13 @@ def _value_error(request: Request, exc: ValueError):
 
 
 def create_console_app() -> FastAPI:
-    """The console as server.py wants it. A factory rather than a bare import
-    so the fail-closed checks run before anything binds a socket -- see
-    server.py and, from phase 02 on, console/security.py."""
+    """The console as server.py wants it.
+
+    A factory rather than a bare import because of the first line: the binding
+    check can end the process, and it has to do that BEFORE a socket exists,
+    not after the first request finds out there is no password.
+    """
+    security.assert_safe_binding()
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     return app

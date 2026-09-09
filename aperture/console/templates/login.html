@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Sign in — lucya.systems aperture</title>
+  <link rel="icon" type="image/svg+xml" href="{{ static_url('logo/lucya_logo.svg') }}">
+  <link rel="stylesheet" href="{{ static_url('style.css') }}">
+</head>
+<body class="login-body">
+  {# The same backdrop the console wears, so signing in is the same room and
+     not a lobby someone else built. #}
+  <div class="site-bg" aria-hidden="true">
+    <picture>
+      <source media="(max-width: 760px)" srcset="{{ static_url('bg/nova-square.svg') }}">
+      <img class="bg-still" src="{{ static_url('bg/nova-wide-16-9.svg') }}" alt="" decoding="async">
+    </picture>
+  </div>
+
+  <main class="login">
+    <form class="login__card" id="login-form" method="post" action="/api/session"
+          autocomplete="on" novalidate>
+      <span class="login__mark">
+        <img src="{{ static_url('logo/lucya_logo.svg') }}" alt="">
+        <span class="brand-text">
+          <span class="brand-name">lucya.systems</span>
+          <span class="brand-sub">console</span>
+        </span>
+      </span>
+
+      <h1 class="login__title">Sign in</h1>
+      <p class="login__note">
+        The console edits the files this gallery is configured by. It is the
+        only part of Aperture that writes.
+      </p>
+
+      <label class="login__label" for="password">Operator password</label>
+      <input type="password" id="password" name="password" required
+             autocomplete="current-password" autofocus
+             aria-describedby="login-error">
+
+      <p class="login__error" id="login-error" role="alert" hidden></p>
+
+      <button type="submit" class="btn btn--primary login__submit" id="login-submit">
+        Sign in
+      </button>
+
+      <p class="login__foot">
+        Lost the password? Set a new one on the host:
+        <code>python -m aperture.cli passwd</code>
+      </p>
+    </form>
+  </main>
+
+  <script src="{{ static_url('login.js') }}"></script>
+</body>
+</html>
