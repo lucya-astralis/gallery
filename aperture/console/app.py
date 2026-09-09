@@ -37,7 +37,7 @@ from .. import brand
 from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
-from . import cfgio, imagemeta, schema, security, validate
+from . import cfgio, imagemeta, opsapi, schema, security, validate
 from .library import Library, asset_kinds, is_image
 
 # The console ships with the app now, so it carries the app's version rather
@@ -81,6 +81,12 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 lib = Library(PHOTOS_DIR)
+
+# The operations surface: status, scan, pause/resume, doctor. Its own module
+# because it shares nothing with the cfg editor below except this app and the
+# door in front of it — it reads the index and writes the control channel,
+# never the photo tree.
+app.include_router(opsapi.router)
 
 # Authentication and CSRF for every route on this app, in one place. Declared
 # here rather than per-route so a route added later is closed by default: the

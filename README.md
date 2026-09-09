@@ -30,7 +30,7 @@ decided by `APERTURE_ROLE` — `all` for one container with both, or `public` an
 - **Three languages (EN / DE / JP):** selector in the top-right corner, cookie-backed with an `Accept-Language` fallback. Album descriptions are per-language markdown files (`album_en.md` / `album_de.md` / `album_jp.md`); UI strings live in `aperture/i18n.py`. See [Languages](#languages--i18n).
 - **Mobile-friendly:** responsive grid, large touch targets, keyboard navigation (← → ESC) on desktop.
 - **Read-only where it faces the public:** the gallery app has no route that is not a `GET` — no write endpoints, no uploads, no tag editing. The one write path in the product belongs to the console, on the other port, and reaches only the `.album/` and `.gallery/` metadata folders. See [Security / hosting](#security--hosting).
-- **Console:** the config editor, built in. Album and gallery `cfg` files, per-language descriptions, icons, title fonts, wallpapers and brand assets, with validation — on its own port, never on the public one.
+- **Console:** the config editor *and the operations panel*, built in. Album and gallery `cfg` files, per-language descriptions, icons, title fonts, wallpapers and brand assets, with validation — plus the indexer's live state, scan / pause / resume, and `doctor`, on its own port, never on the public one.
 - **Operations CLI:** `python -m aperture.cli` — run or pause the indexer, check index/config/derivative drift with `doctor`, audit tags and GPS, and inspect exactly how a photo, an album, the welcome hero or a trip resolves. See [Operations CLI](#operations-cli).
 - **Security headers:** CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy — all set by built-in middleware.
 - **Custom 404 page** with megacorp-terminal aesthetic.
@@ -63,6 +63,23 @@ CLI uses (`data/control/`, see [Operations CLI](#operations-cli)).
 Nothing routes between the two apps. The console's API lives under `/api/` as
 well — it can, because a request that arrives on the public socket has no way
 to reach a handler that was never mounted on it.
+
+### Operations from either front end
+
+`aperture/ops.py` is the operational surface as data — the live state of the
+indexer, what `doctor` checked, what a scan did. Two front ends render it:
+`aperture/cli.py` to a terminal, `aperture/console/opsapi.py` over HTTP. There
+is one implementation of each check, and a report that changes changes in both
+places at once.
+
+Actions go through the flag-file control channel in `data/control/`, never
+through a function call — **even in the `all` role, where the console shares a
+process with the indexer.** A scan requested in the browser is the same file
+`python -m aperture.cli scan` writes, picked up by the same control loop. That
+keeps one place where a scan can begin, one place to look when one did not,
+and it means `APERTURE_ROLE=console` in its own container works with no second
+implementation. The request carries `by: console` or `by: cli`, so `status`
+says afterwards which one asked.
 
 Add images:
 
@@ -878,6 +895,14 @@ Console only:
 | `MAX_UPLOAD_MB`   | `8`         | Cap on icon / font / wallpaper uploads              |
 
 ## Operations CLI
+
+Everything operational is one command — or, since 1.0, the **Operations** entry
+at the top of the [console](aperture/console/), which serves the same reports
+from the same functions (`aperture/ops.py`). The console covers what you need
+while the gallery is running: live indexer state, scan now, pause / resume, and
+`doctor`. The CLI covers those plus everything that is about authoring and
+shipping — `cfg`, `photo`, `trip`, `tags`, `welcome`, `gps`, `export`, `i18n` —
+and it is the only one of the two that works with nothing running at all.
 
 Everything operational is one command:
 

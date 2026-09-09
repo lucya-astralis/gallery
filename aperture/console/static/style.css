@@ -2591,3 +2591,127 @@ img.is-broken { opacity: .2; }
   letter-spacing: 0;
   color: var(--text-dim);
 }
+
+
+/* ============================================================
+   OPERATIONS
+   ------------------------------------------------------------
+   The one view in the tool that is a READOUT rather than a form: it reports
+   what the indexer is doing and offers three buttons. So it borrows the
+   gallery's meta line rather than the console's .field — label left in the
+   mono voice, value right, hairline between rows, and semantic colour
+   (ok / warn / bad) which is NOT the accent: the accent marks state you
+   chose, these mark state you are being told about.
+   ============================================================ */
+.ops {
+  border-top: var(--hair) solid var(--line);
+  padding: var(--s-5) 0;
+}
+.ops:first-of-type { border-top: 0; }
+
+.ops__head {
+  font-family: var(--mono);
+  font-size:var(--fs-chrome-sm);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--label);
+  margin: 0 0 var(--s-4);
+}
+
+.ops__row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: var(--s-4);
+  padding: var(--s-2) 0;
+  border-bottom: var(--hair) solid var(--line);
+  font-size:var(--fs-text-sm);
+}
+.ops__row:last-of-type { border-bottom: 0; }
+
+.ops__label {
+  font-family: var(--mono);
+  font-size:var(--fs-chrome-sm);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+}
+
+.ops__value {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.ops__value.is-ok   { color: var(--ok); }
+.ops__value.is-warn { color: var(--amb); }
+.ops__value.is-bad  { color: var(--acc-red); }
+
+.ops__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  align-items: center;
+  margin-bottom: var(--s-4);
+}
+.ops__form input[type="text"] { flex: 1 1 260px; }
+.ops__check {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--text-dim);
+  font-size:var(--fs-text-sm);
+}
+
+.ops__buttons { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+
+.ops__note {
+  color: var(--text-ghost);
+  font-size:var(--fs-text-sm);
+  margin: var(--s-4) 0 0;
+  max-width: 68ch;
+}
+
+/* ----- doctor findings ------------------------------------------------- */
+.ops__finding { margin-top: var(--s-5); }
+.ops__finding-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  border-bottom: var(--hair) solid var(--line);
+  padding-bottom: var(--s-2);
+}
+.ops__count {
+  font-family: var(--mono);
+  font-size:var(--fs-chrome-sm);
+  color: var(--amb);
+  font-variant-numeric: tabular-nums;
+}
+.ops__list { list-style: none; margin: var(--s-3) 0 0; padding: 0; }
+.ops__list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--s-3);
+  padding: var(--s-1) 0;
+  font-size:var(--fs-chrome-md);
+}
+.ops__list code {
+  font-family: var(--mono);
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.ops__detail { color: var(--text-ghost); overflow-wrap: anywhere; }
+.ops__more { color: var(--text-ghost); font-family: var(--mono); padding-top: var(--s-2); }
+
+/* The tree row that is not a config file. Same object as the gallery.cfg
+   row, one step quieter, because it is a different errand and should not
+   read as the first album. */
+.tree__row--ops .tree__name {
+  font-family: var(--mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  font-size:var(--fs-chrome-sm);
+}
+
+@media (max-width: 760px) {
+  .ops__row { grid-template-columns: 1fr; gap: var(--s-1); }
+  .ops__list li { grid-template-columns: 1fr; gap: var(--s-1); }
+}

@@ -255,6 +255,19 @@ function renderTree() {
   const filter = $('#tree-filter').value.trim().toLowerCase();
   list.innerHTML = '';
 
+  /* Operations sits above the config tree because it is a different errand:
+   * everything below this row edits a file, this row watches and drives the
+   * indexer. It is the CLI's `status`, `scan`, `pause` and `doctor` — the
+   * console can reach them now that it ships with the gallery. */
+  list.append(el('li', {}, el('div', {
+    class: 'tree__row tree__row--ops' +
+      (state.sel && state.sel.kind === 'ops' ? ' is-active' : ''),
+    onclick: () => select({ kind: 'ops' }),
+  },
+    el('span', { class: 'tree__twisty is-leaf' }),
+    el('span', { class: 'tree__name', text: 'operations' }),
+    el('span', { class: 'tree__count', id: 'ops-lamp', text: '' }))));
+
   list.append(el('li', {}, el('div', {
     class: 'tree__row tree__row--gallery' +
       (state.sel && state.sel.kind === 'gallery' ? ' is-active' : ''),
@@ -269,7 +282,7 @@ function renderTree() {
     const item = renderNode(child, 1, filter);
     if (item) list.append(item);
   }
-  if (list.children.length === 1 && filter) {
+  if (list.children.length === 2 && filter) {
     list.append(el('li', { class: 'tree__empty', text: 'No album matches.' }));
   }
 }
@@ -332,6 +345,10 @@ async function select(sel, keepTab = false) {
   renderTree();
   $('#pane').innerHTML = '';
   $('#pane').append(el('div', { class: 'pane__empty', text: 'Loading…' }));
+  if (sel.kind === 'ops') {
+    await renderOps();
+    return;
+  }
   try {
     state.data = sel.kind === 'gallery'
       ? await api('/api/gallery')
@@ -437,6 +454,276 @@ function keepPaneScroll() {
   if (!pane || pane.scrollTop !== paneScrollLanded) return;
   pane.scrollTop = paneScroll;
   paneScrollLanded = pane.scrollTop;
+}
+
+/* ============================================================
+   OPERATIONS
+   ------------------------------------------------------------
+   The CLI's `status`, `scan`, `pause`/`resume` and `doctor`, in the browser.
+   Nothing here talks to the indexer directly: a scan is a request written to
+   the control channel and picked up by whichever process owns the indexer,
+   which is the same path `python -m aperture.cli scan` takes. So this view
+   works identically whether the gallery is in this process or in another
+   container — and there is still exactly one place a scan can begin.
+   ============================================================ */
+const opsState = { status: null, doctor: null, busy: false, poll: null };
+
+const ago = (ts) => {
+  if (typeof ts !== 'number') return 'never';
+  const s = Math.max(0, Math.round(Date.now() / 1000 - ts));
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+};
+
+function opsRow(label, value, tone) {
+  return el('div', { class: 'ops__row' },
+    el('span', { class: 'ops__label', text: label }),
+    el('span', { class: 'ops__value' + (tone ? ' is-' + tone : ''), text: value }));
+}
+
+async function loadOpsStatus() {
+  try {
+    opsState.status = await api('/api/ops/status');
+  } catch (err) {
+    opsState.status = { error: err.message };
+  }
+}
+
+async function renderOps() {
+  const pane = $('#pane');
+  pane.innerHTML = '';
+  pane.append(el('div', { class: 'pane__empty', text: 'Reading the control channel…' }));
+  await loadOpsStatus();
+  if (state.sel.kind !== 'ops') return;   /* navigated away while we waited */
+  paintOps();
+}
+
+function paintOps() {
+  const pane = $('#pane');
+  const st = opsState.status || {};
+  pane.innerHTML = '';
+
+  pane.append(el('div', { class: 'pane__top' },
+    el('div', { class: 'head' },
+      el('div', { class: 'head__crumb', text: st.control_dir || '' }),
+      el('h1', { class: 'head__title', text: 'Operations' }))));
+
+  if (st.error) {
+    pane.append(el('div', { class: 'pane__empty', text: st.error }));
+    return;
+  }
+
+  const paths = st.paths || {};
+  const scan = (st.server && st.server.last_scan) || null;
+  const res = (scan && scan.result) || {};
+  const live = !!st.live;
+  const paused = !!st.paused;
+
+  /* ----- the indexer ----- */
+  pane.append(el('section', { class: 'ops' },
+    el('h2', { class: 'ops__head', text: 'Indexer' }),
+    opsRow('state', live ? (paused ? 'paused' : 'running') : 'not running',
+           live ? (paused ? 'warn' : 'ok') : 'bad'),
+    paused && st.pause
+      ? opsRow('paused since', ago(st.pause.since) +
+               (st.pause.reason ? ' — ' + st.pause.reason : ''), 'warn')
+      : null,
+    opsRow('scanning now', (st.server && st.server.scanning)
+           ? 'yes (' + (st.server.scan_trigger || '?') + ')' : 'no'),
+    opsRow('last scan', scan
+           ? ago(scan.finished_at) + ' · ' + (scan.trigger || '?') +
+             ' · ' + (scan.seconds != null ? scan.seconds + 's' : '—')
+           : 'never'),
+    scan && scan.error ? opsRow('last error', scan.error, 'bad') : null,
+    scan ? opsRow('last result',
+      ['indexed', 'thumbnails', 'previews', 'removed', 'failed']
+        .filter((k) => res[k]).map((k) => res[k] + ' ' + k).join(' · ')
+        || 'nothing to do',
+      res.failed ? 'warn' : null) : null,
+    opsRow('scan interval', paths.scan_interval
+           ? paths.scan_interval + 's' : 'off (manual only)'),
+    opsRow('watcher', paths.watcher ? 'on' : 'off')));
+
+  /* ----- what it is working on ----- */
+  const idx = st.index || {};
+  pane.append(el('section', { class: 'ops' },
+    el('h2', { class: 'ops__head', text: 'Index' }),
+    opsRow('photos', String(idx.images ?? '—')),
+    opsRow('albums', String(idx.albums ?? '—')),
+    opsRow('featured', String(idx.featured ?? '—')),
+    opsRow('tags', String(idx.tags ?? '—')),
+    opsRow('originals', bytes(idx.bytes)),
+    opsRow('database', bytes(idx.db_bytes)),
+    opsRow('photos dir', paths.photos || '—'),
+    opsRow('data dir', paths.data || '—'),
+    opsRow('role', st.role || '—')));
+
+  /* ----- the buttons ----- */
+  const ro = !!st.read_only;
+  const albumField = el('input', {
+    type: 'text', id: 'ops-album', placeholder: 'whole gallery — or one album path',
+    autocomplete: 'off', disabled: ro,
+  });
+  const forceBox = el('input', { type: 'checkbox', id: 'ops-force', disabled: ro });
+  /* A field rather than a window.prompt(): a prompt is disabled outright in a
+   * sandboxed frame, and a reason that shows up in `status` afterwards is
+   * worth typing where you can see it. */
+  const reasonField = el('input', {
+    type: 'text', id: 'ops-reason', placeholder: 'why — shown in status while paused',
+    autocomplete: 'off', disabled: ro || paused,
+  });
+
+  pane.append(el('section', { class: 'ops' },
+    el('h2', { class: 'ops__head', text: 'Actions' }),
+    ro ? el('p', { class: 'ops__note', text:
+        'The console is mounted read-only. Nothing here can be started from the browser.' })
+       : null,
+    el('div', { class: 'ops__form' },
+      albumField,
+      el('label', { class: 'ops__check' }, forceBox,
+        el('span', { text: 'force — re-derive even when mtimes say nothing changed' }))),
+    paused ? null : el('div', { class: 'ops__form' }, reasonField),
+    el('div', { class: 'ops__buttons' },
+      el('button', {
+        type: 'button', class: 'btn btn--primary', id: 'ops-scan',
+        disabled: ro || opsState.busy, text: 'Scan now',
+        onclick: () => startScan(albumField.value.trim(), forceBox.checked),
+      }),
+      el('button', {
+        type: 'button', class: 'btn', disabled: ro || opsState.busy,
+        text: paused ? 'Resume indexing' : 'Pause indexing',
+        onclick: () => (paused ? doResume() : doPause(reasonField.value.trim())),
+      }),
+      el('button', {
+        type: 'button', class: 'btn', disabled: opsState.busy, text: 'Run doctor',
+        onclick: () => runDoctor(albumField.value.trim()),
+      })),
+    el('p', { class: 'ops__note', text:
+      'A scan is a request written to the control channel — the same one ' +
+      'the CLI uses. It starts within a couple of seconds if an indexer is ' +
+      'listening, and waits if none is.' })));
+
+  if (opsState.doctor) pane.append(renderDoctor(opsState.doctor));
+}
+
+function renderDoctor(report) {
+  const problems = report.problems || {};
+  const section = el('section', { class: 'ops' },
+    el('h2', { class: 'ops__head', text: 'Doctor' }),
+    opsRow('scope', report.scope || 'whole gallery'),
+    opsRow('checked', report.photos_on_disk + ' file(s) on disk · ' +
+                      report.rows + ' row(s) indexed'),
+    opsRow('result', report.total ? report.total + ' problem(s) found'
+                                  : 'no problems found',
+           report.total ? 'warn' : 'ok'));
+
+  for (const check of Object.keys(problems).sort()) {
+    const items = problems[check];
+    section.append(el('div', { class: 'ops__finding' },
+      el('div', { class: 'ops__finding-head' },
+        el('span', { class: 'ops__label', text: check.replace(/_/g, ' ') }),
+        el('span', { class: 'ops__count', text: String(items.length) })),
+      el('ul', { class: 'ops__list' },
+        items.slice(0, 25).map((item) =>
+          el('li', {},
+            el('code', { text: item.rel_path || (item.album + ' · ' + item.key) }),
+            el('span', { class: 'ops__detail', text: item.detail || '' }))),
+        items.length > 25
+          ? el('li', { class: 'ops__more', text: (items.length - 25) + ' more' })
+          : null)));
+  }
+  return section;
+}
+
+/* A scan is asynchronous by nature: on a large share over SMB a full pass is
+ * minutes. So the request returns an id and this polls for its summary rather
+ * than holding an HTTP request open across the whole thing. */
+async function startScan(album, force) {
+  opsState.busy = true;
+  paintOps();
+  try {
+    const res = await api('/api/ops/scan', {
+      method: 'POST',
+      body: JSON.stringify({ album: album || null, force: !!force }),
+    });
+    toast(res.note || 'Scan requested');
+    pollScan(res.request.id);
+  } catch (err) {
+    opsState.busy = false;
+    toast(err.message, 'err');
+    paintOps();
+  }
+}
+
+function pollScan(requestId) {
+  clearInterval(opsState.poll);
+  const started = Date.now();
+  opsState.poll = setInterval(async () => {
+    let body;
+    try {
+      body = await api('/api/ops/scan/' + encodeURIComponent(requestId));
+    } catch (_) {
+      return;   /* a hiccup is not a reason to give up on a running scan */
+    }
+    if (body.result) {
+      clearInterval(opsState.poll);
+      opsState.busy = false;
+      const r = body.result.result || {};
+      toast(body.result.error
+        ? 'Scan finished with errors: ' + body.result.error
+        : 'Scan finished in ' + body.result.seconds + 's · ' +
+          (r.indexed || 0) + ' indexed, ' + (r.thumbnails || 0) + ' thumbnails',
+        body.result.error ? 'err' : 'ok');
+      await loadOpsStatus();
+      if (state.sel.kind === 'ops') paintOps();
+      return;
+    }
+    /* Ten minutes is longer than any scan this has been pointed at; past it
+     * the poller is the thing that is stuck, not the scan. */
+    if (Date.now() - started > 600000) {
+      clearInterval(opsState.poll);
+      opsState.busy = false;
+      toast('Still scanning — reload to see the result', 'warn');
+      if (state.sel.kind === 'ops') paintOps();
+    }
+  }, 1500);
+}
+
+async function doPause(reason) {
+  try {
+    await api('/api/ops/pause', { method: 'POST', body: JSON.stringify({ reason: reason || '' }) });
+    toast('Indexing paused');
+  } catch (err) { toast(err.message, 'err'); return; }
+  await loadOpsStatus();
+  paintOps();
+  renderTree();
+}
+
+async function doResume() {
+  try {
+    await api('/api/ops/resume', { method: 'POST' });
+    toast('Indexing resumed');
+  } catch (err) { toast(err.message, 'err'); return; }
+  await loadOpsStatus();
+  paintOps();
+  renderTree();
+}
+
+async function runDoctor(album) {
+  opsState.busy = true;
+  paintOps();
+  toast('Checking…');
+  try {
+    opsState.doctor = await api('/api/ops/doctor' +
+      (album ? '?album=' + encodeURIComponent(album) : ''));
+  } catch (err) {
+    toast(err.message, 'err');
+  } finally {
+    opsState.busy = false;
+    if (state.sel.kind === 'ops') paintOps();
+  }
 }
 
 function renderPane() {

@@ -10,13 +10,21 @@ ASGI app on a separate listener** — and that separation is the point. The
 public port serves pages and cannot reach a route in here; this port is where
 the one write path into the photo tree lives.
 
+Since 1.0 it also carries the **Operations** panel: the live state of the
+indexer, a scan button, pause / resume, and `doctor` — the same reports
+`python -m aperture.cli` prints, from the same functions in `aperture/ops.py`.
+Actions there are written to the flag-file control channel, exactly as the CLI
+writes them, so there is one place a scan can begin whichever front end asked.
+
 Two invariants hold whatever else changes:
 
 - it writes only inside `<album>/.album/` and `photos/.gallery/` — a photograph
   is not addressable for writing by any route here;
 - it never writes the index. Operational requests go through the flag-file
   control channel in `aperture/control.py`, the same one the CLI uses, so the
-  indexer stays the single writer on the database.
+  indexer stays the single writer on the database. `READ_ONLY=1` disables the
+  operations actions too: read-only means the console cannot change anything,
+  not merely that it cannot change photos.
 
 Since the gallery re-reads its cfg files per request, a save here shows up on
 its next page load — no restart, no rescan.
