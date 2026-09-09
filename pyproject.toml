@@ -1,0 +1,8 @@
+# Only the test runner is configured here. The app itself is plain modules and
+# a requirements.txt — there is nothing to build or package.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    "error::DeprecationWarning:aperture.*",
+]
