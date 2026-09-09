@@ -21,25 +21,27 @@ from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import brand, compress, control, db, i18n, scanner, stats, watcher
+from .runtime import ensure_dirs, settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 log = logging.getLogger("main")
 
-PHOTOS_DIR = Path(os.environ.get("PHOTOS_DIR", "./photos")).resolve()
-THUMBS_DIR = Path(os.environ.get("THUMBS_DIR", "./thumbnails")).resolve()
-PREVIEWS_DIR = Path(os.environ.get("PREVIEWS_DIR", "./previews")).resolve()
-FULLS_DIR = Path(os.environ.get("FULLS_DIR", str(PREVIEWS_DIR / "_full"))).resolve()
-DATA_DIR = Path(os.environ.get("DATA_DIR", "./data")).resolve()
-THUMB_SIZE = int(os.environ.get("THUMB_SIZE", "480"))
-PREVIEW_SIZE = int(os.environ.get("PREVIEW_SIZE", "1600"))
-# Default 300s (5 min): the file watcher does not get events over SMB/CIFS/NFS
-# shares, so a periodic full scan is what actually picks up newly added albums
-# and sub-folders there. Set SCAN_INTERVAL=0 to disable.
-SCAN_INTERVAL = int(os.environ.get("SCAN_INTERVAL", "300"))
-ENABLE_WATCHER = os.environ.get("ENABLE_WATCHER", "1") not in ("0", "false", "False", "")
-HIDE_GPS = os.environ.get("HIDE_GPS", "1") not in ("0", "false", "False", "")
-STRIP_GPS = os.environ.get("STRIP_GPS", "1") not in ("0", "false", "False", "")
-PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+# Read once in runtime.py and bound here under the names the rest of this
+# module has always used. The aliases are not ceremony: every reference below
+# is a module-level constant, and turning 400-odd of them into attribute
+# lookups would be a diff nobody can review for no behaviour gained.
+PHOTOS_DIR = settings.photos_dir
+THUMBS_DIR = settings.thumbs_dir
+PREVIEWS_DIR = settings.previews_dir
+FULLS_DIR = settings.fulls_dir
+DATA_DIR = settings.data_dir
+THUMB_SIZE = settings.thumb_size
+PREVIEW_SIZE = settings.preview_size
+SCAN_INTERVAL = settings.scan_interval
+ENABLE_WATCHER = settings.enable_watcher
+HIDE_GPS = settings.hide_gps
+STRIP_GPS = settings.strip_gps
+PUBLIC_BASE_URL = settings.public_base_url
 
 # Every route that hands out a derived or configured FILE (thumbs, previews,
 # originals, album fonts and icons, wallpapers, brand assets, the generated
@@ -53,14 +55,7 @@ IMMUTABLE = {"Cache-Control": "public, max-age=31536000"}
 _scan_lock = threading.Lock()
 _STARTED_AT = time.time()
 
-try:
-    PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
-except (OSError, PermissionError):
-    pass
-THUMBS_DIR.mkdir(parents=True, exist_ok=True)
-PREVIEWS_DIR.mkdir(parents=True, exist_ok=True)
-FULLS_DIR.mkdir(parents=True, exist_ok=True)
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+ensure_dirs()
 # Flag-file channel the CLI talks to this process through (app/control.py).
 control.configure(DATA_DIR)
 
@@ -616,10 +611,12 @@ ALBUM_META_DIR = scanner.ALBUM_META_DIR
 # live gallery, reported 2026-09-04). Add a key to the docs above and to this
 # set in the same edit.
 #
-# The configurator has its own copy in configurator/app/schema.py, and that
-# one is deliberate: it ships as a separate app with its own image and cannot
-# import from here. It needs a per-key TYPE anyway, which this set has no room
-# for. Keep the two in sync by hand — see the note in schema.py.
+# The console has a second copy of this vocabulary in console/schema.py, with
+# a per-key TYPE this set has no room for. That duplication was unavoidable
+# while the two shipped as separate images; now that they don't, it is just
+# duplication, and phase 03 of the Aperture merge collapses both into one
+# registry under core/. Until then the two are kept in sync BY HAND — a key
+# added here and not there is a key the console cannot edit.
 ALBUM_CFG_KEYS = frozenset({
     "name", "collection", "cover", "showcase", "featured", "reel", "order",
     "sort", "tags", "effect", "icon", "font", "font_scale",
@@ -2582,7 +2579,7 @@ _scan_state_lock = threading.Lock()
 
 
 def _publish_status() -> None:
-    """Snapshot this process for `python -m app.cli status`. Cheap enough to
+    """Snapshot this process for `python -m aperture.cli status`. Cheap enough to
     call on every scan edge plus a slow heartbeat."""
     with _scan_state_lock:
         state = dict(_scan_state)
@@ -2723,7 +2720,7 @@ def _startup():
         # A pause is deliberately persistent: it survives the restart it was
         # very likely set for. No startup scan, no periodic scan; the watcher
         # still starts, but only queues events (see watcher._drain).
-        log.warning("indexer PAUSED (%s) — resume with `python -m app.cli resume`",
+        log.warning("indexer PAUSED (%s) — resume with `python -m aperture.cli resume`",
                     info.get("reason") or "no reason given")
     else:
         threading.Thread(target=_run_scan, kwargs={"trigger": "startup"}, daemon=True).start()

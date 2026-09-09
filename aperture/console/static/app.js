@@ -1,4 +1,4 @@
-/* Gallery Configurator — client.
+/* lucya.systems aperture — console client.
  *
  * Three moving parts: the album tree on the left, a tabbed editor on the
  * right, and one photo browser reused by both the Photos tab and the picker
@@ -1592,7 +1592,7 @@ function renderDetail(rel) {
       el('dt', { text: k }), el('dd', { text: v }),
     ])));
     body.append(el('p', { class: 'field__help field__hint', text:
-      'Read-only — the configurator never rewrites a photo file.' }));
+      'Read-only — the console never rewrites a photo file.' }));
 
     body.append(el('h3', { class: 'detail__sub', text: 'Tags' }));
     body.append(tagChips(info.tags, READ_ONLY ? null : (next) =>

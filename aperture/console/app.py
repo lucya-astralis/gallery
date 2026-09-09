@@ -1,9 +1,21 @@
-"""Gallery Configurator -- a standalone editor for the gallery's cfg files.
+"""The Console -- Aperture's operator surface, on its own port.
 
-Runs on its own, next to (not inside) the gallery: it only needs the photos
-folder mounted. Nothing here imports the gallery app, touches its database, or
-expects it to be running -- the gallery re-reads gallery.cfg and album.cfg per
-request, so a save made here shows up on its next page load.
+Was the standalone Configurator. It is now part of the same package as the
+gallery and shares its settings, but it is still a SEPARATE ASGI app on a
+SEPARATE listener, and that separation is the point: the public port serves
+pages and never reaches a route in this module, and this port is where the one
+write path into the photo tree lives.
+
+Two invariants hold whatever else changes here:
+
+  * it writes ONLY inside `<album>/.album/` and `photos/.gallery/` -- a
+    photograph is not addressable through any route below;
+  * it never writes the index. Operational requests (scan, pause) go through
+    the control channel in `aperture/control.py`, the same one the CLI uses,
+    so the indexer stays the single writer on the database.
+
+The gallery re-reads gallery.cfg and album.cfg per request, so a save made
+here shows up on its next page load with nothing to restart.
 """
 
 from __future__ import annotations
@@ -21,39 +33,32 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from .. import brand
+from ..runtime import settings
 from . import cfgio, imagemeta, schema, validate
 from .library import Library, asset_kinds, is_image
 
-# This tool's own release version, reported by /api/meta and shown in the UI.
-APP_VERSION = "3.1"
+# The console ships with the app now, so it carries the app's version rather
+# than one of its own -- there is no combination of the two to report.
+APP_VERSION = brand.VERSION
 
 BASE_DIR = Path(__file__).resolve().parent
-PROJECT_DIR = BASE_DIR.parent
 
-
-def _default(env: str, in_container: str, beside: str) -> Path:
-    """Env var wins. Without one, use the container path when it exists and
-    otherwise a folder next to the checkout -- so `uvicorn configurator.app.main:app`
-    works straight out of the repo, without a compose file."""
-    raw = os.environ.get(env)
-    if raw:
-        return Path(raw).resolve()
-    if Path(in_container).is_dir():
-        return Path(in_container).resolve()
-    return (PROJECT_DIR.parent / beside).resolve()
-
-
-PHOTOS_DIR = _default("PHOTOS_DIR", "/photos", "photos")
-DATA_DIR = _default("DATA_DIR", "/data", "configurator/data")
-# The gallery's own thumbnail tree, mounted read-only when available. Nothing
-# breaks without it -- previews just get generated here instead.
-THUMBS_DIR = _default("THUMBS_DIR", "/thumbnails", "thumbnails")
-CACHE_DIR = DATA_DIR / "thumbcache"
-BACKUP_DIR = DATA_DIR / "backups"
-READ_ONLY = os.environ.get("READ_ONLY", "0").strip().lower() in {"1", "true", "yes", "on"}
-THUMB_SIZE = int(os.environ.get("THUMB_SIZE", "320"))
-BACKUPS = int(os.environ.get("BACKUPS", "20"))
-MAX_UPLOAD = int(os.environ.get("MAX_UPLOAD_MB", "8")) * 1024 * 1024
+# One environment, read once, in aperture/runtime.py. The console used to have
+# its own resolution rules for the same variable names, which meant PHOTOS_DIR
+# could point at two different folders depending on which process you asked.
+PHOTOS_DIR = settings.photos_dir
+DATA_DIR = settings.data_dir
+# The gallery's own thumbnail tree. Nothing breaks without it -- previews just
+# get generated here instead. (Phase 04 drops the fallback cache entirely and
+# reads the index.)
+THUMBS_DIR = settings.thumbs_dir
+CACHE_DIR = settings.console_dir / "thumbcache"
+BACKUP_DIR = settings.backup_dir
+READ_ONLY = settings.console_read_only
+THUMB_SIZE = settings.console_thumb_size
+BACKUPS = settings.console_backups
+MAX_UPLOAD = settings.console_max_upload
 
 try:  # HEIC support is optional -- the tool works without it, minus previews
     import pillow_heif  # type: ignore
@@ -63,7 +68,8 @@ except Exception:  # pragma: no cover - depends on the wheel being installed
 
 from PIL import Image, ImageOps
 
-app = FastAPI(title="Gallery Configurator", docs_url=None, redoc_url=None)
+app = FastAPI(title=f"{brand.PRODUCT} console", docs_url=None, redoc_url=None,
+              openapi_url=None)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
@@ -89,7 +95,7 @@ templates.env.globals["static_url"] = _static_url
 # ----- helpers ----------------------------------------------------------
 def _guard_write() -> None:
     if READ_ONLY:
-        raise HTTPException(403, "the configurator is mounted read-only")
+        raise HTTPException(403, "the console is mounted read-only")
 
 
 def _album_or_400(album: str) -> str:
@@ -668,3 +674,12 @@ def api_health():
 @app.exception_handler(ValueError)
 def _value_error(request: Request, exc: ValueError):
     return JSONResponse({"detail": str(exc)}, status_code=400)
+
+
+def create_console_app() -> FastAPI:
+    """The console as server.py wants it. A factory rather than a bare import
+    so the fail-closed checks run before anything binds a socket -- see
+    server.py and, from phase 02 on, console/security.py."""
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    return app

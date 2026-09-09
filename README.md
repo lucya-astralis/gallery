@@ -1,6 +1,19 @@
-# lucya.systems gallery
+# lucya.systems aperture
 
-A lean, read-only web image gallery with folder-based albums, EXIF display, sidecar-file tags, and automatic thumbnail/preview generation. Deployed via Docker. Safe for public hosting behind Cloudflare.
+One app, two surfaces, two ports.
+
+**Gallery** (`:8000`) is the public half: a lean, read-only image gallery with
+folder-based albums, EXIF display, sidecar-file tags and automatic
+thumbnail/preview generation. Safe for public hosting behind Cloudflare.
+
+**Console** (`:8090`) is the operator half: the editor for the config files the
+gallery reads, on its own listener, reachable only where you publish its port.
+It was a separate program (the *Configurator*) until 1.0.
+
+They ship as one package and one image. Which listeners a process opens is
+decided by `APERTURE_ROLE` — `all` for one container with both, or `public` and
+`console` for two containers with separate blast radii. See
+[One app, two surfaces](#one-app-two-surfaces).
 
 ## Features
 
@@ -13,11 +26,12 @@ A lean, read-only web image gallery with folder-based albums, EXIF display, side
 - **Showcase:** flag photos (`featured = …`) or a whole album (`showcase = true`) in the album's `album.cfg` to surface them on the welcome screen, on the album overview, and via `/api/showcase` JSON for embedding on other sites.
 - **Public statistics (`/stats`):** what the archive holds, charted — a monthly timeline, the largest albums (each bar links into its album), cameras, focal lengths, apertures, ISO, tags, a 24-hour **polar dial** for time of day (the hours are cyclical, so they are drawn round), a weekday column chart, and a **stacked proportion bar** for orientation (the one series whose parts add up to every photo). Everything is measured from the photos' own capture dates and EXIF; no visitor is counted and nothing is logged, so the page is safe to share. Server-rendered SVG geometry — no JavaScript, no chart library. Linked from the archive readout under the welcome hero and from the footer.
 - **Search & sort:** top bar searches album, file, and tag names; sort by date, name or size on every list view — plus a "Curated" order defined in `album.cfg` / `gallery.cfg`, which can also preselect the default sort.
-- **By day:** an album whose photos span more than one day also offers a **By day** sort — newest day first, with the grid split into a framed section per capture day (day counter, weekday, photo count). On an album with a trip configured (`TRIPS` in `app/main.py`) the counter is the trip day, counted from the outbound flight, and each day carries a chip naming the leg it falls into — sub-albums of that trip inherit both.
-- **Three languages (EN / DE / JP):** selector in the top-right corner, cookie-backed with an `Accept-Language` fallback. Album descriptions are per-language markdown files (`album_en.md` / `album_de.md` / `album_jp.md`); UI strings live in `app/i18n.py`. See [Languages](#languages--i18n).
+- **By day:** an album whose photos span more than one day also offers a **By day** sort — newest day first, with the grid split into a framed section per capture day (day counter, weekday, photo count). On an album with a trip configured (`TRIPS` in `aperture/main.py`) the counter is the trip day, counted from the outbound flight, and each day carries a chip naming the leg it falls into — sub-albums of that trip inherit both.
+- **Three languages (EN / DE / JP):** selector in the top-right corner, cookie-backed with an `Accept-Language` fallback. Album descriptions are per-language markdown files (`album_en.md` / `album_de.md` / `album_jp.md`); UI strings live in `aperture/i18n.py`. See [Languages](#languages--i18n).
 - **Mobile-friendly:** responsive grid, large touch targets, keyboard navigation (← → ESC) on desktop.
-- **Read-only:** no write endpoints, no uploads. The `photos/` mount is `:ro`. No attack surface for upload/tag-injection exploits.
-- **Operations CLI:** `python -m app.cli` — run or pause the indexer, check index/config/derivative drift with `doctor`, audit tags and GPS, and inspect exactly how a photo, an album, the welcome hero or a trip resolves. See [Operations CLI](#operations-cli).
+- **Read-only where it faces the public:** the gallery app has no route that is not a `GET` — no write endpoints, no uploads, no tag editing. The one write path in the product belongs to the console, on the other port, and reaches only the `.album/` and `.gallery/` metadata folders. See [Security / hosting](#security--hosting).
+- **Console:** the config editor, built in. Album and gallery `cfg` files, per-language descriptions, icons, title fonts, wallpapers and brand assets, with validation — on its own port, never on the public one.
+- **Operations CLI:** `python -m aperture.cli` — run or pause the indexer, check index/config/derivative drift with `doctor`, audit tags and GPS, and inspect exactly how a photo, an album, the welcome hero or a trip resolves. See [Operations CLI](#operations-cli).
 - **Security headers:** CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy — all set by built-in middleware.
 - **Custom 404 page** with megacorp-terminal aesthetic.
 
@@ -28,7 +42,27 @@ cp .env.example .env   # adjust paths & options
 docker compose up -d --build
 ```
 
-Open: <http://localhost:8000>
+- Gallery: <http://localhost:8000>
+- Console: <http://127.0.0.1:8090> — published to `127.0.0.1` by default.
+  `CONSOLE_HOST` in `.env` decides which host address it appears on; anything
+  other than loopback is a security decision, not a convenience one.
+
+## One app, two surfaces
+
+| `APERTURE_ROLE` | Listeners | Indexer | `photos` mount | Use |
+|---|---|---|---|---|
+| `all` | `:8000` + `:8090` | yes | `rw` | one container, the default |
+| `public` | `:8000` | yes | `ro` | the exposed instance |
+| `console` | `:8090` | no | `rw` | the operator instance, internal |
+
+The indexer follows the *public* role rather than an app lifespan, so in every
+shape there is exactly one writer on the SQLite file. A console-only process
+is a reader: it asks for scans through the same flag-file control channel the
+CLI uses (`data/control/`, see [Operations CLI](#operations-cli)).
+
+Nothing routes between the two apps. The console's API lives under `/api/` as
+well — it can, because a request that arrives on the public socket has no way
+to reach a handler that was never mounted on it.
 
 Add images:
 
@@ -100,8 +134,8 @@ so shared caches key correctly.
 menu, EXIF labels, trip countdown, empty states, OG descriptions. The
 decorative camera-HUD tokens (REC, FRM, SIG /, ONLINE, T-x DAYS, …)
 intentionally stay English in every language, like the HUD of an actual
-Japanese camera. UI strings live in `app/i18n.py` (server) and in the
-`UI_STRINGS` table at the top of `app/static/app.js` (client) — keep both
+Japanese camera. UI strings live in `aperture/i18n.py` (server) and in the
+`UI_STRINGS` table at the top of `aperture/static/app.js` (client) — keep both
 in sync when adding text.
 
 **Caching:** because the same URL serves different languages, all HTML is
@@ -149,7 +183,7 @@ photos/
 ```
 
 It is excluded from indexing exactly like `.album/`, so a logo never turns
-up as a photo, and `python -m app.cli export` archives it along with every
+up as a photo, and `python -m aperture.cli export` archives it along with every
 `.album/`.
 
 **Album descriptions** are the per-language markdown files above. Missing
@@ -199,7 +233,7 @@ every one of those places without per-page tuning. Served from
 ever served and the filename never travels in the URL.
 
 **Japanese font subset:** the site ships a glyph subset of Noto Sans JP
-(`app/static/fonts/NotoSansJP-subset.woff2`, ~120 KB instead of the 8.8 MB
+(`aperture/static/fonts/NotoSansJP-subset.woff2`, ~120 KB instead of the 8.8 MB
 variable TTF). Every JP glyph the site can render must be baked in — after
 changing/adding Japanese text anywhere (album_jp.md, i18n.py, app.js,
 templates), rebuild it or new characters show as tofu:
@@ -235,7 +269,7 @@ python tools/build_display_faces.py   # needs: pip install fonttools brotli
 ```
 
 **Logo raster:** the terminal CLI can draw the real logo as a picture (see
-[Terminals](#terminals)), which needs a bitmap. `app/static/logo/lucya_logo.png`
+[Terminals](#terminals)), which needs a bitmap. `aperture/static/logo/lucya_logo.png`
 is rasterised from the SVG on a developer machine, so the container needs no
 SVG stack at all — Pillow and nothing else:
 
@@ -422,7 +456,7 @@ Notes:
   than written into an `href`.
 - Text values may contain commas (the parser splits on them and the gallery
   rejoins the parts), but the two halves of a badge line may not.
-- `python -m app.cli doctor` reports a key naming a missing file, a bad URL
+- `python -m aperture.cli doctor` reports a key naming a missing file, a bad URL
   or a badge that will silently vanish — none of which look like errors in
   the browser.
 - Japanese branding text is a special case: the shipped Noto Sans JP is a
@@ -449,7 +483,7 @@ re-derives what it affects on the next request (unrelated edits to
 
 Everything above is the operator's to set. What is *not* configurable is the
 software's own origin: however a deployment is branded, it still says what
-it runs on. That set lives in [`app/brand.py`](app/brand.py), reads no
+it runs on. That set lives in [`aperture/brand.py`](aperture/brand.py), reads no
 config, and reaches a visitor through eight independent channels:
 
 | Where | What it says |
@@ -461,7 +495,7 @@ config, and reaches a visitor through eight independent channels:
 | `/api` | `product`, `product_version`, `vendor`, `vendor_url`, kept separate from the archive's own `name` |
 | EXIF `Software` | written into every derivative — thumbnails (WebP), previews and converted fulls (JPEG) |
 | `style.css` / `app.js` | a banner at the top of both files, which an operator serves verbatim |
-| CLI masthead | `python -m app.cli` is the vendor's tool, not the operator's site |
+| CLI masthead | `python -m aperture.cli` is the vendor's tool, not the operator's site |
 
 The one place it is deliberately *absent* is the photographs themselves.
 Nothing is ever drawn onto a picture, and the EXIF `Artist`/`Copyright` of a
@@ -483,10 +517,10 @@ Rules for the hand-picked welcome list:
 
 ## Design — Nebula
 
-The look has a name, because two apps wear it: the gallery, and the
-[configurator](configurator/) that edits its config files. **Nebula**, after
+The look has a name, because two surfaces wear it: the gallery, and the
+[console](aperture/console/) that edits its config files. **Nebula**, after
 the accent it rations — `#5865F2`, "Nebula Blue". Six rules, and everything
-in `app/static/style.css` is one of them:
+in `aperture/static/style.css` is one of them:
 
 1. **Black ground, grey furniture, one purple accent.** `--acc` marks *state*
    and nothing else — links, focus, active/selected/open, the featured mark.
@@ -530,10 +564,12 @@ those are the knobs Nebula exposes, and they run through the same derivation
 so a hand-typed hex still lands with the contrast guarantees. Everything else
 is the software's.
 
-The configurator carries the same tokens and the same controls rather than a
+The console carries the same tokens and the same controls rather than a
 lookalike of them; its README lists which of its objects comes from which of
-the gallery's. The two deploy as separate images and never share a mount, so
-a change to the language has to be made in **both** stylesheets.
+the gallery's. They ship in one image now, but still as **two stylesheets** —
+`aperture/static/style.css` and `aperture/console/static/style.css` — so a
+change to the language still has to be made in both. Collapsing them onto one
+shared `nebula.css` is a later milestone.
 
 [`nebula/`](nebula/) is the language on its own, away from either app: an
 interactive specimen book (`index.html` — the component set, plus four
@@ -789,13 +825,29 @@ The scanner reads the file on the next indexing pass and links the tags. Empty o
 
 ## Folder structure
 
-| Path           | Purpose                                                  |
-|----------------|----------------------------------------------------------|
-| `photos/`      | Your originals + `.tags` sidecars (mounted read-only)    |
-| `thumbnails/`  | Generated grid thumbnails (cache, can be wiped anytime)  |
-| `previews/`    | Generated stage previews (cache, can be wiped anytime)   |
-| `data/`        | SQLite DB with EXIF cache and tag index                  |
-| `data/control/`| Flag files the CLI and the server talk through (see below) |
+| Path            | Purpose                                                   |
+|-----------------|-----------------------------------------------------------|
+| `photos/`       | Your originals + `.tags` sidecars + the `.album/` and `.gallery/` metadata folders |
+| `thumbnails/`   | Generated grid thumbnails (cache, can be wiped anytime)   |
+| `previews/`     | Generated stage previews (cache, can be wiped anytime)    |
+| `data/`         | SQLite DB with EXIF cache and tag index                   |
+| `data/control/` | Flag files the CLI and the server talk through (see below)|
+| `data/console/` | The console's own state: rolling backups of every file it overwrites, its thumbnail fallback cache |
+
+Everything this software is trusted with lives under `data/`, never in the
+photo tree — the gallery *serves* files out of `photos/.gallery/`, so a secret
+placed there would be a secret published.
+
+Inside the package:
+
+| Path                | Purpose                                             |
+|---------------------|-----------------------------------------------------|
+| `aperture/main.py`  | the gallery app and its routes                      |
+| `aperture/server.py`| the process: which listeners open, and shutdown     |
+| `aperture/runtime.py`| the one place that reads the environment            |
+| `aperture/console/` | the console app, its static files and templates     |
+| `aperture/cli.py` + `termui.py` | the operator CLI and its terminal vocabulary |
+| `tests/`            | the characterization net (`python -m pytest`)       |
 
 ## Configuration
 
@@ -812,13 +864,25 @@ The scanner reads the file on the next indexing pass and links the tags. Empty o
 | `HIDE_GPS`      | `1`           | Strip GPS from EXIF display                                |
 | `STRIP_GPS`     | `1`           | Strip GPS from the original file on import (in-place)      |
 | `PUBLIC_BASE_URL`| (auto)       | Absolute base URL used in OG tags + `/api/showcase` URLs   |
+| `APERTURE_ROLE` | `all`         | `all` / `public` / `console` — which listeners open         |
+
+Console only:
+
+| Variable          | Default     | Meaning                                            |
+|-------------------|-------------|----------------------------------------------------|
+| `CONSOLE_ENABLED` | `1`         | `0` leaves the second listener closed entirely      |
+| `CONSOLE_PORT`    | `8090`      | Port inside the container                           |
+| `CONSOLE_BIND`    | `127.0.0.1` | Address the console binds. In Docker this is `0.0.0.0` and `CONSOLE_HOST` in `.env` decides which host address the port is published on — a container's own loopback would be unreachable from anywhere |
+| `READ_ONLY`       | `0`         | `1` = browse and validate, write nothing            |
+| `BACKUPS`         | `20`        | Versions kept per edited file under `data/console/backups` |
+| `MAX_UPLOAD_MB`   | `8`         | Cap on icon / font / wallpaper uploads              |
 
 ## Operations CLI
 
 Everything operational is one command:
 
 ```bash
-python -m app.cli
+python -m aperture.cli
 ```
 
 Without arguments it draws the dashboard — masthead, what the server is
@@ -827,7 +891,7 @@ underneath it (only when it actually has a terminal; piped or in a cron job
 it prints the dashboard and exits).
 
 ```
-┌─ LUCYA.SYSTEMS GALLERY ──────────────────────────────────── OPS CONSOLE ─┐
+┌─ LUCYA.SYSTEMS APERTURE ──────────────────────────────────── OPS CONSOLE ─┐
 │                                                                          │
 │   ________       .__  .__                                                │
 │  /  _____/_____  |  | |  |   ___________ ___.__.                         │
@@ -868,13 +932,13 @@ values fold under their own column instead of being cut off.
 Or go straight at a single command:
 
 ```bash
-python -m app.cli <command> [options]
+python -m aperture.cli <command> [options]
 ```
 
 In Docker, run it inside the container:
 
 ```bash
-docker compose exec gallery python -m app.cli status
+docker compose exec gallery python -m aperture.cli status
 ```
 
 | Command | What it does |
@@ -900,7 +964,7 @@ docker compose exec gallery python -m app.cli status
 | `search <query> [--album X]` | The same query the `/search` page runs — album name, file name and tag — from the terminal |
 | `gps [album] [--strip]` | Which originals still carry GPS coordinates, alongside the effective `HIDE_GPS` / `STRIP_GPS` settings. **Exits 1** when any do. `--strip` **rewrites those originals in place** to remove the block |
 | `export [--out F] [--list]` | Archive `gallery.cfg` and every `.album/` folder — config, descriptions, icons, title fonts — to a `.tar.gz`. Photos are left out; they are already the backup. `--list` shows what would go in without writing |
-| `i18n` | EN/DE/JP completeness in `app/i18n.py`, keys used but undefined (they render as the key), and whether the `UI_STRINGS` mirror in `app.js` has the same keys in every language |
+| `i18n` | EN/DE/JP completeness in `aperture/i18n.py`, keys used but undefined (they render as the key), and whether the `UI_STRINGS` mirror in `app.js` has the same keys in every language |
 
 Every command also takes `--json` for a machine-readable dump, `--no-color`
 for plain output, `--color` to force it on, and `-i` / `--interactive` to
@@ -934,7 +998,7 @@ single line below 50 columns.
 When something looks wrong, ask:
 
 ```bash
-python -m app.cli term
+python -m aperture.cli term
 ```
 
 It prints what was detected (`stdout.isatty`, mintty, `/dev/tty`, `TERM`,
@@ -966,13 +1030,13 @@ for the same reason; `--logo blocks` covers them. Into a pipe or a log file
 image data — and `kitty`/`iterm` are skipped inside a frame, because those
 protocols move the cursor themselves and would tear the box apart.
 
-The picture comes from `app/static/logo/lucya_logo.png`; if it is missing,
+The picture comes from `aperture/static/logo/lucya_logo.png`; if it is missing,
 run `python tools/render_logo.py` (see above) — `term` says so too. Its
 transparency is preserved in every mode: the logo sits on your terminal
 background, not in a white box.
 
 ```bash
-python -m app.cli --logo kitty
+python -m aperture.cli --logo kitty
 ```
 
 ### How `pause` and `scan` reach the running server
@@ -1055,43 +1119,43 @@ everywhere else in this project.
 
 ```bash
 # is anything running, and what did the last scan do?
-python -m app.cli status
+python -m aperture.cli status
 
 # freshly dropped an album on the share and do not want to wait 5 minutes
-python -m app.cli scan japan_2026/kansai
+python -m aperture.cli scan japan_2026/kansai
 
 # reorganising folders — stop the indexer from reacting to every move
-python -m app.cli pause "resorting kansai"
-python -m app.cli resume --scan
+python -m aperture.cli pause "resorting kansai"
+python -m aperture.cli resume --scan
 
 # why is this photo not in the reel?
-python -m app.cli photo japan_2026/kansai/osaka/IMG_4853.png
-python -m app.cli featured japan_2026
+python -m aperture.cli photo japan_2026/kansai/osaka/IMG_4853.png
+python -m aperture.cli featured japan_2026
 
 # after changing THUMB_SIZE
-python -m app.cli thumbs --rebuild --all
+python -m aperture.cli thumbs --rebuild --all
 
 # after an upgrade that changes a tier's FORMAT (the grid tier became WebP):
 # build what is missing, then clear the files of the old format, which the
 # orphan sweep reports because no photo maps to them any more
-python -m app.cli thumbs --rebuild
-python -m app.cli thumbs --prune            # look first
-python -m app.cli thumbs --prune --apply    # then delete
+python -m aperture.cli thumbs --rebuild
+python -m aperture.cli thumbs --prune            # look first
+python -m aperture.cli thumbs --prune --apply    # then delete
 
 # nightly health check (exits 1 when it finds something)
-python -m app.cli doctor --json
+python -m aperture.cli doctor --json
 
 # what the front page will actually show, and what it skipped
-python -m app.cli welcome
+python -m aperture.cli welcome
 
 # tag vocabulary, and whether the sidecars and the index still agree
-python -m app.cli tags
+python -m aperture.cli tags
 
 # privacy audit: which originals still carry coordinates
-python -m app.cli gps
+python -m aperture.cli gps
 
 # snapshot every hand-written file (config, text, icons, fonts)
-python -m app.cli export --out backups/config.tar.gz
+python -m aperture.cli export --out backups/config.tar.gz
 ```
 
 ## Performance
@@ -1162,15 +1226,49 @@ wordmark and the album's title face too. See the Cloudflare notes under
 
 ## Security / hosting
 
-The app is fully **read-only** by design:
+### The public surface is read-only
 
-- No write API, no uploads, no tag editing via the web
-- `photos/` is mounted `:ro` — even a hypothetical code bug can't touch the originals
-- Tags and thumbnails live in `data/` and `thumbnails/` — none of it is security-critical
-- Path traversal blocked (`_safe_rel`)
+- No write API, no uploads, no tag editing — the gallery app answers `GET`,
+  `HEAD` and `OPTIONS` and has no other method on any route. That is asserted
+  by a test (`tests/test_runtime.py`), not just intended.
+- Path traversal blocked (`_safe_rel`); the four routes that turn a URL into a
+  filesystem path have their own test file (`tests/test_paths.py`)
 - GPS stripping on (`HIDE_GPS=1`)
+- Tags, thumbnails and the index live in `data/` and `thumbnails/` — none of it
+  is security-critical
 
-**Built-in security headers** (set by middleware in `app/main.py`):
+### The console is the write path, and it is on the other port
+
+Until 1.0 the editor was a separate program, and this section could say
+"`photos/` is mounted `:ro`, so even a code bug cannot touch the originals".
+With the two merged that sentence needs qualifying: in the `all` role one
+process serves both surfaces and the photo mount is writable.
+
+What replaces it:
+
+- **Where a write can land.** The console writes only inside an album's
+  `.album/` folder and inside `photos/.gallery/`. A photograph is not
+  addressable for writing by any route, and there is no delete outside those
+  metadata folders.
+- **Where the console can be reached from.** Its port is published to a host
+  address, not to every interface. `127.0.0.1` is the default; a LAN or VPN
+  address puts it on exactly that network. It is not meant for the open
+  internet — reach it over WireGuard, Tailscale or an SSH tunnel.
+- **What it never touches.** The console does not write the index. Scans and
+  pauses go through the flag-file control channel, so the indexer stays the
+  single writer on the database.
+- **Two containers if you want the old guarantee literally.** Run
+  `APERTURE_ROLE=public` with `photos:ro` and `APERTURE_ROLE=console`
+  separately; it costs one environment variable.
+- **Not root.** The image runs as uid 10001; the compose service adds
+  `read_only`, `cap_drop: ALL` and `no-new-privileges`.
+
+**Still open at 1.0** — the console has *no authentication yet*. Until it has,
+the port itself is the only control, so keep it off any network you do not
+trust. Session login, CSRF, login throttling and an audit log are the next
+milestone.
+
+**Built-in security headers** (set by middleware in `aperture/main.py`):
 
 - `Content-Security-Policy` — strict `'self'`-only policy, no inline scripts/styles, no external resources. `frame-ancestors 'none'` (clickjacking protection)
 - `X-Frame-Options: DENY` — same, for older browsers
@@ -1203,7 +1301,7 @@ All GET, all public:
 
 - `GET /` — welcome screen (live-view hero cycling through the `gallery.cfg` feed: curated list, showcase or random; plus a Showcase Albums section)
 - `GET /albums` — album overview (showcase albums section + main grid; `?sort=`)
-- `GET /stats` — public statistics: headline figures plus ten charts over the whole index (timeline, albums, cameras, focal length, aperture, ISO, orientation, weekday, hour of day, tags). Computed in `app/stats.py`, drawn by the Jinja macros in `app/templates/_charts.html`. Bars, columns and the stacked bar are plain HTML with one `<rect>` per mark in a stretched (`preserveAspectRatio="none"`) SVG; the hour dial is a real uniformly-scaled SVG whose polar geometry is computed server-side. In every case the sizes are SVG *geometry attributes*, never inline CSS, because `style-src 'self'` drops inline styles (see [Security](#security--hosting)) — and never JS, so the page is complete without scripts. Colour is one hue on a four-step ramp keyed to each mark's value against its series maximum.
+- `GET /stats` — public statistics: headline figures plus ten charts over the whole index (timeline, albums, cameras, focal length, aperture, ISO, orientation, weekday, hour of day, tags). Computed in `aperture/stats.py`, drawn by the Jinja macros in `aperture/templates/_charts.html`. Bars, columns and the stacked bar are plain HTML with one `<rect>` per mark in a stretched (`preserveAspectRatio="none"`) SVG; the hour dial is a real uniformly-scaled SVG whose polar geometry is computed server-side. In every case the sizes are SVG *geometry attributes*, never inline CSS, because `style-src 'self'` drops inline styles (see [Security](#security--hosting)) — and never JS, so the page is complete without scripts. Colour is one hue on a four-step ramp keyed to each mark's value against its series maximum.
 - `GET /album/{album}` — images in an album (`?tag=`, `?sort=`)
 - `GET /image/{album}/{file}` — detail view (stage shows preview by default; `?sort=` preserved for prev/next ordering)
 - `GET /thumb/{album}/{file}` — grid thumbnail (lazy generated)
@@ -1229,10 +1327,29 @@ All GET, all public:
 ```bash
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 mkdir -p photos thumbnails previews data
-uvicorn app.main:app --reload
+
+python -m aperture                 # both surfaces, one process
 ```
+
+`--reload` is a uvicorn CLI feature and does not apply to the two-listener
+run, so while working on one surface start that one on its own:
+
+```bash
+uvicorn aperture.main:app --reload --port 8000          # gallery
+uvicorn aperture.console.app:app --reload --port 8090   # console
+```
+
+Tests:
+
+```bash
+python -m pytest
+```
+
+They build their own photo tree in a temp folder and index it synchronously,
+so they never touch `photos/` and never race the scanner.
+
 
 ## Notes
 
@@ -1240,4 +1357,4 @@ uvicorn app.main:app --reload
 - Delete an image: remove it from `photos/` — watcher/scan clean up DB entry, thumbnail, and preview.
 - Rename a tag: edit the `.tags` file.
 - Thumbnails, previews, and DB can be wiped any time — they are regenerated on the next scan.
-- Something looks off? `python -m app.cli doctor` compares index, files, derivatives and config in one pass.
+- Something looks off? `python -m aperture.cli doctor` compares index, files, derivatives and config in one pass.

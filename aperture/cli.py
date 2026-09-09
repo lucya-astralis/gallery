@@ -1,7 +1,7 @@
 """Operator CLI for the gallery backend.
 
-    python -m app.cli <command> [options]
-    docker compose exec gallery python -m app.cli <command>
+    python -m aperture.cli <command> [options]
+    docker compose exec gallery python -m aperture.cli <command>
 
 Two kinds of command live in here:
 
@@ -12,7 +12,7 @@ Two kinds of command live in here:
   * Ones that just look at the index, the photo tree and the config the same
     way the app does — `doctor`, `thumbs`, `featured`, `cfg`, `photo`,
     `trip`, `i18n`. Those run standalone and need no server at all; they
-    import app.main purely to reuse its resolution helpers, so what they
+    import aperture.main purely to reuse its resolution helpers, so what they
     report is what the pages actually render.
 
 Every command takes `--json` for a machine-readable dump. `doctor` exits
@@ -39,7 +39,7 @@ from PIL import Image
 # Those would land above the masthead, so they are muted here and reported by
 # the dashboard instead — anything a command logs while running still shows.
 logging.disable(logging.CRITICAL)
-from . import console as ui
+from . import termui as ui
 from . import control, db, i18n, scanner
 from . import main as gallery
 logging.disable(logging.NOTSET)
@@ -53,7 +53,7 @@ for _stream in (sys.stdout, sys.stderr):
     except (AttributeError, ValueError):
         pass
 
-# The report vocabulary lives in app/console.py (colour, rules, meters, the
+# The report vocabulary lives in aperture/termui.py (colour, rules, meters, the
 # masthead); these are just the short names the command bodies use.
 out = ui.out
 kv = ui.kv
@@ -1178,7 +1178,7 @@ def cmd_photo(args) -> int:
 def cmd_trip(args) -> int:
     _connect()
     if not args.album:
-        kv("trips", f"{len(gallery.TRIPS)} configured in app/main.py")
+        kv("trips", f"{len(gallery.TRIPS)} configured in aperture/main.py")
         for key, cfg in gallery.TRIPS.items():
             exists = gallery._album_exists(key)
             out(f"  {key:<16}{cfg.get('title')} · {len(cfg.get('stops', []))} stop(s)"
@@ -1362,7 +1362,7 @@ def cmd_tags(args) -> int:
         ui.columns([(t, f"{len(r)} photo(s)") for t, r in
                     sorted(indexed.items(), key=lambda kv: (-len(kv[1]), kv[0].lower()))])
     else:
-        out("  none — write a `<photo>.tags` sidecar, or use the configurator")
+        out("  none — write a `<photo>.tags` sidecar, or use the console")
 
     if drift_unindexed:
         head(f"on disk, not indexed  ({len(drift_unindexed)})")
@@ -1795,7 +1795,7 @@ def cmd_i18n(args) -> int:
 
 
 # ----- dashboard / menu / help -----------------------------------------
-# `python -m app.cli` with no arguments lands here: the masthead, what the
+# `python -m aperture.cli` with no arguments lands here: the masthead, what the
 # server is doing, and what the archive currently holds. On a terminal it
 # then drops into the menu; piped or redirected it just prints and exits.
 SUBTITLE_FMT = "{title}  ·  CLI v{app}  ·  API v{api}"
@@ -2073,8 +2073,8 @@ def cmd_menu(args) -> int:
         ui.warn("no terminal detected — printing the command overview instead")
         _command_columns()
         print()
-        hint("  `python -m app.cli term` shows what was detected")
-        hint("  `python -m app.cli menu --interactive` forces the menu anyway")
+        hint("  `python -m aperture.cli term` shows what was detected")
+        hint("  `python -m aperture.cli menu --interactive` forces the menu anyway")
         return 1
     _connect()
     last: list[str] | None = None
@@ -2084,7 +2084,7 @@ def cmd_menu(args) -> int:
             ui.clear_screen()
         with _screen("menu"):
             if intro:
-                # entered by plain `python -m app.cli`: lead with the whole
+                # entered by plain `python -m aperture.cli`: lead with the whole
                 # dashboard, with the menu as the last section of the screen
                 intro = False
                 _dash_body(footer=False)
@@ -2172,8 +2172,8 @@ def _help_body() -> None:
                                 app=gallery.APP_VERSION, api=gallery.API_VERSION))
     ui.rule("usage")
     ui.columns([
-        ("python -m app.cli", "dashboard, then the interactive menu"),
-        ("python -m app.cli <cmd>", "run one command"),
+        ("python -m aperture.cli", "dashboard, then the interactive menu"),
+        ("python -m aperture.cli <cmd>", "run one command"),
         ("… <cmd> --help", "options of that command"),
         ("… <cmd> --json", "machine-readable output"),
         ("--logo blocks", "draw the real logo as a picture (see `term`)"),
@@ -2271,7 +2271,7 @@ def cmd_home() -> int:
 # ----- argument parsing -------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="python -m app.cli",
+        prog="python -m aperture.cli",
         description="Operator CLI for the gallery backend.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Run without arguments for the dashboard and the interactive menu.\n"
@@ -2409,7 +2409,7 @@ def _take_presentation_flags(argv: list[str]):
 
     They are not really per-command options: they configure the console
     itself. Handling them here makes `--logo blocks status` work as well as
-    `status --logo blocks`, lets the bare `python -m app.cli` take them,
+    `status --logo blocks`, lets the bare `python -m aperture.cli` take them,
     and — because they are applied to the console module rather than to one
     parsed namespace — keeps them in effect for the commands the menu starts
     afterwards.

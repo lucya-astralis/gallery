@@ -58,7 +58,7 @@ FONT_SCALE_RANGE = (0.5, 2.5)
 # Per-album theme (album.cfg `accent` / `wallpaper_tint` / `wallpaper_dim`).
 # The gallery derives three faces from the accent and rejects anything that
 # isn't a hex colour; these two ranges are its guard rails on the backdrop
-# treatment. Keep in step with app/main.py.
+# treatment. Keep in step with aperture/main.py.
 WALLPAPER_TINT_RANGE = (0.0, 1.0)
 WALLPAPER_DIM_RANGE = (0.25, 1.0)
 

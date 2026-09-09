@@ -142,7 +142,7 @@ os.environ.update(
 )
 
 # Import order matters — see the module docstring.
-from app import db, main as gallery  # noqa: E402
+from aperture import db, main as gallery  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 

@@ -1,22 +1,36 @@
-# Gallery Configurator 3.0
+# Console
 
-A standalone web GUI for the gallery's config files — `photos/.gallery/gallery.cfg` and
+The web GUI for the gallery's config files — `photos/.gallery/gallery.cfg` and
 every `<album>/.album/album.cfg`, plus the per-language `album_*.md`
 descriptions and the icon/font assets that sit beside them.
 
-It is a separate app with its own compose file, its own image and its own port.
-It does **not** import the gallery, read its database, or need it to be
-running: the only thing the two share is the photo folder. Since the gallery
-re-reads its cfg files per request, a save here shows up on its next page load
-— no restart, no rescan.
+It was the standalone *Configurator* until Aperture 1.0. It now ships in the
+same package and the same image as the gallery, but it is still a **separate
+ASGI app on a separate listener** — and that separation is the point. The
+public port serves pages and cannot reach a route in here; this port is where
+the one write path into the photo tree lives.
+
+Two invariants hold whatever else changes:
+
+- it writes only inside `<album>/.album/` and `photos/.gallery/` — a photograph
+  is not addressable for writing by any route here;
+- it never writes the index. Operational requests go through the flag-file
+  control channel in `aperture/control.py`, the same one the CLI uses, so the
+  indexer stays the single writer on the database.
+
+Since the gallery re-reads its cfg files per request, a save here shows up on
+its next page load — no restart, no rescan.
 
 ```bash
-cd configurator
-cp .env.example .env      # optional; every value has a working default
+cp .env.example .env      # in the repo root; every value has a working default
 docker compose up -d --build
 ```
 
-Then open <http://localhost:8090>.
+Then open <http://127.0.0.1:8090>. `CONSOLE_HOST` decides which host address
+that port appears on; see [Security / hosting](../../README.md#security--hosting).
+
+**The console has no authentication yet.** Until it has, the port is the only
+control — keep it off any network you do not trust.
 
 ## What it edits
 
@@ -123,7 +137,7 @@ photo's, the next scan picks the change up on its own.
 
 Clicking a photo also opens its metadata panel: dimensions, file size, camera,
 lens, exposure, aperture, ISO, focal length, capture date. That panel is
-**read-only** — the configurator never rewrites a photo file. This library is
+**read-only** — the console never rewrites a photo file. This library is
 almost entirely PNG and BMP, where there is no dependable metadata container
 to write into, so tags in a sidecar are the honest way to attach anything.
 
@@ -261,17 +275,18 @@ second ago already counts.
 
 ## Configuration
 
-All optional — see `.env.example`.
+All optional — see the repo root's `.env.example`. Paths are no longer set
+here: `PHOTOS_DIR`, `THUMBS_DIR` and `DATA_DIR` are the app's, read once in
+`aperture/runtime.py`, and the console gets the same values the gallery does.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `CONFIGURATOR_PORT` | `8090` | host port |
-| `PHOTOS_PATH` | `../photos` | the photo folder to manage; point it at the same folder or share the gallery serves |
-| `THUMBS_PATH` | `../thumbnails` | the gallery's thumbnail tree, mounted read-only so grids reuse it. Optional |
-| `DATA_PATH` | `./data` | thumbnail cache + backups. Disposable |
-| `THUMB_SIZE` | `320` | fallback preview size, for photos the gallery has not thumbnailed |
-| `BACKUPS` | `20` | versions kept per edited file |
-| `MAX_UPLOAD_MB` | `8` | cap on icon/font uploads |
+| `CONSOLE_ENABLED` | `1` | `0` leaves this listener closed entirely |
+| `CONSOLE_PORT` | `8090` | port inside the container |
+| `CONSOLE_HOST` | `127.0.0.1` | which host address that port is published on. The boundary — see the root README |
+| `CONSOLE_THUMB_SIZE` | `320` | fallback preview size, for photos the gallery has not thumbnailed |
+| `BACKUPS` | `20` | versions kept per edited file, under `data/console/backups` |
+| `MAX_UPLOAD_MB` | `8` | cap on icon/font/wallpaper uploads |
 | `READ_ONLY` | `0` | `1` = browse and validate only; every write endpoint returns 403 and the UI disables its controls |
 
 ### Previews come from the gallery's thumbnails
@@ -295,37 +310,45 @@ For an SMB/NFS mount that is usually an absolute host path:
 PHOTOS_PATH=/mnt/photos
 ```
 
-The configurator needs that mount **read-write** — editing the cfg files is the
-whole job. It only ever writes inside `.album/` folders and the root
-`gallery.cfg`; it never touches a photo.
+The console needs that mount **read-write** — editing the cfg files is the
+whole job. It only ever writes inside `.album/` folders and `.gallery/`; it
+never touches a photo.
 
 ## Running it without Docker
 
 ```bash
-pip install -r requirements.txt
-PHOTOS_DIR=/path/to/photos python -m uvicorn configurator.app.main:app --port 8090
+pip install -r requirements-dev.txt
+python -m aperture                                        # both surfaces
+APERTURE_ROLE=console python -m aperture                  # this one alone
+uvicorn aperture.console.app:app --reload --port 8090     # with a reloader
 ```
 
-Run from the repo root. With no `PHOTOS_DIR` set it falls back to the `photos/`
-folder next to the checkout, which is what the local gallery uses.
+Run from the repo root. Paths come from `aperture/runtime.py`, which reads the
+same environment the gallery does — one `PHOTOS_DIR`, one meaning.
 
 ## Layout
 
 ```
-configurator/
-  app/
-    main.py       FastAPI routes: tree, cfg read/write, photos, thumbs, tags, assets
-    cfgio.py      the comment-preserving parser/writer
-    schema.py     which keys exist, their allowed values and write style
-    library.py    the photo tree and the .tags sidecars, off the filesystem
-    imagemeta.py  read-only EXIF for the metadata panel
-    validate.py   the checks behind "Check all"
-    static/       style.css, app.js, fonts/, logo/
-    templates/    index.html
-  Dockerfile
-  docker-compose.yml
+aperture/console/
+  app.py        FastAPI routes: tree, cfg read/write, photos, thumbs, tags, assets
+  cfgio.py      the comment-preserving parser/writer
+  schema.py     which keys exist, their allowed values and write style
+  library.py    the photo tree and the .tags sidecars, off the filesystem
+  imagemeta.py  read-only EXIF for the metadata panel
+  validate.py   the checks behind "Check all"
+  static/       style.css, app.js, fonts/, logo/
+  templates/    index.html
 ```
 
-`schema.py` is the one file to touch when the gallery grows a config key: add
-it to `KEY_SPEC`, to `ALBUM_KEYS`/`GALLERY_KEYS`, and to `HELP`. The form
+State lives in `data/console/` — rolling backups of every file the console
+overwrites, and its thumbnail fallback cache. Never in the photo tree: the
+gallery serves files out of `photos/.gallery/`.
+
+`schema.py` is the one file to touch here when the gallery grows a config key:
+add it to `KEY_SPEC`, to `ALBUM_KEYS`/`GALLERY_KEYS`, and to `HELP`. The form
 builds itself from there.
+
+It is still a **second** copy of that vocabulary — `ALBUM_CFG_KEYS` in
+`aperture/main.py` is the first — and the two are kept in sync by hand. A key
+added there and not here is a key the console cannot edit. Collapsing both into
+one registry is the next structural milestone.

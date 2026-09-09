@@ -1,4 +1,4 @@
-"""Terminal presentation layer for the operator CLI (app/cli.py).
+"""Terminal presentation layer for the operator CLI (aperture/cli.py).
 
 Same editorial line as the site itself: a megacorp-terminal HUD — uppercase
 labels, thin rules, cyan accents, numbers that line up. Everything here is
@@ -17,7 +17,7 @@ common setups:
 
 So: colour follows *stdout*, interactivity follows "is there any terminal I
 can read from", and both can be forced with `--color` / `--interactive`,
-`FORCE_COLOR` / `NO_COLOR`. `python -m app.cli term` prints what was
+`FORCE_COLOR` / `NO_COLOR`. `python -m aperture.cli term` prints what was
 detected and why.
 """
 
@@ -34,7 +34,7 @@ from pathlib import Path
 # readable in a 40-column pane and do not sprawl across an ultrawide one.
 MIN_WIDTH = 40
 MAX_WIDTH = 96
-LOGO_MIN_WIDTH = 50
+LOGO_MIN_WIDTH = 60
 
 _color = False
 _force_interactive: bool | None = None
@@ -738,12 +738,12 @@ def logo_image(cols: int | None = None) -> bool:
 
 # ----- logo -------------------------------------------------------------
 LOGO = r"""
-  ________       .__  .__
- /  _____/_____  |  | |  |   ___________ ___.__.
-/   \  ___\__  \ |  | |  | _/ __ \_  __ <   |  |
-\    \_\  \/ __ \|  |_|  |_\  ___/|  | \/\___  |
- \______  (____  /____/____/\___  >__|   / ____|
-        \/     \/               \/       \/
+   _____                        __
+  /  _  \ ______   ____________/  |_ __ _________   ____
+ /  /_\  \\____ \_/ __ \_  __ \   __\  |  \_  __ \_/ __ \
+/    |    \  |_> >  ___/|  | \/|  | |  |  /|  | \/\  ___/
+\____|__  /   __/ \___  >__|   |__| |____/ |__|    \___  >
+        \/|__|        \/                               \/
 """
 
 

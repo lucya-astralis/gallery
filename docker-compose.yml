@@ -1,15 +1,33 @@
+# lucya.systems aperture — one image, one container, two ports.
+#
+#   docker compose up -d --build     ->  gallery  http://localhost:8000
+#                                        console  http://127.0.0.1:8090
+#
+# The console's port is published to a HOST ADDRESS, not to every interface:
+# `CONSOLE_HOST=127.0.0.1` keeps it on the machine, and a LAN or VPN address
+# (`CONSOLE_HOST=10.0.0.5`) puts it on exactly that network and nowhere else.
+# That is the boundary — the container itself always listens on 0.0.0.0:8090,
+# because a container's own loopback would be unreachable from anywhere.
+#
+# To split the two apart instead, run this file twice with APERTURE_ROLE=public
+# (photos mounted :ro) and APERTURE_ROLE=console.
+
 services:
-  gallery:
+  aperture:
     build: .
-    container_name: imageslucya
+    container_name: aperture
     ports:
       - "${PORT:-8000}:8000"
+      - "${CONSOLE_HOST:-127.0.0.1}:${CONSOLE_PORT:-8090}:8090"
     volumes:
+      # Read-write: editing the cfg files in .album/ and .gallery/ is what the
+      # console is for. No route can address a photograph for writing.
       - ${PHOTOS_PATH:-./photos}:/photos
       - ${THUMBS_PATH:-./thumbnails}:/thumbnails
       - ${PREVIEWS_PATH:-./previews}:/previews
       - ${DATA_PATH:-./data}:/data
     environment:
+      - APERTURE_ROLE=${APERTURE_ROLE:-all}
       - PHOTOS_DIR=/photos
       - THUMBS_DIR=/thumbnails
       - PREVIEWS_DIR=/previews
@@ -17,13 +35,27 @@ services:
       - THUMB_SIZE=${THUMB_SIZE:-480}
       - PREVIEW_SIZE=${PREVIEW_SIZE:-1600}
       # Default 300s: SMB/CIFS/NFS shares don't deliver file-watch events, so a
-      # periodic full scan is what picks up newly added albums/sub-folders there.
+      # periodic full scan is what picks up newly added albums there.
       - SCAN_INTERVAL=${SCAN_INTERVAL:-300}
       - ENABLE_WATCHER=${ENABLE_WATCHER:-1}
       - HIDE_GPS=${HIDE_GPS:-1}
       - STRIP_GPS=${STRIP_GPS:-1}
-      # Public base URL used for OG / Twitter link previews.
-      # Set this when behind a reverse proxy that terminates TLS,
-      # e.g. PUBLIC_BASE_URL=https://gallery.lucya.systems
+      # Public base URL used for OG / Twitter link previews. Set this when
+      # behind a reverse proxy that terminates TLS.
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      # ----- console -----
+      - CONSOLE_ENABLED=${CONSOLE_ENABLED:-1}
+      - CONSOLE_BIND=0.0.0.0
+      - READ_ONLY=${READ_ONLY:-0}
+      - BACKUPS=${BACKUPS:-20}
+      - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-8}
+    # Nothing in here needs a privilege it isn't given.
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped

@@ -1,4 +1,4 @@
-"""Who built this gallery — as opposed to who runs it.
+"""Who built this — as opposed to who runs it.
 
 The two used to be one string. Every page said "lucya.systems gallery",
 which was simultaneously the name of the archive's operator and the name of
@@ -28,7 +28,8 @@ the lot:
   * the EXIF `Software` tag written into every derived JPEG (scanner.py)
   * a banner at the top of style.css and app.js, which an operator serves
     verbatim
-  * the CLI masthead (that is the vendor's tool, not the operator's site)
+  * the CLI masthead and the console's own chrome (those are the
+    vendor's tools, not the operator's site)
 
 None of it is enforcement: anyone holding the source can delete a line. The
 licence is what asks for attribution — these are the defaults that make
@@ -43,17 +44,20 @@ which is where all eight of these live.
 
 NAME = "lucya.systems"
 URL = "https://lucya.systems"
-PRODUCT = f"{NAME} gallery"
+PRODUCT = f"{NAME} aperture"
 
-# The gallery's own release version, shown in the nav and the footer.
-# Distinct from API_VERSION (main.py), which versions the JSON API contract.
-VERSION = "7.2"
+# Aperture's own release version, shown in the nav and the footer. It starts
+# at 1.0 rather than continuing the gallery's 7.2: the gallery and the
+# configurator were two programs, this is one, and a version is a promise
+# about a thing. Distinct from API_VERSION (main.py), which versions the JSON
+# API contract and did NOT reset — the endpoints kept their shape.
+VERSION = "1.0"
 
 # One-line form, shared by <meta name="generator">, the X-Powered-By header
 # and the EXIF `Software` tag so all three can never drift apart.
 GENERATOR = f"{PRODUCT} {VERSION}"
 # outbound requests identify themselves as the product, not as a browser
-USER_AGENT = "lucya.systems-gallery"
+USER_AGENT = "lucya.systems-aperture"
 
 # what templates get as `vendor`
 CONTEXT = {
