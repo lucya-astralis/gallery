@@ -60,22 +60,29 @@ def _num(v):
     return float(v)
 
 
-def _fmt_num(v: float) -> str:
-    """2.0 -> '2', 1.60 -> '1.6' — the same trimming main.py uses for the
-    album stat rows, kept local so this module imports nothing from there."""
+def fmt_num(v: float) -> str:
+    """2.0 -> '2', 1.60 -> '1.6'. Shared with the album stat rows."""
     return f"{v:.1f}".rstrip("0").rstrip(".")
 
 
-def _clean_device(make, model) -> str | None:
-    """'Apple' + 'iPhone 17' -> 'Apple iPhone 17', without saying Apple twice
-    when the model already carries the brand."""
+def clean_device(make: str | None, model: str | None) -> str | None:
+    """Human camera name from EXIF Make/Model: 'Apple' + 'iPhone 17' ->
+    'iPhone 17'; 'FUJIFILM' + 'X100V' -> 'FUJIFILM X100V'. Drops a Make the
+    Model already echoes.
+
+    One definition for the album pages and the /stats camera chart. There
+    used to be two, and they disagreed about the same photos: the album said
+    "iPhone 17", the chart said "Apple iPhone 17"."""
     make = str(make or "").strip()
     model = str(model or "").strip()
     if not model:
         return make or None
-    if make and not model.lower().startswith(make.lower()):
-        return f"{make} {model}"
-    return model
+    # Apple brands by model alone ("iPhone 17", never "Apple iPhone 17")
+    if make.lower() == "apple":
+        return model
+    if make and make.split()[0].lower() in model.lower():
+        return model
+    return f"{make} {model}" if make else model
 
 
 def _rank(counter: Counter, top: int = TOP_N, other_label: str | None = None) -> list[dict]:
@@ -224,7 +231,7 @@ def collect(conn, month_name, weekday_name, more_label: str = "+{n} more") -> di
                 last_ts = ts
 
         # ---- what it was shot with --------------------------------------
-        dev = _clean_device(exif.get("Make"), exif.get("Model"))
+        dev = clean_device(exif.get("Make"), exif.get("Model"))
         if dev:
             devices[dev] += 1
         fl = _num(exif.get("FocalLengthIn35mmFilm")) or _num(exif.get("FocalLength"))
@@ -319,7 +326,7 @@ def collect(conn, month_name, weekday_name, more_label: str = "+{n} more") -> di
         "cameras": _rank(devices, TOP_N, more_label),
         "focals": _rows([(f"{k} mm", n) for k, n in sorted(focals.items())
                          if n >= max(1, total // 200)][:12]),
-        "apertures": _rows([(f"ƒ{_fmt_num(k)}", n) for k, n in sorted(apertures.items())]),
+        "apertures": _rows([(f"ƒ{fmt_num(k)}", n) for k, n in sorted(apertures.items())]),
         "isos": _rows([(name, isos[name]) for _, name in _ISO_BUCKETS if isos.get(name)]
                       + ([(_ISO_OVER, isos[_ISO_OVER])] if isos.get(_ISO_OVER) else [])),
         "shapes_raw": shapes,

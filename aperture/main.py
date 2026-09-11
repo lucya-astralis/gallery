@@ -17,10 +17,9 @@ from urllib.parse import quote
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import brand, cfgio, compress, control, db, i18n, scanner, schema, stats, watcher
+from . import brand, cfgio, compress, control, db, i18n, scanner, schema, stats, templating, watcher
 from .runtime import ensure_dirs, settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
@@ -122,8 +121,7 @@ def _i18n_context(request: Request) -> dict:
     }
 
 
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"),
-                            context_processors=[_i18n_context])
+templates = templating.make_templates(BASE_DIR, context_processors=[_i18n_context])
 # Python's mimetypes table has no entry for the web font formats, so
 # StaticFiles fell back to `text/plain; charset=utf-8` for every .woff2 —
 # which is what base.html's `<link rel=preload as=font type="font/woff2">`
@@ -137,21 +135,6 @@ mimetypes.add_type("font/otf", ".otf")
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
-
-def _static_url(path: str) -> str:
-    """Cache-busting URL for a file under /static: appends the file's mtime as
-    `?v=` so a browser re-fetches the asset the moment it actually changes, but
-    keeps serving from cache otherwise. Without this, edits to style.css / app.js
-    can sit behind a stale browser cache. Falls back to the bare path if the file
-    is missing."""
-    try:
-        version = int((BASE_DIR / "static" / path).stat().st_mtime)
-    except OSError:
-        return f"/static/{path}"
-    return f"/static/{path}?v={version}"
-
-
-templates.env.globals["static_url"] = _static_url
 
 APP_VERSION = brand.VERSION
 templates.env.globals["app_version"] = APP_VERSION
@@ -783,27 +766,6 @@ def _humanize_bytes(n: int | None) -> str | None:
     return f"{f:.0f} {units[i]}" if f >= 100 else f"{f:.1f} {units[i]}"
 
 
-def _clean_device(make: str | None, model: str | None) -> str | None:
-    """Human camera name from EXIF Make/Model: 'Apple' + 'iPhone 17' ->
-    'iPhone 17'; 'FUJIFILM' + 'X100V' -> 'FUJIFILM X100V'. Drops a Make the
-    Model already echoes."""
-    make = (make or "").strip()
-    model = (model or "").strip()
-    if not model:
-        return make or None
-    # Apple brands by model alone ("iPhone 17", never "Apple iPhone 17")
-    if make.lower() == "apple":
-        return model
-    if make and make.split()[0].lower() in model.lower():
-        return model
-    return f"{make} {model}" if make else model
-
-
-def _fmt_num(v: float) -> str:
-    """2.0 -> '2', 1.6 -> '1.6' (trims a trailing zero decimal)."""
-    return f"{v:.1f}".rstrip("0").rstrip(".")
-
-
 def _album_stats(images: list[dict], cfg: dict[str, list[str]], lang: str) -> dict:
     """Stats block for the description card: {'context': [...], 'capture': [...],
     'has': bool}. Each entry is {'key': LABEL, 'val': text}. `images` is the
@@ -847,7 +809,7 @@ def _album_stats(images: list[dict], cfg: dict[str, list[str]], lang: str) -> di
             exif = json.loads(im["exif_json"]) if im.get("exif_json") else {}
         except (ValueError, TypeError):
             exif = {}
-        dev = _clean_device(exif.get("Make"), exif.get("Model"))
+        dev = stats.clean_device(exif.get("Make"), exif.get("Model"))
         if dev:
             devices[dev] += 1
         fn = exif.get("FNumber")
@@ -873,7 +835,7 @@ def _album_stats(images: list[dict], cfg: dict[str, list[str]], lang: str) -> di
                         "val": f"{lo} mm" if lo == hi else f"{lo}–{hi} mm"})
     if fnums:
         lo, hi = min(fnums), max(fnums)
-        val = f"ƒ{_fmt_num(lo)}" if lo == hi else f"ƒ{_fmt_num(lo)}–{_fmt_num(hi)}"
+        val = f"ƒ{stats.fmt_num(lo)}" if lo == hi else f"ƒ{stats.fmt_num(lo)}–{stats.fmt_num(hi)}"
         capture.append({"key": i18n.t(lang, "stat.aperture"), "val": val})
     data = _humanize_bytes(total)
     if data:
@@ -976,7 +938,7 @@ def _album_font_scale(album: str) -> float | None:
 def _album_font_version(album: str) -> int:
     """Cache-busting stamp for an album's generated font sheet: the newest
     mtime of the font file and of the album.cfg naming it (same idea as
-    _static_url). The cfg has to count — the sheet carries `font_scale`
+    templating.static_url). The cfg has to count — the sheet carries `font_scale`
     too, and retuning that never touches the font file, so versioning on
     the font alone would leave the edit masked by a year-long cache."""
     meta = _album_meta_dir(album)
@@ -1590,7 +1552,7 @@ def _site_bg(album: str | None = None) -> dict:
     that belongs to it."""
     desktop = _bg_layer(album, "desktop")
     mobile = _bg_layer(album, "mobile")
-    default_still = _static_url("bg-poster.jpg")
+    default_still = templating.static_url(BASE_DIR, "bg-poster.jpg")
     desktop_is_video = (desktop is not None
                         and desktop[1].suffix.lower() in ALBUM_WALLPAPER_VIDEO_TYPES)
     if desktop is None:
@@ -1603,7 +1565,7 @@ def _site_bg(album: str | None = None) -> dict:
         "still_mobile": mobile[0] if mobile else default_still,
         "still_desktop": still_desktop,
         "video": (desktop[0] if desktop_is_video else
-                  (None if desktop else _static_url("bg.mp4"))),
+                  (None if desktop else templating.static_url(BASE_DIR, "bg.mp4"))),
     }
 
 
@@ -1773,7 +1735,7 @@ def _brand(lang: str = i18n.DEFAULT_LANG) -> dict:
     logo = _brand_asset("logo", cfg)
     favicon = _brand_asset("favicon", cfg) or logo
     if logo is None:
-        logo = {"url": _static_url(BRAND_DEFAULT_LOGO), "type": "image/svg+xml"}
+        logo = {"url": templating.static_url(BASE_DIR, BRAND_DEFAULT_LOGO), "type": "image/svg+xml"}
     if favicon is None:
         favicon = logo
     return {
@@ -2479,8 +2441,8 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         return resp
     if exc.status_code == 404:
         return templates.TemplateResponse(
-            "404.html",
-            {"request": request, "path": request.url.path},
+            request, "404.html",
+            {"path": request.url.path},
             status_code=404,
         )
     return Response(content=str(exc.detail), status_code=exc.status_code)
@@ -2683,7 +2645,7 @@ def _safe_rel(album: str, filename: str) -> Path:
     # at, and /full/ handed out any other file sitting in an album folder
     # verbatim — a `.tags` sidecar, a stray note. Nothing links to those and
     # nothing is meant to read them over HTTP.
-    if not scanner.is_image(rel):
+    if not schema.is_image(rel):
         raise HTTPException(404, "not found")
     full = (PHOTOS_DIR / rel).resolve()
     try:
@@ -2909,9 +2871,8 @@ def welcome(request: Request):
     ).fetchone()
     showcase_albums = _showcase_album_rows(limit=6)
     return templates.TemplateResponse(
-        "welcome.html",
+        request, "welcome.html",
         {
-            "request": request,
             "shuffle": feed,
             "feed_label": feed_label,
             "feed_mode": feed_mode,
@@ -2948,9 +2909,8 @@ def albums_index(request: Request, sort: str | None = None):
     sort_options = _album_sort_options_for_template(current_sort, curated=has_curated,
                                                     lang=_request_lang(request))
     return templates.TemplateResponse(
-        "index.html",
+        request, "index.html",
         {
-            "request": request,
             "albums": albums,
             "showcase_albums": showcase_albums,
             "archive_albums": archive_albums,
@@ -3032,9 +2992,8 @@ def stats_page(request: Request):
     cover = _showcase_rows(limit=1, random_order=True)
 
     return templates.TemplateResponse(
-        "stats.html",
+        request, "stats.html",
         {
-            "request": request,
             "figs": {
                 "photos": data["total"],
                 "albums": len(_child_album_names(None)),
@@ -3790,9 +3749,8 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
         stat_src = images
     album_stats = _album_stats(stat_src, album_cfg, lang)
     return templates.TemplateResponse(
-        "album.html",
+        request, "album.html",
         {
-            "request": request,
             "album": album,
             # base.html paints the backdrop from this; a sub-album with no
             # wallpaper of its own inherits its nearest ancestor's
@@ -3899,9 +3857,8 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
     pretty_exif = _prettify_exif(exif, _request_lang(request))
     description = _extract_description(exif)
     return templates.TemplateResponse(
-        "image.html",
+        request, "image.html",
         {
-            "request": request,
             "image": dict(row),
             "bg_album": row["album"],
             "breadcrumbs": _album_breadcrumbs(row["album"]),
@@ -4358,9 +4315,8 @@ def search(request: Request, q: str = "", sort: str | None = None):
         [_album_card(a) for a in matched_albums[:SEARCH_ALBUM_LIMIT]], "name_asc")
     sort_options = _image_sort_options_for_template(current_sort, lang=lang)
     return templates.TemplateResponse(
-        "search.html",
+        request, "search.html",
         {
-            "request": request,
             "query": q,
             "albums": album_cards,
             "images": images,

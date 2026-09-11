@@ -66,10 +66,6 @@ PREVIEW_EXT = ".jpg"
 DERIVATIVE_EXTS = (".jpg", ".webp")
 
 
-def is_image(p: Path) -> bool:
-    return p.suffix.lower() in IMAGE_EXTS
-
-
 def needs_jpeg_conversion(p: Path) -> bool:
     return p.suffix.lower() in JPEG_CONVERT_EXTS
 
@@ -419,7 +415,7 @@ def make_full_jpeg(src: Path, dst: Path) -> bool:
 
 def ensure_full_jpeg(photos_dir: Path, fulls_dir: Path, rel_path: str) -> Path | None:
     src = photos_dir / rel_path
-    if not src.exists() or not is_image(src):
+    if not src.exists() or not schema.is_image(src):
         return None
     dst = (fulls_dir / rel_path).with_suffix(".jpg")
     if not needs_rebuild(dst, src):
@@ -622,7 +618,7 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
     # Walk the whole tree so albums can nest (photos/japan/tokyo/img.jpg).
     # Files sitting directly in photos_dir (no album folder) are skipped.
     for file in sorted(base.rglob("*")):
-        if not file.is_file() or not is_image(file):
+        if not file.is_file() or not schema.is_image(file):
             continue
         relp = file.relative_to(photos_dir)
         if len(relp.parts) < 2:
@@ -697,7 +693,7 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
 def ensure_thumb(photos_dir: Path, thumbs_dir: Path, rel_path: str, size: int,
                  ext: str = THUMB_EXT) -> Path | None:
     src = photos_dir / rel_path
-    if not src.exists() or not is_image(src):
+    if not src.exists() or not schema.is_image(src):
         return None
     dst = (thumbs_dir / rel_path).with_suffix(ext)
     if not needs_rebuild(dst, src):

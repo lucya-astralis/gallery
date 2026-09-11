@@ -39,7 +39,7 @@ from PIL import Image
 # Those would land above the masthead, so they are muted here and reported by
 # the dashboard instead — anything a command logs while running still shows.
 logging.disable(logging.CRITICAL)
-from . import termui as ui
+from . import termui as ui, schema
 from . import control, db, i18n, scanner
 from . import main as gallery
 logging.disable(logging.NOTSET)
@@ -917,7 +917,7 @@ def cmd_gps(args) -> int:
         return fail(f"no such album: {args.album!r}")
 
     files = [p for p in sorted(base.rglob("*"))
-             if p.is_file() and scanner.is_image(p)
+             if p.is_file() and schema.is_image(p)
              and not scanner.is_meta_path(p.relative_to(gallery.PHOTOS_DIR))]
 
     live = ui.Live("reading EXIF", enabled=not args.json)

@@ -6,7 +6,7 @@ from pathlib import Path
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from . import control, scanner
+from . import control, scanner, schema
 
 log = logging.getLogger("watcher")
 
@@ -104,7 +104,7 @@ class _Handler(FileSystemEventHandler):
                     continue  # album metadata — never a photo, never thumbed
                 if fp.suffix == ".tags":
                     image = fp.with_suffix("")
-                    if image.exists() and scanner.is_image(image):
+                    if image.exists() and schema.is_image(image):
                         try:
                             scanner.index_image(self.photos_dir, image)
                             log.info("re-indexed tags for %s", image.name)
@@ -112,10 +112,10 @@ class _Handler(FileSystemEventHandler):
                             log.warning("tag reindex failed for %s: %s", image, e)
                     continue
                 if not fp.exists():
-                    if scanner.is_image(fp):
+                    if schema.is_image(fp):
                         self._forget(fp)
                     continue
-                if not scanner.is_image(fp):
+                if not schema.is_image(fp):
                     continue
                 try:
                     scanner.index_image(self.photos_dir, fp)

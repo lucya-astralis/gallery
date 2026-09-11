@@ -5,4 +5,7 @@ testpaths = ["tests"]
 addopts = "-q"
 filterwarnings = [
     "error::DeprecationWarning:aperture.*",
+    # Starlette raises the old TemplateResponse(name, {"request": ...})
+    # warning from its own module, which the filter above does not match.
+    "error:.*TemplateResponse.*:DeprecationWarning",
 ]

@@ -31,15 +31,14 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from .. import brand
 from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
-from .. import cfgio, schema
+from .. import cfgio, schema, templating
 from . import imagemeta, opsapi, security, validate
-from .library import Library, asset_kinds, is_image
+from .library import Library, asset_kinds
 
 # The console ships with the app now, so it carries the app's version rather
 # than one of its own -- there is no combination of the two to report.
@@ -79,7 +78,7 @@ Image.MAX_IMAGE_PIXELS = 64 * 1024 * 1024
 app = FastAPI(title=f"{brand.PRODUCT} console", docs_url=None, redoc_url=None,
               openapi_url=None)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+templates = templating.make_templates(BASE_DIR)
 
 lib = Library(PHOTOS_DIR)
 
@@ -164,22 +163,6 @@ def _writes(request: Request, action: str, target: Path, before: str | None) -> 
     something did."""
     security.audit(request, action, relative_to_photos(PHOTOS_DIR, target),
                    before=before, after=security.sha256_of(target))
-
-
-def _static_url(path: str) -> str:
-    """`/static/<path>` stamped with the file's mtime.
-
-    Without this a browser keeps serving the app.js it cached before an
-    update, and the UI silently runs last week's code against this week's API.
-    """
-    try:
-        stamp = int((BASE_DIR / "static" / path).stat().st_mtime)
-    except OSError:
-        return "/static/%s" % path
-    return "/static/%s?v=%d" % (path, stamp)
-
-
-templates.env.globals["static_url"] = _static_url
 
 
 # ----- helpers ----------------------------------------------------------
@@ -290,8 +273,7 @@ def login_page(request: Request, next: str = "/"):
     there is a session."""
     if security.open_access() or security.current(request):
         return RedirectResponse("/", status_code=303)
-    return templates.TemplateResponse("login.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "login.html", {
         "vendor": brand.CONTEXT,
     })
 
@@ -327,8 +309,7 @@ def api_session_close(request: Request):
 # ----- page -------------------------------------------------------------
 @app.get("/")
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "index.html", {
         "photos_dir": PHOTOS_DIR.as_posix(),
         "read_only": READ_ONLY,
         "app_version": APP_VERSION,
@@ -571,7 +552,7 @@ def api_thumb(path: str, size: int = 0):
         source = lib.safe(path)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
-    if not source.is_file() or not is_image(source.name):
+    if not source.is_file() or not schema.is_image(source.name):
         raise HTTPException(404, "no such photo")
     size = max(64, min(size or THUMB_SIZE, 1600))
     st = source.stat()
@@ -612,7 +593,7 @@ def api_image(path: str):
         source = lib.safe(path)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
-    if not source.is_file() or not is_image(source.name):
+    if not source.is_file() or not schema.is_image(source.name):
         raise HTTPException(404, "no such photo")
     rel = path.replace("\\", "/").strip().strip("/")
     return {
@@ -674,7 +655,7 @@ async def api_tags_write(request: Request):
         # builds the sidecar's name from it. Nothing about the file written
         # here comes from the request except which picture it belongs to.
         try:
-            sidecar = sidecar_target(PHOTOS_DIR, rel, is_image=is_image)
+            sidecar = sidecar_target(PHOTOS_DIR, rel, is_image=schema.is_image)
         except PathRefused as exc:
             raise HTTPException(400, str(exc))
 

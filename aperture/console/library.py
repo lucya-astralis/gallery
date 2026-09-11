@@ -45,10 +45,6 @@ def asset_kinds(name: str) -> list[str]:
     return kinds or ["other"]
 
 
-def is_image(name: str) -> bool:
-    return Path(name).suffix.lower() in schema.IMAGE_EXTS
-
-
 def _visible_dir(name: str) -> bool:
     return name not in _SKIP_DIRS and not name.startswith(".")
 
@@ -136,7 +132,7 @@ class Library:
                 child_rel = ("%s/%s" % (rel, entry.name)) if rel else entry.name
                 node.children.append(
                     self._scan(Path(entry.path), child_rel, entry.name))
-            elif entry.is_file() and is_image(entry.name):
+            elif entry.is_file() and schema.is_image(entry.name):
                 node.own_photos += 1
                 if first_own is None:
                     first_own = ("%s/%s" % (rel, entry.name)) if rel else entry.name
@@ -213,7 +209,7 @@ class Library:
             dirnames[:] = sorted((d for d in dirnames if _visible_dir(d)),
                                  key=str.lower)
             for filename in sorted(filenames, key=str.lower):
-                if filename in _SKIP_FILES or not is_image(filename):
+                if filename in _SKIP_FILES or not schema.is_image(filename):
                     continue
                 full = Path(folder) / filename
                 sub = full.relative_to(base).as_posix()
@@ -246,7 +242,7 @@ class Library:
         if album.strip("/") and item.lower().startswith(prefix.lower()):
             item = item[len(prefix):]
         direct = base / item
-        if direct.is_file() and is_image(direct.name):
+        if direct.is_file() and schema.is_image(direct.name):
             try:
                 return direct.resolve().relative_to(base.resolve()).as_posix()
             except ValueError:
@@ -271,7 +267,7 @@ class Library:
             target = self.safe(rel)
         except ValueError:
             return None
-        if target.is_file() and is_image(target.name):
+        if target.is_file() and schema.is_image(target.name):
             return rel
         return None
 

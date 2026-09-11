@@ -26,6 +26,8 @@ The grammar of the files is not in here; that is `aperture/cfgio.py`.
 
 from __future__ import annotations
 
+import os
+
 from .cfgio import FALSE, GROUP_KEYS
 from .i18n import LANGS as _I18N_LANGS
 
@@ -46,6 +48,13 @@ MIME: dict[str, str] = {
 # serves one.
 IMAGE_EXTS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff",
                         ".tif", ".heic", ".heif"})
+def is_image(name) -> bool:
+    """Whether a file name or path is a photograph, by extension. One function
+    for the scanner, the watcher, the console and the path guards -- there
+    used to be two, one taking a Path and one a string."""
+    return os.path.splitext(os.fspath(name))[1].lower() in IMAGE_EXTS
+
+
 # An album's `icon` and the gallery's marks. The console used to accept only
 # .svg/.png/.webp here while the gallery served .gif/.jpg/.jpeg as well, so an
 # operator whose icon was a JPEG could not manage it from the console.

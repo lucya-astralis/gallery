@@ -124,7 +124,7 @@ def photo_files(root: str | None = None):
         return []
     found = []
     for file in sorted(base.rglob("*")):
-        if not file.is_file() or not scanner.is_image(file):
+        if not file.is_file() or not schema.is_image(file):
             continue
         relp = file.relative_to(gallery.PHOTOS_DIR)
         if len(relp.parts) < 2 or scanner.is_meta_path(relp):
