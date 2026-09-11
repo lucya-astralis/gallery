@@ -120,3 +120,25 @@ def test_the_server_module_builds_both_configs(monkeypatch):
     # pointed, which is loopback unless someone said otherwise.
     assert configs[0].host == "0.0.0.0"
     assert configs[1].host == runtime.settings.console_bind
+
+
+# ----- the proxy in front ---------------------------------------------
+def test_only_loopback_may_speak_for_a_client_by_default():
+    import os
+    saved = os.environ.pop("FORWARDED_ALLOW_IPS", None)
+    try:
+        assert runtime.load().forwarded_allow_ips == "127.0.0.1"
+    finally:
+        if saved is not None:
+            os.environ["FORWARDED_ALLOW_IPS"] = saved
+
+
+def test_both_listeners_trust_the_configured_proxy(monkeypatch):
+    """The login throttle and the audit log key on the client address, so
+    the console must trust exactly the proxy the gallery trusts."""
+    server = importlib.import_module("aperture.server")
+    monkeypatch.setattr(server, "settings",
+                        _settings(APERTURE_ROLE="all", FORWARDED_ALLOW_IPS="10.0.0.2"))
+    configs = server._configs()
+    assert [c.forwarded_allow_ips for c in configs] == ["10.0.0.2", "10.0.0.2"]
+    assert all(c.proxy_headers for c in configs)

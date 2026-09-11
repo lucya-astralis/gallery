@@ -55,13 +55,15 @@ def _configs() -> list[uvicorn.Config]:
     if settings.runs_public:
         out.append(uvicorn.Config(
             create_public_app(), host="0.0.0.0", port=settings.port,
-            proxy_headers=True, log_config=None,
+            proxy_headers=True, forwarded_allow_ips=settings.forwarded_allow_ips,
+            log_config=None,
         ))
     if settings.runs_console:
         from .console.app import create_console_app
         out.append(uvicorn.Config(
             create_console_app(), host=settings.console_bind,
-            port=settings.console_port, proxy_headers=True, log_config=None,
+            port=settings.console_port, proxy_headers=True,
+            forwarded_allow_ips=settings.forwarded_allow_ips, log_config=None,
         ))
     return out
 

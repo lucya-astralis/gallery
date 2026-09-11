@@ -75,6 +75,15 @@ class Settings:
     console_backups: int
     console_max_upload: int
 
+    # ----- the network in front of both --------------------------------
+    # Which peers may set X-Forwarded-For / X-Forwarded-Proto. Only those
+    # addresses are believed about the client behind them; everyone else's
+    # headers are ignored. It matters since 1.0 because the console's login
+    # throttle and audit log key on the client address: with the proxy
+    # untrusted, every visitor looks like the proxy, and one wrong password
+    # rate-limits everybody.
+    forwarded_allow_ips: str
+
     @property
     def runs_public(self) -> bool:
         return self.role in ("all", "public")
@@ -144,6 +153,12 @@ def load() -> Settings:
         console_thumb_size=_int("CONSOLE_THUMB_SIZE", 320),
         console_backups=_int("BACKUPS", 20),
         console_max_upload=_int("MAX_UPLOAD_MB", 8) * 1024 * 1024,
+
+        # uvicorn's own default, made explicit and configurable. Set it to the
+        # reverse proxy's address (or its network, comma-separated) — never
+        # `*` on a port something else can reach directly, or any client can
+        # claim any address.
+        forwarded_allow_ips=(os.environ.get("FORWARDED_ALLOW_IPS") or "127.0.0.1").strip(),
     )
 
 
