@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import threading
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from fractions import Fraction
@@ -321,6 +322,7 @@ def _derivative_exif(credit: str | None) -> bytes:
 # because in full_scan() it would abort the whole walk (see there) and in the
 # /thumb route it surfaces as a 500 with a traceback instead of a skipped file.
 def make_thumbnail(src: Path, dst: Path, size: int) -> bool:
+    tmp = None
     try:
         dst.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(src) as img:
@@ -336,15 +338,23 @@ def make_thumbnail(src: Path, dst: Path, size: int) -> bool:
             # CLI rebuild, on-demand route — writes the same thing. `method`
             # is the encoder's effort knob: 4 is the point where more time
             # stops buying meaningful size on 480 px tiles.
+            #
+            # Encoded beside the destination and renamed into place: the scan,
+            # the gallery's /thumb route and the console's /api/thumb all build
+            # into this tree, and none of them may hand out a half-written file.
+            tmp = dst.with_name(f".{dst.name}.{os.getpid()}.{threading.get_ident()}.tmp")
             if dst.suffix.lower() == ".webp":
-                img.save(dst, "WEBP", quality=76, method=4,
+                img.save(tmp, "WEBP", quality=76, method=4,
                          exif=_derivative_exif(_credit()))
             else:
-                img.save(dst, "JPEG", quality=82, optimize=True, progressive=True,
+                img.save(tmp, "JPEG", quality=82, optimize=True, progressive=True,
                          exif=_derivative_exif(_credit()))
+        tmp.replace(dst)
         return True
     except Exception as e:
         log.warning("thumb failed for %s: %s: %s", src, type(e).__name__, e)
+        if tmp is not None:
+            tmp.unlink(missing_ok=True)
         return False
 
 

@@ -21,8 +21,6 @@ here shows up on its next page load with nothing to restart.
 from __future__ import annotations
 
 import hashlib
-import io
-import os
 import shutil
 import time
 from datetime import datetime, timezone
@@ -32,7 +30,7 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from .. import brand, checks
+from .. import brand, checks, scanner
 from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
@@ -51,14 +49,8 @@ BASE_DIR = Path(__file__).resolve().parent
 # could point at two different folders depending on which process you asked.
 PHOTOS_DIR = settings.photos_dir
 DATA_DIR = settings.data_dir
-# The gallery's own thumbnail tree. Nothing breaks without it -- previews just
-# get generated here instead. (Phase 04 drops the fallback cache entirely and
-# reads the index.)
-THUMBS_DIR = settings.thumbs_dir
-CACHE_DIR = settings.console_dir / "thumbcache"
 BACKUP_DIR = settings.backup_dir
 READ_ONLY = settings.console_read_only
-THUMB_SIZE = settings.console_thumb_size
 BACKUPS = settings.console_backups
 MAX_UPLOAD = settings.console_max_upload
 
@@ -68,7 +60,7 @@ try:  # HEIC support is optional -- the tool works without it, minus previews
 except Exception:  # pragma: no cover - depends on the wheel being installed
     pass
 
-from PIL import Image, ImageOps
+from PIL import Image
 
 # A 64 MP ceiling on anything decoded here. Pillow's own default is ~89 MP and
 # only warns; a metadata folder holds icons and backdrops, so nothing
@@ -206,25 +198,6 @@ def _backup(path: Path, label: str) -> None:
             stale.unlink(missing_ok=True)
 
 
-def _gallery_thumb(rel: str, source_mtime: float) -> Path | None:
-    """The gallery's own thumbnail for a photo, when it has one that is not
-    stale. Mirrors the gallery's layout: THUMBS_DIR holds the photo tree with
-    every file re-suffixed to .jpg."""
-    if not THUMBS_DIR.is_dir():
-        return None
-    try:
-        candidate = (THUMBS_DIR / rel).with_suffix(".jpg").resolve()
-        candidate.relative_to(THUMBS_DIR.resolve())
-    except (ValueError, OSError):
-        return None
-    try:
-        if candidate.is_file() and candidate.stat().st_mtime >= source_mtime:
-            return candidate
-    except OSError:
-        return None
-    return None
-
-
 def _updates_from(payload: dict) -> dict[str, list[str] | None]:
     """Normalize a {key: value} patch from the client into {key: [values]|None}.
 
@@ -327,7 +300,6 @@ def api_meta():
     return {
         "version": APP_VERSION,
         "photos_dir": PHOTOS_DIR.as_posix(),
-        "shared_thumbs": THUMBS_DIR.is_dir(),
         "read_only": READ_ONLY,
         "album_keys": schema.ALBUM_KEYS,
         "gallery_keys": schema.GALLERY_KEYS,
@@ -539,50 +511,28 @@ def api_photos(path: str = "", recursive: int = 0, limit: int = 5000,
 
 
 @app.get("/api/thumb")
-def api_thumb(path: str, size: int = 0):
-    """A small JPEG of one photo.
+def api_thumb(path: str):
+    """The gallery's own grid thumbnail of one photo, built first when it is
+    missing or older than the photo.
 
-    The gallery already renders a thumbnail per photo into THUMBS_DIR, so when
-    that folder is mounted this hands the existing file straight back -- no
-    decode of a 20 MB original just to draw a 200px tile. Only a photo the
-    gallery has not thumbed yet (or a stale one) falls through to Pillow, and
-    that result is cached under DATA_DIR so it happens once.
-    """
+    It is the file /thumb serves visitors, out of the same tree and from the
+    same encoder, so whichever of the two asks first builds it for both. Every
+    size the console draws a photo at fits inside THUMB_SIZE; there is no
+    second tier to keep."""
     try:
         source = lib.safe(path)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
-    if not source.is_file() or not schema.is_image(source.name):
+    rel = relative_to_photos(PHOTOS_DIR, source)
+    # A metadata folder holds marks and backdrops, not photos; a thumbnail of
+    # one would land in the gallery's tree as an orphan.
+    if not source.is_file() or not schema.is_image(source.name) or scanner.is_meta_path(Path(rel)):
         raise HTTPException(404, "no such photo")
-    size = max(64, min(size or THUMB_SIZE, 1600))
-    st = source.stat()
-
-    shared = _gallery_thumb(path, st.st_mtime)
-    if shared is not None:
-        return FileResponse(shared, media_type="image/jpeg",
-                            headers={"Cache-Control": "public, max-age=86400",
-                                     "X-Thumb-Source": "gallery"})
-
-    token = "%s|%s|%s|%s" % (path, st.st_mtime_ns, st.st_size, size)
-    cached = CACHE_DIR / (hashlib.sha1(token.encode("utf-8")).hexdigest() + ".jpg")
-    if not cached.is_file():
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        try:
-            with Image.open(source) as img:
-                img = ImageOps.exif_transpose(img)
-                img.thumbnail((size, size), Image.LANCZOS)
-                if img.mode not in ("RGB", "L"):
-                    img = img.convert("RGB")
-                buf = io.BytesIO()
-                img.save(buf, "JPEG", quality=82, optimize=True)
-        except Exception:
-            raise HTTPException(415, "cannot decode %s" % source.name)
-        tmp = cached.with_suffix(".tmp%d" % os.getpid())
-        tmp.write_bytes(buf.getvalue())
-        tmp.replace(cached)
-    return FileResponse(cached, media_type="image/jpeg",
-                        headers={"Cache-Control": "public, max-age=86400",
-                                 "X-Thumb-Source": "generated"})
+    thumb = scanner.ensure_thumb(settings.photos_dir, settings.thumbs_dir, rel, settings.thumb_size)
+    if thumb is None:
+        raise HTTPException(415, "cannot decode %s" % source.name)
+    return FileResponse(thumb, media_type=schema.MIME[scanner.THUMB_EXT],
+                        headers={"Cache-Control": "private, max-age=86400"})
 
 
 # ----- per-image metadata and tags --------------------------------------
@@ -856,16 +806,13 @@ def api_validate():
 @app.get("/api/health")
 def api_health(request: Request):
     """A liveness probe, and the ONE route that answers without a session —
-    so it says only what a container orchestrator needs. The mount path, the
-    album counts and whether a thumbnail tree is shared used to be in here;
-    they are facts about the deployment and now live behind the door, in
-    /api/meta."""
+    so it says only what a container orchestrator needs. The mount path and
+    the album counts used to be in here; they are facts about the deployment
+    and now live behind the door, in /api/meta."""
     payload = {"ok": PHOTOS_DIR.is_dir(), "version": APP_VERSION,
                "auth": "open" if security.open_access() else "password"}
     if security.current(request) or security.open_access():
-        payload.update(photos_dir=PHOTOS_DIR.as_posix(),
-                       shared_thumbs=THUMBS_DIR.is_dir(),
-                       read_only=READ_ONLY)
+        payload.update(photos_dir=PHOTOS_DIR.as_posix(), read_only=READ_ONLY)
     return payload
 
 
@@ -882,6 +829,5 @@ def create_console_app() -> FastAPI:
     not after the first request finds out there is no password.
     """
     security.assert_safe_binding()
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     return app

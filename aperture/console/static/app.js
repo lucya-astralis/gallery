@@ -149,11 +149,10 @@ const bytes = (n) => !n ? '—'
   : n > 1048576 ? (n / 1048576).toFixed(1) + ' MB'
   : n > 1024 ? Math.round(n / 1024) + ' KB' : n + ' B';
 
-/* Previews always come from /api/thumb, which hands back the gallery's own
- * thumbnail when that tree is mounted — a grid of 200px tiles must never pull
- * the full-size originals. */
-const thumbUrl = (rel, size) =>
-  '/api/thumb?size=' + (size || 200) + '&path=' + encodeURIComponent(rel);
+/* Previews always come from /api/thumb: the gallery's own grid thumbnail,
+ * the file /thumb serves visitors. A grid of tiles must never pull the
+ * full-size originals, and every tile here is drawn smaller than THUMB_SIZE. */
+const thumbUrl = (rel) => '/api/thumb?path=' + encodeURIComponent(rel);
 
 function splitPath(value) {
   const i = String(value).lastIndexOf('/');
@@ -318,7 +317,7 @@ function renderNode(node, depth, filter) {
       class: 'tree__cover' + (errored ? ' has-err' : node.has_cfg ? ' has-cfg' : ''),
       title: errored ? 'has config issues' : node.has_cfg ? 'has an album.cfg' : '',
     }, node.cover
-      ? el('img', { src: thumbUrl(node.cover, 64), alt: '', loading: 'lazy',
+      ? el('img', { src: thumbUrl(node.cover), alt: '', loading: 'lazy',
                     onerror: (ev) => { ev.target.remove(); } })
       : null),
     el('span', { class: 'tree__name', text: node.name }),
@@ -1171,7 +1170,7 @@ function coverControl(key) {
   const box = el('div', { class: 'cover-preview' });
   if (current) {
     box.append(el('img', {
-      src: thumbUrl(album + '/' + strip(current), 160), alt: '', loading: 'lazy',
+      src: thumbUrl(album + '/' + strip(current)), alt: '', loading: 'lazy',
       onerror: (ev) => { ev.target.classList.add('is-broken'); },
     }));
   }
@@ -1202,7 +1201,7 @@ function photoListControl(key) {
     const [folder, name] = splitPath(strip(item));
     box.append(sortableRow({
       index, items, key,
-      thumb: thumbUrl(album + '/' + strip(item), 120),
+      thumb: thumbUrl(album + '/' + strip(item)),
       label: [el('b', { text: name }), ' ', el('span', { text: folder })],
     }));
   });
@@ -1329,7 +1328,7 @@ function welcomeControl(key) {
     const [folder, name] = splitPath(strip(item));
     box.append(sortableRow({
       index, items, key,
-      thumb: thumbUrl(strip(item), 120),
+      thumb: thumbUrl(strip(item)),
       label: [el('b', { text: name }), ' ', el('span', { text: folder })],
     }));
   });
@@ -1721,7 +1720,7 @@ function folderTile(folder, onOpen) {
     onclick: () => onOpen(folder.path),
   },
     folder.cover
-      ? el('img', { src: thumbUrl(folder.cover, 200), alt: '', loading: 'lazy' })
+      ? el('img', { src: thumbUrl(folder.cover), alt: '', loading: 'lazy' })
       : el('span', { class: 'foldertile__blank' }),
     el('span', { class: 'foldertile__body' },
       el('span', { class: 'foldertile__name', text: folder.name }),
@@ -1864,7 +1863,7 @@ function fillBrowser(body, b, payload) {
         renderPane();
       },
     },
-      el('img', { src: thumbUrl(photo.rel, 220), alt: '', loading: 'lazy' }),
+      el('img', { src: thumbUrl(photo.rel), alt: '', loading: 'lazy' }),
       // A plain-click way to extend the selection: not everyone reaches for
       // a modifier, and on some setups ctrl-click never arrives at all.
       el('button', {
@@ -1916,7 +1915,7 @@ function renderDetail(rel) {
     body.innerHTML = '';
     const m = info.meta;
 
-    body.append(el('img', { class: 'detail__thumb', src: thumbUrl(rel, 420), alt: '' }));
+    body.append(el('img', { class: 'detail__thumb', src: thumbUrl(rel), alt: '' }));
 
     const facts = [
       ['Dimensions', m.width ? m.width + ' × ' + m.height : '—'],
@@ -2322,7 +2321,7 @@ function drawPicker() {
           markPicks(grid);
         },
       },
-        el('img', { src: thumbUrl(photo.rel, 220), alt: '', loading: 'lazy' }),
+        el('img', { src: thumbUrl(photo.rel), alt: '', loading: 'lazy' }),
         badge,
         el('span', { class: 'cell__foot' },
           el('span', { class: 'cell__name', text: photo.name })));

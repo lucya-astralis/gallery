@@ -849,7 +849,7 @@ The scanner reads the file on the next indexing pass and links the tags. Empty o
 | `previews/`     | Generated stage previews (cache, can be wiped anytime)    |
 | `data/`         | SQLite DB with EXIF cache and tag index                   |
 | `data/control/` | Flag files the CLI and the server talk through (see below)|
-| `data/console/` | The console's own state: rolling backups of every file it overwrites, its thumbnail fallback cache |
+| `data/console/` | The console's own state: its password hash, the audit log, rolling backups of every file it overwrites |
 
 Everything this software is trusted with lives under `data/`, never in the
 photo tree — the gallery *serves* files out of `photos/.gallery/`, so a secret

@@ -71,7 +71,6 @@ class Settings:
     console_bind: str
     console_port: int
     console_read_only: bool
-    console_thumb_size: int
     console_backups: int
     console_max_upload: int
 
@@ -150,7 +149,6 @@ def load() -> Settings:
         console_bind=(os.environ.get("CONSOLE_BIND") or "127.0.0.1").strip(),
         console_port=_int("CONSOLE_PORT", 8090),
         console_read_only=_flag("READ_ONLY", "0"),
-        console_thumb_size=_int("CONSOLE_THUMB_SIZE", 320),
         console_backups=_int("BACKUPS", 20),
         console_max_upload=_int("MAX_UPLOAD_MB", 8) * 1024 * 1024,
 

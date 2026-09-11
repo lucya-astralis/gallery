@@ -281,8 +281,10 @@ whitelisted, a `font`/`icon` naming a file that isn't in that album's
 drop. Errors also show as a red dot next to the album in the tree; clicking an
 issue jumps to it.
 
-Checks run against the filesystem, not the gallery's index, so a photo added a
-second ago already counts.
+Checks resolve photos the way the gallery does, against its index, so what they
+call missing is what a visitor would not see; a photo added a second ago counts
+once the indexer has picked it up. `doctor` runs the same checks —
+`aperture/checks.py`.
 
 ## Configuration
 
@@ -295,7 +297,6 @@ here: `PHOTOS_DIR`, `THUMBS_DIR` and `DATA_DIR` are the app's, read once in
 | `CONSOLE_ENABLED` | `1` | `0` leaves this listener closed entirely |
 | `CONSOLE_PORT` | `8090` | port inside the container |
 | `CONSOLE_HOST` | `127.0.0.1` | which host address that port is published on. The boundary — see the root README |
-| `CONSOLE_THUMB_SIZE` | `320` | fallback preview size, for photos the gallery has not thumbnailed |
 | `BACKUPS` | `20` | versions kept per edited file, under `data/console/backups` |
 | `MAX_UPLOAD_MB` | `8` | cap on icon/font/wallpaper uploads |
 | `READ_ONLY` | `0` | `1` = browse and validate only; every write endpoint returns 403 and the UI disables its controls |
@@ -304,14 +305,10 @@ here: `PHOTOS_DIR`, `THUMBS_DIR` and `DATA_DIR` are the app's, read once in
 ### Previews come from the gallery's thumbnails
 
 Photo grids never load originals. `/api/thumb` hands back the gallery's own
-thumbnail from `THUMBS_DIR` whenever that tree is mounted and the file is not
-older than the photo — the response says which, in an `X-Thumb-Source` header.
-Only a photo the gallery has not thumbnailed yet falls through to Pillow, and
-that result is cached under `DATA_PATH` so it happens once.
-
-Mount it read-only, pointing at the same folder as the gallery's
-`THUMBS_PATH`. Without it nothing breaks; the first view of a folder is just
-slower.
+grid thumbnail — the file `/thumb` serves visitors, out of `THUMBS_DIR` — and
+builds it first when the photo has none yet or a stale one. There is one
+derivative tree and the console builds into it exactly as the gallery does, so
+`THUMBS_DIR` has to be writable for this listener too.
 
 ### Pointing at the same share as the gallery
 
@@ -351,8 +348,8 @@ aperture/console/
   templates/    index.html
 ```
 
-State lives in `data/console/` — rolling backups of every file the console
-overwrites, and its thumbnail fallback cache. Never in the photo tree: the
+State lives in `data/console/` — the password hash, the audit log and rolling
+backups of every file the console overwrites. Never in the photo tree: the
 gallery serves files out of `photos/.gallery/`.
 
 The format and the vocabulary live one level up, shared with the gallery:
