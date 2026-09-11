@@ -1,11 +1,21 @@
-"""Read and write the gallery's `.cfg` files without losing their comments.
+"""The cfg format: one parser, one writer, for both surfaces.
 
-The gallery ships both files heavily commented -- the comments *are* the
-documentation -- so a GUI that rewrote a whole file from a parsed dict would
-throw that away. Everything here is therefore line-based: parsing produces the
-same dict the gallery's own `_parse_cfg` produces, while writing only touches
-the lines belonging to the key being changed and leaves every comment, blank
-line and neighbouring key exactly where it was.
+`album.cfg` and `gallery.cfg` used to be read by two implementations of the
+same grammar -- `main._parse_cfg` in the gallery, `parse` here in the
+configurator -- kept in step by a comment saying "mirror of". They were
+byte-identical, which is the best case for a copy and still a copy: the next
+change to the grammar would have landed in one of them.
+
+This module is now the only one. The gallery binds its `_parse_cfg`,
+`_cfg_first`, `_cfg_bool` and `_cfg_text` to the functions below, and the
+console edits files through `CfgFile`.
+
+Reading is what the gallery needs. Writing is line-based, because the shipped
+files are heavily commented -- the comments ARE the documentation -- so an
+edit touches only the lines of the key being changed and leaves every comment,
+blank line and neighbouring key exactly where it was.
+
+What a key MEANS is not in here; that is `aperture/schema.py`.
 """
 
 from __future__ import annotations
@@ -15,11 +25,16 @@ from pathlib import Path
 # Keys whose values may carry `#label` group markers (gallery.cfg album_order).
 GROUP_KEYS = frozenset({"album_order"})
 
-_TRUE = {"1", "true", "yes", "on"}
+# The two truthiness vocabularies every boolean-ish key is read with. FALSE is
+# wider than "not TRUE" on purpose: `reel = hide` and `stats = none` are real
+# spellings an operator uses, and a key that treats them as unknown would turn
+# a deliberate "off" into a validation error.
+TRUE = frozenset({"1", "true", "yes", "on"})
+FALSE = frozenset({"0", "false", "no", "off", "none", "hide"})
 
 
 def parse(text: str, group_keys: frozenset[str] = frozenset()) -> dict[str, list[str]]:
-    """Mirror of the gallery's `_parse_cfg`.
+    """Parse cfg text.
 
     Lower-cased key -> [values]. Repeated keys and comma lists accumulate in
     order; a bare line (no `=`) appends to the key above it. A key written with
@@ -57,8 +72,18 @@ def first(cfg: dict[str, list[str]], key: str) -> str | None:
     return vals[0] if vals else None
 
 
+def joined(cfg: dict[str, list[str]], key: str) -> str:
+    """A scalar key whose value is PROSE, with the parser's comma split
+    undone. Every value is comma-split on the way in, which is what list keys
+    want and what a sentence does not: `site_desc = Archive, mostly Japan.`
+    arrives as two values, and taking the first would silently truncate it at
+    the comma. Rejoining reconstructs the line (whitespace around the commas
+    is normalized, which no display string minds)."""
+    return ", ".join(cfg.get(key) or []).strip()
+
+
 def as_bool(value: str | None) -> bool:
-    return str(value or "").strip().lower() in _TRUE
+    return str(value or "").strip().lower() in TRUE
 
 
 class CfgFile:

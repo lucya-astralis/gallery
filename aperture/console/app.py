@@ -37,7 +37,8 @@ from .. import brand
 from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
-from . import cfgio, imagemeta, opsapi, schema, security, validate
+from .. import cfgio, schema
+from . import imagemeta, opsapi, security, validate
 from .library import Library, asset_kinds, is_image
 
 # The console ships with the app now, so it carries the app's version rather
@@ -702,14 +703,7 @@ async def api_tags_write(request: Request):
 # schema whitelists rather than hand-listed: this map used to be its own
 # hardcoded set and silently fell behind when wallpapers were added, so a
 # .jpg backdrop answered 415 and never previewed.
-_ASSET_TYPES = {
-    ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp",
-    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
-    ".avif": "image/avif",
-    ".mp4": "video/mp4", ".webm": "video/webm",
-    ".otf": "font/otf", ".ttf": "font/ttf", ".woff": "font/woff",
-    ".woff2": "font/woff2",
-}
+_ASSET_TYPES = schema.MIME
 _MISSING_TYPES = (schema.ICON_EXTS | schema.FONT_EXTS | schema.WALLPAPER_EXTS
                   | schema.BRAND_EXTS) - set(_ASSET_TYPES)
 assert not _MISSING_TYPES, "no content type for %s" % sorted(_MISSING_TYPES)

@@ -1,25 +1,60 @@
-"""What the gallery accepts in album.cfg / gallery.cfg.
+"""What album.cfg and gallery.cfg may say -- the one registry.
 
-Mirrored by hand from the gallery app -- its cfg format block in main.py and
-the ALBUM_CFG_KEYS / GALLERY_CFG_KEYS sets declared right under it -- so this
-tool stays a standalone editor: it never imports the gallery, and it can point
-at a photos/ folder served by any version of it. When the gallery grows a key,
-add it here too. The gallery's own `doctor` imports those sets rather than
-copying them; this file is the one deliberate copy, because it ships as a
-separate image and needs a per-key TYPE the gallery has no use for.
+This used to be a hand-kept copy of the gallery's vocabulary, living in the
+configurator because that shipped as its own image and could not import the
+gallery. Its docstring said so: "when the gallery grows a key, add it here
+too". The copy had already drifted in two places by the time the two became
+one product -- the console refused `.gif`/`.jpg` icons the gallery serves, and
+both validators flagged `reel = hide`, which the gallery honours.
+
+So the direction is reversed. Everything below is the source, and the
+gallery, the operations surface and the console all import it:
+
+    aperture/main.py      ALBUM_CFG_KEYS, GALLERY_CFG_KEYS, the effect
+                          whitelist, the badge limit, every served file type
+    aperture/scanner.py   what counts as a photograph
+    aperture/ops.py       what `doctor` checks against
+    aperture/console/     the form (KEY_SPEC, HELP) and its validation
+
+Adding a key is one edit here: its name in ALBUM_KEYS or GALLERY_KEYS, its
+write style in KEY_SPEC, its help line in HELP. `tests/test_schema.py` fails
+if any of the three is missing, or if something starts keeping its own list
+again.
+
+The grammar of the files is not in here; that is `aperture/cfgio.py`.
 """
 
 from __future__ import annotations
 
+from .cfgio import FALSE, GROUP_KEYS
+from .i18n import LANGS as _I18N_LANGS
+
 # ----- vocabularies the gallery whitelists ------------------------------
-IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff",
-              ".tif", ".heic", ".heif"}
-ICON_EXTS = {".svg", ".png", ".webp"}
-FONT_EXTS = {".otf", ".ttf", ".woff2", ".woff"}
+# What each file extension is served as. Every set below must be a subset of
+# this map -- a file the gallery accepts but cannot name a type for would go
+# out as application/octet-stream and render as a download.
+MIME: dict[str, str] = {
+    ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp",
+    ".gif": "image/gif", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".avif": "image/avif",
+    ".mp4": "video/mp4", ".webm": "video/webm",
+    ".otf": "font/otf", ".ttf": "font/ttf", ".woff": "font/woff",
+    ".woff2": "font/woff2",
+}
+
+# What counts as a photograph, for the scanner and for every route that
+# serves one.
+IMAGE_EXTS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff",
+                        ".tif", ".heic", ".heif"})
+# An album's `icon` and the gallery's marks. The console used to accept only
+# .svg/.png/.webp here while the gallery served .gif/.jpg/.jpeg as well, so an
+# operator whose icon was a JPEG could not manage it from the console.
+ICON_EXTS = frozenset({".svg", ".png", ".webp", ".gif", ".jpg", ".jpeg"})
+FONT_EXTS = frozenset({".otf", ".ttf", ".woff2", ".woff"})
 # Per-album page backdrop. Desktop may be a clip; the mobile key is stills
 # only, because the gallery never loads a backdrop video on a phone.
-WALLPAPER_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
-WALLPAPER_VIDEO_EXTS = {".mp4", ".webm"}
+WALLPAPER_IMAGE_EXTS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".avif"})
+WALLPAPER_VIDEO_EXTS = frozenset({".mp4", ".webm"})
 WALLPAPER_EXTS = WALLPAPER_IMAGE_EXTS | WALLPAPER_VIDEO_EXTS
 
 ALBUM_META_DIR = ".album"
@@ -29,7 +64,7 @@ GALLERY_CFG_NAME = "gallery.cfg"
 # badges — live in photos/.gallery/, the gallery-wide mirror of
 # an album's .album/ folder.
 GALLERY_META_DIR = ".gallery"
-BRAND_EXTS = {".svg", ".png", ".webp", ".gif", ".jpg", ".jpeg"}
+BRAND_EXTS = ICON_EXTS
 # Everything that folder may now hold. It started as marks only; the theme
 # block one tier down (`font`, `wallpaper`, `wallpaper_mobile` in gallery.cfg)
 # puts a face and a backdrop next to them, so the upload whitelist is the
@@ -40,10 +75,14 @@ BADGE_MAX = 6
 # http(s) or site-relative; anything else is dropped rather than put in an href
 URL_KEYS = ("operator_url", "privacy_url", "imprint_url")
 
-LANGS = ["en", "de", "jp"]
+LANGS = list(_I18N_LANGS)
 
 EFFECTS = ["sakura"]
+# The three the console offers as a choice ...
 REEL_VALUES = ["featured", "random", "off"]
+# ... and every spelling the gallery honours (main._album_reel): `shuffle` is
+# random, and anything in cfgio.FALSE -- `hide` and `none` included -- is off.
+REEL_ACCEPTED = frozenset({"featured", "random", "shuffle"}) | FALSE
 IMAGE_SORTS = ["date_desc", "date_asc", "name_asc", "name_desc",
                "size_desc", "size_asc"]
 ALBUM_SORTS = ["latest_desc", "latest_asc", "name_asc", "name_desc",

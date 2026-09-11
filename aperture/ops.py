@@ -38,7 +38,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from . import control, db, i18n, scanner
+from . import control, db, i18n, scanner, schema
 from . import main as gallery
 
 
@@ -268,19 +268,23 @@ def featured_map() -> tuple[dict[str, list[tuple[str, str]]], list[dict]]:
 # comment block that documents them). This file used to keep its own copy and
 # it went stale — `name` was never added, so doctor reported every album that
 # set a display name as an error.
-ALBUM_CFG_KEYS = gallery.ALBUM_CFG_KEYS
-GALLERY_CFG_KEYS = gallery.GALLERY_CFG_KEYS
+# The registry is aperture/schema.py; doctor checks against it directly.
+ALBUM_CFG_KEYS = frozenset(schema.ALBUM_KEYS)
+GALLERY_CFG_KEYS = frozenset(schema.GALLERY_KEYS)
 
 # gallery.cfg keys naming a file in photos/.gallery/. Checked the same way
 # and for the same reason as an album's `icon`: a typo here is silent at
 # runtime — the slot simply falls back or disappears.
 BRAND_ASSET_KEYS = ("logo", "favicon", "operator_pfp")
-BRAND_URL_KEYS = ("operator_url", "privacy_url", "imprint_url")
+BRAND_URL_KEYS = tuple(schema.URL_KEYS)
 # Both files carry the knobs with identical rules, so the range check that
 # reads this lives in one place (check_wallpaper_knobs).
-WALLPAPER_KNOBS = (("wallpaper_tint", (0.0, 1.0), "0–1 or off"),
-                   ("wallpaper_dim", (0.25, 1.0), "0.25–1 or off"))
-REEL_VALUES = {"featured", "random", "shuffle", "off", "false", "0", "no", "none"}
+WALLPAPER_KNOBS = tuple(
+    (key, span, f"{span[0]:g}–{span[1]:g} or off")
+    for key, span in (("wallpaper_tint", schema.WALLPAPER_TINT_RANGE),
+                      ("wallpaper_dim", schema.WALLPAPER_DIM_RANGE)))
+# Every spelling the gallery honours, not just the three the console offers.
+REEL_VALUES = schema.REEL_ACCEPTED
 
 
 def wallpaper_line(album: str, variant: str) -> str:

@@ -53,8 +53,10 @@ import os
 import re
 from pathlib import Path, PurePosixPath
 
-ALBUM_META_DIR = ".album"
-GALLERY_META_DIR = ".gallery"
+from . import schema
+
+ALBUM_META_DIR = schema.ALBUM_META_DIR
+GALLERY_META_DIR = schema.GALLERY_META_DIR
 META_DIRS = (ALBUM_META_DIR, GALLERY_META_DIR)
 
 # Windows resolves these to devices whatever the extension, and refuses to

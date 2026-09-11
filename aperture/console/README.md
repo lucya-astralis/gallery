@@ -262,13 +262,13 @@ save touches only the lines belonging to the key you changed:
 - a key that wasn't in the file yet is appended at the end.
 
 Comments, blank lines, ordering and every key you didn't touch come through
-untouched. The parser is a line-for-line mirror of the gallery's own
-`_parse_cfg`, verified to produce identical output on all 24 shipped config
-files — including the `#label` group markers inside `album_order`, which
-survive a drag-reorder.
+untouched. There is one parser for both surfaces — `aperture/cfgio.py`, which
+the gallery reads with too — so what the console shows and what the gallery
+renders cannot disagree about a file. That includes the `#label` group markers
+inside `album_order`, which survive a drag-reorder.
 
 Before overwriting anything it also drops a timestamped copy into
-`DATA_PATH/backups/` (20 versions per file by default), so a bad save is one
+`DATA_PATH/console/backups/` (20 versions per file by default), so a bad save is one
 `cp` away from undone.
 
 ## Validation
@@ -343,8 +343,8 @@ same environment the gallery does — one `PHOTOS_DIR`, one meaning.
 ```
 aperture/console/
   app.py        FastAPI routes: tree, cfg read/write, photos, thumbs, tags, assets
-  cfgio.py      the comment-preserving parser/writer
-  schema.py     which keys exist, their allowed values and write style
+  opsapi.py     the operations panel: status, scan, pause/resume, doctor
+  security.py   the door: password, sessions, CSRF, throttle, audit log
   library.py    the photo tree and the .tags sidecars, off the filesystem
   imagemeta.py  read-only EXIF for the metadata panel
   validate.py   the checks behind "Check all"
@@ -356,11 +356,15 @@ State lives in `data/console/` — rolling backups of every file the console
 overwrites, and its thumbnail fallback cache. Never in the photo tree: the
 gallery serves files out of `photos/.gallery/`.
 
-`schema.py` is the one file to touch here when the gallery grows a config key:
-add it to `KEY_SPEC`, to `ALBUM_KEYS`/`GALLERY_KEYS`, and to `HELP`. The form
-builds itself from there.
+The format and the vocabulary live one level up, shared with the gallery:
 
-It is still a **second** copy of that vocabulary — `ALBUM_CFG_KEYS` in
-`aperture/main.py` is the first — and the two are kept in sync by hand. A key
-added there and not here is a key the console cannot edit. Collapsing both into
-one registry is the next structural milestone.
+- `aperture/cfgio.py` — the grammar, and the comment-preserving writer
+- `aperture/schema.py` — which keys exist, their allowed values, write style
+  and help text
+
+`aperture/schema.py` is the one file to touch when the gallery grows a config
+key: its name in `ALBUM_KEYS`/`GALLERY_KEYS`, its write style in `KEY_SPEC`, its
+help line in `HELP`. The form builds itself from there, the gallery accepts it,
+and `doctor` stops calling it unknown — all from that one edit.
+`tests/test_schema.py` fails if a key is missing any of the three, or if a key
+list or a cfg-reading loop turns up anywhere else.

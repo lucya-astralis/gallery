@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import brand, compress, control, db, i18n, scanner, stats, watcher
+from . import brand, cfgio, compress, control, db, i18n, scanner, schema, stats, watcher
 from .runtime import ensure_dirs, settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
@@ -603,93 +603,36 @@ def _album_description(album: str, lang: str = i18n.DEFAULT_LANG) -> str | None:
 #   stats = off          -> hide the whole stats block for this album.
 ALBUM_META_DIR = scanner.ALBUM_META_DIR
 
-# Every key the block above documents, as data. This is the ONLY list — the
-# CLI's `doctor` imports it to decide what counts as an unknown key, rather
-# than keeping a second copy. It used to keep one, and the copy went stale:
-# it never learned about `name`, so doctor called a perfectly valid
-# `name = Japan 2026` an error on every album that set one (11 of them on the
-# live gallery, reported 2026-09-04). Add a key to the docs above and to this
-# set in the same edit.
-#
-# The console has a second copy of this vocabulary in console/schema.py, with
-# a per-key TYPE this set has no room for. That duplication was unavoidable
-# while the two shipped as separate images; now that they don't, it is just
-# duplication, and phase 03 of the Aperture merge collapses both into one
-# registry under core/. Until then the two are kept in sync BY HAND — a key
-# added here and not there is a key the console cannot edit.
-ALBUM_CFG_KEYS = frozenset({
-    "name", "collection", "cover", "showcase", "featured", "reel", "order",
-    "sort", "tags", "effect", "icon", "font", "font_scale",
-    # per-album page backdrop; `wallpaper` may be a clip, `wallpaper_mobile`
-    # is stills only (phones never load a backdrop video)
-    "wallpaper", "wallpaper_mobile",
-    # per-album theme: the accent colour of this album's pages, and how the
-    # backdrop behind them is treated (see the per-album theme section)
-    "accent", "wallpaper_tint", "wallpaper_dim",
-    # editorial stats block (_album_stats): `loc` is one line whose comma-split
-    # parts get rejoined, `stat` is the freeform "Label: Value" line (repeat
-    # the key for more), `stats = off` hides the block entirely
-    "loc", "stat", "stats",
-})
+# Every key the block above documents, as data -- and ONE list of them. The
+# CLI's `doctor` once kept its own copy, and the copy went stale: it never
+# learned about `name`, so doctor called a valid `name = Japan 2026` an error
+# on every album that set one (11 on the live gallery, 2026-09-04). The
+# configurator kept another, by hand. Since 2026-09-11 the list is
+# aperture/schema.py's (ALBUM_KEYS, with KEY_SPEC and HELP beside it): document
+# a new key in the notes above, register it there, and nowhere else --
+# tests/test_schema.py fails if anything spells a key list out again.
+ALBUM_CFG_KEYS = frozenset(schema.ALBUM_KEYS)
 
-_TRUE = {"1", "true", "yes", "on"}
-_FALSE = {"0", "false", "no", "off", "none", "hide"}
+_TRUE = cfgio.TRUE
+_FALSE = cfgio.FALSE
 
 # Ambient per-album page effects (album.cfg `effect = ...`). Whitelisted so
 # a cfg typo can't inject arbitrary class names / JS hooks into the page.
-ALBUM_EFFECTS = {"sakura"}
+ALBUM_EFFECTS = frozenset(schema.EFFECTS)
 
 
-def _cfg_bool(v: str | None) -> bool:
-    return str(v or "").strip().lower() in _TRUE
+# The cfg grammar lives in aperture/cfgio.py, shared with the console. The
+# underscore names are what this module has always called at ~50 sites.
+_cfg_bool = cfgio.as_bool
 
 
-def _parse_cfg(text: str, group_keys: frozenset[str] = frozenset()) -> dict[str, list[str]]:
-    """Parse cfg text into a lower-cased key -> [values] dict. Repeated keys
-    and comma lists accumulate in order; bare lines append to the key above
-    (one entry per line). A key given with an empty value still registers
-    (empty list), so "present but empty" is distinguishable from "absent".
-    Inside a key listed in `group_keys`, a bare `#label` line (# glued to
-    the label) is kept as a "#label" group-marker entry; `# spaced`, `##`
-    and `;` comment styles still vanish everywhere."""
-    out: dict[str, list[str]] = {}
-    key: str | None = None
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        if line[0] in "#;":
-            label = line[1:].strip()
-            if (line[0] == "#" and label and key in group_keys
-                    and not line[1].isspace() and line[1] not in "#;"):
-                out[key].append("#" + label)
-            continue
-        if "=" in line:
-            key, _, val = line.partition("=")
-            key = key.strip().lower()
-            out.setdefault(key, [])
-        elif key is None:
-            continue  # stray line before any key
-        else:
-            val = line
-        out[key].extend(i.strip() for i in val.split(",") if i.strip())
-    return out
+_parse_cfg = cfgio.parse
 
 
-def _cfg_first(cfg: dict[str, list[str]], key: str) -> str | None:
-    """First configured value for a scalar key, or None."""
-    vals = cfg.get(key)
-    return vals[0] if vals else None
+_cfg_first = cfgio.first
 
 
-def _cfg_text(cfg: dict[str, list[str]], key: str) -> str:
-    """A scalar key whose value is PROSE, with the parser's comma split
-    undone. Every value here is comma-split on the way in, which is what
-    list keys want and what a sentence does not: `site_desc = Archive,
-    mostly Japan.` arrives as two values, and taking the first would silently
-    truncate it at the comma. Rejoining reconstructs the line (whitespace
-    around the commas is normalized, which no display string minds)."""
-    return ", ".join(cfg.get(key) or []).strip()
+_cfg_text = cfgio.joined
 
 
 def _album_meta_dir(album: str) -> Path | None:
@@ -983,12 +926,10 @@ ALBUM_FONT_SCALE_RANGE = (0.5, 2.5)
 # Extension -> (CSS `format()` hint, response media type). Doubles as the
 # whitelist of what may be served: a `font = …` naming anything else (an
 # album_en.md, say) resolves to nothing.
-ALBUM_FONT_TYPES = {
-    ".otf": ("opentype", "font/otf"),
-    ".ttf": ("truetype", "font/ttf"),
-    ".woff2": ("woff2", "font/woff2"),
-    ".woff": ("woff", "font/woff"),
-}
+# @font-face format() names are a CSS concern and stay here; which
+# extensions are fonts, and their content type, are schema.py's.
+_FONT_FORMAT = {".otf": "opentype", ".ttf": "truetype", ".woff2": "woff2", ".woff": "woff"}
+ALBUM_FONT_TYPES = {e: (_FONT_FORMAT[e], schema.MIME[e]) for e in sorted(schema.FONT_EXTS)}
 
 
 def _album_font_file(album: str) -> Path | None:
@@ -1367,14 +1308,7 @@ def _theme_css_url(album: str | None = None) -> str | None:
 #   icon = kansai.svg
 # and /album-icon/{album} serves it back. Nothing is looked at without that
 # key, so an album without one just renders without a mark.
-ALBUM_ICON_TYPES = {
-    ".svg": "image/svg+xml",
-    ".png": "image/png",
-    ".webp": "image/webp",
-    ".gif": "image/gif",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-}
+ALBUM_ICON_TYPES = {e: schema.MIME[e] for e in sorted(schema.ICON_EXTS)}
 
 
 def _album_icon_file(album: str) -> Path | None:
@@ -1431,17 +1365,8 @@ def _album_icon_url(album: str | None) -> str | None:
 # A sub-album with no wallpaper of its own inherits the nearest ancestor's,
 # so `japan_2026` dresses `japan_2026/kansai/osaka` too — otherwise every
 # nested folder would drop back to the site default mid-browse.
-ALBUM_WALLPAPER_VIDEO_TYPES = {
-    ".mp4": "video/mp4",
-    ".webm": "video/webm",
-}
-ALBUM_WALLPAPER_IMAGE_TYPES = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-    ".avif": "image/avif",
-}
+ALBUM_WALLPAPER_VIDEO_TYPES = {e: schema.MIME[e] for e in sorted(schema.WALLPAPER_VIDEO_EXTS)}
+ALBUM_WALLPAPER_IMAGE_TYPES = {e: schema.MIME[e] for e in sorted(schema.WALLPAPER_IMAGE_EXTS)}
 ALBUM_WALLPAPER_TYPES = {**ALBUM_WALLPAPER_VIDEO_TYPES, **ALBUM_WALLPAPER_IMAGE_TYPES}
 # phones get a still frame, never a clip — see the note above
 ALBUM_WALLPAPER_KEYS = {"desktop": ("wallpaper", ALBUM_WALLPAPER_TYPES),
@@ -1741,7 +1666,7 @@ BRAND_DEFAULT_LOGO = "logo/gallery-mark.svg"
 # `badges = eu.gif | European Union` — the label is what the alt text and
 # the tooltip say. Neither half can contain a comma: _parse_cfg splits list
 # values on them (the same caveat album.cfg `stat` carries).
-BRAND_BADGE_MAX = 6
+BRAND_BADGE_MAX = schema.BADGE_MAX
 
 
 def _brand_file(name: str) -> Path | None:
@@ -2825,26 +2750,11 @@ def _safe_rel(album: str, filename: str) -> Path:
 GALLERY_CFG_NAME = "gallery.cfg"
 # Next to the assets it names, the way an album.cfg sits in `.album/`.
 GALLERY_CFG_PATH = PHOTOS_DIR / GALLERY_META_DIR / GALLERY_CFG_NAME
-GALLERY_GROUP_KEYS = frozenset({"album_order"})
+GALLERY_GROUP_KEYS = cfgio.GROUP_KEYS
 # The gallery.cfg counterpart to ALBUM_CFG_KEYS — same contract: one list,
 # imported by the CLI's `doctor`, kept next to the keys it documents.
-GALLERY_CFG_KEYS = frozenset({
-    "welcome", "welcome_desktop", "welcome_mobile", "album_order", "album_sort",
-    # How the site looks: the same theme keys an album.cfg carries, one tier
-    # DOWN — gallery.cfg dresses every page, an album still overrides its own.
-    # The files (`font`, both wallpapers) sit in photos/.gallery/ rather than
-    # in an `.album/`; see the site face/backdrop section.
-    "accent", "font", "font_scale",
-    "wallpaper", "wallpaper_mobile", "wallpaper_tint", "wallpaper_dim",
-    # who the archive belongs to — wordmark, mark, operator, legal links
-    # (_brand). The files live in photos/.gallery/.
-    "site_name", "site_sub", "site_hero", "site_desc",
-    "site_desc_en", "site_desc_de", "site_desc_jp",
-    "logo", "favicon", "operator", "operator_url",
-    "operator_pfp", "privacy_url", "imprint_url", "badges",
-    # EXIF Artist/Copyright written into the derived images (_credit)
-    "credit",
-})
+# Derived from aperture/schema.py (GALLERY_KEYS), same as ALBUM_CFG_KEYS.
+GALLERY_CFG_KEYS = frozenset(schema.GALLERY_KEYS)
 WELCOME_FEED_MAX = 24
 
 _WELCOME_KEYWORDS = {

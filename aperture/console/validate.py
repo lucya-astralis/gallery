@@ -1,4 +1,4 @@
-"""Config checks, mirroring what the gallery's `python -m app.cli doctor` reports.
+"""Config checks, mirroring what the gallery's `python -m aperture.cli doctor` reports.
 
 Runs against the filesystem rather than the gallery's index, so it catches the
 same class of mistake (a cover pointing at a file that isn't there, a font the
@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from . import cfgio, schema
+from .. import cfgio, schema
 from .library import Library
 
 
@@ -138,8 +138,7 @@ def check_album(lib: Library, album: str,
 
     if "reel" in cfg:
         val = (cfgio.first(cfg, "reel") or "").strip().lower()
-        allowed = set(schema.REEL_VALUES) | {"shuffle", "false", "0", "no", "none"}
-        if val and val not in allowed:
+        if val and val not in schema.REEL_ACCEPTED:
             out.append(_issue("error", "reel", "%r is not featured/random/off" % val))
 
     if "sort" in cfg:

@@ -11,7 +11,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import schema
+from .. import cfgio, schema
 
 # Metadata folders and the junk file managers leave behind.
 _SKIP_DIRS = {schema.ALBUM_META_DIR, schema.GALLERY_META_DIR,
@@ -171,24 +171,18 @@ class Library:
             text = cfg_path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             return None
-        for line in text.splitlines():
-            line = line.strip()
-            if not line or line[0] in "#;" or "=" not in line:
-                continue
-            key, _, val = line.partition("=")
-            if key.strip().lower() != "cover":
-                continue
-            val = val.split(",")[0].replace("\\", "/").strip().strip("/")
-            if not val:
-                return None
-            candidate = ("%s/%s" % (rel, val)) if rel else val
-            try:
-                if self.safe(candidate).is_file():
-                    return candidate
-            except ValueError:
-                return None
+        # Read through the shared grammar (aperture/cfgio.py). This used to be a
+        # loop of its own -- a third cfg parser next to the gallery's and the
+        # console's -- which tests/test_schema.py now refuses.
+        val = (cfgio.first(cfgio.parse(text), "cover") or "")
+        val = val.replace("\\", "/").strip().strip("/")
+        if not val:
             return None
-        return None
+        candidate = ("%s/%s" % (rel, val)) if rel else val
+        try:
+            return candidate if self.safe(candidate).is_file() else None
+        except ValueError:
+            return None
 
     def album_paths(self) -> list[str]:
         """Every album path in the tree, root excluded, depth-first."""

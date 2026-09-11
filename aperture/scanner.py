@@ -9,6 +9,7 @@ from pathlib import Path
 from PIL import Image, ExifTags
 
 from . import brand, db
+from . import schema
 
 log = logging.getLogger("scanner")
 
@@ -20,13 +21,13 @@ GPS_IFD_TAG = 0x8825
 # title font — lives in `<album>/.album/`, keeping the photo folder itself
 # nothing but photos. Never indexed: a stray image in here is metadata (a
 # font specimen, a screenshot of the cfg), not a gallery photo.
-ALBUM_META_DIR = ".album"
+ALBUM_META_DIR = schema.ALBUM_META_DIR
 # The same idea one tier up: the gallery's own assets — its logo, the
 # operator's portrait, the footer badges — live in
 # `photos/.gallery/` (see the site-branding section in main.py). It sits
 # directly in the photos root, so without an exclusion it would be walked as
 # an album named ".gallery" whose "photos" are the logo and the badges.
-GALLERY_META_DIR = ".gallery"
+GALLERY_META_DIR = schema.GALLERY_META_DIR
 _META_DIRS = (ALBUM_META_DIR, GALLERY_META_DIR)
 
 
@@ -49,7 +50,8 @@ except ImportError:
     HEIF_SUPPORTED = False
     log.warning("pillow-heif not installed; HEIC/HEIF support disabled")
 
-IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif", ".heic", ".heif"}
+# What counts as a photograph is aperture/schema.py's; the scanner reads it.
+IMAGE_EXTS = schema.IMAGE_EXTS
 JPEG_CONVERT_EXTS = {".heic", ".heif"}
 
 # The format each derivative tier is written in. The grid thumbnail is WebP:
