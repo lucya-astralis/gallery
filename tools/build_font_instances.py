@@ -14,16 +14,16 @@ only the weights it renders.
     python tools/build_font_instances.py
 
 Writes, for each weight in WEIGHTS:
-    aperture/static/fonts/SpaceGrotesk-<w>.woff2
-    aperture/static/fonts/JetBrainsMono-<w>.woff2
-    aperture/static/fonts/NotoSansJP-subset-<w>.woff2
+    aperture/gallery/static/fonts/SpaceGrotesk-<w>.woff2
+    aperture/gallery/static/fonts/JetBrainsMono-<w>.woff2
+    aperture/gallery/static/fonts/NotoSansJP-subset-<w>.woff2
 
 The variable sources stay where they are (the console still uses
 them, and they are what this script instantiates from). The JP instances
 derive from the glyph SUBSET, so tools/build_jp_subset.py calls build_jp()
 at the end of its own run — a Japanese text change rebuilds both.
 
-The @font-face block at the top of aperture/static/style.css lists these files
+The @font-face block at the top of aperture/gallery/static/style.css lists these files
 with weight RANGES (400 -> 100-450, 500 -> 451-550, 600 -> 551-650,
 700 -> 651-900); add a weight here and add its faces there.
 
@@ -34,7 +34,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-FONT_DIR = ROOT / "aperture" / "static" / "fonts"
+FONT_DIR = ROOT / "aperture" / "gallery" / "static" / "fonts"
 
 # every weight the stylesheet asks for; 300 is declared in the old range
 # but never used, bold <b> resolves to 700

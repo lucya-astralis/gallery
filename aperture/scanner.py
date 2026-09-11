@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PIL import Image, ExifTags
 
-from . import brand, db
+from . import brand, db, marks
 from . import schema
 
 log = logging.getLogger("scanner")
@@ -24,7 +24,7 @@ GPS_IFD_TAG = 0x8825
 ALBUM_META_DIR = schema.ALBUM_META_DIR
 # The same idea one tier up: the gallery's own assets — its logo, the
 # operator's portrait, the footer badges — live in
-# `photos/.gallery/` (see the site-branding section in main.py). It sits
+# `photos/.gallery/` (see aperture/branding.py). It sits
 # directly in the photos root, so without an exclusion it would be walked as
 # an album named ".gallery" whose "photos" are the logo and the badges.
 GALLERY_META_DIR = schema.GALLERY_META_DIR
@@ -102,7 +102,7 @@ _XMP_DC_NS = "http://purl.org/dc/elements/1.1/"
 _XMP_RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 _XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 # key under which the extracted value is stored in exif_json (read back by
-# main._extract_description).
+# photos.extract_description).
 XMP_DESCRIPTION_KEY = "XMP:dc:Description"
 
 
@@ -251,7 +251,7 @@ def strip_gps_inplace(path: Path) -> bool:
 #
 #   the vendor's     the EXIF `Software` tag. Unconditional, and the one
 #                    attribution that rides in the served bytes rather than
-#                    in the page around them (app/brand.py).
+#                    in the page around them (aperture/brand.py).
 #
 #   the operator's   EXIF Artist / Copyright, from gallery.cfg `credit` —
 #                    who took the picture. Never the vendor's name there:
@@ -262,42 +262,27 @@ def strip_gps_inplace(path: Path) -> bool:
 # bytes on disk (the X-Powered-By header is what names the software on that
 # response).
 #
-# The operator half needs PHOTOS_DIR-level knowledge this module does not
-# have, so main.py installs a reader here at import time (the same shape as
-# control.configure) and every writer below asks it. Nothing had to grow a
+# The operator half comes from aperture/marks.py, which reads gallery.cfg;
+# every writer below asks it through marks.credit(). Nothing had to grow a
 # parameter, which matters: thumbs are written from five places (here, the
 # watcher, the CLI, and both serve routes) and metadata that reached only
 # some of them would be worse than none.
-_credit_source = None
-_mark_stamp = None
-
-
-def configure_marks(credit, stamp) -> None:
-    """Install the callbacks main.py answers with.
-
-    credit() -> str | None   gallery.cfg `credit`, or None when unset
-    stamp()  -> float        when that last changed, so that a derivative
-                             written under the old value counts as stale
-                             (see needs_rebuild) and is rebuilt on demand."""
-    global _credit_source, _mark_stamp
-    _credit_source, _mark_stamp = credit, stamp
 
 
 def _credit() -> str | None:
-    if _credit_source is None:
-        return None
+    """gallery.cfg `credit` (see aperture/marks.py). A cfg problem must never
+    cost a thumbnail, so it is reported and treated as unset."""
     try:
-        return _credit_source()
-    except Exception as e:  # a cfg problem must never cost a thumbnail
+        return marks.credit()
+    except Exception as e:
         log.warning("credit unreadable: %s: %s", type(e).__name__, e)
         return None
 
 
 def marks_stamp() -> float:
-    if _mark_stamp is None:
-        return 0.0
+    """When `credit` last changed (see aperture/marks.py), or 0."""
     try:
-        return float(_mark_stamp() or 0.0)
+        return float(marks.stamp() or 0.0)
     except Exception:
         return 0.0
 
@@ -506,7 +491,7 @@ def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
     # `album` is the full relative directory path of the folder holding the
     # image (POSIX, e.g. "japan/tokyo"). This keeps the invariant
     # rel_path == album + "/" + filename and lets albums nest arbitrarily —
-    # the album *tree* is derived from these paths (see main.py helpers).
+    # the album *tree* is derived from these paths (see aperture/albums.py).
     album = "/".join(parts[:-1])
     filename = parts[-1]
     stat = file.stat()
@@ -543,7 +528,7 @@ def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
         log.warning("open failed for %s: %s: %s", file, type(e).__name__, e)
         return False
 
-    # `is_showcase` (featured flag) is owned by main._recompute_featured(),
+    # `is_showcase` (featured flag) is owned by albums.recompute_featured(),
     # which derives it from each album's album.cfg (`featured = …`). We
     # deliberately leave the column untouched here so a re-index never
     # clobbers a computed flag: new rows default to 0, existing rows keep
@@ -633,7 +618,7 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         # One damaged or half-uploaded file must never take the scan down with
         # it. Without this guard a single unreadable photo aborts the whole
         # walk — every album sorting after it is left unindexed and un-thumbed,
-        # the stale-row cleanup never runs, and main._recompute_featured() is
+        # the stale-row cleanup never runs, and albums.recompute_featured() is
         # never reached, so the gallery silently loses everything past that
         # file until it is removed.
         broken = False  # counts the FILE once, however many derivatives failed

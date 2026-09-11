@@ -2,7 +2,7 @@
    lucya.systems gallery  —  https://lucya.systems
 
    NEBULA — the design language this sheet carries, and the one the
-   configurator carries too (configurator/app/static/style.css). Named
+   console carries too (aperture/console/static/style.css). Named
    after the accent it rations: #5865F2, "Nebula Blue". SIX rules, and
    every decision in here is one of them. The language is written out in
    full in nebula/NEBULA.md, and nebula/nebula.css is it as a portable
@@ -39,7 +39,7 @@
 
    The colours, the wordmark and the logo belong to whoever runs the
    gallery (gallery.cfg); this file and the software under it do not.
-   See app/brand.py.
+   See aperture/brand.py.
    ================================================================ */
 
 /* No local('…') anywhere in these faces, on purpose: every local() entry
@@ -334,7 +334,7 @@
      #5865F2 ("Nebula Blue", handed over by the user on 2026-09-01 after two
      rounds of "etwas mehr blau") is the BRAND hex - the value gallery.cfg
      supplies and the colour the wordmark is drawn in. It is not used raw:
-     like any hand-typed accent it goes through _accent_shades() in main.py
+     like any hand-typed accent it goes through theme.accent_shades() in aperture/theme.py
      and comes out one step lifted, because the derivation's reference
      surface is --surface and not --bg.
 
@@ -791,7 +791,7 @@ body > .foot{ flex-shrink:0; }
    screens (opt-in via app.js) and hides it once it plays. Both fill the
    backdrop the same way, so swapping one for the other doesn't move
    anything. An album's own wallpaper arrives through exactly these two
-   elements — see _site_bg in main.py — so nothing here has to know whether
+   elements — see theme.site_bg in aperture/theme.py — so nothing here has to know whether
    the picture is the site default or the album's. */
 .bg-still,
 .bg-video{

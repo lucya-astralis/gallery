@@ -3,7 +3,7 @@
 Space Grotesk, JetBrains Mono and Noto Sans JP arrive here as woff2 already
 (tools/build_font_instances.py instantiates them out of their variable
 sources). The fixed-weight display faces did not: they sat in
-aperture/static/fonts/ as the .otf / .ttf the foundry shipped and were served
+aperture/gallery/static/fonts/ as the .otf / .ttf the foundry shipped and were served
 raw. Ethnocentric alone is 68 KB that way and it is on the first paint of
 every page — the wordmark is drawn in it — against ~30 KB as woff2, which
 is the same outlines with a better container.
@@ -11,11 +11,11 @@ is the same outlines with a better container.
     python tools/build_display_faces.py
 
 Writes, next to each source:
-    aperture/static/fonts/<name>.woff2
+    aperture/gallery/static/fonts/<name>.woff2
 
 The .otf/.ttf sources stay where they are, exactly like the variable
 sources build_font_instances.py reads: this script is the only thing that
-regenerates the woff2, and the @font-face blocks in aperture/static/style.css
+regenerates the woff2, and the @font-face blocks in aperture/gallery/static/style.css
 are what point at the result. Add a face here and change its `src:` there.
 
 No subsetting happens here on purpose. The display face draws the archive's
@@ -31,7 +31,7 @@ from pathlib import Path
 
 from fontTools.ttLib import TTFont
 
-FONTS = Path(__file__).resolve().parent.parent / "aperture" / "static" / "fonts"
+FONTS = Path(__file__).resolve().parent.parent / "aperture" / "gallery" / "static" / "fonts"
 
 # every fixed-weight face style.css declares by file rather than by instance
 SOURCES = [

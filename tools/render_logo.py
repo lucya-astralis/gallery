@@ -8,7 +8,7 @@ about never, so it gets rasterised once, on a developer machine, and the
 container keeps the dependency list it has (Pillow, nothing else).
 
 This is deliberately NOT a general SVG renderer. It understands exactly what
-`aperture/static/logo/lucya_logo.svg` uses — nested `matrix(...)` groups and paths
+`aperture/gallery/static/logo/lucya_logo.svg` uses — nested `matrix(...)` groups and paths
 built from absolute `M`, `L`, `C`, `Z` — and raises on anything else, so a
 redesigned logo fails here loudly instead of silently rendering garbage.
 
@@ -25,8 +25,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 REPO = Path(__file__).resolve().parent.parent
-DEFAULT_SVG = REPO / "aperture" / "static" / "logo" / "lucya_logo.svg"
-DEFAULT_OUT = REPO / "aperture" / "static" / "logo" / "lucya_logo.png"
+DEFAULT_SVG = REPO / "aperture" / "gallery" / "static" / "logo" / "lucya_logo.svg"
+DEFAULT_OUT = REPO / "aperture" / "gallery" / "static" / "logo" / "lucya_logo.png"
 
 SVG_NS = "{http://www.w3.org/2000/svg}"
 # Curves are flattened to line segments; 24 per cubic is far below one pixel

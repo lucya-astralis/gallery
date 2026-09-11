@@ -1,7 +1,7 @@
 """Rebuild the Font Awesome glyph subset + its stylesheet.
 
-    aperture/static/fonts/fa-solid-subset.woff2   (font, generated)
-    aperture/static/fa-icons.css                  (stylesheet, generated)
+    aperture/gallery/static/fonts/fa-solid-subset.woff2   (font, generated)
+    aperture/gallery/static/fa-icons.css                  (stylesheet, generated)
 
 Font Awesome Free ships ~1400 solid icons in a 117 KB woff2. The site uses a
 couple of dozen, so — exactly like the Noto Sans JP subset next door — only
@@ -15,7 +15,7 @@ How an icon gets in:
   * write it in the markup as  <i class="fa fa-camera" aria-hidden="true"></i>
   * re-run this script.
 
-The scan reads aperture/templates/*.html, aperture/static/app.js and aperture/main.py and
+The scan reads aperture/gallery/templates/*.html, aperture/gallery/static/app.js and aperture/*.py and
 picks up every `fa-<name>` token. A name that Font Awesome doesn't know is a
 hard error rather than a silently blank box — check the spelling against
 tools/fa-icons.json (name -> codepoint, extracted from the upstream package).
@@ -28,7 +28,7 @@ subset is cut from, and there is no way to rebuild without it.
 
 Font Awesome Free 7.3.1, https://fontawesome.com
   icons  CC BY 4.0 · fonts  SIL OFL 1.1 · code  MIT
-  (full text in aperture/static/fonts/FONTAWESOME-LICENSE.txt)
+  (full text in aperture/gallery/static/fonts/FONTAWESOME-LICENSE.txt)
 
 Requires fonttools + brotli (pip install fonttools brotli).
 """
@@ -42,10 +42,10 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parent.parent
-FONT_DIR = ROOT / "aperture" / "static" / "fonts"
+FONT_DIR = ROOT / "aperture" / "gallery" / "static" / "fonts"
 SRC = FONT_DIR / "fa-solid-900.woff2"
 OUT_FONT = FONT_DIR / "fa-solid-subset.woff2"
-OUT_CSS = ROOT / "aperture" / "static" / "fa-icons.css"
+OUT_CSS = ROOT / "aperture" / "gallery" / "static" / "fa-icons.css"
 ICON_MAP = Path(__file__).resolve().parent / "fa-icons.json"
 
 # `fa` itself is the base class, not an icon; `fa-fw`/`fa-lg` are modifiers
@@ -95,8 +95,9 @@ CSS_HEADER = """/* =============================================================
 
 def collect_names() -> dict:
     """Every fa-<name> token used in the site, mapped to the files using it."""
-    files = sorted((ROOT / "aperture" / "templates").glob("*.html"))
-    files += [ROOT / "aperture" / "static" / "app.js", ROOT / "aperture" / "main.py"]
+    files = sorted((ROOT / "aperture" / "gallery" / "templates").glob("*.html"))
+    files += [ROOT / "aperture" / "gallery" / "static" / "app.js"]
+    files += sorted(p for p in (ROOT / "aperture").rglob("*.py") if "console" not in p.parts)
 
     # class attributes only — a bare fa-* search over the whole file also
     # swallows the woff2 filename in the <link rel=preload>. Jinja tags inside

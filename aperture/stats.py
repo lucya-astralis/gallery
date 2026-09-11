@@ -8,8 +8,8 @@ part, so it happens exactly once here rather than once per chart.
 
 What this module deliberately does NOT know:
   * album display names and album marks — those live behind album.cfg and
-    main.py's resolvers, so album rows come out keyed by folder path and the
-    route decorates them (see /stats in main.py).
+    the gallery's resolvers, so album rows come out keyed by folder path and the
+    route decorates them (see /stats in gallery/pages.py).
   * how anything is drawn. Every dataset is returned already reduced to
     {label, value, pct, …} rows, where `pct` is 0–100 against the series
     maximum. The Jinja chart macros in _charts.html only place rectangles;

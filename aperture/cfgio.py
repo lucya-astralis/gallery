@@ -6,8 +6,8 @@ configurator -- kept in step by a comment saying "mirror of". They were
 byte-identical, which is the best case for a copy and still a copy: the next
 change to the grammar would have landed in one of them.
 
-This module is now the only one. The gallery binds its `_parse_cfg`,
-`_cfg_first`, `_cfg_bool` and `_cfg_text` to the functions below, and the
+This module is now the only one. The gallery binds its `parse`,
+`first`, `as_bool` and `joined` to the functions below, and the
 console edits files through `CfgFile`.
 
 Reading is what the gallery needs. Writing is line-based, because the shipped

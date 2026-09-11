@@ -9,7 +9,7 @@ through small JSON files under `DATA_DIR/control/`:
     scan.request.json   written by the CLI  -> consumed by the server
     status.json         written by the server -> read by the CLI
 
-The server's control loop (main._control_loop) ticks every CONTROL_TICK
+The server's control loop (indexer._control_loop) ticks every CONTROL_TICK
 seconds: it publishes `status.json` as a heartbeat, picks up a pending scan
 request, and skips periodic work while `paused.json` exists. So the whole
 channel is one directory of tiny files — no socket, no port, no token, and
@@ -64,8 +64,14 @@ def configure(data_dir: Path) -> Path:
 
 
 def control_dir() -> Path:
+    """The channel's directory. Defaults to DATA_DIR/control/ the first time
+    anything asks, so no importer has to remember to configure() it -- the
+    gallery used to do that as a side effect of being imported, and every
+    other reader got the directory only because it had imported the gallery.
+    configure() still points it elsewhere explicitly."""
     if _dir is None:
-        raise RuntimeError("control channel not configured")
+        from .runtime import settings
+        configure(settings.data_dir)
     return _dir
 
 

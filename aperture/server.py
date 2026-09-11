@@ -28,7 +28,7 @@ Two uvicorn details this file exists to get right:
   * uvicorn installs its own logging handlers when it configures logging, and
     two Servers doing that put two handlers on the root logger — every line,
     including every access log line, printed twice. `log_config=None` leaves
-    logging to us; the app already set it up in main.py.
+    logging to us; the app already set it up in gallery/app.py.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ log = logging.getLogger("server")
 
 def create_public_app():
     """The gallery. Read-only, CORS-enabled, the thing the world sees."""
-    from .main import app
+    from .gallery.app import app
     return app
 
 

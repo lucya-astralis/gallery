@@ -13,7 +13,7 @@ import pytest
 
 from aperture import runtime
 from aperture.console.app import app as console_app
-from aperture.main import app as public_app
+from aperture.gallery.app import app as public_app
 
 
 def _settings(**env):

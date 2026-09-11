@@ -43,7 +43,7 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "foot.operator": ("Operator", "Operator", "オペレーター"),
     # {operator} is gallery.cfg's `operator` — who runs this archive. The
     # name used to be baked in here, which made the translation table a
-    # branding file; see the site-branding section in main.py.
+    # branding file; see aperture/branding.py.
     "foot.about": ("{operator} / about me", "{operator} / über mich",
                    "{operator} / 私について"),
     "foot.privacy": ("Privacy", "Datenschutz", "プライバシー"),
@@ -99,7 +99,7 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     # EN/DE pages, and flips to English on the JP page so it stays a
     # bilingual ornament instead of repeating the slug.
     "stat.albums": ("albums", "Alben", "アルバム"),
-    # keys of the album description card's stat rows (main._album_stats)
+    # keys of the album description card's stat rows (albums.album_stats)
     "stat.location": ("Location", "Ort", "場所"),
     "stat.span": ("Dates", "Zeitraum", "期間"),
     "stat.device": ("Camera", "Kamera", "カメラ"),
@@ -122,7 +122,7 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "unit.dirs": ("folders", "Ordner", "フォルダ"),
     "unit.folder": ("folder", "Ordner", "フォルダ"),
 
-    # ---- sort options (main.py) ----------------------------------------
+    # ---- sort options (photos.py) ----------------------------------------
     "sort.date_desc": ("Newest first", "Neueste zuerst", "新しい順"),
     "sort.date_asc": ("Oldest first", "Älteste zuerst", "古い順"),
     "sort.name_asc": ("Filename A → Z", "Dateiname A → Z", "ファイル名 A → Z"),
@@ -346,7 +346,7 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "aria.close": ("Close (Esc)", "Schließen (Esc)", "閉じる (Esc)"),
     "aria.lightbox": ("Fullscreen viewer", "Vollbild-Ansicht", "全画面ビューア"),
 
-    # ---- EXIF labels (main._prettify_exif) ----------------------------------
+    # ---- EXIF labels (photos.prettify_exif) ----------------------------------
     "exif.make": ("Camera make", "Kamerahersteller", "メーカー"),
     "exif.model": ("Camera model", "Kameramodell", "機種"),
     "exif.lens": ("Lens", "Objektiv", "レンズ"),

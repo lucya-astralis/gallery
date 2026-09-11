@@ -2,7 +2,7 @@
    LUCYA.SYSTEMS APERTURE  —  CONSOLE
 
    NEBULA, the same design language the gallery is built in — its six
-   rules are written out at the top of app/static/style.css, in full in
+   rules are written out at the top of aperture/gallery/static/style.css, in full in
    nebula/NEBULA.md, and as a portable sheet in nebula/nebula.css. They
    are not restated here. What matters on this side: this is not a
    lookalike.
@@ -106,7 +106,7 @@
      never share a mount, so a palette change has to be made in both files,
      and a change to a RULE in nebula/nebula.css as well. Black ground, grey
      body, ONE purple accent; nothing in the grey ramp carries a hue. See
-     app/static/style.css for the reasoning behind each block. */
+     aperture/gallery/static/style.css for the reasoning behind each block. */
   --bg:          #000000;
   --bg-2:        #08080a;
   --surface:     #0e0e10;
@@ -143,7 +143,7 @@
      groups purple, which is the thing the gallery's palette pass was for.
 
      #5865F2 is the BRAND hex and it is not used raw. It goes through the
-     derivation (_accent_shades() in the gallery's main.py, nebulaAccent()
+     derivation (theme.accent_shades() in aperture/theme.py, nebulaAccent()
      in nebula/showcase.js) whose reference surface is --surface rather than
      --bg, and comes out one step lifted: #5865F2 -> #616EF3. That step is
      the difference between a promise and a rounding error — the brand hex

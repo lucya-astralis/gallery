@@ -1,14 +1,14 @@
 """The one function that turns a request into a writable path.
 
 Before Aperture the gallery and the configurator each had their own guard —
-`main._safe_rel` for the routes that hand out a photograph, `Library.safe` for
+`media.safe_rel` for the routes that hand out a photograph, `Library.safe` for
 the ones that edit a cfg file. Two implementations of "stay inside the photo
 tree", one of them on a *writing* path.
 
 This module owns the writing half. `Library.safe` is still what resolves a
 folder for reading; what changed is that nothing writes through it any more.
-(The reading guard joins this file when main.py is split; the two then share
-their normalization and their test file.)
+(The reading guard, `media.safe_rel`, stayed with the routes it protects: it
+answers in HTTP errors, and this module does not speak HTTP.)
 
 The rule it enforces is narrower than "no traversal", and that is the point.
 The console may write in exactly three kinds of place:

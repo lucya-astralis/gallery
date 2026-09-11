@@ -167,7 +167,7 @@ def check_album(lib: Library, album: str,
         meta.is_dir(), ".album/")
     out += _check_theme(cfg)
 
-    # _album_stats splits on the FIRST colon and skips an entry whose value is
+    # albums.album_stats splits on the FIRST colon and skips an entry whose value is
     # empty, so both shapes vanish from the page without a word.
     for item in cfg.get("stat", []):
         label, sep, val = item.partition(":")

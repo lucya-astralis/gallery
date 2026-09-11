@@ -10,8 +10,9 @@ both validators flagged `reel = hide`, which the gallery honours.
 So the direction is reversed. Everything below is the source, and the
 gallery, the operations surface and the console all import it:
 
-    aperture/main.py      ALBUM_CFG_KEYS, GALLERY_CFG_KEYS, the effect
-                          whitelist, the badge limit, every served file type
+    aperture/config.py,   which keys the gallery reads, the effect whitelist,
+    albums.py, theme.py,  the badge limit, every served file type and the
+    branding.py           content type it goes out as
     aperture/scanner.py   what counts as a photograph
     aperture/ops.py       what `doctor` checks against
     aperture/console/     the form (KEY_SPEC, HELP) and its validation
@@ -89,7 +90,7 @@ LANGS = list(_I18N_LANGS)
 EFFECTS = ["sakura"]
 # The three the console offers as a choice ...
 REEL_VALUES = ["featured", "random", "off"]
-# ... and every spelling the gallery honours (main._album_reel): `shuffle` is
+# ... and every spelling the gallery honours (albums.album_reel): `shuffle` is
 # random, and anything in cfgio.FALSE -- `hide` and `none` included -- is off.
 REEL_ACCEPTED = frozenset({"featured", "random", "shuffle"}) | FALSE
 IMAGE_SORTS = ["date_desc", "date_asc", "name_asc", "name_desc",
@@ -106,7 +107,7 @@ FONT_SCALE_RANGE = (0.5, 2.5)
 # Per-album theme (album.cfg `accent` / `wallpaper_tint` / `wallpaper_dim`).
 # The gallery derives three faces from the accent and rejects anything that
 # isn't a hex colour; these two ranges are its guard rails on the backdrop
-# treatment. Keep in step with aperture/main.py.
+# treatment; aperture/theme.py and doctor both read them from here.
 WALLPAPER_TINT_RANGE = (0.0, 1.0)
 WALLPAPER_DIM_RANGE = (0.25, 1.0)
 
@@ -117,7 +118,7 @@ WALLPAPER_DIM_RANGE = (0.25, 1.0)
 KEY_SPEC: dict[str, dict] = {
     # album.cfg
     # The album's display name. Like loc, the gallery rejoins the parser's
-    # comma-split parts with ", " (_album_display_name), so it stays one line.
+    # comma-split parts with ", " (config.album_display_name), so it stays one line.
     "name": {"type": "text", "joined": True},
     "collection": {"type": "bool"},
     "showcase": {"type": "bool"},
@@ -141,7 +142,7 @@ KEY_SPEC: dict[str, dict] = {
                        "step": 0.02, "off": "off"},
     "wallpaper_dim": {"type": "ratio", "range": list(WALLPAPER_DIM_RANGE),
                       "step": 0.02, "off": "off"},
-    # The gallery re-joins loc's comma-split parts with ", " (_album_stats),
+    # The gallery re-joins loc's comma-split parts with ", " (albums.album_stats),
     # so it reads as one line even though the parser sees a list.
     "loc": {"type": "text", "joined": True},
     # The album's custom attributes: freeform "Label: Value" lines the

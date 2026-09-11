@@ -1,4 +1,4 @@
-# Generates aperture/templates/_trip_map.html from a MapSVG prefecture map of Japan.
+# Generates aperture/gallery/templates/_trip_map.html from a MapSVG prefecture map of Japan.
 # - parses all 47 prefecture paths, converts to absolute polylines
 # - verifies whether the map's y-axis is linear or Mercator in latitude
 #   (by checking where known city coords land relative to prefecture bboxes)
@@ -8,7 +8,7 @@
 #
 # A stop is a REGION (Kansai / Hokkaido / Kanto), so its highlight is the
 # union of that region's prefectures; the dot sits on the region's base city,
-# which is also what the itinerary's lat/lon in main.py points at.
+# which is also what the itinerary's lat/lon in aperture/trips.py points at.
 #
 # Run from anywhere: `python tools/generate_trip_map.py` — paths are resolved
 # relative to this file. Tune REGIONS / segment bulges / LBL offsets below
@@ -20,7 +20,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / "tools" / "japan-prefectures.svg"
-OUT = REPO / "aperture" / "templates" / "_trip_map.html"
+OUT = REPO / "aperture" / "gallery" / "templates" / "_trip_map.html"
 
 svg = SRC.read_text(encoding="utf-8")
 
@@ -134,7 +134,7 @@ def bbox(rings):
 
 # ---- the itinerary's regions ----------------------------------------------
 # One entry per trip stop, in travel order, mirroring TRIPS["japan_2026"] in
-# aperture/main.py: `prefs` are the region's prefectures (ISO 3166-2:JP codes,
+# aperture/*.py: `prefs` are the region's prefectures (ISO 3166-2:JP codes,
 # highlighted as one shape), `lat`/`lon` the base city the dot sits on, and
 # `base` names that city's own prefecture for the projection check below.
 # Kansai is taken as the 2府4県 (Mie counted to Tokai, as it usually is).

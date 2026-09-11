@@ -142,7 +142,9 @@ os.environ.update(
 )
 
 # Import order matters — see the module docstring.
-from aperture import db, main as gallery  # noqa: E402
+from aperture import db, indexer  # noqa: E402
+from aperture.gallery.app import app as gallery_app  # noqa: E402
+from aperture.runtime import settings  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 
@@ -154,8 +156,8 @@ def pytest_sessionfinish(session, exitstatus):
 def indexed():
     """The fixture tree, walked once, exactly like a startup scan does it —
     but synchronously, so a test never races the indexer."""
-    db.init(gallery.DATA_DIR)
-    summary = gallery._run_scan(trigger="test")
+    db.init(settings.data_dir)
+    summary = indexer.run_scan(trigger="test")
     assert summary is not None and summary["error"] is None, summary
     assert summary["result"]["indexed"] == sum(len(v) for v in TREE.values())
     return summary
@@ -166,7 +168,7 @@ def client(indexed):
     """The public app. Deliberately NOT used as a context manager: entering it
     would run the lifespan, which starts the scanner thread and the control
     loop — background work a route test has no use for."""
-    return TestClient(gallery.app)
+    return TestClient(gallery_app)
 
 
 @pytest.fixture(scope="session")

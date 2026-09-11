@@ -12,7 +12,7 @@ Two kinds of command live in here:
   * Ones that just look at the index, the photo tree and the config the same
     way the app does — `doctor`, `thumbs`, `featured`, `cfg`, `photo`,
     `trip`, `i18n`. Those run standalone and need no server at all; they
-    import aperture.main purely to reuse its resolution helpers, so what they
+    import the gallery's own modules to reuse their resolution helpers, so what they
     report is what the pages actually render.
 
 Every command takes `--json` for a machine-readable dump. `doctor` exits
@@ -39,9 +39,8 @@ from PIL import Image
 # Those would land above the masthead, so they are muted here and reported by
 # the dashboard instead — anything a command logs while running still shows.
 logging.disable(logging.CRITICAL)
-from . import termui as ui, schema
+from . import albums, brand, cfgio, config, photos, schema, templating, termui as ui, theme, trips, welcome
 from . import control, db, i18n, scanner
-from . import main as gallery
 logging.disable(logging.NOTSET)
 
 # ----- output helpers ---------------------------------------------------
@@ -72,6 +71,8 @@ def fail(msg: str) -> int:
 
 from . import ops
 from .ops import UnknownAlbum
+from .gallery import api
+from .runtime import settings
 
 # ----- the data layer, now in ops.py ------------------------------------
 # Every command below used these as module-level names long before there was
@@ -105,7 +106,7 @@ _check_brand = ops.check_brand
 def _screen(right: str = ""):
     """Every full-page view gets the same frame: app name left, what you are
     looking at right."""
-    return ui.screen(gallery.app.title, right)
+    return ui.screen(brand.PRODUCT, right)
 
 
 def _render_system(st: dict | None, live: bool, pause: dict | None) -> None:
@@ -179,16 +180,16 @@ def _render_status_body(st, live, pause, counts) -> None:
     kv("totals", f"{counts['images']} photos · {counts['albums']} albums · "
                 f"{counts['featured']} featured · {counts['tags']} tags · "
                 f"{_bytes(counts['bytes'])} of originals · db {_bytes(counts['db_bytes'])}")
-    kv("paths", f"photos={gallery.PHOTOS_DIR}")
-    kv("", f"thumbs={gallery.THUMBS_DIR}")
-    kv("", f"previews={gallery.PREVIEWS_DIR}")
-    kv("", f"data={gallery.DATA_DIR}")
+    kv("paths", f"photos={settings.photos_dir}")
+    kv("", f"thumbs={settings.thumbs_dir}")
+    kv("", f"previews={settings.previews_dir}")
+    kv("", f"data={settings.data_dir}")
     cfg = (st or {}).get("config") or {}
-    kv("config", f"scan_interval={cfg.get('scan_interval', gallery.SCAN_INTERVAL)}s · "
-                 f"thumb={cfg.get('thumb_size', gallery.THUMB_SIZE)} · "
-                 f"preview={cfg.get('preview_size', gallery.PREVIEW_SIZE)} · "
-                 f"watcher={'on' if gallery.ENABLE_WATCHER else 'off'} · "
-                 f"hide_gps={int(gallery.HIDE_GPS)} · strip_gps={int(gallery.STRIP_GPS)}")
+    kv("config", f"scan_interval={cfg.get('scan_interval', settings.scan_interval)}s · "
+                 f"thumb={cfg.get('thumb_size', settings.thumb_size)} · "
+                 f"preview={cfg.get('preview_size', settings.preview_size)} · "
+                 f"watcher={'on' if settings.enable_watcher else 'off'} · "
+                 f"hide_gps={int(settings.hide_gps)} · strip_gps={int(settings.strip_gps)}")
 
 
 def _wait_for_scan(request_id: str, timeout: float, quiet: bool = False) -> dict | None:
@@ -231,7 +232,7 @@ def _print_scan_result(summary: dict) -> None:
 
 def cmd_scan(args) -> int:
     album = _norm_album(args.album)
-    if album and not (gallery.PHOTOS_DIR / album).is_dir():
+    if album and not (settings.photos_dir / album).is_dir():
         return fail(f"no such album folder: {album}")
     st, live = _server_status()
 
@@ -272,11 +273,11 @@ def cmd_scan(args) -> int:
     _connect()
     started = time.time()
     result = scanner.full_scan(
-        gallery.PHOTOS_DIR, gallery.THUMBS_DIR, gallery.THUMB_SIZE,
-        previews_dir=gallery.PREVIEWS_DIR, preview_size=gallery.PREVIEW_SIZE,
+        settings.photos_dir, settings.thumbs_dir, settings.thumb_size,
+        previews_dir=settings.previews_dir, preview_size=settings.preview_size,
         root=album, force=args.force,
     )
-    gallery._recompute_featured()
+    albums.recompute_featured()
     summary = {"result": result, "seconds": round(time.time() - started, 3), "error": None}
     if args.json:
         dump(summary)
@@ -381,11 +382,11 @@ def cmd_thumbs(args) -> int:
     expected = {p for rel in disk for p in _derivatives(rel).values()}
     orphans: list[Path] = []
     if album is None:
-        for d in (gallery.THUMBS_DIR, gallery.PREVIEWS_DIR, gallery.FULLS_DIR):
+        for d in (settings.thumbs_dir, settings.previews_dir, settings.fulls_dir):
             if not d.is_dir():
                 continue
             for f in _derivative_files(d):
-                if d is gallery.PREVIEWS_DIR and gallery.FULLS_DIR in f.parents:
+                if d is settings.previews_dir and settings.fulls_dir in f.parents:
                     continue
                 if f not in expected:
                     orphans.append(f)
@@ -395,8 +396,8 @@ def cmd_thumbs(args) -> int:
     if args.rebuild:
         live = ui.Live("building", enabled=not args.json)
         for done, (rel, kind) in enumerate(todo, 1):
-            src = gallery.PHOTOS_DIR / rel
-            size = gallery.THUMB_SIZE if kind == "thumb" else gallery.PREVIEW_SIZE
+            src = settings.photos_dir / rel
+            size = settings.thumb_size if kind == "thumb" else settings.preview_size
             dst = _derivatives(rel)[kind]
             if scanner.make_thumbnail(src, dst, size):
                 built += 1
@@ -448,7 +449,7 @@ def cmd_thumbs(args) -> int:
 def cmd_featured(args) -> int:
     c = _connect()
     if args.recompute:
-        gallery._recompute_featured()
+        albums.recompute_featured()
     by_photo, unresolved = _featured_map()
     album = _norm_album(args.album)
 
@@ -465,7 +466,7 @@ def cmd_featured(args) -> int:
     drift_missing = sorted(expected - flagged)
     drift_extra = sorted(flagged - expected)
 
-    showcase_albums = [a for a in gallery._albums_with_ancestors() if gallery._album_is_showcase(a)]
+    showcase_albums = [a for a in albums.albums_with_ancestors() if albums.album_is_showcase(a)]
 
     if args.json:
         dump({"albums": {a: {e: sorted(v) for e, v in entries.items()} for a, entries in by_album.items()},
@@ -508,17 +509,17 @@ def cmd_featured(args) -> int:
 def cmd_cfg(args) -> int:
     _connect()
     if args.gallery:
-        cfg = gallery._gallery_config()
-        path = gallery.GALLERY_CFG_PATH
+        cfg = config.gallery_config()
+        path = config.GALLERY_CFG_PATH
         issues = _check_gallery_cfg()
         title = "gallery.cfg"
     else:
         if not args.album:
             return fail("give an album path, or --gallery for the gallery-wide config")
         album = _norm_album(args.album)
-        cfg = gallery._album_config(album)
-        meta = gallery._album_meta_dir(album)
-        path = (meta / "album.cfg") if meta else (gallery.PHOTOS_DIR / album / ".album" / "album.cfg")
+        cfg = config.album_config(album)
+        meta = config.album_meta_dir(album)
+        path = (meta / "album.cfg") if meta else (settings.photos_dir / album / ".album" / "album.cfg")
         issues = _check_album_cfg(album)
         title = f"{album}/.album/album.cfg"
 
@@ -542,15 +543,15 @@ def cmd_cfg(args) -> int:
     if not args.gallery:
         album = _norm_album(args.album)
         ui.head("resolved")
-        mode, reel = gallery._album_reel(album, cfg)
-        cover = gallery._album_cover_rel(album)
-        langs = [lang for lang in i18n.LANGS if gallery._album_description(album, lang)]
+        mode, reel = albums.album_reel(album, cfg)
+        cover = albums.album_cover_rel(album)
+        langs = [lang for lang in i18n.LANGS if albums.album_description(album, lang)]
         ui.columns([
-            ("showcase album", str(gallery._album_is_showcase(album))),
-            ("collection", str(gallery._album_collection(album))),
+            ("showcase album", str(albums.album_is_showcase(album))),
+            ("collection", str(config.album_collection(album))),
             ("cover", cover or "— (no photo found)"),
             ("reel", f"{mode} ({len(reel)} photo(s))"),
-            ("tags", ", ".join(gallery._album_tags(album, cfg)) or "—"),
+            ("tags", ", ".join(config.album_tags(album, cfg)) or "—"),
             ("descriptions", ", ".join(f"album_{l}.md" for l in langs) or "—"),
             # resolved, so an inherited backdrop names the album it came from
             ("wallpaper", _wallpaper_line(album, "desktop")),
@@ -589,7 +590,7 @@ def cmd_photo(args) -> int:
         "WHERE it.image_id = ? ORDER BY t.name", (row["id"],))]
     by_photo, _ = _featured_map()
     sources = by_photo.get(rel, [])
-    src = gallery.PHOTOS_DIR / rel
+    src = settings.photos_dir / rel
     disk_mtime = _effective_mtime(rel)
     derivatives = {k: {"path": str(p), "state": _derivative_state(rel).get(k)}
                    for k, p in _derivatives(rel).items()}
@@ -624,7 +625,7 @@ def cmd_photo(args) -> int:
     for name in ("thumb", "preview", "full", "image", "api/photo"):
         out(f"  /{name}/{rel}")
     head(f"exif  ({len(exif)} raw key(s))")
-    for label, value in gallery._prettify_exif(exif, i18n.DEFAULT_LANG):
+    for label, value in photos.prettify_exif(exif, i18n.DEFAULT_LANG):
         out(f"  {label:<18}{value}")
     if args.exif:
         ui.head("exif (raw)")
@@ -636,19 +637,19 @@ def cmd_photo(args) -> int:
 def cmd_trip(args) -> int:
     _connect()
     if not args.album:
-        kv("trips", f"{len(gallery.TRIPS)} configured in aperture/main.py")
-        for key, cfg in gallery.TRIPS.items():
-            exists = gallery._album_exists(key)
+        kv("trips", f"{len(trips.TRIPS)} configured in aperture/trips.py")
+        for key, cfg in trips.TRIPS.items():
+            exists = albums.album_exists(key)
             out(f"  {key:<16}{cfg.get('title')} · {len(cfg.get('stops', []))} stop(s)"
                 f"{'' if exists else '  ← no album with this path!'}")
         out()
         out("a trip attaches to the album whose lower-cased path equals its key")
         return 0
     album = _norm_album(args.album)
-    trip = gallery._trip_for_album(album, args.lang)
+    trip = trips.trip_for_album(album, args.lang)
     if trip is None:
         return fail(f"no trip configured for {album!r} "
-                    f"(keys: {', '.join(gallery.TRIPS) or 'none'})")
+                    f"(keys: {', '.join(trips.TRIPS) or 'none'})")
     if args.json:
         dump(trip)
         return 0
@@ -681,9 +682,9 @@ def _i18n_sources() -> str:
     app modules (minus i18n.py itself, whose table would match everything,
     and this file)."""
     parts = []
-    for path in sorted((gallery.BASE_DIR / "templates").glob("*.html")):
+    for path in sorted((templating.WEB_DIR / "templates").glob("*.html")):
         parts.append(path.read_text(encoding="utf-8"))
-    for path in sorted(gallery.BASE_DIR.glob("*.py")):
+    for path in sorted(p for p in templating.WEB_DIR.parent.rglob("*.py") if "console" not in p.parts):
         if path.name in ("i18n.py", "cli.py"):
             continue
         parts.append(path.read_text(encoding="utf-8"))
@@ -694,7 +695,7 @@ def _js_ui_strings() -> dict[str, set[str]]:
     """Key sets of the UI_STRINGS blocks in app.js, per language. Parsed by
     indentation rather than by evaluating JS — the block is hand-formatted
     and stays that way."""
-    text = (gallery.BASE_DIR / "static" / "app.js").read_text(encoding="utf-8")
+    text = (templating.WEB_DIR / "static" / "app.js").read_text(encoding="utf-8")
     lines = text.splitlines()
     try:
         start = next(i for i, l in enumerate(lines) if l.startswith("const UI_STRINGS"))
@@ -726,7 +727,7 @@ def _sidecar_tags_on_disk(album: str | None = None) -> tuple[dict, list[str]]:
     """
     found: dict[str, list[str]] = {}
     orphans: list[str] = []
-    root = gallery.PHOTOS_DIR
+    root = settings.photos_dir
     base = (root / album) if album else root
     if not base.is_dir():
         return found, orphans
@@ -845,7 +846,7 @@ def cmd_tags(args) -> int:
 def _welcome_report(mobile: bool) -> dict:
     """What the welcome hero resolves to for one device class, and which
     gallery.cfg entries were dropped getting there."""
-    cfg = gallery._gallery_config()
+    cfg = config.gallery_config()
     key = "welcome_mobile" if mobile else "welcome_desktop"
     spec = cfg.get(key)
     source = key
@@ -854,12 +855,12 @@ def _welcome_report(mobile: bool) -> dict:
         source = "welcome" if spec else "(unset)"
 
     skipped = []
-    if not (len(spec) == 1 and spec[0].lower() in gallery._WELCOME_KEYWORDS):
+    if not (len(spec) == 1 and spec[0].lower() in welcome.WELCOME_KEYWORDS):
         for raw in spec:
-            if gallery._lookup_welcome_image(raw) is None:
+            if welcome.lookup_welcome_image(raw) is None:
                 skipped.append(raw)
 
-    feed, label, mode = gallery._welcome_feed(mobile=mobile)
+    feed, label, mode = welcome.welcome_feed(mobile=mobile)
     return {"device": "mobile" if mobile else "desktop",
             "source_key": source, "spec": list(spec), "skipped": skipped,
             "mode": mode, "label": label,
@@ -883,8 +884,8 @@ def cmd_welcome(args) -> int:
 
     if args.json:
         dump({"devices": devices,
-              "feed_max": gallery.WELCOME_FEED_MAX,
-              "keywords": sorted(set(gallery._WELCOME_KEYWORDS))})
+              "feed_max": welcome.WELCOME_FEED_MAX,
+              "keywords": sorted(set(welcome.WELCOME_KEYWORDS))})
         return 1 if any(d["skipped"] for d in devices) else 0
 
     for report in devices:
@@ -912,13 +913,13 @@ def cmd_gps(args) -> int:
     """Which originals still carry coordinates. WRITES with --strip."""
     _connect()
     album = _norm_album(args.album)
-    base = (gallery.PHOTOS_DIR / album) if album else gallery.PHOTOS_DIR
+    base = (settings.photos_dir / album) if album else settings.photos_dir
     if not base.is_dir():
         return fail(f"no such album: {args.album!r}")
 
     files = [p for p in sorted(base.rglob("*"))
              if p.is_file() and schema.is_image(p)
-             and not scanner.is_meta_path(p.relative_to(gallery.PHOTOS_DIR))]
+             and not scanner.is_meta_path(p.relative_to(settings.photos_dir))]
 
     live = ui.Live("reading EXIF", enabled=not args.json)
     carrying: list[str] = []
@@ -931,11 +932,11 @@ def cmd_gps(args) -> int:
             with Image.open(path) as img:
                 has = scanner._has_gps(img.getexif())
         except Exception as exc:
-            unreadable.append(f"{path.relative_to(gallery.PHOTOS_DIR).as_posix()} — {exc}")
+            unreadable.append(f"{path.relative_to(settings.photos_dir).as_posix()} — {exc}")
             continue
         if not has:
             continue
-        rel = path.relative_to(gallery.PHOTOS_DIR).as_posix()
+        rel = path.relative_to(settings.photos_dir).as_posix()
         carrying.append(rel)
         if args.strip and scanner.strip_gps_inplace(path):
             stripped.append(rel)
@@ -945,14 +946,14 @@ def cmd_gps(args) -> int:
         dump({"album": album, "checked": len(files),
               "with_gps": carrying, "stripped": stripped,
               "unreadable": unreadable,
-              "settings": {"hide_gps": bool(gallery.HIDE_GPS),
-                           "strip_gps": bool(gallery.STRIP_GPS)}})
+              "settings": {"hide_gps": bool(settings.hide_gps),
+                           "strip_gps": bool(settings.strip_gps)}})
         return 1 if carrying and not args.strip else 0
 
     kv("scope", album or "whole gallery")
     kv("checked", f"{len(files)} original(s)")
-    kv("settings", f"hide_gps={int(gallery.HIDE_GPS)} · strip_gps={int(gallery.STRIP_GPS)}",
-       "" if gallery.STRIP_GPS else ui.C.ye)
+    kv("settings", f"hide_gps={int(settings.hide_gps)} · strip_gps={int(settings.strip_gps)}",
+       "" if settings.strip_gps else ui.C.ye)
     kv("with gps", f"{len(carrying)} photo(s)", ui.C.gn if not carrying else ui.C.ye)
     if carrying:
         head("coordinates present")
@@ -981,14 +982,14 @@ def cmd_album(args) -> int:
 
     if not album:
         listing = []
-        for name in gallery._all_album_nodes():
+        for name in albums.all_album_nodes():
             row = c.execute(
                 "SELECT COUNT(*) AS n FROM images WHERE album = ? OR substr(album, 1, ?) = ?",
                 (name, len(name) + 1, name + "/")).fetchone()
-            cfg = gallery._album_config(name)
+            cfg = config.album_config(name)
             listing.append({"album": name, "photos": row["n"], "has_cfg": bool(cfg),
-                            "showcase": gallery._album_is_showcase(name),
-                            "collection": gallery._album_collection(name, cfg)})
+                            "showcase": albums.album_is_showcase(name),
+                            "collection": config.album_collection(name, cfg)})
         if args.json:
             dump({"albums": listing})
             return 0
@@ -1003,18 +1004,18 @@ def cmd_album(args) -> int:
         hint("  `album <name>` for one in full")
         return 0
 
-    cfg = gallery._album_config(album)
+    cfg = config.album_config(album)
     rows = c.execute(
         "SELECT rel_path, taken_at, size FROM images "
         "WHERE album = ? OR substr(album, 1, ?) = ? ORDER BY taken_at",
         (album, len(album) + 1, album + "/")).fetchall()
     dates = [r["taken_at"] for r in rows if r["taken_at"]]
-    meta = gallery._album_meta_dir(album)
+    meta = config.album_meta_dir(album)
     descriptions = sorted(p.name for p in meta.glob("album_*.md")) if meta else []
-    children = [n for n in gallery._all_album_nodes() if n.startswith(album + "/")]
-    featured = gallery._resolve_photo_refs(album, cfg.get("featured", []))
-    icon = gallery._album_icon_file(album)
-    font = gallery._album_font_file(album)
+    children = [n for n in albums.all_album_nodes() if n.startswith(album + "/")]
+    featured = albums.resolve_photo_refs(album, cfg.get("featured", []))
+    icon = theme.album_icon_file(album)
+    font = theme.album_font_file(album)
 
     info = {
         "album": album,
@@ -1024,11 +1025,11 @@ def cmd_album(args) -> int:
         "undated": sum(1 for r in rows if not r["taken_at"]),
         "has_cfg": bool(cfg),
         "cfg": dict(cfg),
-        "cover": gallery._config_cover_rel(album, gallery._cfg_first(cfg, "cover")),
+        "cover": albums.config_cover_rel(album, cfgio.first(cfg, "cover")),
         "featured": featured,
-        "showcase": gallery._album_is_showcase(album),
-        "collection": gallery._album_collection(album, cfg),
-        "tags": gallery._album_tags(album, cfg),
+        "showcase": albums.album_is_showcase(album),
+        "collection": config.album_collection(album, cfg),
+        "tags": config.album_tags(album, cfg),
         "descriptions": descriptions,
         "icon": icon.name if icon else None,
         "font": font.name if font else None,
@@ -1054,7 +1055,7 @@ def cmd_album(args) -> int:
     kv("look", ", ".join(filter(None, [
         f"icon={info['icon']}" if info["icon"] else None,
         f"font={info['font']}" if info["font"] else None,
-        f"effect={gallery._cfg_first(cfg, 'effect')}" if cfg.get("effect") else None,
+        f"effect={cfgio.first(cfg, 'effect')}" if cfg.get("effect") else None,
     ])) or "—")
     kv("text", ", ".join(info["descriptions"]) or "no album_*.md")
     if children:
@@ -1122,7 +1123,7 @@ def cmd_export(args) -> int:
     """
     import tarfile
 
-    root = gallery.PHOTOS_DIR
+    root = settings.photos_dir
     members: list[tuple[Path, str]] = []
     # gallery.cfg lives inside `.gallery/`, which the walk below takes whole
     metas = sorted(root.rglob(scanner.ALBUM_META_DIR))
@@ -1362,17 +1363,17 @@ def _dash_body(footer: bool = True) -> None:
         "SELECT MIN(taken_at) AS a, MAX(taken_at) AS b FROM images "
         "WHERE taken_at IS NOT NULL").fetchone()
 
-    ui.logo(SUBTITLE_FMT.format(title=gallery.app.title.upper(),
-                                app=gallery.APP_VERSION, api=gallery.API_VERSION))
+    ui.logo(SUBTITLE_FMT.format(title=brand.PRODUCT.upper(),
+                                app=brand.VERSION, api=api.API_VERSION))
     ui.rule("system")
     _render_system(st, live, pause)
 
     ui.head("archive")
     kv("photos", f"{counts['images']:,}".replace(",", " "))
     kv("albums", f"{counts['albums']} with photos · "
-                 f"{len(gallery._all_album_nodes())} incl. parents")
+                 f"{len(albums.all_album_nodes())} incl. parents")
     kv("featured", f"{counts['featured']} photo(s) · "
-                   f"{sum(1 for a in gallery._albums_with_ancestors() if gallery._album_is_showcase(a))} showcase album(s)")
+                   f"{sum(1 for a in albums.albums_with_ancestors() if albums.album_is_showcase(a))} showcase album(s)")
     kv("tags", str(counts["tags"]))
     kv("originals", _bytes(counts["bytes"]))
     kv("span", f"{(span['a'] or '—')[:10]} → {(span['b'] or '—')[:10]}")
@@ -1408,8 +1409,8 @@ def _dash_body(footer: bool = True) -> None:
     ui.head("health")
     if counts["images"] <= QUICK_CHECK_MAX_ROWS:
         on_disk = len(_photo_files())
-        thumbs, thumb_bytes = _dir_stats(gallery.THUMBS_DIR)
-        previews, preview_bytes = _dir_stats(gallery.PREVIEWS_DIR)
+        thumbs, thumb_bytes = _dir_stats(settings.thumbs_dir)
+        previews, preview_bytes = _dir_stats(settings.previews_dir)
         drift = on_disk - counts["images"]
         if drift == 0:
             kv("index", f"{ui.state('in sync')} · {on_disk} file(s) on disk = {counts['images']} row(s)")
@@ -1547,9 +1548,9 @@ def cmd_menu(args) -> int:
                 intro = False
                 _dash_body(footer=False)
             else:
-                ui.logo(SUBTITLE_FMT.format(title=gallery.app.title.upper(),
-                                            app=gallery.APP_VERSION,
-                                            api=gallery.API_VERSION))
+                ui.logo(SUBTITLE_FMT.format(title=brand.PRODUCT.upper(),
+                                            app=brand.VERSION,
+                                            api=api.API_VERSION))
                 _menu_status_line()
             ui.head("menu")
             ui.columns([(str(i), f"{ui.C.bold}{name:<9}{ui.C.off}{ui.C.gy}{desc}{ui.C.off}")
@@ -1626,8 +1627,8 @@ def cmd_help(args) -> int:
 
 
 def _help_body() -> None:
-    ui.logo(SUBTITLE_FMT.format(title=gallery.app.title.upper(),
-                                app=gallery.APP_VERSION, api=gallery.API_VERSION))
+    ui.logo(SUBTITLE_FMT.format(title=brand.PRODUCT.upper(),
+                                app=brand.VERSION, api=api.API_VERSION))
     ui.rule("usage")
     ui.columns([
         ("python -m aperture.cli", "dashboard, then the interactive menu"),
@@ -1996,7 +1997,7 @@ def main(argv=None) -> int:
         # interface. `dash`/`menu`/`help`/`term`/`status` draw their own (they
         # repaint, or nest a body), and --json output must stay plain.
         if args.command in FRAMED_COMMANDS and not args.json:
-            with ui.screen(gallery.app.title, args.command):
+            with ui.screen(brand.PRODUCT, args.command):
                 return args.func(args) or 0
         return args.func(args) or 0
     except UnknownAlbum as exc:

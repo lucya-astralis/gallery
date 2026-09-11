@@ -22,37 +22,39 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from aperture import cfgio, main, ops, paths, scanner, schema
+from aperture import albums, cfgio, ops, paths, scanner, schema, theme
 from aperture.console import app as console_mod
 from aperture.console import security, validate
 from aperture.console.library import Library
 from aperture.runtime import settings
 
 ALL_KEYS = frozenset(schema.ALBUM_KEYS) | frozenset(schema.GALLERY_KEYS)
-PACKAGE = Path(main.__file__).parent
+PACKAGE = Path(schema.__file__).parent
 
 
 # ============================================================
 # one registry
 # ============================================================
-def test_the_grammar_is_the_shared_one():
-    assert main._parse_cfg is cfgio.parse
-    assert main._cfg_first is cfgio.first
-    assert main._cfg_text is cfgio.joined
-    assert main._cfg_bool is cfgio.as_bool
-    assert main._TRUE is cfgio.TRUE and main._FALSE is cfgio.FALSE
-    assert main.GALLERY_GROUP_KEYS is cfgio.GROUP_KEYS
+def test_main_py_is_gone_and_nothing_imports_it():
+    """main.py held the gallery's grammar aliases, key sets and every helper in
+    one 4 400-line file. It was split into aperture/{config,albums,photos,
+    theme,branding,marks,trips,welcome,indexer}.py and aperture/gallery/; a
+    reappearing import would mean something still reaches for the old home."""
+    assert not (PACKAGE / "main.py").exists()
+    for path in sorted(PACKAGE.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.ImportFrom):
+                names = {a.name for a in node.names}
+                assert not (node.module in ("main", "aperture.main")
+                            or (node.module in (None, "aperture") and "main" in names)), path
 
 
 def test_the_key_sets_come_from_the_schema():
-    for module in (main, ops):
-        assert module.ALBUM_CFG_KEYS == frozenset(schema.ALBUM_KEYS), module.__name__
-        assert module.GALLERY_CFG_KEYS == frozenset(schema.GALLERY_KEYS), module.__name__
+    assert ops.ALBUM_CFG_KEYS == frozenset(schema.ALBUM_KEYS)
+    assert ops.GALLERY_CFG_KEYS == frozenset(schema.GALLERY_KEYS)
 
 
 def test_the_smaller_vocabularies_come_from_the_schema():
-    assert main.ALBUM_EFFECTS == frozenset(schema.EFFECTS)
-    assert main.BRAND_BADGE_MAX == schema.BADGE_MAX
     assert ops.REEL_VALUES is schema.REEL_ACCEPTED
     assert ops.BRAND_URL_KEYS == tuple(schema.URL_KEYS)
     assert scanner.IMAGE_EXTS is schema.IMAGE_EXTS
@@ -64,11 +66,11 @@ def test_the_smaller_vocabularies_come_from_the_schema():
 def test_every_served_file_type_is_the_schemas():
     """What the gallery serves and what the console accepts for upload are the
     same sets, with the same content type. The icon sets were not."""
-    assert set(main.ALBUM_ICON_TYPES) == schema.ICON_EXTS
-    assert set(main.ALBUM_FONT_TYPES) == schema.FONT_EXTS
-    assert set(main.ALBUM_WALLPAPER_TYPES) == schema.WALLPAPER_EXTS
-    assert set(main.ALBUM_WALLPAPER_IMAGE_TYPES) == schema.WALLPAPER_IMAGE_EXTS
-    for ext, mime in main.ALBUM_ICON_TYPES.items():
+    assert set(theme.ALBUM_ICON_TYPES) == schema.ICON_EXTS
+    assert set(theme.ALBUM_FONT_TYPES) == schema.FONT_EXTS
+    assert set(theme.ALBUM_WALLPAPER_TYPES) == schema.WALLPAPER_EXTS
+    assert set(theme.ALBUM_WALLPAPER_IMAGE_TYPES) == schema.WALLPAPER_IMAGE_EXTS
+    for ext, mime in theme.ALBUM_ICON_TYPES.items():
         assert mime == schema.MIME[ext]
     assert console_mod._ASSET_TYPES is schema.MIME
     assert schema.ICON_EXTS <= console_mod._SCOPE_EXTS["album"]
@@ -221,11 +223,11 @@ def test_reel_hide_is_not_an_error_anywhere(berlin_cfg):
     assert not [i for i in doctor_issues if i.get("key") == "reel"], doctor_issues
 
     # ... and the gallery really does treat it as off.
-    assert main._album_reel("berlin", cfg)[0] == "off"
+    assert albums.album_reel("berlin", cfg)[0] == "off"
 
 
 def test_a_jpeg_icon_can_be_uploaded_and_is_served_as_one():
     target = paths.writable_target(settings.photos_dir, "berlin", "mark.jpg",
                                    allowed_exts=console_mod._SCOPE_EXTS["album"])
     assert target.name == "mark.jpg"
-    assert main.ALBUM_ICON_TYPES[".jpg"] == "image/jpeg"
+    assert theme.ALBUM_ICON_TYPES[".jpg"] == "image/jpeg"

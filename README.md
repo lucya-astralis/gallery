@@ -1398,7 +1398,7 @@ python -m aperture                 # both surfaces, one process
 run, so while working on one surface start that one on its own:
 
 ```bash
-uvicorn aperture.main:app --reload --port 8000          # gallery
+uvicorn aperture.gallery.app:app --reload --port 8000          # gallery
 uvicorn aperture.console.app:app --reload --port 8090   # console
 ```
 

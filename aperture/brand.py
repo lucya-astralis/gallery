@@ -6,7 +6,7 @@ the software serving it. Those are different facts about a deployment and
 only one of them belongs to the person running it, so they were split:
 
   operator branding   gallery.cfg (`site_name`, `logo`, `operator_url`, …)
-                      resolved in main._brand(); assets live in
+                      resolved in branding.site_brand(); assets live in
                       photos/.gallery/. Theirs to set, neutral by default.
 
   vendor identity     this module. Fixed, reads no config, ships with the
@@ -49,7 +49,7 @@ PRODUCT = f"{NAME} aperture"
 # Aperture's own release version, shown in the nav and the footer. It starts
 # at 1.0 rather than continuing the gallery's 7.2: the gallery and the
 # configurator were two programs, this is one, and a version is a promise
-# about a thing. Distinct from API_VERSION (main.py), which versions the JSON
+# about a thing. Distinct from API_VERSION (gallery/api.py), which versions the JSON
 # API contract and did NOT reset — the endpoints kept their shape.
 VERSION = "1.0"
 

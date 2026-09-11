@@ -230,7 +230,7 @@ class Library:
 
     def resolve_photo(self, album: str, item: str) -> str | None:
         """Resolve one album.cfg photo reference to a path relative to the
-        album, or None. Mirrors the gallery's `_resolve_photo_refs`: an exact
+        album, or None. Mirrors the gallery's `albums.resolve_photo_refs`: an exact
         relative path wins, otherwise a case-insensitive match on a bare
         filename anywhere in the subtree, or on any path-suffix."""
         item = (item or "").replace("\\", "/").strip().strip("/")

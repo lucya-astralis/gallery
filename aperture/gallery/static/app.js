@@ -1202,7 +1202,7 @@ window.__stagePixelIn = () => {
 // ---------- SCROLL MEMORY (back / forward) ---------------------
 // Browsers remember the scroll position of a history entry themselves —
 // but not usefully on this site. Every HTML response is Cache-Control:
-// no-store (see the security_headers middleware in main.py), so a back
+// no-store (see the security_headers middleware in aperture/gallery/app.py), so a back
 // navigation is a full reload rather than a bfcache restore, and Chrome
 // applies its remembered offset while the document is still streaming.
 // Measured on a throttled phone profile with a cold cache: /albums came

@@ -12,6 +12,10 @@ from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
 
+# The gallery's own static/ and templates/. The console has its own pair
+# under aperture/console/.
+WEB_DIR = Path(__file__).resolve().parent / "gallery"
+
 
 def static_url(base_dir: Path, path: str) -> str:
     """`/static/<path>` stamped with the file's mtime as `?v=`.

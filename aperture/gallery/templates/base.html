@@ -8,7 +8,7 @@
   <link rel="icon" type="{{ brand.favicon_type }}" href="{{ brand.favicon }}">
   {# Which software served this page. Outside {% block meta %} on purpose:
      that block is overridden wholesale by album/image/stats, and the
-     attribution is not a per-page decision. See app/brand.py. #}
+     attribution is not a per-page decision. See aperture/brand.py. #}
   <meta name="generator" content="{{ vendor.generator }}">
   <link rel="author" href="/humans.txt">
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
@@ -70,12 +70,12 @@
   {% block head_extra %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-  <!-- Fixed site backdrop as a single real element (NOT body::before/::after):
+  {# Fixed site backdrop as a single real element (NOT body::before/::after):
        iOS Safari mispositions fixed *pseudo-elements* of the flex <body> during
        scroll, so the grid + wallpaper are painted here instead and stay pinned.
 
        An album can dress its own backdrop (album.cfg `wallpaper` /
-       `wallpaper_mobile`, see _site_bg in main.py); everything else gets the
+       `wallpaper_mobile`, see theme.site_bg in aperture/theme.py); everything else gets the
        site default. The still is a <picture> so the browser fetches exactly
        ONE of the two — a display:none <img> would still be downloaded — and it
        doubles as the poster frame behind a loading video. No inline styles
@@ -83,7 +83,7 @@
 
        The ambient video is opt-in: app.js only loads/plays it on capable, large
        screens; low-end / mobile / reduced-motion / data-saver users keep the
-       still and never fetch the clip. -->
+       still and never fetch the clip. #}
   {% set bg = site_bg(bg_album | default(none)) %}
   <div class="site-bg" aria-hidden="true">
     <picture>

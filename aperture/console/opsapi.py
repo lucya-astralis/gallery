@@ -86,7 +86,7 @@ async def api_scan(request: Request):
 
     album = _album(body.get("album"))
     force = bool(body.get("force"))
-    if album and not (ops.gallery.PHOTOS_DIR / album).is_dir():
+    if album and not (settings.photos_dir / album).is_dir():
         raise HTTPException(404, "no such album: %r" % album)
 
     req = ops.request_scan(album=album, force=force, by=BY)
