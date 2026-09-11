@@ -1,0 +1,232 @@
+"""What is wrong with a cfg file -- one implementation, for every front end.
+
+`doctor` and the `cfg` / `album` commands in the CLI, and "Check all" and the
+issue list under every form in the console, all ask here.
+
+There used to be two implementations. The console's resolved photos and
+files against the filesystem, doctor's against the gallery's index and
+resolvers; their messages differed and so, now and then, did their verdicts.
+The gallery's own resolution is what decides what a visitor sees, so that is
+what these checks use. The precise messages about a key that names a file --
+not a bare name, an extension that key does not take, no folder yet, no such
+file -- came along from the console, because they tell an operator what to
+fix and not only that something is wrong. They describe the gallery's rule
+exactly: theme.album_icon_file and config.gallery_asset_file check those
+four things and nothing else.
+
+Every issue is a dict:
+
+    scope   "album" | "gallery"
+    album   the album path, or None for gallery.cfg
+    level   "error"  the gallery ignores or drops what the file says
+            "warn"   it works, but not the way the file suggests
+    key     the cfg key
+    detail  one sentence an operator can act on
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from . import albums, branding, cfgio, config, db, schema, theme, welcome
+
+# Said after an extension error where the whitelist alone would not explain
+# itself.
+_EXTENSION_HINTS = {"wallpaper_mobile": "stills only: a phone never loads a backdrop video"}
+
+
+def album(name: str, cfg: dict[str, list[str]] | None = None) -> list[dict]:
+    """Everything wrong with one album.cfg. Empty when the file is fine or absent.
+
+    `cfg` is the parsed file when the caller already holds it. The console
+    passes what it has just written: the gallery's cfg cache is keyed on the
+    file's mtime and size, and a same-size edit inside one timestamp tick
+    would otherwise be checked as the version before it."""
+    cfg = config.album_config(name) if cfg is None else cfg
+    if not cfg:
+        return []
+    out: list[dict] = []
+
+    def add(level: str, key: str, detail: str) -> None:
+        out.append({"scope": "album", "album": name, "level": level, "key": key, "detail": detail})
+
+    for key in cfg:
+        if key not in schema.ALBUM_KEYS:
+            add("error", key, "unknown key — ignored by the gallery (known: %s)"
+                % ", ".join(sorted(schema.ALBUM_KEYS)))
+
+    if "cover" in cfg:
+        raw = cfgio.first(cfg, "cover")
+        if raw and not albums.config_cover_rel(name, raw):
+            add("error", "cover", f"{raw!r} does not resolve to an indexed photo")
+
+    featured = [i.strip() for i in cfg.get("featured", []) if i.strip()]
+    if any(i.lower() in ("*", "all") for i in featured):
+        # The gallery then features the album's own photos and reads no
+        # other entry, so there is nothing else to resolve.
+        if not db.conn().execute("SELECT 1 FROM images WHERE album = ? LIMIT 1", (name,)).fetchone():
+            add("error", "featured", "`*` features nothing — the album has no photos of its own")
+    else:
+        for item in featured:
+            if not albums.resolve_photo_refs(name, [item]):
+                add("error", "featured", f"{item!r} matches no indexed photo")
+    for item in cfg.get("order", []):
+        item = item.strip()
+        if item and not albums.resolve_photo_refs(name, [item]):
+            add("warn", "order", f"{item!r} matches no indexed photo")
+
+    reel = (cfgio.first(cfg, "reel") or "").strip().lower()
+    if reel and reel not in schema.REEL_ACCEPTED:
+        add("error", "reel", f"{reel!r} is not featured, random or off")
+
+    sort = (cfgio.first(cfg, "sort") or "").strip().lower()
+    if sort and sort not in schema.PHOTO_SORTS:
+        add("error", "sort", f"{sort!r} is not one of {', '.join(sorted(schema.PHOTO_SORTS))}")
+    elif sort == "curated" and "order" not in cfg:
+        add("warn", "sort", "curated preset without an `order` list — the gallery falls back to date_desc")
+
+    effect = (cfgio.first(cfg, "effect") or "").strip().lower()
+    if effect and effect not in schema.EFFECTS:
+        add("error", "effect", f"{effect!r} is not whitelisted ({', '.join(sorted(schema.EFFECTS))})")
+
+    _files(cfg, schema.ALBUM_ASSET_KEYS, config.album_meta_dir(name), schema.ALBUM_META_DIR + "/", add)
+    _theme(cfg, add)
+
+    # A custom stat renders as LABEL / VALUE, so it needs the colon to split
+    # on; without one, or with nothing after it, the line is dropped silently.
+    for item in cfg.get("stat", []):
+        _label, sep, value = item.partition(":")
+        if not sep:
+            add("warn", "stat", f"{item!r} has no `Label: Value` colon — the line is dropped")
+        elif not value.strip():
+            add("warn", "stat", f"{item!r} has an empty value — the line is dropped")
+    stats = (cfgio.first(cfg, "stats") or "").strip().lower()
+    if stats and stats not in cfgio.FALSE:
+        add("warn", "stats", f"{stats!r} does nothing — only an off/false/no value hides the block")
+    return out
+
+
+def gallery(cfg: dict[str, list[str]] | None = None) -> list[dict]:
+    """Everything wrong with gallery.cfg. Empty when the file is fine or
+    absent. `cfg` as for album()."""
+    cfg = config.gallery_config() if cfg is None else cfg
+    if not cfg:
+        return []
+    out: list[dict] = []
+
+    def add(level: str, key: str, detail: str) -> None:
+        out.append({"scope": "gallery", "album": None, "level": level, "key": key, "detail": detail})
+
+    for key in cfg:
+        if key not in schema.GALLERY_KEYS:
+            add("error", key, "unknown key — ignored by the gallery (known: %s)"
+                % ", ".join(sorted(schema.GALLERY_KEYS)))
+
+    for key in ("welcome", "welcome_desktop", "welcome_mobile"):
+        spec = cfg.get(key, [])
+        if len(spec) == 1 and spec[0].strip().lower() in schema.WELCOME_KEYWORDS:
+            continue
+        for raw in spec:
+            if not welcome.lookup_welcome_image(raw):
+                add("error", key, f"{raw!r} does not resolve to an indexed photo — the entry is skipped")
+
+    if "album_order" in cfg:
+        known = {albums.album_order_key(n) for n in albums.all_album_nodes()}
+        for item in cfg["album_order"]:
+            if item.startswith("#"):
+                continue          # a group label, not an album
+            if albums.album_order_key(item) not in known:
+                add("warn", "album_order", f"{item!r} matches no album")
+
+    album_sort = (cfgio.first(cfg, "album_sort") or "").strip().lower()
+    if album_sort and album_sort not in schema.GALLERY_ALBUM_SORTS:
+        add("error", "album_sort", "%r is not one of %s"
+            % (album_sort, ", ".join(sorted(schema.GALLERY_ALBUM_SORTS))))
+    elif album_sort == "curated" and "album_order" not in cfg:
+        add("warn", "album_sort", "curated preset without an `album_order` list")
+
+    _files(cfg, schema.GALLERY_ASSET_KEYS, config.gallery_meta_dir(), schema.GALLERY_META_DIR + "/", add)
+    _theme(cfg, add)
+
+    # A bad link or a badge naming a missing file is silent in the browser --
+    # the link is dropped, the badge vanishes -- so this is the only place it
+    # surfaces.
+    for key in schema.URL_KEYS:
+        raw = cfgio.joined(cfg, key)
+        if raw and branding.brand_link(cfg, key) is None:
+            add("error", key, f"{raw!r} is not an http(s) or site-relative URL — the link is dropped")
+    badges = cfg.get("badges", [])
+    for badge in badges[:schema.BADGE_MAX]:
+        file = badge.partition("|")[0].strip()
+        if file and branding.brand_file(file) is None:
+            add("error", "badges", f"{file!r} is not an image in {schema.GALLERY_META_DIR}/ — the badge is skipped")
+    if len(badges) > schema.BADGE_MAX:
+        add("warn", "badges", f"only the first {schema.BADGE_MAX} are shown")
+    return out
+
+
+def everything() -> list[dict]:
+    """gallery.cfg, then every album that can carry an album.cfg."""
+    out = gallery()
+    for name in albums.albums_with_ancestors():
+        out += album(name)
+    return out
+
+
+# ----- rules both files share ---------------------------------------------
+def _files(cfg: dict, keys: dict, folder: Path | None, where: str, add) -> None:
+    """The four things the gallery checks before it serves a file a cfg
+    names, in the order an operator would fix them."""
+    for key, allowed in keys.items():
+        raw = (cfgio.first(cfg, key) or "").strip()
+        if not raw:
+            continue
+        if Path(raw).name != raw:
+            add("error", key, f"{raw!r} must be a bare file name inside {where}")
+        elif Path(raw).suffix.lower() not in allowed:
+            hint = _EXTENSION_HINTS.get(key)
+            add("error", key, f"{raw!r} is not one of {', '.join(sorted(allowed))}"
+                + (f" — {hint}" if hint else ""))
+        elif folder is None:
+            add("error", key, f"{raw!r} — there is no {where} folder yet")
+        elif not (folder / raw).is_file():
+            add("error", key, f"{raw!r} is not in {where}")
+
+
+def _theme(cfg: dict, add) -> None:
+    """The value half of the theme block album.cfg and gallery.cfg both carry
+    under identical rules: the face's scale, the accent, the backdrop knobs.
+    (The file half -- `font`, both wallpapers -- goes through _files.)"""
+    if "font_scale" in cfg:
+        raw = (cfgio.first(cfg, "font_scale") or "").strip()
+        lo, hi = schema.FONT_SCALE_RANGE
+        if config.cfg_font_scale(raw) is None:
+            add("warn", "font_scale", f"{raw!r} is ignored — not a number in {lo:g}–{hi:g}")
+        elif "font" not in cfg:
+            add("warn", "font_scale", "ignored — there is no `font` for it to scale")
+
+    accent = (cfgio.first(cfg, "accent") or "").strip()
+    if accent:
+        rgb = theme.parse_hex_color(accent)
+        if rgb is None:
+            add("error", "accent", f"{accent!r} is not a hex colour (#abc or #aabbcc) — the gallery ignores it")
+        elif theme.accent_shades(rgb)["lifted"]:
+            # Not an error: the gallery lightens it rather than ship an
+            # unreadable page. But the colour on screen is then not the one in
+            # the file, and that is worth saying out loud.
+            add("warn", "accent", f"{accent!r} is too dark to read on the black page — "
+                f"the gallery lightens it to {theme.accent_shades(rgb)['acc']}")
+
+    for key, span in (("wallpaper_tint", schema.WALLPAPER_TINT_RANGE),
+                      ("wallpaper_dim", schema.WALLPAPER_DIM_RANGE)):
+        raw = (cfgio.first(cfg, key) or "").strip()
+        if not raw or raw.lower() in cfgio.TRUE | cfgio.FALSE:
+            continue
+        unit = f"{span[0]:g}–{span[1]:g} or off"
+        try:
+            value = float(raw.replace(",", "."))
+        except ValueError:
+            add("error", key, f"{raw!r} is not a number ({unit}) — ignored")
+            continue
+        if not span[0] <= value <= span[1]:
+            add("warn", key, f"{raw!r} is outside {unit} — ignored, the default stands")

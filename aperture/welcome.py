@@ -5,14 +5,10 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from . import config, db, photos
+from . import config, db, photos, schema
 
 log = logging.getLogger("aperture.welcome")
 WELCOME_FEED_MAX = 24
-WELCOME_KEYWORDS = {
-    "showcase": "showcase", "auto": "showcase", "featured": "showcase",
-    "random": "random", "shuffle": "random",
-}
 _warned_welcome: set[str] = set()
 
 
@@ -36,8 +32,8 @@ def welcome_feed(mobile: bool = False) -> tuple[list[dict], str, str]:
     cfg = config.gallery_config()
     spec = cfg.get("welcome_mobile" if mobile else "welcome_desktop") or cfg.get("welcome", [])
     mode = "showcase"
-    if len(spec) == 1 and spec[0].lower() in WELCOME_KEYWORDS:
-        mode = WELCOME_KEYWORDS[spec[0].lower()]
+    if len(spec) == 1 and spec[0].lower() in schema.WELCOME_KEYWORDS:
+        mode = schema.WELCOME_KEYWORDS[spec[0].lower()]
     elif spec:
         feed: list[dict] = []
         seen: set[str] = set()

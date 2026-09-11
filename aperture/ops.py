@@ -38,7 +38,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from . import albums, branding, cfgio, config, control, db, i18n, photos, scanner, schema, theme, welcome
+from . import albums, checks, config, control, db, scanner, schema, theme
 from .runtime import settings
 
 
@@ -262,31 +262,6 @@ def featured_map() -> tuple[dict[str, list[tuple[str, str]]], list[dict]]:
     return by_photo, unresolved
 
 
-# ----- config validation ------------------------------------------------
-# What counts as a KNOWN key is the gallery's own business, so both sets come
-# from there (main.ALBUM_CFG_KEYS / main.GALLERY_CFG_KEYS, declared next to the
-# comment block that documents them). This file used to keep its own copy and
-# it went stale — `name` was never added, so doctor reported every album that
-# set a display name as an error.
-# The registry is aperture/schema.py; doctor checks against it directly.
-ALBUM_CFG_KEYS = frozenset(schema.ALBUM_KEYS)
-GALLERY_CFG_KEYS = frozenset(schema.GALLERY_KEYS)
-
-# gallery.cfg keys naming a file in photos/.gallery/. Checked the same way
-# and for the same reason as an album's `icon`: a typo here is silent at
-# runtime — the slot simply falls back or disappears.
-BRAND_ASSET_KEYS = ("logo", "favicon", "operator_pfp")
-BRAND_URL_KEYS = tuple(schema.URL_KEYS)
-# Both files carry the knobs with identical rules, so the range check that
-# reads this lives in one place (check_wallpaper_knobs).
-WALLPAPER_KNOBS = tuple(
-    (key, span, f"{span[0]:g}–{span[1]:g} or off")
-    for key, span in (("wallpaper_tint", schema.WALLPAPER_TINT_RANGE),
-                      ("wallpaper_dim", schema.WALLPAPER_DIM_RANGE)))
-# Every spelling the gallery honours, not just the three the console offers.
-REEL_VALUES = schema.REEL_ACCEPTED
-
-
 def wallpaper_line(album: str, variant: str) -> str:
     """The backdrop this album actually shows, named through the tiers it is
     resolved by: `file.jpg` for its own, `file.jpg (from japan_2026)` for an
@@ -300,223 +275,6 @@ def wallpaper_line(album: str, variant: str) -> str:
     if site is not None:
         return f"{site.name} (gallery.cfg)"
     return "— (shipped default)"
-
-
-# What each file key of the theme block will and will not accept, for the
-# message a typo gets. Same two keys in both cfg files (check_theme).
-_WALLPAPER_HINTS = {"wallpaper": "video or still", "wallpaper_mobile": "stills only"}
-
-
-def check_theme(cfg: dict, files: dict, scale, where: str) -> list[tuple]:
-    """(level, key, detail) for the theme block BOTH cfg files carry: the
-    accent, the face (`font` / `font_scale`) and the backdrop (`wallpaper`,
-    `wallpaper_mobile`, and the two knobs).
-
-    The keys are spelled identically in album.cfg and gallery.cfg — gallery.cfg
-    dresses the site, an album overrides its own pages — so the rules live
-    here once. All the caller passes in is what genuinely differs: how the
-    file keys resolve (`files`: key -> a no-arg resolver returning a Path or
-    None), how the scale resolves, and the folder to name in a message."""
-    out = []
-    for key, resolve in files.items():
-        if key not in cfg:
-            continue
-        raw = cfgio.first(cfg, key)
-        if resolve() is None:
-            hint = _WALLPAPER_HINTS.get(key)
-            detail = f"{raw!r} not found in {where} (or unsupported type"
-            detail += f" — {hint})" if hint else ")"
-            out.append(("error", key, detail))
-    if "font_scale" in cfg and scale() is None:
-        lo, hi = schema.FONT_SCALE_RANGE
-        out.append(("warn", "font_scale",
-                    f"ignored — not a number in {lo}–{hi}, or no `font` set"))
-    if "accent" in cfg:
-        raw = (cfgio.first(cfg, "accent") or "").strip()
-        rgb = theme.parse_hex_color(raw)
-        if rgb is None:
-            out.append(("error", "accent",
-                        f"{raw!r} is not a hex colour (#abc or #aabbcc) — ignored"))
-        elif theme.accent_shades(rgb)["lifted"]:
-            # not an error: the gallery lightens it rather than shipping an
-            # unreadable page, but the colour on screen is then not the one
-            # in the file, and that is worth saying out loud.
-            out.append(("warn", "accent",
-                        f"{raw!r} is too dark to read on the black page — the gallery "
-                        f"lightens it to {theme.accent_shades(rgb)['acc']}"))
-    out += check_wallpaper_knobs(cfg)
-    return out
-
-
-def check_wallpaper_knobs(cfg: dict) -> list[tuple]:
-    """(level, key, detail) for whatever is wrong with `wallpaper_tint` /
-    `wallpaper_dim`. Both album.cfg and gallery.cfg carry them under the same
-    rules — gallery.cfg sets the site default, an album overrides it — so the
-    check is written once."""
-    out = []
-    for key, span, unit in WALLPAPER_KNOBS:
-        if key not in cfg:
-            continue
-        raw = (cfgio.first(cfg, key) or "").strip()
-        if raw.lower() in cfgio.TRUE | cfgio.FALSE:
-            continue
-        try:
-            num = float(raw.replace(",", "."))
-        except ValueError:
-            out.append(("error", key, f"{raw!r} is not a number ({unit}) — ignored"))
-            continue
-        if not span[0] <= num <= span[1]:
-            out.append(("warn", key,
-                        f"{raw!r} is outside {unit} — ignored, the gallery default stands"))
-    return out
-
-
-def check_album_cfg(album: str) -> list[dict]:
-    """Everything wrong with one album.cfg, as {level, key, detail}. Empty
-    list means the file is fine (or absent)."""
-    cfg = config.album_config(album)
-    if not cfg:
-        return []
-    issues: list[dict] = []
-
-    def add(level, key, detail):
-        issues.append({"album": album, "level": level, "key": key, "detail": detail})
-
-    for key in cfg:
-        if key not in ALBUM_CFG_KEYS:
-            add("error", key, f"unknown key — ignored by the app (known: {', '.join(sorted(ALBUM_CFG_KEYS))})")
-
-    if "cover" in cfg:
-        raw = cfgio.first(cfg, "cover")
-        if not albums.config_cover_rel(album, raw):
-            add("error", "cover", f"{raw!r} does not resolve to an indexed photo")
-    if "featured" in cfg:
-        for item in cfg["featured"]:
-            item = item.strip()
-            if not item or item.lower() in ("*", "all"):
-                continue
-            if not albums.resolve_photo_refs(album, [item]):
-                add("error", "featured", f"{item!r} matches no photo")
-    if "order" in cfg:
-        for item in cfg["order"]:
-            item = item.strip()
-            if item and not albums.resolve_photo_refs(album, [item]):
-                add("warn", "order", f"{item!r} matches no photo")
-    if "reel" in cfg:
-        val = (cfgio.first(cfg, "reel") or "").strip().lower()
-        if val and val not in REEL_VALUES:
-            add("error", "reel", f"{val!r} is not featured/random/off")
-    if "sort" in cfg:
-        val = (cfgio.first(cfg, "sort") or "").strip().lower()
-        allowed = set(photos.SORT_IMAGE_SQL) | {photos.SORT_CURATED, photos.SORT_DAYS}
-        if val and val not in allowed:
-            add("error", "sort", f"{val!r} is not one of {', '.join(sorted(allowed))}")
-        elif val == photos.SORT_CURATED and "order" not in cfg:
-            add("warn", "sort", "curated preset without an `order` list — falls back to date_desc")
-    if "effect" in cfg:
-        val = (cfgio.first(cfg, "effect") or "").strip().lower()
-        if val and val not in schema.EFFECTS:
-            add("error", "effect", f"{val!r} is not whitelisted ({', '.join(sorted(schema.EFFECTS))})")
-    if "icon" in cfg:
-        raw = cfgio.first(cfg, "icon")
-        if theme.album_icon_file(album) is None:
-            add("error", "icon", f"{raw!r} not found in .album/ (or unsupported type)")
-    for level, key, detail in check_theme(
-            cfg,
-            {"font": lambda: theme.album_font_file(album),
-             "wallpaper": lambda: theme.album_wallpaper_file(album, "desktop"),
-             "wallpaper_mobile": lambda: theme.album_wallpaper_file(album, "mobile")},
-            lambda: theme.album_font_scale(album), ".album/"):
-        add(level, key, detail)
-    # A custom stat renders as KEY / VALUE, so it needs the colon to split on;
-    # without one albums.album_stats drops the line silently.
-    for item in cfg.get("stat", []):
-        label, sep, val = item.partition(":")
-        if not sep:
-            add("warn", "stat", f"{item!r} has no `Label: Value` colon — the line is dropped")
-        elif not val.strip():
-            add("warn", "stat", f"{item!r} has an empty value — the line is dropped")
-    if "stats" in cfg:
-        val = (cfgio.first(cfg, "stats") or "").strip().lower()
-        if val and val not in cfgio.FALSE:
-            add("warn", "stats", f"{val!r} does nothing — only an off/false/no value hides the block")
-    return issues
-
-
-def check_gallery_cfg() -> list[dict]:
-    cfg = config.gallery_config()
-    issues: list[dict] = []
-
-    def add(level, key, detail):
-        issues.append({"album": "(gallery.cfg)", "level": level, "key": key, "detail": detail})
-
-    if not cfg:
-        return issues
-
-    for key in cfg:
-        if key not in GALLERY_CFG_KEYS:
-            add("error", key, f"unknown key — ignored (known: {', '.join(sorted(GALLERY_CFG_KEYS))})")
-    for key in ("welcome", "welcome_desktop", "welcome_mobile"):
-        spec = cfg.get(key, [])
-        if len(spec) == 1 and spec[0].lower() in welcome.WELCOME_KEYWORDS:
-            continue
-        for raw in spec:
-            if not welcome.lookup_welcome_image(raw):
-                add("error", key, f"{raw!r} does not resolve to an indexed photo — entry is skipped")
-    if "album_order" in cfg:
-        known = {albums.album_order_key(n) for n in albums.all_album_nodes()}
-        for item in cfg["album_order"]:
-            if item.startswith("#"):
-                continue
-            if albums.album_order_key(item) not in known:
-                add("warn", "album_order", f"{item!r} matches no album")
-    if "album_sort" in cfg:
-        val = (cfgio.first(cfg, "album_sort") or "").strip().lower()
-        allowed = set(photos.SORT_ALBUM_SQL) | {photos.SORT_CURATED}
-        if val and val not in allowed:
-            add("error", "album_sort", f"{val!r} is not one of {', '.join(sorted(allowed))}")
-    for level, key, detail in check_theme(
-            cfg,
-            {"font": theme.site_font_file,
-             "wallpaper": lambda: theme.site_wallpaper_file("desktop"),
-             "wallpaper_mobile": lambda: theme.site_wallpaper_file("mobile")},
-            theme.site_font_scale, ".gallery/"):
-        add(level, key, detail)
-    for level, key, detail in check_brand(cfg):
-        add(level, key, detail)
-    return issues
-
-
-def check_brand(cfg: dict) -> list[tuple]:
-    """(level, key, detail) for the branding block. Every failure here is
-    silent in the browser — a mistyped logo falls back to the built-in mark,
-    a bad URL drops the link, a badge naming a missing file just vanishes —
-    so this is the only place they surface."""
-    out = []
-    meta = config.gallery_meta_dir()
-    for key in BRAND_ASSET_KEYS:
-        name = (cfgio.first(cfg, key) or "").strip()
-        if not name:
-            continue
-        if meta is None:
-            out.append(("error", key, f"{name!r} — there is no photos/{schema.GALLERY_META_DIR}/ folder"))
-            continue
-        if Path(name).name != name:
-            out.append(("error", key, f"{name!r} must be a bare filename inside {schema.GALLERY_META_DIR}/"))
-        elif branding.brand_file(name) is None:
-            types = ", ".join(sorted(branding.BRAND_ASSET_TYPES))
-            out.append(("error", key, f"{name!r} is not a readable file in {schema.GALLERY_META_DIR}/ ({types})"))
-    for key in BRAND_URL_KEYS:
-        raw = cfgio.joined(cfg, key)
-        if raw and branding.brand_link(cfg, key) is None:
-            out.append(("error", key, f"{raw!r} is not an http(s) or site-relative URL — the link is dropped"))
-    for badge in cfg.get("badges", [])[:schema.BADGE_MAX]:
-        name = badge.partition("|")[0].strip()
-        if name and branding.brand_file(name) is None:
-            out.append(("error", "badges", f"{name!r} is not a readable image in {schema.GALLERY_META_DIR}/ — the badge is skipped"))
-    if len(cfg.get("badges", [])) > schema.BADGE_MAX:
-        out.append(("warn", "badges", f"only the first {schema.BADGE_MAX} are shown"))
-    return out
 
 
 # ----- state ------------------------------------------------------------
@@ -682,17 +440,14 @@ def doctor(album: str | None = None, limit_slow: int = 50,
     # --- config ---
     _tick("parsing album.cfg files")
     for a in (albums.albums_with_ancestors() if album is None else [album]):
-        for issue in check_album_cfg(a):
+        for issue in checks.album(a):
             note("config", issue)
     if album is None:
-        for issue in check_gallery_cfg():
+        for issue in checks.gallery():
             note("config", issue)
 
     # --- featured drift ---
-    by_photo, unresolved = featured_map()
-    for item in unresolved:
-        note("config", {"album": item["album"], "level": "error", "key": "featured",
-                        "detail": f"{item['entry']!r} — {item['reason']}"})
+    by_photo, _unresolved = featured_map()   # the unresolved half is a config issue above
     flagged = {r["rel_path"] for r in rows if r["is_showcase"]}
     expected_featured = {rel for rel in by_photo if rel in row_by_rel}
     for rel in sorted(expected_featured - flagged):

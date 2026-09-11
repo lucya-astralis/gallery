@@ -101,7 +101,11 @@ ALBUM_SORTS = ["latest_desc", "latest_asc", "name_asc", "name_desc",
 PHOTO_SORTS = ["curated", "days"] + IMAGE_SORTS
 GALLERY_ALBUM_SORTS = ["curated"] + ALBUM_SORTS
 
-WELCOME_KEYWORDS = ["showcase", "auto", "featured", "random", "shuffle"]
+# A welcome key holding one of these words is a feed rather than a list of
+# photos; the value is which feed. welcome.welcome_feed reads it, the
+# console offers the words, aperture/checks.py knows not to resolve them.
+WELCOME_KEYWORDS = {"showcase": "showcase", "auto": "showcase", "featured": "showcase",
+                    "random": "random", "shuffle": "random"}
 
 FONT_SCALE_RANGE = (0.5, 2.5)
 # Per-album theme (album.cfg `accent` / `wallpaper_tint` / `wallpaper_dim`).
@@ -201,6 +205,10 @@ GALLERY_ASSET_KEYS = {"logo": BRAND_EXTS, "favicon": BRAND_EXTS,
                       "font": FONT_EXTS,
                       "wallpaper": WALLPAPER_EXTS,
                       "wallpaper_mobile": WALLPAPER_IMAGE_EXTS}
+# The same for album.cfg, against the album's own .album/.
+ALBUM_ASSET_KEYS = {"icon": ICON_EXTS, "font": FONT_EXTS,
+                    "wallpaper": WALLPAPER_EXTS,
+                    "wallpaper_mobile": WALLPAPER_IMAGE_EXTS}
 
 # Where a key means something different on the gallery tab than on an album's.
 # Both files spell the theme block identically, but one tier down the files
@@ -276,9 +284,3 @@ GALLERY_HELP: dict[str, str] = {
     "wallpaper_tint": "How much colour the site backdrop keeps -- the gallery's own and any an album brings that says nothing itself. Empty = the built-in near-greyscale treatment. \u201coff\u201d = full colour, a number = partial.",
     "wallpaper_dim": "How bright that backdrop is -- 1 and \u201coff\u201d both leave it untouched. Empty = the built-in 0.72. An album that sets it wins for its own pages.",
 }
-
-
-def order_key(path: str) -> str:
-    """Normalize an album path or photo ref the way the gallery does when
-    matching cfg entries: slashes forward, trimmed, lower-cased."""
-    return path.replace("\\", "/").strip().strip("/").lower()

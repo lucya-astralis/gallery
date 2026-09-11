@@ -228,49 +228,6 @@ class Library:
                 dirnames[:] = []
         return out
 
-    def resolve_photo(self, album: str, item: str) -> str | None:
-        """Resolve one album.cfg photo reference to a path relative to the
-        album, or None. Mirrors the gallery's `albums.resolve_photo_refs`: an exact
-        relative path wins, otherwise a case-insensitive match on a bare
-        filename anywhere in the subtree, or on any path-suffix."""
-        item = (item or "").replace("\\", "/").strip().strip("/")
-        if not item:
-            return None
-        base = self.safe(album)
-        # The gallery tolerates a ref that already carries the album prefix.
-        prefix = album.strip("/") + "/"
-        if album.strip("/") and item.lower().startswith(prefix.lower()):
-            item = item[len(prefix):]
-        direct = base / item
-        if direct.is_file() and schema.is_image(direct.name):
-            try:
-                return direct.resolve().relative_to(base.resolve()).as_posix()
-            except ValueError:
-                return None
-        key = schema.order_key(item)
-        for photo in self.photos(album, recursive=True):
-            sub = schema.order_key(photo["sub"])
-            if "/" in key:
-                if sub == key or sub.endswith("/" + key):
-                    return photo["sub"]
-            elif schema.order_key(photo["name"]) == key:
-                return photo["sub"]
-        return None
-
-    def resolve_gallery_photo(self, raw: str) -> str | None:
-        """Resolve a gallery.cfg welcome entry (a path relative to the photos
-        root) to that path, or None."""
-        rel = (raw or "").replace("\\", "/").strip().strip("/")
-        if not rel or "/" not in rel:
-            return None
-        try:
-            target = self.safe(rel)
-        except ValueError:
-            return None
-        if target.is_file() and schema.is_image(target.name):
-            return rel
-        return None
-
     # ----- .gallery assets ------------------------------------------------
     def brand_assets(self) -> list[dict]:
         """Files in photos/.gallery/. Unlike an album's assets these are not

@@ -347,7 +347,6 @@ aperture/console/
   security.py   the door: password, sessions, CSRF, throttle, audit log
   library.py    the photo tree and the .tags sidecars, off the filesystem
   imagemeta.py  read-only EXIF for the metadata panel
-  validate.py   the checks behind "Check all"
   static/       style.css, app.js, fonts/, logo/
   templates/    index.html
 ```
@@ -361,6 +360,8 @@ The format and the vocabulary live one level up, shared with the gallery:
 - `aperture/cfgio.py` — the grammar, and the comment-preserving writer
 - `aperture/schema.py` — which keys exist, their allowed values, write style
   and help text
+- `aperture/checks.py` — what is wrong with a cfg: the checks behind "Check
+  all" and every form's issue list, the same ones `doctor` runs
 
 `aperture/schema.py` is the one file to touch when the gallery grows a config
 key: its name in `ALBUM_KEYS`/`GALLERY_KEYS`, its write style in `KEY_SPEC`, its

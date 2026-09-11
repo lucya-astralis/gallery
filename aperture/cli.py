@@ -39,7 +39,7 @@ from PIL import Image
 # Those would land above the masthead, so they are muted here and reported by
 # the dashboard instead — anything a command logs while running still shows.
 logging.disable(logging.CRITICAL)
-from . import albums, brand, cfgio, config, photos, schema, templating, termui as ui, theme, trips, welcome
+from . import albums, brand, cfgio, checks, config, photos, schema, templating, termui as ui, theme, trips, welcome
 from . import control, db, i18n, scanner
 logging.disable(logging.NOTSET)
 
@@ -95,11 +95,6 @@ _scope_rows = ops.scope_rows
 _index_counts = ops.index_counts
 _featured_map = ops.featured_map
 _wallpaper_line = ops.wallpaper_line
-_check_theme = ops.check_theme
-_check_wallpaper_knobs = ops.check_wallpaper_knobs
-_check_album_cfg = ops.check_album_cfg
-_check_gallery_cfg = ops.check_gallery_cfg
-_check_brand = ops.check_brand
 
 
 # ----- commands ---------------------------------------------------------
@@ -349,7 +344,7 @@ def cmd_doctor(args) -> int:
         head(f"{check}  ({len(items)})")
         for item in items[:args.limit]:
             if check == "config":
-                out(f"  [{item['level']}] {item['album']} · {item['key']}: {item['detail']}")
+                out(f"  [{item['level']}] {item['album'] or 'gallery.cfg'} · {item['key']}: {item['detail']}")
             else:
                 out(f"  {item['rel_path']}")
                 out(f"      {item['detail']}")
@@ -511,7 +506,7 @@ def cmd_cfg(args) -> int:
     if args.gallery:
         cfg = config.gallery_config()
         path = config.GALLERY_CFG_PATH
-        issues = _check_gallery_cfg()
+        issues = checks.gallery()
         title = "gallery.cfg"
     else:
         if not args.album:
@@ -520,7 +515,7 @@ def cmd_cfg(args) -> int:
         cfg = config.album_config(album)
         meta = config.album_meta_dir(album)
         path = (meta / "album.cfg") if meta else (settings.photos_dir / album / ".album" / "album.cfg")
-        issues = _check_album_cfg(album)
+        issues = checks.album(album)
         title = f"{album}/.album/album.cfg"
 
     if args.json:
@@ -855,7 +850,7 @@ def _welcome_report(mobile: bool) -> dict:
         source = "welcome" if spec else "(unset)"
 
     skipped = []
-    if not (len(spec) == 1 and spec[0].lower() in welcome.WELCOME_KEYWORDS):
+    if not (len(spec) == 1 and spec[0].lower() in schema.WELCOME_KEYWORDS):
         for raw in spec:
             if welcome.lookup_welcome_image(raw) is None:
                 skipped.append(raw)
@@ -885,7 +880,7 @@ def cmd_welcome(args) -> int:
     if args.json:
         dump({"devices": devices,
               "feed_max": welcome.WELCOME_FEED_MAX,
-              "keywords": sorted(set(welcome.WELCOME_KEYWORDS))})
+              "keywords": sorted(schema.WELCOME_KEYWORDS)})
         return 1 if any(d["skipped"] for d in devices) else 0
 
     for report in devices:
@@ -1034,7 +1029,7 @@ def cmd_album(args) -> int:
         "icon": icon.name if icon else None,
         "font": font.name if font else None,
         "sub_albums": children,
-        "issues": _check_album_cfg(album),
+        "issues": checks.album(album),
     }
     if args.json:
         dump(info)

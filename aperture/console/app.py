@@ -32,12 +32,12 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from .. import brand
+from .. import brand, checks
 from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
 from .. import cfgio, schema, templating
-from . import imagemeta, opsapi, security, validate
+from . import imagemeta, opsapi, security
 from .library import Library, asset_kinds
 
 # The console ships with the app now, so it carries the app's version rather
@@ -344,7 +344,7 @@ def api_meta():
         "reel_values": schema.REEL_VALUES,
         "photo_sorts": schema.PHOTO_SORTS,
         "gallery_album_sorts": schema.GALLERY_ALBUM_SORTS,
-        "welcome_keywords": schema.WELCOME_KEYWORDS,
+        "welcome_keywords": list(schema.WELCOME_KEYWORDS),
         "icon_exts": sorted(schema.ICON_EXTS),
         "font_exts": sorted(schema.FONT_EXTS),
         "wallpaper_exts": sorted(schema.WALLPAPER_EXTS),
@@ -383,7 +383,7 @@ def api_album(path: str = ""):
         "exists": lib.cfg_path(album).is_file(),
         "values": values,
         "raw": cfg_file.text(),
-        "issues": validate.check_album(lib, album, values),
+        "issues": checks.album(album, values),
         "assets": lib.assets(album),
         "descriptions": {lang: lib.read_desc(album, lang) for lang in schema.LANGS},
         "photo_count": len(lib.photos(album, recursive=True)),
@@ -406,7 +406,7 @@ async def api_album_cfg(request: Request):
     _writes(request, "album.cfg", path, before)
     values = cfg_file.values()
     return {"ok": True, "values": values, "raw": cfg_file.text(),
-            "issues": validate.check_album(lib, album, values)}
+            "issues": checks.album(album, values)}
 
 
 @app.put("/api/album/raw")
@@ -425,7 +425,7 @@ async def api_album_raw(request: Request):
     _writes(request, "album.cfg (raw)", path, before)
     values = cfg_file.values()
     return {"ok": True, "values": values, "raw": cfg_file.text(),
-            "issues": validate.check_album(lib, album, values)}
+            "issues": checks.album(album, values)}
 
 
 @app.delete("/api/album/cfg")
@@ -469,7 +469,7 @@ def api_gallery():
         "exists": path.is_file(),
         "values": values,
         "raw": cfg_file.text(),
-        "issues": validate.check_gallery(lib, values),
+        "issues": checks.gallery(values),
         "albums": lib.album_paths(),
         # what the logo / favicon / portrait pickers can offer
         "assets": lib.brand_assets(),
@@ -490,7 +490,7 @@ async def api_gallery_cfg(request: Request):
     _writes(request, "gallery.cfg", path, before)
     values = cfg_file.values()
     return {"ok": True, "values": values, "raw": cfg_file.text(),
-            "issues": validate.check_gallery(lib, values),
+            "issues": checks.gallery(values),
             "assets": lib.brand_assets()}
 
 
@@ -509,7 +509,7 @@ async def api_gallery_raw(request: Request):
     _writes(request, "gallery.cfg (raw)", path, before)
     values = cfg_file.values()
     return {"ok": True, "values": values, "raw": cfg_file.text(),
-            "issues": validate.check_gallery(lib, values),
+            "issues": checks.gallery(values),
             "assets": lib.brand_assets()}
 
 
@@ -844,7 +844,7 @@ def api_asset_delete(request: Request, path: str = "", name: str = "",
 @app.get("/api/validate")
 def api_validate():
     started = time.monotonic()
-    issues = validate.check_all(lib)
+    issues = checks.everything()
     return {
         "issues": issues,
         "errors": sum(1 for i in issues if i["level"] == "error"),

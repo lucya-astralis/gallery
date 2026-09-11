@@ -9,6 +9,7 @@ chain behind them actually ran.
 """
 
 import pytest
+from fastapi.testclient import TestClient
 
 # Routes that render a page or hand out a file, with the content type they
 # promise. `None` means "don't care beyond the status".
@@ -109,7 +110,11 @@ def test_album_page_resolves_its_config(client):
 
 
 def test_album_page_is_german_under_the_lang_cookie(client):
-    body = client.get("/album/berlin", cookies={"lang": "de"}).text
+    # A client of its own: cookies set per request are deprecated in httpx,
+    # and setting one on the shared session client would leak into every
+    # other test.
+    german = TestClient(client.app, cookies={"lang": "de"})
+    body = german.get("/album/berlin").text
     assert "überwiegend in der Kälte" in body
 
 

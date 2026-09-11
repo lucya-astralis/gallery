@@ -32,6 +32,9 @@ from pathlib import Path
 # Writers only. Readers hold no lock — with a connection each they don't need
 # one, which is the whole point of the split.
 _lock = threading.Lock()
+# Held while the database is opened for the first time, so two threads
+# arriving together do not both run the schema migrations.
+_init_lock = threading.Lock()
 # Where init() put the database. Doubles as "has init() run yet".
 _db_path: Path | None = None
 # The per-thread connection. A thread that ends drops its reference and the
@@ -92,8 +95,9 @@ def _connect(db_path: Path) -> sqlite3.Connection:
 
 def init(data_dir: Path) -> sqlite3.Connection:
     """Create the database if it isn't there, bring the schema up to date, and
-    hand back this thread's connection. Called once per process — by the
-    server at startup and by the CLI before it touches the index."""
+    hand back this thread's connection. conn() calls it on first use; the
+    indexer also calls it at startup, so a migration runs before the first
+    request rather than inside one."""
     global _db_path
     data_dir.mkdir(parents=True, exist_ok=True)
     _db_path = data_dir / "gallery.db"
@@ -117,7 +121,13 @@ def conn() -> sqlite3.Connection:
     across threads — sqlite3 refuses it, which is deliberate: the guarantees
     at the top of this file are exactly what that refusal protects."""
     if _db_path is None:
-        raise RuntimeError("DB not initialised")
+        # Nothing has to remember to open it first. A console-only process
+        # never runs the indexer's startup, and every read it made of the
+        # index used to fail here.
+        with _init_lock:
+            if _db_path is None:
+                from .runtime import settings
+                return init(settings.data_dir)
     existing = getattr(_local, "conn", None)
     if existing is not None:
         return existing

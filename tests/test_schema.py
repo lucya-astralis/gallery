@@ -22,10 +22,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from aperture import albums, cfgio, ops, paths, scanner, schema, theme
+from aperture import albums, cfgio, checks, paths, scanner, schema, theme
 from aperture.console import app as console_mod
-from aperture.console import security, validate
-from aperture.console.library import Library
+from aperture.console import security
 from aperture.runtime import settings
 
 ALL_KEYS = frozenset(schema.ALBUM_KEYS) | frozenset(schema.GALLERY_KEYS)
@@ -49,14 +48,7 @@ def test_main_py_is_gone_and_nothing_imports_it():
                             or (node.module in (None, "aperture") and "main" in names)), path
 
 
-def test_the_key_sets_come_from_the_schema():
-    assert ops.ALBUM_CFG_KEYS == frozenset(schema.ALBUM_KEYS)
-    assert ops.GALLERY_CFG_KEYS == frozenset(schema.GALLERY_KEYS)
-
-
 def test_the_smaller_vocabularies_come_from_the_schema():
-    assert ops.REEL_VALUES is schema.REEL_ACCEPTED
-    assert ops.BRAND_URL_KEYS == tuple(schema.URL_KEYS)
     assert scanner.IMAGE_EXTS is schema.IMAGE_EXTS
     for module in (scanner, paths):
         assert module.ALBUM_META_DIR == schema.ALBUM_META_DIR
@@ -216,11 +208,8 @@ def test_reel_hide_is_not_an_error_anywhere(berlin_cfg):
                           encoding="utf-8")
     cfg = cfgio.parse(berlin_cfg.read_text(encoding="utf-8"))
 
-    console_issues = validate.check_album(Library(settings.photos_dir), "berlin", cfg)
-    assert not [i for i in console_issues if i["key"] == "reel"], console_issues
-
-    doctor_issues = ops.check_album_cfg("berlin")
-    assert not [i for i in doctor_issues if i.get("key") == "reel"], doctor_issues
+    issues = checks.album("berlin")
+    assert not [i for i in issues if i["key"] == "reel"], issues
 
     # ... and the gallery really does treat it as off.
     assert albums.album_reel("berlin", cfg)[0] == "off"
