@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import os
 
-from .cfgio import FALSE, GROUP_KEYS
+from .cfgio import FALSE
 from .i18n import LANGS as _I18N_LANGS
 
 # ----- vocabularies the gallery whitelists ------------------------------
@@ -67,6 +67,11 @@ WALLPAPER_IMAGE_EXTS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".avif"})
 WALLPAPER_VIDEO_EXTS = frozenset({".mp4", ".webm"})
 WALLPAPER_EXTS = WALLPAPER_IMAGE_EXTS | WALLPAPER_VIDEO_EXTS
 
+# Per-album metadata folder: everything that describes an album rather
+# than being one of its photos -- album.cfg, the album_*.md descriptions,
+# a custom title font. Never indexed (scanner.is_meta_path): a stray
+# image in here is metadata -- a font specimen, a screenshot of the cfg --
+# and not a gallery photo.
 ALBUM_META_DIR = ".album"
 ALBUM_CFG_NAME = "album.cfg"
 GALLERY_CFG_NAME = "gallery.cfg"
@@ -74,6 +79,9 @@ GALLERY_CFG_NAME = "gallery.cfg"
 # badges — live in photos/.gallery/, the gallery-wide mirror of
 # an album's .album/ folder.
 GALLERY_META_DIR = ".gallery"
+# Both, for the guards that ask "is this path metadata?" -- the scanner
+# walking the tree, and the write resolver in aperture/paths.py.
+META_DIRS = (ALBUM_META_DIR, GALLERY_META_DIR)
 BRAND_EXTS = ICON_EXTS
 # Everything that folder may now hold. It started as marks only; the theme
 # block one tier down (`font`, `wallpaper`, `wallpaper_mobile` in gallery.cfg)

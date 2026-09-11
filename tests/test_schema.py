@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from aperture import albums, cfgio, checks, paths, scanner, schema, theme
+from aperture import albums, cfgio, checks, paths, schema, theme
 from aperture.console import app as console_mod
 from aperture.console import security
 from aperture.runtime import settings
@@ -48,11 +48,38 @@ def test_main_py_is_gone_and_nothing_imports_it():
                             or (node.module in (None, "aperture") and "main" in names)), path
 
 
-def test_the_smaller_vocabularies_come_from_the_schema():
-    assert scanner.IMAGE_EXTS is schema.IMAGE_EXTS
-    for module in (scanner, paths):
-        assert module.ALBUM_META_DIR == schema.ALBUM_META_DIR
-        assert module.GALLERY_META_DIR == schema.GALLERY_META_DIR
+# A name a module gives a schema value BECAUSE IT MEANS SOMETHING ELSE there,
+# and the CLI's four report verbs, which read as verbs in a command body and
+# are bound once where the file says so.
+ALIASES_ALLOWED = {("branding.py", "BRAND_ASSET_TYPES"),
+                   ("cli.py", "out"), ("cli.py", "kv"),
+                   ("cli.py", "head"), ("cli.py", "hint")}
+
+
+def test_no_module_keeps_a_second_name_for_something():
+    """`X = other.X` at module level is how a copy starts.
+
+    Both kinds went wrong here already. A snapshot of a setting: the console
+    bound READ_ONLY at import, so a read-only console refused the operations
+    panel and wrote cfg files anyway. And a shortcut to another module: the
+    CLI's sixteen `_x = ops.x`, bound to avoid a rename diff, which left the
+    file talking about code that had moved out of it years of edits ago.
+    """
+    offenders = []
+    for path in sorted(PACKAGE.rglob("*.py")):
+        for node in ast.parse(path.read_text(encoding="utf-8")).body:
+            if not (isinstance(node, ast.Assign) and len(node.targets) == 1
+                    and isinstance(node.targets[0], ast.Name)
+                    and isinstance(node.value, ast.Attribute)
+                    and isinstance(node.value.value, ast.Name)):
+                continue
+            name = node.targets[0].id
+            if (path.name, name) in ALIASES_ALLOWED:
+                continue
+            offenders.append("%s:%d  %s = %s.%s" % (
+                path.relative_to(PACKAGE), node.lineno, name,
+                node.value.value.id, node.value.attr))
+    assert not offenders, "say it once, where it lives:\n" + "\n".join(offenders)
 
 
 def test_every_served_file_type_is_the_schemas():
@@ -64,7 +91,6 @@ def test_every_served_file_type_is_the_schemas():
     assert set(theme.ALBUM_WALLPAPER_IMAGE_TYPES) == schema.WALLPAPER_IMAGE_EXTS
     for ext, mime in theme.ALBUM_ICON_TYPES.items():
         assert mime == schema.MIME[ext]
-    assert console_mod._ASSET_TYPES is schema.MIME
     assert schema.ICON_EXTS <= console_mod._SCOPE_EXTS["album"]
 
 

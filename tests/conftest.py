@@ -11,7 +11,6 @@ routes under test resolve all of those. Nothing here touches the operator's
 own `photos/`.
 """
 
-import io
 import os
 import shutil
 import tempfile

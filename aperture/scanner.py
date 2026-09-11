@@ -17,27 +17,13 @@ log = logging.getLogger("scanner")
 
 GPS_IFD_TAG = 0x8825
 
-# Per-album metadata folder. Everything that describes an album rather than
-# being one of its photos — album.cfg, the album_*.md descriptions, a custom
-# title font — lives in `<album>/.album/`, keeping the photo folder itself
-# nothing but photos. Never indexed: a stray image in here is metadata (a
-# font specimen, a screenshot of the cfg), not a gallery photo.
-ALBUM_META_DIR = schema.ALBUM_META_DIR
-# The same idea one tier up: the gallery's own assets — its logo, the
-# operator's portrait, the footer badges — live in
-# `photos/.gallery/` (see aperture/branding.py). It sits
-# directly in the photos root, so without an exclusion it would be walked as
-# an album named ".gallery" whose "photos" are the logo and the badges.
-GALLERY_META_DIR = schema.GALLERY_META_DIR
-_META_DIRS = (ALBUM_META_DIR, GALLERY_META_DIR)
-
 
 def is_meta_path(relp: Path) -> bool:
     """True for a path (relative to photos_dir) inside a metadata folder —
     an album's `.album/` or the gallery's own `.gallery/`. Never indexed: an
     image in either is metadata (a mark, a font specimen, a screenshot of the
     cfg), not a gallery photo."""
-    return any(d in relp.parts for d in _META_DIRS)
+    return any(d in relp.parts for d in schema.META_DIRS)
 
 
 # iPhone photos are HEIC; without the plugin they cannot be opened at all,
@@ -51,8 +37,6 @@ except ImportError:
     HEIF_SUPPORTED = False
     log.warning("pillow-heif not installed; HEIC/HEIF support disabled")
 
-# What counts as a photograph is aperture/schema.py's; the scanner reads it.
-IMAGE_EXTS = schema.IMAGE_EXTS
 JPEG_CONVERT_EXTS = {".heic", ".heif"}
 
 # The format each derivative tier is written in. The grid thumbnail is WebP:

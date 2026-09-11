@@ -14,7 +14,6 @@ import json
 import io
 import contextlib
 
-import pytest
 
 from aperture import cli
 

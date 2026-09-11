@@ -42,7 +42,7 @@ import os
 import secrets
 import stat
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import HTTPException, Request

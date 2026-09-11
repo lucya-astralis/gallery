@@ -13,13 +13,11 @@ Two halves:
 """
 
 import json
-import os
-import time
 
 import pytest
 from fastapi.testclient import TestClient
 
-from aperture import paths, runtime
+from aperture import paths, runtime, schema
 from aperture.console import security
 from aperture.console.app import app as console_app
 from aperture.runtime import settings
@@ -113,7 +111,7 @@ def test_no_photo_is_ever_a_writable_target():
                 target = paths.writable_target(PHOTOS, album, name)
             except paths.PathRefused:
                 continue
-            assert target.parent.name in paths.META_DIRS
+            assert target.parent.name in schema.META_DIRS
 
 
 def test_symlinked_metadata_folder_is_refused(tmp_path):

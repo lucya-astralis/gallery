@@ -38,20 +38,7 @@ from .. import cfgio, schema, templating
 from . import imagemeta, opsapi, security
 from .library import Library, asset_kinds
 
-# The console ships with the app now, so it carries the app's version rather
-# than one of its own -- there is no combination of the two to report.
-APP_VERSION = brand.VERSION
-
 BASE_DIR = Path(__file__).resolve().parent
-
-# One environment, read once, in aperture/runtime.py. The console used to have
-# its own resolution rules for the same variable names, which meant PHOTOS_DIR
-# could point at two different folders depending on which process you asked.
-PHOTOS_DIR = settings.photos_dir
-DATA_DIR = settings.data_dir
-BACKUP_DIR = settings.backup_dir
-BACKUPS = settings.console_backups
-MAX_UPLOAD = settings.console_max_upload
 
 try:  # HEIC support is optional -- the tool works without it, minus previews
     import pillow_heif  # type: ignore
@@ -71,7 +58,7 @@ app = FastAPI(title=f"{brand.PRODUCT} console", docs_url=None, redoc_url=None,
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = templating.make_templates(BASE_DIR)
 
-lib = Library(PHOTOS_DIR)
+lib = Library(settings.photos_dir)
 
 # The operations surface: status, scan, pause/resume, doctor. Its own module
 # because it shares nothing with the cfg editor below except this app and the
@@ -134,7 +121,7 @@ def _target(album: str | None, name: str, *, scope: str = "album",
     internal detail.
     """
     try:
-        return writable_target(PHOTOS_DIR, album, name, scope=scope,
+        return writable_target(settings.photos_dir, album, name, scope=scope,
                                allowed_exts=allowed_exts)
     except PathRefused as exc:
         raise HTTPException(400, str(exc))
@@ -152,7 +139,7 @@ def _writes(request: Request, action: str, target: Path, before: str | None) -> 
     """Record one completed write. Called after the file is on disk, with the
     hash it had beforehand, so the log says what changed and not merely that
     something did."""
-    security.audit(request, action, relative_to_photos(PHOTOS_DIR, target),
+    security.audit(request, action, relative_to_photos(settings.photos_dir, target),
                    before=before, after=security.sha256_of(target))
 
 
@@ -185,14 +172,14 @@ def _backup(path: Path, label: str) -> None:
         return
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     slug = hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:10]
-    folder = BACKUP_DIR / ("%s-%s" % (label, slug))
+    folder = settings.backup_dir / ("%s-%s" % (label, slug))
     folder.mkdir(parents=True, exist_ok=True)
     try:
         shutil.copy2(path, folder / ("%s-%s" % (stamp, path.name)))
     except OSError:
         return
-    keep = sorted(folder.iterdir(), reverse=True)[:BACKUPS]
-    for stale in sorted(folder.iterdir(), reverse=True)[BACKUPS:]:
+    keep = sorted(folder.iterdir(), reverse=True)[:settings.console_backups]
+    for stale in sorted(folder.iterdir(), reverse=True)[settings.console_backups:]:
         if stale not in keep:
             stale.unlink(missing_ok=True)
 
@@ -282,9 +269,9 @@ def api_session_close(request: Request):
 @app.get("/")
 def index(request: Request):
     return templates.TemplateResponse(request, "index.html", {
-        "photos_dir": PHOTOS_DIR.as_posix(),
+        "photos_dir": settings.photos_dir.as_posix(),
         "read_only": settings.console_read_only,
-        "app_version": APP_VERSION,
+        "app_version": brand.VERSION,
         # "open" means no password is configured. The UI says so out loud —
         # an unauthenticated console should never look like an authenticated
         # one (see security.assert_safe_binding).
@@ -297,8 +284,8 @@ def api_meta():
     """Everything the UI needs to build its forms: the key list, the write
     style and allowed values per key, and the help text."""
     return {
-        "version": APP_VERSION,
-        "photos_dir": PHOTOS_DIR.as_posix(),
+        "version": brand.VERSION,
+        "photos_dir": settings.photos_dir.as_posix(),
         "read_only": settings.console_read_only,
         "album_keys": schema.ALBUM_KEYS,
         "gallery_keys": schema.GALLERY_KEYS,
@@ -331,8 +318,8 @@ def api_meta():
 # ----- tree -------------------------------------------------------------
 @app.get("/api/tree")
 def api_tree():
-    if not PHOTOS_DIR.is_dir():
-        raise HTTPException(500, "PHOTOS_DIR %s is not a directory" % PHOTOS_DIR)
+    if not settings.photos_dir.is_dir():
+        raise HTTPException(500, "PHOTOS_DIR %s is not a directory" % settings.photos_dir)
     tree = lib.tree()
     gallery_cfg = lib.gallery_cfg_path()
     return {
@@ -522,7 +509,7 @@ def api_thumb(path: str):
         source = lib.safe(path)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
-    rel = relative_to_photos(PHOTOS_DIR, source)
+    rel = relative_to_photos(settings.photos_dir, source)
     # A metadata folder holds marks and backdrops, not photos; a thumbnail of
     # one would land in the gallery's tree as an orphan.
     if not source.is_file() or not schema.is_image(source.name) or scanner.is_meta_path(Path(rel)):
@@ -604,7 +591,7 @@ async def api_tags_write(request: Request):
         # builds the sidecar's name from it. Nothing about the file written
         # here comes from the request except which picture it belongs to.
         try:
-            sidecar = sidecar_target(PHOTOS_DIR, rel, is_image=schema.is_image)
+            sidecar = sidecar_target(settings.photos_dir, rel, is_image=schema.is_image)
         except PathRefused as exc:
             raise HTTPException(400, str(exc))
 
@@ -629,13 +616,12 @@ async def api_tags_write(request: Request):
 
 
 # ----- .album assets ----------------------------------------------------
-# Content types for everything the .album/ folder can hold. Derived from the
-# schema whitelists rather than hand-listed: this map used to be its own
-# hardcoded set and silently fell behind when wallpapers were added, so a
-# .jpg backdrop answered 415 and never previewed.
-_ASSET_TYPES = schema.MIME
+# Every type that folder can hold has to be one the schema can name a
+# content type for. The console kept its own hardcoded map once and it
+# silently fell behind when wallpapers were added: a .jpg backdrop
+# answered 415 and never previewed.
 _MISSING_TYPES = (schema.ICON_EXTS | schema.FONT_EXTS | schema.WALLPAPER_EXTS
-                  | schema.BRAND_EXTS) - set(_ASSET_TYPES)
+                  | schema.BRAND_EXTS) - set(schema.MIME)
 assert not _MISSING_TYPES, "no content type for %s" % sorted(_MISSING_TYPES)
 
 
@@ -725,9 +711,9 @@ def api_asset(path: str = "", name: str = "", scope: str = "album"):
     if not target.is_file():
         raise HTTPException(404, "no such asset")
     ext = target.suffix.lower()
-    if ext not in _ASSET_TYPES:
+    if ext not in schema.MIME:
         raise HTTPException(415, "not a servable asset type")
-    return FileResponse(target, media_type=_ASSET_TYPES[ext],
+    return FileResponse(target, media_type=schema.MIME[ext],
                         headers={"Cache-Control": "no-cache"})
 
 
@@ -757,9 +743,9 @@ async def api_asset_upload(request: Request, path: str = Form(""),
     name = Path(file.filename or "").name
     target = _target(album, name, scope=scope, allowed_exts=_SCOPE_EXTS[scope])
 
-    payload = await file.read(MAX_UPLOAD + 1)
-    if len(payload) > MAX_UPLOAD:
-        raise HTTPException(413, "file is larger than %d MB" % (MAX_UPLOAD // 1048576))
+    payload = await file.read(settings.console_max_upload + 1)
+    if len(payload) > settings.console_max_upload:
+        raise HTTPException(413, "file is larger than %d MB" % (settings.console_max_upload // 1048576))
     _sniff(name, payload)
 
     before = security.sha256_of(target)
@@ -808,10 +794,10 @@ def api_health(request: Request):
     so it says only what a container orchestrator needs. The mount path and
     the album counts used to be in here; they are facts about the deployment
     and now live behind the door, in /api/meta."""
-    payload = {"ok": PHOTOS_DIR.is_dir(), "version": APP_VERSION,
+    payload = {"ok": settings.photos_dir.is_dir(), "version": brand.VERSION,
                "auth": "open" if security.open_access() else "password"}
     if security.current(request) or security.open_access():
-        payload.update(photos_dir=PHOTOS_DIR.as_posix(), read_only=settings.console_read_only)
+        payload.update(photos_dir=settings.photos_dir.as_posix(), read_only=settings.console_read_only)
     return payload
 
 
@@ -828,5 +814,5 @@ def create_console_app() -> FastAPI:
     not after the first request finds out there is no password.
     """
     security.assert_safe_binding()
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    settings.backup_dir.mkdir(parents=True, exist_ok=True)
     return app

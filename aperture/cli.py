@@ -40,7 +40,10 @@ from PIL import Image
 # the dashboard instead — anything a command logs while running still shows.
 logging.disable(logging.CRITICAL)
 from . import albums, brand, cfgio, checks, config, photos, schema, templating, termui as ui, theme, trips, welcome
-from . import control, db, i18n, scanner
+from . import control, db, i18n, ops, scanner
+from .gallery import api
+from .ops import UnknownAlbum
+from .runtime import settings
 logging.disable(logging.NOTSET)
 
 # ----- output helpers ---------------------------------------------------
@@ -69,33 +72,6 @@ def fail(msg: str) -> int:
     return 2
 
 
-from . import ops
-from .ops import UnknownAlbum
-from .gallery import api
-from .runtime import settings
-
-# ----- the data layer, now in ops.py ------------------------------------
-# Every command below used these as module-level names long before there was
-# a second front end. They are bound rather than renamed: the alternative is a
-# 200-site rename diff with no behaviour in it. What changed is where the code
-# lives, not what it is called here.
-_stamp = ops.stamp
-_dur = ops.dur
-_ago = ops.ago
-_bytes = ops.bytes_h
-_server_status = ops.server_status
-_norm_album = ops.norm_album
-_photo_files = ops.photo_files
-_effective_mtime = ops.effective_mtime
-_derivative_files = ops.derivative_files
-_derivatives = ops.derivatives
-_derivative_state = ops.derivative_state
-_scope_rows = ops.scope_rows
-_index_counts = ops.index_counts
-_featured_map = ops.featured_map
-_wallpaper_line = ops.wallpaper_line
-
-
 # ----- commands ---------------------------------------------------------
 def _screen(right: str = ""):
     """Every full-page view gets the same frame: app name left, what you are
@@ -111,17 +87,17 @@ def _render_system(st: dict | None, live: bool, pause: dict | None) -> None:
         # hard-killed (SIGKILL, OOM) leaves its status file behind, and a
         # growing age here is the first sign of that.
         kv("server", f"{ui.state('running')} · pid {st.get('pid')} · "
-                     f"up {_dur(time.time() - (st.get('started_at') or time.time()))} · "
-                     f"heartbeat {_ago(st.get('heartbeat'))}")
+                     f"up {ops.dur(time.time() - (st.get('started_at') or time.time()))} · "
+                     f"heartbeat {ops.ago(st.get('heartbeat'))}")
     elif st:
         kv("server", f"{ui.state('NOT running', 'bad')} · last heartbeat "
-                     f"{_ago(st.get('heartbeat'))} (stale status file)")
+                     f"{ops.ago(st.get('heartbeat'))} (stale status file)")
     else:
         kv("server", f"{ui.state('NOT running', 'idle')} "
                      f"(no status file — never started, or a clean shutdown)")
 
     if pause:
-        since = f" since {_stamp(pause.get('since'))}" if pause.get("since") else ""
+        since = f" since {ops.stamp(pause.get('since'))}" if pause.get("since") else ""
         reason = f" · {pause['reason']}" if pause.get("reason") else ""
         kv("indexer", f"{ui.state('PAUSED', 'warn')}{since}{reason}")
     else:
@@ -130,7 +106,7 @@ def _render_system(st: dict | None, live: bool, pause: dict | None) -> None:
     if live:
         if st.get("scanning"):
             kv("scan", f"{ui.state('RUNNING', 'warn')} ({st.get('scan_trigger')}) · "
-                       f"started {_ago(st.get('scan_started_at'))}")
+                       f"started {ops.ago(st.get('scan_started_at'))}")
         else:
             last = st.get("last_scan") or {}
             if last:
@@ -142,8 +118,8 @@ def _render_system(st: dict | None, live: bool, pause: dict | None) -> None:
                                  if res.get(k)) or "no changes"
                 scope = f" [{last['album']}]" if last.get("album") else ""
                 err = f" · {ui.state('ERROR ' + str(last['error']), 'bad')}" if last.get("error") else ""
-                kv("scan", f"idle · last {last.get('trigger')}{scope} {_ago(last.get('finished_at'))} "
-                           f"in {_dur(last.get('seconds'))} → {bits}{err}")
+                kv("scan", f"idle · last {last.get('trigger')}{scope} {ops.ago(last.get('finished_at'))} "
+                           f"in {ops.dur(last.get('seconds'))} → {bits}{err}")
             else:
                 kv("scan", "idle · no scan in this process yet")
         w = st.get("watcher") or {}
@@ -153,8 +129,7 @@ def _render_system(st: dict | None, live: bool, pause: dict | None) -> None:
                       f"{ui.state(f'{queued} event(s) queued', 'warn' if queued else 'idle')}")
         pend = st.get("pending_request")
         if pend:
-            kv("queued", f"scan request {pend.get('id')} waiting ({_ago(pend.get('requested_at'))})")
-
+            kv("queued", f"scan request {pend.get('id')} waiting ({ops.ago(pend.get('requested_at'))})")
 
 
 def cmd_status(args) -> int:
@@ -170,10 +145,10 @@ def cmd_status(args) -> int:
 
 def _render_status_body(st, live, pause, counts) -> None:
     _render_system(st, live, pause)
-    ui.head("index")
+    head("index")
     kv("totals", f"{counts['images']} photos · {counts['albums']} albums · "
                 f"{counts['featured']} featured · {counts['tags']} tags · "
-                f"{_bytes(counts['bytes'])} of originals · db {_bytes(counts['db_bytes'])}")
+                f"{ops.bytes_h(counts['bytes'])} of originals · db {ops.bytes_h(counts['db_bytes'])}")
     kv("paths", f"photos={settings.photos_dir}")
     kv("", f"thumbs={settings.thumbs_dir}")
     kv("", f"previews={settings.previews_dir}")
@@ -202,7 +177,7 @@ def _wait_for_scan(request_id: str, timeout: float, quiet: bool = False) -> dict
                 return None
             live.label = (f"scanning ({st.get('scan_trigger')})" if st.get("scanning")
                           else "waiting for the server")
-            live.tick(_dur(time.time() - started))
+            live.tick(ops.dur(time.time() - started))
             time.sleep(0.2)
         return None
     finally:
@@ -212,10 +187,10 @@ def _wait_for_scan(request_id: str, timeout: float, quiet: bool = False) -> dict
 def _print_scan_result(summary: dict) -> None:
     res = summary.get("result") or {}
     if summary.get("error"):
-        kv("finished", ui.state(f"with errors in {_dur(summary.get('seconds'))} · "
+        kv("finished", ui.state(f"with errors in {ops.dur(summary.get('seconds'))} · "
                                 f"{summary['error']}", "bad"))
     else:
-        kv("finished", f"in {_dur(summary.get('seconds'))}")
+        kv("finished", f"in {ops.dur(summary.get('seconds'))}")
     for key in ("indexed", "thumbnails", "previews", "removed", "failed", "total_seen"):
         if key in res:
             kv(key, res[key])
@@ -225,10 +200,10 @@ def _print_scan_result(summary: dict) -> None:
 
 
 def cmd_scan(args) -> int:
-    album = _norm_album(args.album)
+    album = ops.norm_album(args.album)
     if album and not (settings.photos_dir / album).is_dir():
         return fail(f"no such album folder: {album}")
-    st, live = _server_status()
+    st, live = ops.server_status()
 
     if live and not args.local:
         req = control.request_scan(album=album, force=args.force)
@@ -248,7 +223,7 @@ def cmd_scan(args) -> int:
                 dump({"queued": req, "waited": True, "result": None,
                       "error": "timeout or server gone"})
             else:
-                kv("gave up", ui.state(f"after {_dur(args.timeout)} — the scan may still be "
+                kv("gave up", ui.state(f"after {ops.dur(args.timeout)} — the scan may still be "
                                        f"running, check `status`", "warn"))
             return 1
         if args.json:
@@ -283,7 +258,7 @@ def cmd_scan(args) -> int:
 def cmd_pause(args) -> int:
     reason = " ".join(args.reason).strip() if args.reason else ""
     info = control.pause(reason or None)
-    _, live = _server_status()
+    _, live = ops.server_status()
     if args.json:
         dump({"paused": True, "info": info, "server_live": live})
         return 0
@@ -298,7 +273,7 @@ def cmd_pause(args) -> int:
 
 def cmd_resume(args) -> int:
     was_paused = control.resume()
-    _, live = _server_status()
+    _, live = ops.server_status()
     if args.scan and live:
         control.request_scan()
     if args.json:
@@ -349,7 +324,7 @@ def cmd_doctor(args) -> int:
                 out(f"      {item['detail']}")
         if len(items) > args.limit:
             out(f"  … {len(items) - args.limit} more (--limit {len(items)} to see all, or --json)")
-    ui.head("what now")
+    head("what now")
     ui.columns([
         ("thumbs --rebuild", "missing or stale thumbnails and previews"),
         ("thumbs --prune", "generated files with no source photo"),
@@ -363,23 +338,23 @@ def cmd_doctor(args) -> int:
 
 def cmd_thumbs(args) -> int:
     db.conn()
-    album = _norm_album(args.album)
-    disk = _photo_files(album)
+    album = ops.norm_album(args.album)
+    disk = ops.photo_files(album)
     todo: list[tuple[str, str]] = []      # (rel, kind)
     for rel in disk:
-        for kind, state in _derivative_state(rel).items():
+        for kind, state in ops.derivative_state(rel).items():
             if kind == "full":
                 continue  # built on demand, never eagerly
             if args.all or state in ("missing", "stale"):
                 todo.append((rel, kind))
 
-    expected = {p for rel in disk for p in _derivatives(rel).values()}
+    expected = {p for rel in disk for p in ops.derivatives(rel).values()}
     orphans: list[Path] = []
     if album is None:
         for d in (settings.thumbs_dir, settings.previews_dir, settings.fulls_dir):
             if not d.is_dir():
                 continue
-            for f in _derivative_files(d):
+            for f in ops.derivative_files(d):
                 if d is settings.previews_dir and settings.fulls_dir in f.parents:
                     continue
                 if f not in expected:
@@ -392,7 +367,7 @@ def cmd_thumbs(args) -> int:
         for done, (rel, kind) in enumerate(todo, 1):
             src = settings.photos_dir / rel
             size = settings.thumb_size if kind == "thumb" else settings.preview_size
-            dst = _derivatives(rel)[kind]
+            dst = ops.derivatives(rel)[kind]
             if scanner.make_thumbnail(src, dst, size):
                 built += 1
             else:
@@ -431,7 +406,7 @@ def cmd_thumbs(args) -> int:
         if args.apply:
             kv("pruned", f"{pruned} file(s) deleted")
         else:
-            ui.head("orphans")
+            head("orphans")
             for f in orphans[:args.limit]:
                 out(f"  {f}")
             if len(orphans) > args.limit:
@@ -444,8 +419,8 @@ def cmd_featured(args) -> int:
     c = db.conn()
     if args.recompute:
         albums.recompute_featured()
-    by_photo, unresolved = _featured_map()
-    album = _norm_album(args.album)
+    by_photo, unresolved = ops.featured_map()
+    album = ops.norm_album(args.album)
 
     by_album: dict[str, dict[str, list[str]]] = {}
     for rel, sources in by_photo.items():
@@ -510,7 +485,7 @@ def cmd_cfg(args) -> int:
     else:
         if not args.album:
             return fail("give an album path, or --gallery for the gallery-wide config")
-        album = _norm_album(args.album)
+        album = ops.norm_album(args.album)
         cfg = config.album_config(album)
         meta = config.album_meta_dir(album)
         path = (meta / "album.cfg") if meta else (settings.photos_dir / album / ".album" / "album.cfg")
@@ -535,8 +510,8 @@ def cmd_cfg(args) -> int:
         shown = values[0] if len(values) == 1 else json.dumps(values, ensure_ascii=False)
         out(f"  {key:<{key_w}}{shown}")
     if not args.gallery:
-        album = _norm_album(args.album)
-        ui.head("resolved")
+        album = ops.norm_album(args.album)
+        head("resolved")
         mode, reel = albums.album_reel(album, cfg)
         cover = albums.album_cover_rel(album)
         langs = [lang for lang in i18n.LANGS if albums.album_description(album, lang)]
@@ -548,15 +523,15 @@ def cmd_cfg(args) -> int:
             ("tags", ", ".join(config.album_tags(album, cfg)) or "—"),
             ("descriptions", ", ".join(f"album_{l}.md" for l in langs) or "—"),
             # resolved, so an inherited backdrop names the album it came from
-            ("wallpaper", _wallpaper_line(album, "desktop")),
-            ("wallpaper mobile", _wallpaper_line(album, "mobile")),
+            ("wallpaper", ops.wallpaper_line(album, "desktop")),
+            ("wallpaper mobile", ops.wallpaper_line(album, "mobile")),
         ], key_tint=ui.C.gy)
     if issues:
         head(f"issues  ({len(issues)})")
         for item in issues:
             out(f"  [{item['level']}] {item['key']}: {item['detail']}")
         return 1 if any(i["level"] == "error" for i in issues) else 0
-    ui.head("issues")
+    head("issues")
     out("  none")
     return 0
 
@@ -582,12 +557,12 @@ def cmd_photo(args) -> int:
     tags = [r["name"] for r in c.execute(
         "SELECT t.name FROM tags t JOIN image_tags it ON it.tag_id = t.id "
         "WHERE it.image_id = ? ORDER BY t.name", (row["id"],))]
-    by_photo, _ = _featured_map()
+    by_photo, _ = ops.featured_map()
     sources = by_photo.get(rel, [])
     src = settings.photos_dir / rel
-    disk_mtime = _effective_mtime(rel)
-    derivatives = {k: {"path": str(p), "state": _derivative_state(rel).get(k)}
-                   for k, p in _derivatives(rel).items()}
+    disk_mtime = ops.effective_mtime(rel)
+    derivatives = {k: {"path": str(p), "state": ops.derivative_state(rel).get(k)}
+                   for k, p in ops.derivatives(rel).items()}
 
     if args.json:
         dump({**{k: v for k, v in row.items() if k != "exif_json"},
@@ -599,14 +574,14 @@ def cmd_photo(args) -> int:
 
     kv("rel_path", rel)
     kv("album", row["album"])
-    kv("file", f"{row['filename']} · {_bytes(row['size'])} · "
+    kv("file", f"{row['filename']} · {ops.bytes_h(row['size'])} · "
                f"{row['width']}×{row['height']}" if row["width"] else row["filename"])
     kv("on disk", "yes" if src.exists() else "NO — the row is stale, run `scan`")
     kv("taken", row["taken_at"] or "— (no EXIF date; sorted by mtime)")
     drift = ""
     if disk_mtime is not None and abs(disk_mtime - row["mtime"]) >= 1.0:
-        drift = f"  ← file says {_stamp(disk_mtime)} (stale index)"
-    kv("mtime", f"{_stamp(row['mtime'])}{drift}")
+        drift = f"  ← file says {ops.stamp(disk_mtime)} (stale index)"
+    kv("mtime", f"{ops.stamp(row['mtime'])}{drift}")
     kv("indexed", row["indexed_at"])
     kv("featured", ("yes" if row["is_showcase"] else "no") +
                    (" · " + ", ".join(f"{a} → featured = {e}" for a, e in sources) if sources
@@ -622,7 +597,7 @@ def cmd_photo(args) -> int:
     for label, value in photos.prettify_exif(exif, i18n.DEFAULT_LANG):
         out(f"  {label:<18}{value}")
     if args.exif:
-        ui.head("exif (raw)")
+        head("exif (raw)")
         for key in sorted(exif):
             out(f"  {key:<26}{exif[key]}")
     return 0
@@ -639,7 +614,7 @@ def cmd_trip(args) -> int:
         out()
         out("a trip attaches to the album whose lower-cased path equals its key")
         return 0
-    album = _norm_album(args.album)
+    album = ops.norm_album(args.album)
     trip = trips.trip_for_album(album, args.lang)
     if trip is None:
         return fail(f"no trip configured for {album!r} "
@@ -650,7 +625,7 @@ def cmd_trip(args) -> int:
     kv("album", album)
     kv("trip", f"{trip.get('title')} ({trip.get('key')})")
     kv("depart", str(trip.get("depart")))
-    ui.head("stops")
+    head("stops")
     for stop in trip.get("stops", []):
         # `href` is the resolved sub-album link — None when that folder holds
         # no photos, which is exactly what you want to see here
@@ -737,7 +712,7 @@ def _sidecar_tags_on_disk(album: str | None = None) -> tuple[dict, list[str]]:
 
 def cmd_tags(args) -> int:
     c = db.conn()
-    album = _norm_album(args.album)
+    album = ops.norm_album(args.album)
 
     # What the index believes.
     where, params = "", []
@@ -906,7 +881,7 @@ def cmd_welcome(args) -> int:
 def cmd_gps(args) -> int:
     """Which originals still carry coordinates. WRITES with --strip."""
     db.conn()
-    album = _norm_album(args.album)
+    album = ops.norm_album(args.album)
     base = (settings.photos_dir / album) if album else settings.photos_dir
     if not base.is_dir():
         return fail(f"no such album: {args.album!r}")
@@ -972,7 +947,7 @@ def cmd_gps(args) -> int:
 # ----- album ------------------------------------------------------------
 def cmd_album(args) -> int:
     c = db.conn()
-    album = _norm_album(args.album)
+    album = ops.norm_album(args.album)
 
     if not album:
         listing = []
@@ -1035,7 +1010,7 @@ def cmd_album(args) -> int:
         return 1 if info["issues"] else 0
 
     kv("album", album)
-    kv("photos", f"{info['photos']} · {_bytes(info['bytes'])}"
+    kv("photos", f"{info['photos']} · {ops.bytes_h(info['bytes'])}"
                  + (f" · {info['undated']} undated" if info["undated"] else ""))
     if info["span"]:
         kv("span", f"{info['span'][0][:10]} → {info['span'][1][:10]}")
@@ -1082,7 +1057,7 @@ def cmd_search(args) -> int:
            ORDER BY i.taken_at IS NULL, i.taken_at DESC, i.filename""",
         (like, like, like)).fetchall()
 
-    album = _norm_album(args.album)
+    album = ops.norm_album(args.album)
     if album:
         rows = [r for r in rows
                 if r["album"] == album or r["album"].startswith(album + "/")]
@@ -1136,7 +1111,7 @@ def cmd_export(args) -> int:
         if args.json:
             dump({"files": [name for _, name in members], "bytes": total})
             return 0
-        kv("contents", f"{len(members)} file(s) · {_bytes(total)}")
+        kv("contents", f"{len(members)} file(s) · {ops.bytes_h(total)}")
         kv("archive", "not written — drop --list to create it")
         head("files")
         for _, name in members[:args.limit]:
@@ -1158,7 +1133,7 @@ def cmd_export(args) -> int:
               "bytes": target.stat().st_size})
         return 0
     kv("archive", str(target))
-    kv("contents", f"{len(members)} file(s) · {_bytes(target.stat().st_size)}")
+    kv("contents", f"{len(members)} file(s) · {ops.bytes_h(target.stat().st_size)}")
     hint("  restore with:  tar -xzf <archive> -C <photos dir>")
     return 0
 
@@ -1235,7 +1210,7 @@ def cmd_i18n(args) -> int:
             out(f"  {detail}")
         if len(items) > args.limit:
             out(f"  … {len(items) - args.limit} more")
-    ui.head("result")
+    head("result")
     if not total:
         kv("result", ui.state("no problems found"))
     elif not hard:
@@ -1296,11 +1271,11 @@ def _dir_stats(path):
 def cmd_dash(args) -> int:
     if args.json:
         c = db.conn()
-        st, live = _server_status()
+        st, live = ops.server_status()
         span = c.execute(
             "SELECT MIN(taken_at) AS a, MAX(taken_at) AS b FROM images "
             "WHERE taken_at IS NOT NULL").fetchone()
-        dump({"index": _index_counts(c), "span": {"from": span["a"], "to": span["b"]},
+        dump({"index": ops.index_counts(c), "span": {"from": span["a"], "to": span["b"]},
               "albums": [dict(r) for r in _top_albums(c, 12)],
               "months": [dict(r) for r in _months(c)],
               "formats": _formats(c), "server": st, "live": live,
@@ -1350,9 +1325,9 @@ def _dash_body(footer: bool = True) -> None:
     """The dashboard content — drawn inside whatever frame is already open,
     so the menu can lead with it without nesting a second box."""
     c = db.conn()
-    st, live = _server_status()
+    st, live = ops.server_status()
     pause = control.pause_info()
-    counts = _index_counts(c)
+    counts = ops.index_counts(c)
     span = c.execute(
         "SELECT MIN(taken_at) AS a, MAX(taken_at) AS b FROM images "
         "WHERE taken_at IS NOT NULL").fetchone()
@@ -1362,20 +1337,20 @@ def _dash_body(footer: bool = True) -> None:
     ui.rule("system")
     _render_system(st, live, pause)
 
-    ui.head("archive")
+    head("archive")
     kv("photos", f"{counts['images']:,}".replace(",", " "))
     kv("albums", f"{counts['albums']} with photos · "
                  f"{len(albums.all_album_nodes())} incl. parents")
     kv("featured", f"{counts['featured']} photo(s) · "
                    f"{sum(1 for a in albums.albums_with_ancestors() if albums.album_is_showcase(a))} showcase album(s)")
     kv("tags", str(counts["tags"]))
-    kv("originals", _bytes(counts["bytes"]))
+    kv("originals", ops.bytes_h(counts["bytes"]))
     kv("span", f"{(span['a'] or '—')[:10]} → {(span['b'] or '—')[:10]}")
-    kv("database", _bytes(counts["db_bytes"]))
+    kv("database", ops.bytes_h(counts["db_bytes"]))
 
     albums = _top_albums(c)
     if albums:
-        ui.head("largest albums")
+        head("largest albums")
         peak = albums[0]["n"]
         name_w = min(28, max(len(r["album"]) for r in albums))
         for r in albums:
@@ -1383,11 +1358,11 @@ def _dash_body(footer: bool = True) -> None:
             if len(name) > name_w:
                 name = "…" + name[-(name_w - 1):]
             print(f"  {name:<{name_w}}  {ui.bar(r['n'], peak, 22)} "
-                  f"{ui.C.bold}{r['n']:>5}{ui.C.off} {ui.C.gy}{_bytes(r['bytes'])}{ui.C.off}")
+                  f"{ui.C.bold}{r['n']:>5}{ui.C.off} {ui.C.gy}{ops.bytes_h(r['bytes'])}{ui.C.off}")
 
     months = _months(c)
     if months:
-        ui.head("activity (by capture month)")
+        head("activity (by capture month)")
         peak = max(r["n"] for r in months)
         for r in months:
             print(f"  {r['ym']}   {ui.bar(r['n'], peak, 30, ui.C.mg)} "
@@ -1395,14 +1370,14 @@ def _dash_body(footer: bool = True) -> None:
 
     formats = _formats(c)
     if formats:
-        ui.head("formats")
+        head("formats")
         kv("types", " · ".join(f"{ext} {n}" for ext, n in formats[:6]))
     kv("heic/heif", ui.state("supported") if scanner.HEIF_SUPPORTED
        else ui.state("NOT supported — pillow-heif is missing", "warn"))
 
-    ui.head("health")
+    head("health")
     if counts["images"] <= QUICK_CHECK_MAX_ROWS:
-        on_disk = len(_photo_files())
+        on_disk = len(ops.photo_files())
         thumbs, thumb_bytes = _dir_stats(settings.thumbs_dir)
         previews, preview_bytes = _dir_stats(settings.previews_dir)
         drift = on_disk - counts["images"]
@@ -1412,14 +1387,14 @@ def _dash_body(footer: bool = True) -> None:
             what = "not indexed" if drift > 0 else "indexed but gone"
             kv("index", f"{ui.state(f'{abs(drift)} file(s) {what}', 'warn')}"
                         f" · {on_disk} on disk / {counts['images']} indexed")
-        kv("cache", f"{thumbs} thumb(s) {_bytes(thumb_bytes)} · "
-                    f"{previews} preview(s) {_bytes(preview_bytes)}")
+        kv("cache", f"{thumbs} thumb(s) {ops.bytes_h(thumb_bytes)} · "
+                    f"{previews} preview(s) {ops.bytes_h(preview_bytes)}")
         hint("  a full check (config, derivatives, drift) is `doctor`")
     else:
         hint(f"  skipped — over {QUICK_CHECK_MAX_ROWS} rows; run `doctor` for the full check")
 
     if footer:
-        ui.head("commands")
+        head("commands")
         _command_columns()
         print()
         hint("  <command> --help   ·   `menu` for the console   ·   `dash --watch` for a live view")
@@ -1501,9 +1476,9 @@ def _menu_argv(command: str, prompts) -> list[str] | None:
 def _menu_status_line() -> None:
     """One live line above the menu: is the server up, is it paused, is a scan
     running, how big is the index. Re-read on every repaint."""
-    st, live = _server_status()
+    st, live = ops.server_status()
     pause = control.pause_info()
-    counts = _index_counts(db.conn())
+    counts = ops.index_counts(db.conn())
     if not live:
         server = ui.state("server down", "idle")
     elif st.get("scanning"):
@@ -1546,7 +1521,7 @@ def cmd_menu(args) -> int:
                                             app=brand.VERSION,
                                             api=api.API_VERSION))
                 _menu_status_line()
-            ui.head("menu")
+            head("menu")
             ui.columns([(str(i), f"{ui.C.bold}{name:<9}{ui.C.off}{ui.C.gy}{desc}{ui.C.off}")
                         for i, (name, desc, _) in enumerate(MENU_ITEMS, 1)])
             print()
@@ -1607,7 +1582,7 @@ def cmd_menu(args) -> int:
         print()
         ui.rule()
         verdict = ui.state("ok", "ok") if not code else ui.state(f"exit {code}", "warn")
-        hint(f"  {' '.join(argv)} · {verdict} · {_dur(time.time() - started)}")
+        hint(f"  {' '.join(argv)} · {verdict} · {ops.dur(time.time() - started)}")
         try:
             _ask("enter to return")
         except KeyboardInterrupt:
@@ -1631,9 +1606,9 @@ def _help_body() -> None:
         ("… <cmd> --json", "machine-readable output"),
         ("--logo blocks", "draw the real logo as a picture (see `term`)"),
     ])
-    ui.head("commands")
+    head("commands")
     _command_columns()
-    ui.head("control channel")
+    head("control channel")
     hint(f"  the server is driven through flag files in {control.control_dir()}")
     hint("  status.json (server) · paused.json + scan.request.json (this CLI)")
     hint("  there is no control HTTP endpoint — the web surface stays read-only")
@@ -1746,7 +1721,7 @@ def _term_body(report: dict) -> None:
                             "MSYSTEM", "TERM_PROGRAM", "NO_COLOR", "FORCE_COLOR",
                             "encoding", "columns")],
                key_tint=ui.C.gy)
-    ui.head("verdict")
+    head("verdict")
     ui.columns([
         ("colour", ui.state("on", "ok") if report["color"] else ui.state("off", "warn")),
         ("menu", ui.state("available", "ok") if report["interactive"]
@@ -1755,7 +1730,7 @@ def _term_body(report: dict) -> None:
         ("pictures", _picture_verdict(report)),
     ], key_tint=ui.C.gy)
     if not report["color"] or not report["interactive"]:
-        ui.head("what to do")
+        head("what to do")
         if not report["stdout.isatty"] and not report["mintty_out"]:
             hint("  stdout is not a terminal — output is piped or redirected.")
             hint("  In Docker use `docker compose exec` (it allocates a TTY);")
@@ -1764,7 +1739,7 @@ def _term_body(report: dict) -> None:
             hint("  NO_COLOR is set in this environment — that disables colour by design.")
         hint("  Force it: FORCE_COLOR=1, or --color / --interactive on any command.")
     if report["images"] == "none" and report["ansi"]:
-        ui.head("pictures")
+        head("pictures")
         hint("  No picture protocol detected. Terminals that can:")
         hint("    kitty, ghostty          -> kitty graphics protocol")
         hint("    iTerm2, WezTerm         -> inline images")

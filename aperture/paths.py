@@ -55,9 +55,6 @@ from pathlib import Path, PurePosixPath
 
 from . import schema
 
-ALBUM_META_DIR = schema.ALBUM_META_DIR
-GALLERY_META_DIR = schema.GALLERY_META_DIR
-META_DIRS = (ALBUM_META_DIR, GALLERY_META_DIR)
 
 # Windows resolves these to devices whatever the extension, and refuses to
 # create a file with the name. On a share mounted from Linux they are legal
@@ -139,13 +136,13 @@ def writable_target(photos_root: Path, album: str | None, name: str, *,
     root = Path(photos_root).resolve()
 
     if scope == "gallery":
-        parts = [GALLERY_META_DIR]
+        parts = [schema.GALLERY_META_DIR]
     elif scope == "album":
         if not (album or "").strip():
             raise PathRefused(
                 "an album is required: the root of the photo share is not an "
                 "album, and a metadata file written there is read by nothing")
-        parts = album_segments(album) + [ALBUM_META_DIR]
+        parts = album_segments(album) + [schema.ALBUM_META_DIR]
     else:
         raise PathRefused(f"unknown scope: {scope!r}")
 
