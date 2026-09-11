@@ -1,4 +1,4 @@
-"""Rebuild the Noto Sans JP glyph subset (app/static/fonts/NotoSansJP-subset.woff2)
+"""Rebuild the Noto Sans JP glyph subset (aperture/static/fonts/NotoSansJP-subset.woff2)
 and its static per-weight instances (NotoSansJP-subset-<w>.woff2).
 
 The site ships a tiny woff2 subset of Noto Sans JP instead of the 8.8 MB
@@ -14,8 +14,8 @@ What goes into the subset:
   * every CJK ideograph / fullwidth form actually used right now, scanned
     from: photos/**/album*.md (the per-language album descriptions),
     photos/**/*.cfg (album names, and the branding block in gallery.cfg —
-    site_name, site_desc_jp and the rest), app/i18n.py (UI strings),
-    app/templates/*.html, app/static/app.js and app/main.py (trip config).
+    site_name, site_desc_jp and the rest), aperture/i18n.py (UI strings),
+    aperture/templates/*.html, aperture/static/app.js and aperture/main.py (trip config).
 
 Note the limit this has: the cfg files are RUNTIME data, read per request,
 while the subset is built here. Editing Japanese branding text on a running
@@ -37,7 +37,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parent.parent
-FONT_DIR = ROOT / "app" / "static" / "fonts"
+FONT_DIR = ROOT / "aperture" / "static" / "fonts"
 SRC = FONT_DIR / "NotoSansJP-VariableFont_wght.ttf"
 OUT = FONT_DIR / "NotoSansJP-subset.woff2"
 
@@ -56,9 +56,9 @@ def collect_text() -> str:
     files: list[Path] = []
     files += sorted((ROOT / "photos").rglob("album*.md"))
     files += sorted((ROOT / "photos").rglob("*.cfg"))
-    files += sorted((ROOT / "app" / "templates").glob("*.html"))
-    files += [ROOT / "app" / "i18n.py", ROOT / "app" / "main.py",
-              ROOT / "app" / "static" / "app.js"]
+    files += sorted((ROOT / "aperture" / "templates").glob("*.html"))
+    files += [ROOT / "aperture" / "i18n.py", ROOT / "aperture" / "main.py",
+              ROOT / "aperture" / "static" / "app.js"]
     chunks = []
     for f in files:
         try:
