@@ -20,7 +20,8 @@ DATA_DIR, never in the photo tree. The gallery serves files out of
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from contextlib import contextmanager
+from dataclasses import dataclass, fields
 from pathlib import Path
 
 # The roles a process can run in. See server.py — this is what decides which
@@ -71,6 +72,7 @@ class Settings:
     console_bind: str
     console_port: int
     console_read_only: bool
+    console_allow_open: bool
     console_backups: int
     console_max_upload: int
 
@@ -149,6 +151,11 @@ def load() -> Settings:
         console_bind=(os.environ.get("CONSOLE_BIND") or "127.0.0.1").strip(),
         console_port=_int("CONSOLE_PORT", 8090),
         console_read_only=_flag("READ_ONLY", "0"),
+        # The one startup rule an operator can wave away, so it belongs
+        # with the rest of the configuration rather than being read out
+        # of the environment where it is enforced -- see
+        # console.security.assert_safe_binding().
+        console_allow_open=_flag("CONSOLE_ALLOW_OPEN", "0"),
         console_backups=_int("BACKUPS", 20),
         console_max_upload=_int("MAX_UPLOAD_MB", 8) * 1024 * 1024,
 
@@ -174,3 +181,28 @@ def ensure_dirs() -> None:
     for d in (settings.thumbs_dir, settings.previews_dir, settings.fulls_dir,
               settings.data_dir):
         d.mkdir(parents=True, exist_ok=True)
+
+
+@contextmanager
+def override(**changes):
+    """Settings, changed for the length of a `with` block. FOR TESTS.
+
+    They are frozen because configuration does not change while a process
+    runs, and every module holds this one instance rather than a copy, so a
+    test that needs the other value of a flag cannot simply build a second
+    Settings. It says so here instead of reaching past the freeze itself,
+    which is what several tests used to do one object.__setattr__ at a time --
+    and which left the value changed for the rest of the session whenever the
+    test failed before its cleanup ran.
+    """
+    unknown = set(changes) - {f.name for f in fields(Settings)}
+    if unknown:
+        raise TypeError("no such setting: %s" % ", ".join(sorted(unknown)))
+    before = {name: getattr(settings, name) for name in changes}
+    for name, value in changes.items():
+        object.__setattr__(settings, name, value)
+    try:
+        yield settings
+    finally:
+        for name, value in before.items():
+            object.__setattr__(settings, name, value)

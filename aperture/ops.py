@@ -79,12 +79,6 @@ def bytes_h(n) -> str:
 
 
 # ----- shared plumbing --------------------------------------------------
-def connect():
-    """Open the index. Every non-control command needs this — the CLI runs
-    outside the server process, so db.init() has not run here."""
-    return db.init(settings.data_dir)
-
-
 def server_status() -> tuple[dict | None, bool]:
     st = control.read_status()
     return st, control.status_is_live(st)
@@ -287,7 +281,7 @@ def status() -> dict:
     """
     st, live = server_status()
     pause = control.pause_info()
-    counts = index_counts(connect())
+    counts = index_counts(db.conn())
     return {"server": st, "live": live, "paused": pause is not None,
             "pause": pause, "index": counts,
             "control_dir": str(control.control_dir())}
@@ -369,7 +363,7 @@ def doctor(album: str | None = None, limit_slow: int = 50,
         if progress is not None:
             progress(label, done, total)
 
-    c = connect()
+    c = db.conn()
     album = norm_album(album)
     _tick("reading the index")
     rows = scope_rows(c, album)

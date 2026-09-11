@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from aperture import control, ops
 from aperture.console import security
 from aperture.console.app import app as console_app
+from aperture import runtime
 from aperture.runtime import settings
 
 PASSWORD = "ops-test-password"
@@ -35,14 +36,13 @@ def open_console(indexed):
 @pytest.fixture
 def signed_in(indexed):
     security.set_password(PASSWORD)
-    security._sessions.clear()
-    security._failures.clear()
+    security.reset()
     client = TestClient(console_app)
     csrf = client.post("/api/session", json={"password": PASSWORD}).json()["csrf"]
     yield client, csrf
     control.resume()
     security.clear_password()
-    security._sessions.clear()
+    security.reset()
 
 
 # ----- state ------------------------------------------------------------
@@ -140,19 +140,24 @@ def test_an_action_is_recorded(signed_in):
     assert "session" in record
 
 
-def test_reading_is_allowed_read_only_but_acting_is_not(open_console, request):
+def test_reading_is_allowed_read_only_but_acting_is_not(open_console):
     """READ_ONLY means the console cannot change anything — not merely that it
-    cannot change photos. Pausing the indexer is a change.
+    cannot change photos. Pausing the indexer is a change, and so is writing a
+    cfg file.
 
-    Settings are frozen on purpose (configuration does not change while the
-    process runs) and the app binds the global at import, so the only way to
-    exercise the other value is to reach past the freeze deliberately.
+    Both guards ask the setting itself. The cfg routes used to ask a copy
+    bound at import, which no test could reach and no operator could change
+    without a restart: a console switched to read-only refused the operations
+    panel and wrote the file anyway.
     """
-    object.__setattr__(settings, "console_read_only", True)
-    request.addfinalizer(
-        lambda: object.__setattr__(settings, "console_read_only", False))
-    assert open_console.get("/api/ops/status").json()["read_only"] is True
-    for path in ("/api/ops/scan", "/api/ops/pause", "/api/ops/resume"):
-        res = open_console.post(path, json={})
-        assert res.status_code == 403, path
+    with runtime.override(console_read_only=True):
+        assert open_console.get("/api/ops/status").json()["read_only"] is True
+        assert open_console.get("/api/meta").json()["read_only"] is True
+        for path in ("/api/ops/scan", "/api/ops/pause", "/api/ops/resume"):
+            res = open_console.post(path, json={})
+            assert res.status_code == 403, path
+            assert "read-only" in res.json()["detail"]
+        res = open_console.put("/api/album/cfg",
+                               json={"album": "tech", "values": {"name": "Nope"}})
+        assert res.status_code == 403, res.text
         assert "read-only" in res.json()["detail"]

@@ -50,7 +50,6 @@ BASE_DIR = Path(__file__).resolve().parent
 PHOTOS_DIR = settings.photos_dir
 DATA_DIR = settings.data_dir
 BACKUP_DIR = settings.backup_dir
-READ_ONLY = settings.console_read_only
 BACKUPS = settings.console_backups
 MAX_UPLOAD = settings.console_max_upload
 
@@ -159,7 +158,7 @@ def _writes(request: Request, action: str, target: Path, before: str | None) -> 
 
 # ----- helpers ----------------------------------------------------------
 def _guard_write() -> None:
-    if READ_ONLY:
+    if settings.console_read_only:
         raise HTTPException(403, "the console is mounted read-only")
 
 
@@ -284,7 +283,7 @@ def api_session_close(request: Request):
 def index(request: Request):
     return templates.TemplateResponse(request, "index.html", {
         "photos_dir": PHOTOS_DIR.as_posix(),
-        "read_only": READ_ONLY,
+        "read_only": settings.console_read_only,
         "app_version": APP_VERSION,
         # "open" means no password is configured. The UI says so out loud —
         # an unauthenticated console should never look like an authenticated
@@ -300,7 +299,7 @@ def api_meta():
     return {
         "version": APP_VERSION,
         "photos_dir": PHOTOS_DIR.as_posix(),
-        "read_only": READ_ONLY,
+        "read_only": settings.console_read_only,
         "album_keys": schema.ALBUM_KEYS,
         "gallery_keys": schema.GALLERY_KEYS,
         "spec": schema.KEY_SPEC,
@@ -812,7 +811,7 @@ def api_health(request: Request):
     payload = {"ok": PHOTOS_DIR.is_dir(), "version": APP_VERSION,
                "auth": "open" if security.open_access() else "password"}
     if security.current(request) or security.open_access():
-        payload.update(photos_dir=PHOTOS_DIR.as_posix(), read_only=READ_ONLY)
+        payload.update(photos_dir=PHOTOS_DIR.as_posix(), read_only=settings.console_read_only)
     return payload
 
 

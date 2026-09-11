@@ -83,7 +83,6 @@ _stamp = ops.stamp
 _dur = ops.dur
 _ago = ops.ago
 _bytes = ops.bytes_h
-_connect = ops.connect
 _server_status = ops.server_status
 _norm_album = ops.norm_album
 _photo_files = ops.photo_files
@@ -265,7 +264,7 @@ def cmd_scan(args) -> int:
     elif not live and not args.json:
         kv("mode", "server not running — scanning in this process")
 
-    _connect()
+    db.conn()
     started = time.time()
     result = scanner.full_scan(
         settings.photos_dir, settings.thumbs_dir, settings.thumb_size,
@@ -363,7 +362,7 @@ def cmd_doctor(args) -> int:
 
 
 def cmd_thumbs(args) -> int:
-    _connect()
+    db.conn()
     album = _norm_album(args.album)
     disk = _photo_files(album)
     todo: list[tuple[str, str]] = []      # (rel, kind)
@@ -442,7 +441,7 @@ def cmd_thumbs(args) -> int:
 
 
 def cmd_featured(args) -> int:
-    c = _connect()
+    c = db.conn()
     if args.recompute:
         albums.recompute_featured()
     by_photo, unresolved = _featured_map()
@@ -502,7 +501,7 @@ def cmd_featured(args) -> int:
 
 
 def cmd_cfg(args) -> int:
-    _connect()
+    db.conn()
     if args.gallery:
         cfg = config.gallery_config()
         path = config.GALLERY_CFG_PATH
@@ -563,7 +562,7 @@ def cmd_cfg(args) -> int:
 
 
 def cmd_photo(args) -> int:
-    c = _connect()
+    c = db.conn()
     rel = args.rel_path.replace("\\", "/").strip().strip("/")
     row = c.execute("SELECT * FROM images WHERE rel_path = ?", (rel,)).fetchone()
     if row is None:
@@ -630,7 +629,7 @@ def cmd_photo(args) -> int:
 
 
 def cmd_trip(args) -> int:
-    _connect()
+    db.conn()
     if not args.album:
         kv("trips", f"{len(trips.TRIPS)} configured in aperture/trips.py")
         for key, cfg in trips.TRIPS.items():
@@ -737,7 +736,7 @@ def _sidecar_tags_on_disk(album: str | None = None) -> tuple[dict, list[str]]:
 
 
 def cmd_tags(args) -> int:
-    c = _connect()
+    c = db.conn()
     album = _norm_album(args.album)
 
     # What the index believes.
@@ -870,7 +869,7 @@ MODE_NOTE = {
 
 
 def cmd_welcome(args) -> int:
-    _connect()
+    db.conn()
     devices = []
     if not args.mobile_only:
         devices.append(_welcome_report(mobile=False))
@@ -906,7 +905,7 @@ def cmd_welcome(args) -> int:
 # ----- gps --------------------------------------------------------------
 def cmd_gps(args) -> int:
     """Which originals still carry coordinates. WRITES with --strip."""
-    _connect()
+    db.conn()
     album = _norm_album(args.album)
     base = (settings.photos_dir / album) if album else settings.photos_dir
     if not base.is_dir():
@@ -972,7 +971,7 @@ def cmd_gps(args) -> int:
 
 # ----- album ------------------------------------------------------------
 def cmd_album(args) -> int:
-    c = _connect()
+    c = db.conn()
     album = _norm_album(args.album)
 
     if not album:
@@ -1069,7 +1068,7 @@ def cmd_album(args) -> int:
 def cmd_search(args) -> int:
     """The same query the /search page runs, so what this lists is what the
     page would list."""
-    c = _connect()
+    c = db.conn()
     query = (args.query or "").strip()
     if not query:
         return fail("nothing to search for")
@@ -1296,7 +1295,7 @@ def _dir_stats(path):
 
 def cmd_dash(args) -> int:
     if args.json:
-        c = _connect()
+        c = db.conn()
         st, live = _server_status()
         span = c.execute(
             "SELECT MIN(taken_at) AS a, MAX(taken_at) AS b FROM images "
@@ -1350,7 +1349,7 @@ def _watch_dash(args) -> int:
 def _dash_body(footer: bool = True) -> None:
     """The dashboard content — drawn inside whatever frame is already open,
     so the menu can lead with it without nesting a second box."""
-    c = _connect()
+    c = db.conn()
     st, live = _server_status()
     pause = control.pause_info()
     counts = _index_counts(c)
@@ -1530,7 +1529,7 @@ def cmd_menu(args) -> int:
         hint("  `python -m aperture.cli term` shows what was detected")
         hint("  `python -m aperture.cli menu --interactive` forces the menu anyway")
         return 1
-    _connect()
+    db.conn()
     last: list[str] | None = None
     intro = bool(getattr(args, "intro", False))
     while True:

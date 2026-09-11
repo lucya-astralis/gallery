@@ -173,14 +173,12 @@ def assert_safe_binding(bind: str | None = None, port: int | None = None) -> Non
     bind = settings.console_bind if bind is None else bind
     port = settings.console_port if port is None else port
 
-    allow_open = (os.environ.get("CONSOLE_ALLOW_OPEN", "0").strip().lower()
-                  not in ("0", "false", "no", "off", ""))
     if _is_loopback(bind):
         log.warning(
             "console: NO PASSWORD SET - open to anything that reaches "
             "%s:%d. Set one with `python -m aperture.cli passwd`.", bind, port)
         return
-    if allow_open:
+    if settings.console_allow_open:
         log.warning(
             "console: NO PASSWORD SET and bound to %s:%d, running open because "
             "CONSOLE_ALLOW_OPEN=1. Whatever can reach that port can rewrite "
@@ -228,6 +226,13 @@ class Session:
 _sessions: dict[str, Session] = {}
 # ip -> [failures, blocked_until]
 _failures: dict[str, list] = {}
+
+
+def reset() -> None:
+    """Forget every session and every recorded failure. FOR TESTS, which need
+    a door nobody has knocked on yet; nothing in the app calls it."""
+    _sessions.clear()
+    _failures.clear()
 
 
 def _sweep(now: float) -> None:

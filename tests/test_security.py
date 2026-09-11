@@ -19,7 +19,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from aperture import paths
+from aperture import paths, runtime
 from aperture.console import security
 from aperture.console.app import app as console_app
 from aperture.runtime import settings
@@ -163,38 +163,36 @@ def no_password():
     security.clear_password()
 
 
-def _check(monkeypatch, host, allow_open=None):
-    """Run the startup rule against one address. Settings are frozen on
-    purpose, so the address is passed in rather than patched over."""
-    if allow_open is None:
-        monkeypatch.delenv("CONSOLE_ALLOW_OPEN", raising=False)
-    else:
-        monkeypatch.setenv("CONSOLE_ALLOW_OPEN", allow_open)
-    security.assert_safe_binding(host, 8090)
+def _check(host, allow_open=False):
+    """Run the startup rule against one address. The address is an argument
+    because the settings are frozen; the escape hatch is one of them, so it is
+    overridden rather than set in an environment the rule no longer reads."""
+    with runtime.override(console_allow_open=allow_open):
+        security.assert_safe_binding(host, 8090)
 
 
 @pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1"])
-def test_open_on_loopback_is_allowed(monkeypatch, no_password, host):
-    _check(monkeypatch, host)               # must not raise
+def test_open_on_loopback_is_allowed(no_password, host):
+    _check(host)               # must not raise
 
 
 @pytest.mark.parametrize("host", ["0.0.0.0", "10.0.0.5", "192.168.1.20"])
-def test_open_on_a_network_refuses_to_start(monkeypatch, no_password, host):
+def test_open_on_a_network_refuses_to_start(no_password, host):
     with pytest.raises(SystemExit) as caught:
-        _check(monkeypatch, host)
+        _check(host)
     message = str(caught.value)
     # The refusal has to teach, not just refuse.
     assert "passwd" in message and "CONSOLE_ALLOW_OPEN" in message
 
 
-def test_the_escape_hatch_is_explicit(monkeypatch, no_password):
-    _check(monkeypatch, "0.0.0.0", allow_open="1")
+def test_the_escape_hatch_is_explicit(no_password):
+    _check("0.0.0.0", allow_open=True)
 
 
-def test_a_password_makes_the_bind_irrelevant(monkeypatch):
+def test_a_password_makes_the_bind_irrelevant():
     security.set_password(PASSWORD)
     try:
-        _check(monkeypatch, "0.0.0.0")
+        _check("0.0.0.0")
     finally:
         security.clear_password()
 
@@ -206,12 +204,10 @@ def test_a_password_makes_the_bind_irrelevant(monkeypatch):
 def locked():
     """The console with a password set and every session cleared."""
     security.set_password(PASSWORD)
-    security._sessions.clear()
-    security._failures.clear()
+    security.reset()
     yield TestClient(console_app)
     security.clear_password()
-    security._sessions.clear()
-    security._failures.clear()
+    security.reset()
 
 
 @pytest.fixture

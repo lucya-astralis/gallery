@@ -11,10 +11,10 @@ from PIL import Image, ExifTags
 
 from . import brand, db, marks
 from . import schema
+from .runtime import settings
 
 log = logging.getLogger("scanner")
 
-STRIP_GPS = os.environ.get("STRIP_GPS", "1") not in ("0", "false", "False", "")
 GPS_IFD_TAG = 0x8825
 
 # Per-album metadata folder. Everything that describes an album rather than
@@ -519,7 +519,7 @@ def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
         if not force and row and abs(row["mtime"] - effective_mtime) < 1.0:
             return False
 
-    if STRIP_GPS and strip_gps_inplace(file):
+    if settings.strip_gps and strip_gps_inplace(file):
         stat = file.stat()
         mtime = stat.st_mtime
         effective_mtime = max(mtime, sidecar_mtime)
