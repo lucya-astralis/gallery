@@ -365,6 +365,12 @@ def test_an_upload_with_a_path_for_a_name_is_refused(signed_in):
     assert not (PHOTOS.parent / "escape.png").exists()
 
 
+def test_the_audit_route_is_behind_the_door(locked):
+    """It names files, addresses and sessions — everything the door exists
+    for. `recent()` reads the same log `audit()` writes."""
+    assert locked.get("/api/audit").status_code == 401
+
+
 # ----- headers ----------------------------------------------------------
 def test_the_console_is_never_cached_and_never_framed(locked):
     res = locked.get("/login")

@@ -801,6 +801,15 @@ def api_asset_delete(request: Request, path: str = "", name: str = "",
     return {"ok": True, "assets": _asset_listing(scope, path)}
 
 
+# ----- what changed here ------------------------------------------------
+@app.get("/api/audit")
+def api_audit(limit: int = 40):
+    """The console's own writes, newest first -- the log every save already
+    wrote, finally readable. Behind the door like everything else: it names
+    files, addresses and sessions."""
+    return {"entries": security.recent(max(1, min(limit, 200)))}
+
+
 # ----- whole-gallery check ----------------------------------------------
 @app.get("/api/validate")
 def api_validate():

@@ -59,6 +59,10 @@ class Node:
     total_photos: int = 0           # own + whole subtree
     has_cfg: bool = False
     has_meta: bool = False
+    # Whether ANY album_<lang>.md is there. The console asks so it can say
+    # which albums are still unwritten; which languages are missing is the
+    # album view's business, not the tree's.
+    has_desc: bool = False
     cover: str | None = None        # photo to show for this album, root-relative
 
     def as_dict(self) -> dict:
@@ -69,6 +73,7 @@ class Node:
             "total_photos": self.total_photos,
             "has_cfg": self.has_cfg,
             "has_meta": self.has_meta,
+            "has_desc": self.has_desc,
             "cover": self.cover,
             "children": [c.as_dict() for c in self.children],
         }
@@ -140,6 +145,8 @@ class Library:
         meta = folder / schema.ALBUM_META_DIR
         node.has_meta = meta.is_dir()
         node.has_cfg = (meta / schema.ALBUM_CFG_NAME).is_file()
+        node.has_desc = any((meta / ("album_%s.md" % lang)).is_file()
+                            for lang in schema.LANGS)
 
         # The face the album shows in the tree: what album.cfg pins, else the
         # first photo here, else whatever the first sub-album is showing -- so

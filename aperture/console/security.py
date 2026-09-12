@@ -385,6 +385,11 @@ def sha256_of(path: Path) -> str | None:
         return None
 
 
+# How much of the tail recent() reads. 64 KB is some 400 writes -- more than
+# any dashboard shows, and a bounded read whatever the log grew to.
+AUDIT_TAIL_BYTES = 64 * 1024
+
+
 def audit(request: Request, action: str, target: str, *,
           before: str | None = None, after: str | None = None,
           extra: dict | None = None) -> None:
@@ -413,6 +418,38 @@ def audit(request: Request, action: str, target: str, *,
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError as exc:                     # pragma: no cover - disk trouble
         log.warning("console: could not write the audit log: %s", exc)
+
+
+def recent(limit: int = 40) -> list[dict]:
+    """The last writes, newest first. The console shows them as "what changed
+    here"; until now the log was written on every save and read by nobody.
+
+    Only the tail is read -- the file grows for the life of the deployment and
+    a dashboard has no business parsing all of it. A line that is not JSON is
+    skipped rather than raised on: this is a report, and half a log is worth
+    more than an error page.
+    """
+    path = _audit_path()
+    try:
+        with path.open("rb") as fh:
+            fh.seek(0, 2)
+            fh.seek(max(0, fh.tell() - AUDIT_TAIL_BYTES))
+            raw = fh.read().decode("utf-8", errors="replace")
+    except OSError:
+        return []
+    out: list[dict] = []
+    for line in raw.splitlines()[-limit * 2:]:
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(record, dict):
+            out.append(record)
+    out.reverse()
+    return out[:limit]
 
 
 def state(request: Request) -> dict:
