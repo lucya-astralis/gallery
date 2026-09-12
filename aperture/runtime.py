@@ -175,7 +175,7 @@ def _owner(path: Path) -> str:
     try:
         st = path.stat()
     except OSError:
-        return "it does not exist"
+        return "does not exist"
     return "uid %s, gid %s, mode %s" % (
         getattr(st, "st_uid", "?"), getattr(st, "st_gid", "?"), oct(st.st_mode & 0o777))
 
@@ -189,14 +189,14 @@ def _refuse_dir(directory: Path, exc: OSError) -> SystemExit:
     directory) belong in the refusal rather than in a traceback.
     """
     me = getattr(os, "getuid", None)
-    who = ("uid %d, gid %d" % (os.getuid(), os.getgid())) if me else "this user"
+    who = ("uid %d, gid %d" % (os.getuid(), os.getgid())) if me else "the current user"
     return SystemExit(
         "\n"
         "  Aperture cannot create %s\n"
         "      %s\n"
         "\n"
         "  This process runs as %s.\n"
-        "  Its parent %s belongs to %s.\n"
+        "  Its parent %s: %s.\n"
         "\n"
         "  It writes into the data, thumbnail and preview directories. On a\n"
         "  bind mount the HOST's ownership is what counts -- the image's own\n"
