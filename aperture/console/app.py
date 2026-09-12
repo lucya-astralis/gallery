@@ -158,8 +158,22 @@ def _guard_write() -> None:
 
 
 def _album_or_400(album: str) -> str:
-    """Validate an album path and hand back its normalized form."""
+    """Validate an album path and hand back its normalized form.
+
+    An empty album is refused rather than resolved. It used to pass: "" strips
+    to "", `lib.safe("")` hands back the photos root, the root IS a directory,
+    so a request that named no album opened a form for
+    `photos/.album/album.cfg` -- a file the gallery never reads, in the folder
+    the operator hands us as input. Only `paths.writable_target()` stopped the
+    save, which made the read routes promise something the write routes then
+    refused. The gallery-wide settings have their own routes (/api/gallery/*)
+    and their own asset scope.
+    """
     album = (album or "").replace("\\", "/").strip().strip("/")
+    if not album:
+        raise HTTPException(400, "an album is required: the root of the photo share "
+                                 "is not an album — the gallery-wide settings live "
+                                 "under /api/gallery")
     try:
         target = lib.safe(album)
     except ValueError as exc:
@@ -489,7 +503,11 @@ def api_photos(path: str = "", recursive: int = 0, limit: int = 5000,
     dozen sub-folders, and flattening that into one wall is exactly what makes
     picking a cover painful. `tags=1` also returns each photo's sidecar tags.
     """
-    album = _album_or_400(path) if path else ""
+    # The one route where the photo root IS a legitimate scope: the picker
+    # starts there and drills in. Normalized before the gate, so "/" means
+    # the root exactly like "" does.
+    album = path.replace(chr(92), "/").strip().strip("/")
+    album = _album_or_400(album) if album else ""
     photos = lib.photos(album, recursive=bool(recursive))
     shown = photos[:limit]
     if tags:

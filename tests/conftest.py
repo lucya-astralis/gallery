@@ -170,6 +170,19 @@ def client(indexed):
     return TestClient(gallery_app)
 
 
+@pytest.fixture
+def console(indexed):
+    """The console app, with its door open — a loopback bind and no password,
+    which is what every test that is not about the door wants. Function-scoped
+    and reset each time, because the tests that DO set a password share this
+    process with the ones that do not."""
+    from aperture.console import security
+    from aperture.console.app import app as console_app
+    security.clear_password()
+    security.reset()
+    return TestClient(console_app)
+
+
 @pytest.fixture(scope="session")
 def photos_dir():
     return PHOTOS

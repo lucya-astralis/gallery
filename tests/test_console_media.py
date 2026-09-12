@@ -8,20 +8,11 @@ put a thumbnail of something that is not a photo into the first.
 """
 
 import pytest
-from fastapi.testclient import TestClient
 from PIL import Image
 
 from aperture import scanner, templating
-from aperture.console import security
 from aperture.console.app import BASE_DIR as CONSOLE_DIR
-from aperture.console.app import app as console_app
 from aperture.runtime import settings
-
-
-@pytest.fixture
-def console(indexed):
-    security.clear_password()
-    return TestClient(console_app)
 
 
 def tile(console, path):
