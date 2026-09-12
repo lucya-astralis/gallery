@@ -8,6 +8,11 @@ So: every command that reads (rather than acts) is run with `--json`, its
 output is parsed, and the keys it promises are asserted. The rendering half is
 not tested here — a report that renders differently is a look; a report that
 reports differently is a bug.
+
+The screens (`dash`, `help`, `home`, and the bare invocation) are the
+exception: they have no `--json` at all, so the only thing that CAN be
+asserted is that they render — which is worth asserting, because `dash` spent
+a while raising UnboundLocalError instead (see test_the_screens_render).
 """
 
 import json
@@ -30,6 +35,16 @@ def run(*argv, expect=0):
     assert code == expect, f"{argv} exited {code}\n{buf.getvalue()[:2000]}"
     text = buf.getvalue().strip()
     return json.loads(text) if text else None
+
+
+def render(*argv, expect=0):
+    """One CLI invocation, its stdout kept as text. For the screens, which
+    have nothing else to give."""
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        code = cli.main(["--no-color", "--logo", "off", *argv])
+    assert code == expect, f"{argv} exited {code}\n{buf.getvalue()[:2000]}"
+    return buf.getvalue()
 
 
 # ----- state ------------------------------------------------------------
@@ -156,3 +171,22 @@ def test_a_scan_runs_locally_when_no_server_is_listening(indexed):
     body = run("scan", "--local", "--json")
     assert body["result"]["total_seen"] == indexed["result"]["indexed"]
     assert body["error"] is None
+
+
+# ----- the screens ------------------------------------------------------
+def test_the_screens_render(indexed):
+    """No --json anywhere in here, so this is the whole contract: they run,
+    they exit 0, and they say what they are. `dash` raised UnboundLocalError
+    for a while -- a local named `albums` shadowing the module -- and nothing
+    noticed, because every other test asked for JSON."""
+    dash = render("dash").lower()
+    assert "archive" in dash
+    assert "largest albums" in dash      # the block the shadow crashed in
+    assert "commands" in render("help").lower()
+
+
+def test_the_bare_invocation_draws_the_dashboard(indexed):
+    """`python -m aperture.cli` with no arguments. With a terminal it opens
+    the menu on top of this; in a pipe -- a cron line, a CI log -- it is the
+    dashboard and nothing to answer."""
+    assert "archive" in render().lower()

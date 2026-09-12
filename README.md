@@ -68,7 +68,7 @@ to reach a handler that was never mounted on it.
 
 `aperture/ops.py` is the operational surface as data — the live state of the
 indexer, what `doctor` checked, what a scan did. Two front ends render it:
-`aperture/cli.py` to a terminal, `aperture/console/opsapi.py` over HTTP. There
+`aperture/cli/` to a terminal, `aperture/console/opsapi.py` over HTTP. There
 is one implementation of each check, and a report that changes changes in both
 places at once.
 
@@ -877,7 +877,7 @@ Inside the package:
 | `aperture/ops.py`   | the operations surface the CLI and the console's `/api/ops/*` share |
 | `aperture/server.py`| the process: which listeners open, and shutdown     |
 | `aperture/runtime.py`| the one place that reads the environment            |
-| `aperture/cli.py` + `termui.py` | the operator CLI and its terminal vocabulary |
+| `aperture/cli/` + `termui.py` | the operator CLI (`render` how it writes, `operate` the commands that act, `reports` the ones that only look, `screens` the full-screen surfaces, `entry` the parser) and its terminal vocabulary |
 | `tests/`            | the characterization net (`python -m pytest`)       |
 
 ## Configuration

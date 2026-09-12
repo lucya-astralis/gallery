@@ -50,10 +50,10 @@ def test_main_py_is_gone_and_nothing_imports_it():
 
 # A name a module gives a schema value BECAUSE IT MEANS SOMETHING ELSE there,
 # and the CLI's four report verbs, which read as verbs in a command body and
-# are bound once where the file says so.
+# are bound once in aperture/cli/render.py, where that file says so.
 ALIASES_ALLOWED = {("branding.py", "BRAND_ASSET_TYPES"),
-                   ("cli.py", "out"), ("cli.py", "kv"),
-                   ("cli.py", "head"), ("cli.py", "hint")}
+                   ("render.py", "out"), ("render.py", "kv"),
+                   ("render.py", "head"), ("render.py", "hint")}
 
 
 def test_no_module_keeps_a_second_name_for_something():
@@ -80,6 +80,39 @@ def test_no_module_keeps_a_second_name_for_something():
                 path.relative_to(PACKAGE), node.lineno, name,
                 node.value.value.id, node.value.attr))
     assert not offenders, "say it once, where it lives:\n" + "\n".join(offenders)
+
+
+def test_no_function_shadows_a_module_the_file_imports():
+    """A local named like an imported module turns every use of that module in
+    the same function into an UnboundLocalError -- a crash the module's own
+    line never sees coming.
+
+    `dash` did exactly this: `albums = _top_albums(c)` sat twelve lines under
+    `albums.all_album_nodes()`, so the dashboard raised before it drew
+    anything, and every CLI test asked for `--json` and never ran it.
+    """
+    offenders = []
+    for path in sorted(PACKAGE.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        modules = set()
+        for node in tree.body:
+            if isinstance(node, ast.Import):
+                modules.update((a.asname or a.name).split(".")[0] for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.level and node.module is None:
+                modules.update(a.asname or a.name for a in node.names)   # from . import x
+        for func in [n for n in ast.walk(tree)
+                     if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+            bound = set()
+            for sub in ast.walk(func):
+                if isinstance(sub, ast.Assign):
+                    bound.update(t.id for t in sub.targets if isinstance(t, ast.Name))
+                elif isinstance(sub, (ast.For, ast.comprehension)):
+                    if isinstance(sub.target, ast.Name):
+                        bound.add(sub.target.id)
+            for name in sorted(bound & modules):
+                offenders.append("%s:%d  %s() binds %s, which is a module here"
+                                 % (path.relative_to(PACKAGE), func.lineno, func.name, name))
+    assert not offenders, "rename the local:\n" + "\n".join(offenders)
 
 
 def test_every_served_file_type_is_the_schemas():
