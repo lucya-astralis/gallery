@@ -145,9 +145,15 @@ async function api(path, options = {}) {
   return payload;
 }
 
-const bytes = (n) => !n ? '—'
-  : n > 1048576 ? (n / 1048576).toFixed(1) + ' MB'
-  : n > 1024 ? Math.round(n / 1024) + ' KB' : n + ' B';
+/* Up the whole ladder: this stopped at MB, so a 31 GB archive read
+ * "31985.1 MB" on every screen that showed its size. */
+const bytes = (n) => {
+  if (!n) return '—';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let step = 0;
+  while (n >= 1024 && step < units.length - 1) { n /= 1024; step += 1; }
+  return (step === 0 ? n : step === 1 ? Math.round(n) : n.toFixed(1)) + ' ' + units[step];
+};
 
 /* Previews always come from /api/thumb: the gallery's own grid thumbnail,
  * the file /thumb serves visitors. A grid of tiles must never pull the
@@ -187,7 +193,7 @@ async function boot() {
   try {
     state.meta = await api('/api/meta');
     await Promise.all([loadTree(), loadVocab()]);
-    select({ kind: 'gallery' });
+    select({ kind: 'home' });
   } catch (err) {
     $('#pane').innerHTML = '';
     $('#pane').append(el('div', { class: 'pane__empty', text: 'Cannot reach the backend: ' + err.message }));
@@ -199,6 +205,10 @@ async function boot() {
     toast('Reloaded');
   });
   $('#btn-check').addEventListener('click', () => { setDrawer(false); checkAll(); });
+  $$('.place').forEach((button) => button.addEventListener('click', () => {
+    setDrawer(false);
+    select({ kind: button.dataset.place });
+  }));
   const signout = $('#btn-signout');
   if (signout) {
     signout.addEventListener('click', async () => {
@@ -254,36 +264,43 @@ function renderTree() {
   const filter = $('#tree-filter').value.trim().toLowerCase();
   list.innerHTML = '';
 
-  /* Operations sits above the config tree because it is a different errand:
-   * everything below this row edits a file, this row watches and drives the
-   * indexer. It is the CLI's `status`, `scan`, `pause` and `doctor` — the
-   * console can reach them now that it ships with the gallery. */
-  list.append(el('li', {}, el('div', {
-    class: 'tree__row tree__row--ops' +
-      (state.sel && state.sel.kind === 'ops' ? ' is-active' : ''),
-    onclick: () => select({ kind: 'ops' }),
-  },
-    el('span', { class: 'tree__twisty is-leaf' }),
-    el('span', { class: 'tree__name', text: 'operations' }),
-    el('span', { class: 'tree__count', id: 'ops-lamp', text: '' }))));
-
-  list.append(el('li', {}, el('div', {
-    class: 'tree__row tree__row--gallery' +
-      (state.sel && state.sel.kind === 'gallery' ? ' is-active' : ''),
-    onclick: () => select({ kind: 'gallery' }),
-  },
-    el('span', { class: 'tree__twisty is-leaf' }),
-    el('span', { class: 'tree__name', text: 'gallery.cfg' }),
-    el('span', { class: 'tree__count', text: 'root' }))));
-
+  /* Albums, and nothing else. Operations and gallery.cfg used to sit at the
+   * top of this list, where a tool and a file read as two odd albums; they
+   * are places now, in the nav. */
   if (!state.tree) return;
   for (const child of state.tree.children) {
     const item = renderNode(child, 1, filter);
     if (item) list.append(item);
   }
-  if (list.children.length === 2 && filter) {
-    list.append(el('li', { class: 'tree__empty', text: 'No album matches.' }));
+  if (!list.children.length) {
+    list.append(el('li', { class: 'tree__empty',
+                          text: filter ? 'No album matches.' : 'No albums yet.' }));
   }
+  /* With a filter typed it reads "3 / 31": how much of the tree is in front
+   * of you, and how much there is. */
+  const count = $('#tree-count');
+  if (count) {
+    const total = countAlbums(state.tree);
+    const shown = list.querySelectorAll('.tree__row').length;
+    count.textContent = filter ? shown + ' / ' + total : String(total);
+  }
+}
+
+/* Every folder below the root that can carry an album.cfg. */
+function countAlbums(node) {
+  return (node.children || []).reduce((n, child) => n + 1 + countAlbums(child), 0);
+}
+
+/* Which place is lit. The album tree lights its own row, and an album is not
+ * a place -- so on an album none of the three is active, which is the truth:
+ * you are in the sidebar's world, not in one of theirs. */
+function syncPlaces() {
+  const kind = state.sel ? state.sel.kind : null;
+  $$('.place').forEach((button) => {
+    const on = button.dataset.place === kind;
+    button.classList.toggle('is-active', on);
+    button.setAttribute('aria-current', on ? 'true' : 'false');
+  });
 }
 
 function renderNode(node, depth, filter) {
@@ -297,9 +314,13 @@ function renderNode(node, depth, filter) {
   const open = filter ? true : state.openPaths.has(node.path);
   const errored = (state.issuesByAlbum[node.path] || 0) > 0;
 
+  /* Depth as an ATTRIBUTE, not a style. This console serves itself under
+   * `style-src 'self'`, so the inline padding that used to sit here was
+   * dropped by the browser and every sub-album has been rendered flush left
+   * -- while the CSP logged a refusal per row. */
   const row = el('div', {
     class: 'tree__row' + (active ? ' is-active' : ''),
-    style: 'padding-left:' + (depth * 12) + 'px',
+    'data-depth': String(Math.min(depth, 8)),
     title: node.path,
     onclick: () => select({ kind: 'album', album: node.path }),
   },
@@ -335,15 +356,23 @@ async function select(sel, keepTab = false) {
   state.sel = sel;
   state.edits = {};
   state.browse = null;
-  if (!keepTab) { state.tab = 'settings'; state.query = ''; }
+  /* An album lands on its photos: the settings are twenty-one keys, and
+   * looking at what is in the folder is the more common errand. The
+   * gallery's own file has no photos to land on. */
+  if (!keepTab) { state.tab = sel.kind === 'album' ? 'photos' : 'settings'; state.query = ''; }
   if (isNarrow()) setDrawer(false);
   if (sel.kind === 'album') {
     const parts = sel.album.split('/');
     for (let i = 1; i < parts.length; i++) state.openPaths.add(parts.slice(0, i).join('/'));
   }
   renderTree();
+  syncPlaces();
   $('#pane').innerHTML = '';
   $('#pane').append(el('div', { class: 'pane__empty', text: 'Loading…' }));
+  if (sel.kind === 'home') {
+    await renderHome();
+    return;
+  }
   if (sel.kind === 'ops') {
     await renderOps();
     return;
@@ -639,9 +668,18 @@ function renderDoctor(report) {
 /* A scan is asynchronous by nature: on a large share over SMB a full pass is
  * minutes. So the request returns an id and this polls for its summary rather
  * than holding an HTTP request open across the whole thing. */
+/* Home and Operations both draw the indexer, and an action can be started
+ * from either. Repaint whichever is actually up -- painting Operations over
+ * the home screen because that is where the code used to live is how a tool
+ * teaches people not to trust its buttons. */
+function repaintOps() {
+  if (state.sel && state.sel.kind === 'ops') paintOps();
+  else if (state.sel && state.sel.kind === 'home') paintHome();
+}
+
 async function startScan(album, force) {
   opsState.busy = true;
-  paintOps();
+  repaintOps();
   try {
     const res = await api('/api/ops/scan', {
       method: 'POST',
@@ -652,7 +690,7 @@ async function startScan(album, force) {
   } catch (err) {
     opsState.busy = false;
     toast(err.message, 'err');
-    paintOps();
+    repaintOps();
   }
 }
 
@@ -676,7 +714,7 @@ function pollScan(requestId) {
           (r.indexed || 0) + ' indexed, ' + (r.thumbnails || 0) + ' thumbnails',
         body.result.error ? 'err' : 'ok');
       await loadOpsStatus();
-      if (state.sel.kind === 'ops') paintOps();
+      repaintOps();
       return;
     }
     /* Ten minutes is longer than any scan this has been pointed at; past it
@@ -685,7 +723,7 @@ function pollScan(requestId) {
       clearInterval(opsState.poll);
       opsState.busy = false;
       toast('Still scanning — reload to see the result', 'warn');
-      if (state.sel.kind === 'ops') paintOps();
+      repaintOps();
     }
   }, 1500);
 }
@@ -696,7 +734,7 @@ async function doPause(reason) {
     toast('Indexing paused');
   } catch (err) { toast(err.message, 'err'); return; }
   await loadOpsStatus();
-  paintOps();
+  repaintOps();
   renderTree();
 }
 
@@ -706,13 +744,13 @@ async function doResume() {
     toast('Indexing resumed');
   } catch (err) { toast(err.message, 'err'); return; }
   await loadOpsStatus();
-  paintOps();
+  repaintOps();
   renderTree();
 }
 
 async function runDoctor(album) {
   opsState.busy = true;
-  paintOps();
+  repaintOps();
   toast('Checking…');
   try {
     opsState.doctor = await api('/api/ops/doctor' +
@@ -721,9 +759,207 @@ async function runDoctor(album) {
     toast(err.message, 'err');
   } finally {
     opsState.busy = false;
-    if (state.sel.kind === 'ops') paintOps();
+    repaintOps();
   }
 }
+
+/* ----- home ------------------------------------------------------------- */
+/* The screen the console opens on. It answers what a person arriving has to
+ * ask anyway -- is the machine working, is anything broken, what happened
+ * here last, what is still unwritten -- and it answers them out of routes
+ * that already existed for other screens. Nothing on it is computed here: a
+ * dashboard with figures of its own is a second opinion to keep in step.
+ */
+const home = { issues: null, audit: [], gallery: null };
+
+async function renderHome() {
+  const pane = $('#pane');
+  pane.innerHTML = '';
+  pane.append(el('div', { class: 'pane__empty', text: 'Reading the archive…' }));
+  const [, issues, audit, gallery] = await Promise.all([
+    loadOpsStatus(),
+    api('/api/validate').catch(() => null),
+    api('/api/audit?limit=8').catch(() => null),
+    api('/api/gallery').catch(() => null),
+  ]);
+  if (!state.sel || state.sel.kind !== 'home') return;   /* navigated away */
+  if (issues) { home.issues = issues; countIssues(issues); renderTree(); }
+  home.audit = (audit && audit.entries) || [];
+  home.gallery = gallery;
+  paintHome();
+}
+
+function card(title, note, ...body) {
+  return el('section', { class: 'card' },
+    el('header', { class: 'card__head' },
+      el('h2', { class: 'card__title', text: title }),
+      note ? el('span', { class: 'card__note', text: note }) : null),
+    el('div', { class: 'card__body' }, ...body));
+}
+
+function tile(label, value, tone) {
+  return el('div', { class: 'tile' + (tone ? ' is-' + tone : '') },
+    el('span', { class: 'tile__v', text: value }),
+    el('span', { class: 'tile__k', text: label }));
+}
+
+function homeRow(where, key, detail, onclick) {
+  return el('div', { class: 'hrow' + (onclick ? ' is-link' : ''), onclick: onclick || null },
+    el('span', { class: 'hrow__where', text: where }),
+    el('span', { class: 'hrow__key', text: key }),
+    el('span', { class: 'hrow__detail', text: detail }));
+}
+
+/* An audit line names a file; the console navigates by album. */
+function auditTarget(target) {
+  const value = String(target || '');
+  if (value.startsWith('.gallery/')) return { kind: 'gallery' };
+  const cut = value.indexOf('/.album/');
+  if (cut > 0) return { kind: 'album', album: value.slice(0, cut) };
+  const slash = value.lastIndexOf('/');
+  return slash > 0 ? { kind: 'album', album: value.slice(0, slash) } : null;
+}
+
+const agoIso = (ts) => {
+  const parsed = Date.parse(ts);
+  return Number.isNaN(parsed) ? '—' : ago(parsed / 1000);
+};
+
+function paintHome() {
+  const pane = $('#pane');
+  const st = opsState.status || {};
+  const idx = st.index || {};
+  const paths = st.paths || {};
+  const scan = (st.server && st.server.last_scan) || null;
+  const res = (scan && scan.result) || {};
+  const live = !!st.live;
+  const paused = !!st.paused;
+  const scanning = !!(st.server && st.server.scanning);
+  const values = (home.gallery && home.gallery.values) || {};
+  const title = (values.site_name || []).join(', ').trim() || 'This archive';
+  const ro = !!st.read_only || READ_ONLY;
+
+  pane.innerHTML = '';
+  pane.append(el('div', { class: 'pane__top' },
+    el('div', { class: 'head' },
+      el('div', { class: 'head__crumb', text: paths.photos || state.meta.photos_dir }),
+      el('div', { class: 'head__line' },
+        el('h1', { class: 'head__title', text: title }),
+        el('div', { class: 'head__meta' },
+          ro ? el('span', { class: 'pill pill--warn', text: 'read-only' }) : null)))));
+
+  const grid = el('div', { class: 'home' });
+  pane.append(grid);
+
+  /* ---- is the machine working ---- */
+  const tone = paused ? 'warn' : live ? 'ok' : 'bad';
+  const word = paused ? 'paused' : scanning ? 'scanning' : live ? 'running' : 'not running';
+  grid.append(card('Indexer', st.control_dir ? 'via the control channel' : null,
+    el('div', { class: 'lamp' },
+      el('span', { class: 'lamp__dot is-' + tone }),
+      el('span', { class: 'lamp__word is-' + tone, text: word }),
+      el('span', { class: 'lamp__note', text: paused && st.pause
+        ? 'since ' + agoIso(new Date(st.pause.since * 1000).toISOString()) +
+          (st.pause.reason ? ' — ' + st.pause.reason : '')
+        : live ? '' : 'no heartbeat — start the gallery to index' })),
+    el('dl', { class: 'facts' },
+      el('div', {}, el('dt', { text: 'last scan' }),
+        el('dd', { text: scan
+          ? ago(scan.finished_at) + ' · ' + (scan.trigger || '?') +
+            (scan.seconds != null ? ' · ' + scan.seconds + 's' : '')
+          : 'never' })),
+      el('div', {}, el('dt', { text: 'it did' }),
+        el('dd', { text: scan
+          ? (['indexed', 'thumbnails', 'previews', 'removed', 'failed']
+              .filter((k) => res[k]).map((k) => res[k] + ' ' + k).join(' · ') || 'nothing to do')
+          : '—' })),
+      el('div', {}, el('dt', { text: 'every' }),
+        el('dd', { text: paths.scan_interval ? paths.scan_interval + 's' : 'manual only' })),
+      el('div', {}, el('dt', { text: 'watcher' }),
+        el('dd', { text: paths.watcher ? 'on' : 'off' })),
+      el('div', {}, el('dt', { text: 'role' }),
+        el('dd', { text: st.role || '—' }))),
+    el('div', { class: 'card__actions' },
+      el('button', {
+        type: 'button', class: 'btn btn--primary', text: 'Scan now',
+        disabled: ro || opsState.busy, onclick: () => startScan('', false),
+      }),
+      el('button', {
+        type: 'button', class: 'btn', disabled: ro || opsState.busy,
+        text: paused ? 'Resume' : 'Pause',
+        onclick: () => (paused ? doResume() : doPause('')),
+      }),
+      el('button', {
+        type: 'button', class: 'btn btn--ghost', text: 'Operations →',
+        onclick: () => select({ kind: 'ops' }),
+      }))));
+
+  /* ---- what is in it ---- */
+  grid.append(card('Archive', 'what the index holds',
+    el('div', { class: 'tiles' },
+      tile('photos', String(idx.images ?? '—')),
+      tile('albums', String(idx.albums ?? '—')),
+      tile('featured', String(idx.featured ?? '—')),
+      tile('tags', String(idx.tags ?? '—')),
+      tile('originals', bytes(idx.bytes)),
+      tile('database', bytes(idx.db_bytes)))));
+
+  /* ---- is anything broken ---- */
+  const issues = home.issues;
+  const list = (issues && issues.issues) || [];
+  const shown = list.slice(0, 6);
+  grid.append(el('div', { class: 'home__wide' }, card('Needs attention',
+    issues ? issues.errors + ' error(s) · ' + issues.warnings + ' warning(s)' : null,
+    !issues
+      ? el('p', { class: 'card__quiet', text: 'The check did not run.' })
+      : !list.length
+        ? el('p', { class: 'card__quiet',
+                    text: 'Every config file checks out — nothing the gallery would ignore.' })
+        : el('div', { class: 'hrows' }, shown.map((issue) => homeRow(
+            issue.scope === 'gallery' ? 'gallery.cfg' : issue.album,
+            issue.key, issue.detail,
+            () => select(issue.scope === 'gallery'
+              ? { kind: 'gallery' } : { kind: 'album', album: issue.album })))),
+    list.length > shown.length
+      ? el('p', { class: 'card__quiet',
+                  text: 'and ' + (list.length - shown.length) + ' more' })
+      : null,
+    el('div', { class: 'card__actions' },
+      el('button', { type: 'button', class: 'btn', text: 'Check again', onclick: checkAll })))));
+
+  /* ---- what is still unwritten ---- */
+  const albums = [];
+  (function walk(node) {
+    for (const child of node.children || []) { albums.push(child); walk(child); }
+  })(state.tree || { children: [] });
+  const noCfg = albums.filter((a) => a.own_photos && !a.has_cfg);
+  const noText = albums.filter((a) => a.own_photos && !a.has_desc);
+  grid.append(card('Unwritten', albums.length + ' album(s) in the tree',
+    !noCfg.length && !noText.length
+      ? el('p', { class: 'card__quiet', text: 'Every album with photos has a cfg and a text.' })
+      : el('div', { class: 'hrows' }, [
+          ...noCfg.slice(0, 4).map((a) => homeRow(a.path, 'no cfg',
+            a.own_photos + ' photo(s), nothing configured',
+            () => select({ kind: 'album', album: a.path }))),
+          ...noText.slice(0, 4).map((a) => homeRow(a.path, 'no text',
+            a.own_photos + ' photo(s), no album_<lang>.md',
+            () => select({ kind: 'album', album: a.path }))),
+        ]),
+    (noCfg.length > 4 || noText.length > 4)
+      ? el('p', { class: 'card__quiet', text: 'and more — the tree marks them' })
+      : null));
+
+  /* ---- what happened here ---- */
+  grid.append(card('Recent changes', 'this console, not the gallery',
+    !home.audit.length
+      ? el('p', { class: 'card__quiet', text: 'Nothing has been saved here yet.' })
+      : el('div', { class: 'hrows' }, home.audit.map((entry) => {
+          const target = auditTarget(entry.target);
+          return homeRow(agoIso(entry.ts), entry.action || '—', entry.target || '',
+            target ? () => select(target) : null);
+        }))));
+}
+
 
 function renderPane() {
   const pane = $('#pane');
@@ -737,9 +973,9 @@ function renderPane() {
 
   const tabs = isGallery
     ? [['settings', 'Settings'], ['assets', 'Files'], ['raw', 'Raw file']]
-    : [['settings', 'Settings'], ['photos', 'Photos & tags'], ['text', 'Description'],
+    : [['photos', 'Photos'], ['settings', 'Settings'], ['text', 'Description'],
        ['assets', 'Files'], ['raw', 'Raw file']];
-  if (!tabs.some(([id]) => id === state.tab)) state.tab = 'settings';
+  if (!tabs.some(([id]) => id === state.tab)) state.tab = tabs[0][0];
 
   /* Header and tabs travel together as one sticky block: on a settings page
    * three screens tall, scrolling used to take the album's name and every
@@ -773,6 +1009,18 @@ function renderPane() {
   restoreFocus(fk, selStart, selEnd);
 }
 
+/* One album out of the loaded tree, by path. */
+function treeNode(path, node) {
+  node = node || state.tree;
+  if (!node) return null;
+  if (node.path === path) return node;
+  for (const child of node.children || []) {
+    const hit = treeNode(path, child);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 function renderHead(isGallery) {
   const data = state.data;
   const meta = [el('span', {
@@ -784,6 +1032,13 @@ function renderHead(isGallery) {
     if (data.photo_count !== data.own_count) {
       meta.push(el('span', { class: 'pill', text: data.photo_count + ' subtree' }));
     }
+    /* Whether anyone has written about this album. It is the one thing the
+     * header could not say, and the thing most often still undone. */
+    const langs = Object.keys(data.descriptions || {})
+      .filter((lang) => (data.descriptions[lang] || '').trim());
+    meta.push(langs.length
+      ? el('span', { class: 'pill', text: 'text ' + langs.join(' ') })
+      : el('span', { class: 'pill', text: 'no text yet' }));
   }
   const errors = (data.issues || []).filter((i) => i.level === 'error').length;
   const warns = (data.issues || []).filter((i) => i.level === 'warn').length;
@@ -796,10 +1051,20 @@ function renderHead(isGallery) {
 
   /* Title and pills share one line so the sticky block stays short; the file
    * path is the first thing dropped once the pane is scrolled. */
+  /* The album's own name for itself, when it has one: the folder name is in
+   * the path above, and repeating it in the title says nothing twice. */
+  const named = !isGallery && (data.values.name || []).join(', ').trim();
+  const node = isGallery ? null : treeNode(state.sel.album);
+  const cover = node && node.cover
+    ? el('img', { class: 'head__cover', src: thumbUrl(node.cover), alt: '', loading: 'lazy',
+                  onerror: (ev) => ev.target.remove() })
+    : null;
+
   return el('div', { class: 'head' },
     el('div', { class: 'head__crumb', text: path, title: path }),
     el('div', { class: 'head__line' },
-      el('h1', { class: 'head__title', text: isGallery ? 'gallery.cfg' : data.name }),
+      cover,
+      el('h1', { class: 'head__title', text: isGallery ? 'gallery.cfg' : (named || data.name) }),
       el('div', { class: 'head__meta' }, meta)));
 }
 
@@ -2373,33 +2638,17 @@ async function checkAll() {
   }
   countIssues(payload);
   renderTree();
-
-  const pane = $('#pane');
-  pane.innerHTML = '';
-  pane.append(el('div', { class: 'head' },
-    el('h1', { class: 'head__title', text: 'Config check' }),
-    el('div', { class: 'head__meta' },
-      el('span', { class: 'pill ' + (payload.errors ? 'pill--err' : 'pill--ok'),
-                   text: payload.errors + ' errors' }),
-      el('span', { class: 'pill ' + (payload.warnings ? 'pill--warn' : ''),
-                   text: payload.warnings + ' warnings' }),
-      el('span', { class: 'pill', text: payload.took_ms + ' ms' }))));
-
-  if (!payload.issues.length) {
-    pane.append(el('div', { class: 'empty-note', text: 'Every config file checks out.' }));
-    return;
-  }
-  pane.append(el('div', { class: 'issues' }, payload.issues.map((issue) =>
-    el('div', { class: 'issue issue--' + (issue.level === 'error' ? 'error' : 'warn') },
-      el('span', {
-        class: 'issue__where',
-        text: issue.scope === 'gallery' ? 'gallery.cfg' : issue.album,
-        onclick: () => select(issue.scope === 'gallery'
-          ? { kind: 'gallery' } : { kind: 'album', album: issue.album }),
-      }),
-      el('span', { class: 'issue__key', text: issue.key }),
-      el('span', { class: 'issue__detail', text: issue.detail })))));
-  state.sel = null;
+  /* The result belongs on the screen that is about the state of the archive,
+   * not on a screen of its own that replaces whatever was open. */
+  home.issues = payload;
+  toast(payload.errors
+    ? payload.errors + ' error(s), ' + payload.warnings + ' warning(s)'
+    : payload.warnings
+      ? payload.warnings + ' warning(s), no errors'
+      : 'Every config file checks out',
+    payload.errors ? 'err' : payload.warnings ? 'warn' : 'ok');
+  if (state.sel && state.sel.kind === 'home') paintHome();
+  else select({ kind: 'home' });
 }
 
 function countIssues(payload) {

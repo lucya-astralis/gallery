@@ -55,6 +55,14 @@
           <span class="brand-sub">console</span>
         </span>
       </span>
+      {# The three places this tool has. They used to sit in the album list,
+         which made a tool and a file look like two odd albums. #}
+      <div class="places" role="group" aria-label="Sections">
+        <button type="button" class="place" data-place="home">Home</button>
+        <button type="button" class="place" data-place="gallery">Gallery</button>
+        <button type="button" class="place" data-place="ops">Operations</button>
+      </div>
+
       <div class="nav__actions">
         {# Only the read-only case is worth a mark: it is the one that changes
            what the tool can do. A "READWRITE" lamp on every normal session was
@@ -77,6 +85,10 @@
     <div class="scrim" id="scrim" hidden></div>
 
     <nav class="sidebar" id="sidebar">
+      <div class="sidebar__head">
+        <span class="sidebar__title">Albums</span>
+        <span class="sidebar__count" id="tree-count"></span>
+      </div>
       <div class="sidebar__search">
         <input type="search" id="tree-filter" class="fieldsearch" placeholder="Filter albums&hellip;" autocomplete="off">
         <button type="button" class="btn btn--ghost btn--icon sidebar__close" id="btn-menu-close"
@@ -86,7 +98,7 @@
     </nav>
 
     <section class="pane" id="pane">
-      <div class="pane__empty">Pick the gallery or an album</div>
+      <div class="pane__empty">Loading&hellip;</div>
     </section>
   </main>
 
