@@ -60,11 +60,29 @@ def _configs() -> list[uvicorn.Config]:
         ))
     if settings.runs_console:
         from .console.app import create_console_app
-        out.append(uvicorn.Config(
-            create_console_app(), host=settings.console_bind,
-            port=settings.console_port, proxy_headers=True,
-            forwarded_allow_ips=settings.forwarded_allow_ips, log_config=None,
-        ))
+        try:
+            console = create_console_app()
+        except (SystemExit, OSError) as refused:
+            # The console refuses to open an unauthenticated write path (see
+            # console.security.assert_safe_binding), or cannot reach its own
+            # state directory. Both are about THIS listener. The gallery is
+            # read-only and has nothing to do with either, so when there is
+            # one it still opens: a missing console password used to take the
+            # whole site down and, under `restart: unless-stopped`, loop on it
+            # forever. Nothing is exposed by this -- the console socket is
+            # exactly as closed as it was before.
+            if not out:
+                raise                      # console-only: there is nothing left to serve
+            log.error("%s", refused)
+            log.error("console: NOT opening on %s:%d. The gallery is serving; "
+                      "fix the above and restart to get the console back.",
+                      settings.console_bind, settings.console_port)
+        else:
+            out.append(uvicorn.Config(
+                console, host=settings.console_bind,
+                port=settings.console_port, proxy_headers=True,
+                forwarded_allow_ips=settings.forwarded_allow_ips, log_config=None,
+            ))
     return out
 
 

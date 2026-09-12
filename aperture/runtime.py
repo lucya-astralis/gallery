@@ -170,17 +170,66 @@ def load() -> Settings:
 settings = load()
 
 
+def _owner(path: Path) -> str:
+    """Who owns a directory, as a person reading a log needs it."""
+    try:
+        st = path.stat()
+    except OSError:
+        return "it does not exist"
+    return "uid %s, gid %s, mode %s" % (
+        getattr(st, "st_uid", "?"), getattr(st, "st_gid", "?"), oct(st.st_mode & 0o777))
+
+
+def _refuse_dir(directory: Path, exc: OSError) -> SystemExit:
+    """The one message this failure is worth.
+
+    A bind mount carries the HOST's ownership into the container, so the
+    chown in the Dockerfile does nothing for a mounted path -- which is the
+    trap, and the reason the useful facts (who this process is, who owns the
+    directory) belong in the refusal rather than in a traceback.
+    """
+    me = getattr(os, "getuid", None)
+    who = ("uid %d, gid %d" % (os.getuid(), os.getgid())) if me else "this user"
+    return SystemExit(
+        "\n"
+        "  Aperture cannot create %s\n"
+        "      %s\n"
+        "\n"
+        "  This process runs as %s.\n"
+        "  Its parent %s belongs to %s.\n"
+        "\n"
+        "  It writes into the data, thumbnail and preview directories. On a\n"
+        "  bind mount the HOST's ownership is what counts -- the image's own\n"
+        "  chown does not reach a mounted path -- so on the host:\n"
+        "\n"
+        "      sudo chown -R %s data thumbnails previews\n"
+        "\n"
+        "  On a CIFS/SMB mount there are no real owners: set uid= and gid= in\n"
+        "  the mount options instead. See DEPLOY-LINUX.md.\n"
+        % (directory, exc, who, directory.parent, _owner(directory.parent),
+           ("%d:%d" % (os.getuid(), os.getgid())) if me else "<uid>:<gid>"))
+
+
 def ensure_dirs() -> None:
     """Create what we own. `photos/` is only attempted, never required: in the
     public role it is mounted read-only on purpose, and a share that is not
-    there yet is a reason to serve an empty gallery, not to refuse to start."""
+    there yet is a reason to serve an empty gallery, not to refuse to start.
+
+    The other four ARE required -- without them there is no index, no control
+    channel and nowhere to put a thumbnail -- so a failure there stops the
+    process. It stops with an instruction rather than a stack trace: this is
+    the first thing a fresh deployment gets wrong, and it gets it wrong on a
+    machine whose logs are the only thing anyone can see."""
     try:
         settings.photos_dir.mkdir(parents=True, exist_ok=True)
     except (OSError, PermissionError):
         pass
     for d in (settings.thumbs_dir, settings.previews_dir, settings.fulls_dir,
               settings.data_dir):
-        d.mkdir(parents=True, exist_ok=True)
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise _refuse_dir(d, exc) from None
 
 
 @contextmanager

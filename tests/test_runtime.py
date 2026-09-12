@@ -8,6 +8,7 @@ assumed.
 """
 
 import importlib
+import pathlib
 
 import pytest
 
@@ -120,6 +121,60 @@ def test_the_server_module_builds_both_configs(monkeypatch):
     # pointed, which is loopback unless someone said otherwise.
     assert configs[0].host == "0.0.0.0"
     assert configs[1].host == runtime.settings.console_bind
+
+
+def test_a_refused_console_does_not_take_the_gallery_with_it(monkeypatch):
+    """The console fails closed when it would open an unauthenticated write
+    path — and that used to raise through the whole process, so a missing
+    console password took the read-only gallery offline too and, under
+    `restart: unless-stopped`, looped on it forever.
+
+    The refusal is about that one listener. The gallery still opens."""
+    server = importlib.import_module("aperture.server")
+    monkeypatch.setattr(server, "settings", _settings(APERTURE_ROLE="all"))
+    monkeypatch.setattr(server, "create_console_app", None, raising=False)
+
+    def refuse():
+        raise SystemExit("no password, not loopback")
+
+    import aperture.console.app as console_module
+    monkeypatch.setattr(console_module, "create_console_app", refuse)
+
+    configs = server._configs()
+    assert [c.port for c in configs] == [runtime.settings.port]
+    assert configs[0].host == "0.0.0.0"
+
+
+def test_a_console_only_process_still_refuses(monkeypatch):
+    """With nothing else to serve, the refusal is the whole answer and the
+    process has to end on it."""
+    server = importlib.import_module("aperture.server")
+    monkeypatch.setattr(server, "settings", _settings(APERTURE_ROLE="console"))
+
+    def refuse():
+        raise SystemExit("no password, not loopback")
+
+    import aperture.console.app as console_module
+    monkeypatch.setattr(console_module, "create_console_app", refuse)
+
+    with pytest.raises(SystemExit):
+        server._configs()
+
+
+def test_a_directory_it_cannot_create_says_what_to_do():
+    """The first thing a fresh deployment gets wrong is the ownership of the
+    bind mounts, and it gets it wrong where the log is all anyone can see. The
+    refusal carries the two facts a traceback did not: who this process is,
+    and who owns the directory."""
+    refusal = runtime._refuse_dir(pathlib.Path("/previews/_full"),
+                                  PermissionError(13, "Permission denied"))
+    text = str(refusal)
+    assert str(pathlib.Path("/previews/_full")) in text
+    assert "chown" in text and "data thumbnails previews" in text
+    assert "CIFS" in text or "uid=" in text
+    # It names the parent, because that is the directory whose ownership is
+    # actually wrong.
+    assert str(pathlib.Path("/previews")) in text
 
 
 # ----- the proxy in front ---------------------------------------------

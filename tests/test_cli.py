@@ -173,6 +173,28 @@ def test_a_scan_runs_locally_when_no_server_is_listening(indexed):
     assert body["error"] is None
 
 
+# ----- the console password ---------------------------------------------
+def test_passwd_sets_and_clears_the_console_password(indexed, monkeypatch):
+    """This command lives in the CLI and reaches into the console's security
+    module, and for one release it could not run at all: the CLI split left
+    its import pointing at `aperture.cli.console`, which is nothing. Importing
+    the module was fine, building the parser was fine — it died when it was
+    called, on the machine where it was needed to open a console that refuses
+    to start without a password.
+
+    So it is CALLED here, not imported."""
+    from aperture.console import security
+
+    monkeypatch.setattr("sys.stdin", io.StringIO("a-real-password\n"))
+    body = run("passwd", "--stdin", "--json")
+    assert body["password_set"] is True
+    assert security.password_is_set()
+
+    body = run("passwd", "--clear", "--json")
+    assert body["cleared"] is True
+    assert not security.password_is_set()
+
+
 # ----- the screens ------------------------------------------------------
 def test_the_screens_render(indexed):
     """No --json anywhere in here, so this is the whole contract: they run,

@@ -371,7 +371,7 @@ def cmd_passwd(args) -> int:
         printf '%s' "$SECRET" | python -m aperture.cli passwd --stdin
         python -m aperture.cli passwd --clear
     """
-    from .console import security
+    from ..console import security   # aperture.console, not aperture.cli.console
 
     if args.clear:
         existed = security.clear_password()

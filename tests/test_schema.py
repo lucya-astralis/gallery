@@ -17,6 +17,7 @@ This file keeps that from happening again. It asserts three things:
 """
 
 import ast
+import pathlib
 from pathlib import Path
 
 import pytest
@@ -80,6 +81,39 @@ def test_no_module_keeps_a_second_name_for_something():
                 path.relative_to(PACKAGE), node.lineno, name,
                 node.value.value.id, node.value.attr))
     assert not offenders, "say it once, where it lives:\n" + "\n".join(offenders)
+
+
+def test_every_relative_import_points_at_something():
+    """Including the ones inside functions, which nothing imports on load.
+
+    `passwd` was broken for exactly one release this way: the CLI split moved
+    cmd_passwd into aperture/cli/ and its late `from .console import security`
+    went on meaning "beside me", which in that package is nothing. The module
+    imported fine, the parser built fine, and the command died the moment it
+    was run -- on the machine where it was needed to set a console password.
+    """
+    missing = []
+    for path in sorted(PACKAGE.rglob("*.py")):
+        here = ("aperture",) + path.parent.relative_to(PACKAGE).parts
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not isinstance(node, ast.ImportFrom) or not node.level:
+                continue
+            up = node.level - 1
+            base = here[:len(here) - up] if up else here
+            target = ".".join(base + ((node.module,) if node.module else ()))
+            folder = PACKAGE.parent / pathlib.Path(*target.split("."))
+            if folder.with_suffix(".py").exists() or (folder / "__init__.py").exists():
+                continue
+            # `from .x import y` where y is the module
+            parent = folder.parent
+            if (parent / "__init__.py").exists() and all(
+                    (parent / (a.name + ".py")).exists() or (parent / a.name).is_dir()
+                    for a in node.names):
+                continue
+            missing.append("%s:%d  from %s%s import %s  ->  %s" % (
+                path.relative_to(PACKAGE), node.lineno, "." * node.level,
+                node.module or "", ", ".join(a.name for a in node.names), target))
+    assert not missing, "these resolve to nothing:\n" + "\n".join(missing)
 
 
 def test_no_function_shadows_a_module_the_file_imports():
