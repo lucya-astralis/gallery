@@ -505,10 +505,15 @@ const ago = (ts) => {
   return Math.floor(s / 86400) + 'd ago';
 };
 
-function opsRow(label, value, tone) {
-  return el('div', { class: 'ops__row' },
-    el('span', { class: 'ops__label', text: label }),
-    el('span', { class: 'ops__value' + (tone ? ' is-' + tone : ''), text: value }));
+/* One row of a short list of facts: the label in the mono voice, the value
+ * in tabular figures. Home and Operations both read the same status, so they
+ * draw it with the same row. */
+function fact(label, value, tone) {
+  /* A PAIR, not a row in a wrapper: `.facts` already existed in this sheet
+   * for a photo's metadata, with dt and dd as its own grid children. One
+   * definition list, one look, whatever is being listed. */
+  return [el('dt', { text: label }),
+          el('dd', { class: tone ? 'is-' + tone : null, text: value })];
 }
 
 async function loadOpsStatus() {
@@ -531,65 +536,88 @@ async function renderOps() {
 function paintOps() {
   const pane = $('#pane');
   const st = opsState.status || {};
+  const paths = st.paths || {};
+  const idx = st.index || {};
+  const scan = (st.server && st.server.last_scan) || null;
+  const res = (scan && scan.result) || {};
+  const live = !!st.live;
+  const paused = !!st.paused;
+  const scanning = !!(st.server && st.server.scanning);
+  const ro = !!st.read_only;
   pane.innerHTML = '';
 
   pane.append(el('div', { class: 'pane__top' },
     el('div', { class: 'head' },
       el('div', { class: 'head__crumb', text: st.control_dir || '' }),
-      el('h1', { class: 'head__title', text: 'Operations' }))));
+      el('div', { class: 'head__line' },
+        el('h1', { class: 'head__title', text: 'Operations' }),
+        el('div', { class: 'head__meta' },
+          el('span', { class: 'pill', text: 'role ' + (st.role || '—') }),
+          ro ? el('span', { class: 'pill pill--warn', text: 'read-only' }) : null)))));
 
   if (st.error) {
     pane.append(el('div', { class: 'pane__empty', text: st.error }));
     return;
   }
 
-  const paths = st.paths || {};
-  const scan = (st.server && st.server.last_scan) || null;
-  const res = (scan && scan.result) || {};
-  const live = !!st.live;
-  const paused = !!st.paused;
+  const grid = el('div', { class: 'home' });
+  pane.append(grid);
 
-  /* ----- the indexer ----- */
-  pane.append(el('section', { class: 'ops' },
-    el('h2', { class: 'ops__head', text: 'Indexer' }),
-    opsRow('state', live ? (paused ? 'paused' : 'running') : 'not running',
-           live ? (paused ? 'warn' : 'ok') : 'bad'),
-    paused && st.pause
-      ? opsRow('paused since', ago(st.pause.since) +
+  /* ----- the indexer, in full ----- */
+  const tone = paused ? 'warn' : live ? 'ok' : 'bad';
+  const word = paused ? 'paused' : scanning ? 'scanning' : live ? 'running' : 'not running';
+  grid.append(card('Indexer', 'one writer, whoever asks',
+    el('div', { class: 'lamp' },
+      el('span', { class: 'lamp__dot is-' + tone }),
+      el('span', { class: 'lamp__word is-' + tone, text: word }),
+      el('span', { class: 'lamp__note', text: scanning
+        ? 'triggered by ' + ((st.server && st.server.scan_trigger) || '?')
+        : live ? '' : 'no heartbeat in the control file' })),
+    el('dl', { class: 'facts' },
+      paused && st.pause
+        ? fact('paused', ago(st.pause.since) +
                (st.pause.reason ? ' — ' + st.pause.reason : ''), 'warn')
-      : null,
-    opsRow('scanning now', (st.server && st.server.scanning)
-           ? 'yes (' + (st.server.scan_trigger || '?') + ')' : 'no'),
-    opsRow('last scan', scan
-           ? ago(scan.finished_at) + ' · ' + (scan.trigger || '?') +
-             ' · ' + (scan.seconds != null ? scan.seconds + 's' : '—')
-           : 'never'),
-    scan && scan.error ? opsRow('last error', scan.error, 'bad') : null,
-    scan ? opsRow('last result',
-      ['indexed', 'thumbnails', 'previews', 'removed', 'failed']
-        .filter((k) => res[k]).map((k) => res[k] + ' ' + k).join(' · ')
-        || 'nothing to do',
-      res.failed ? 'warn' : null) : null,
-    opsRow('scan interval', paths.scan_interval
-           ? paths.scan_interval + 's' : 'off (manual only)'),
-    opsRow('watcher', paths.watcher ? 'on' : 'off')));
+        : null,
+      fact('last scan', scan
+        ? ago(scan.finished_at) + ' · ' + (scan.trigger || '?') +
+          (scan.seconds != null ? ' · ' + scan.seconds + 's' : '')
+        : 'never'),
+      fact('it did', scan ? scanSummary(res) : '—', res.failed ? 'warn' : null),
+      scan && scan.error ? fact('last error', scan.error, 'bad') : null,
+      fact('every', paths.scan_interval ? paths.scan_interval + 's' : 'manual only'),
+      fact('watcher', paths.watcher ? 'on' : 'off'))));
 
-  /* ----- what it is working on ----- */
-  const idx = st.index || {};
-  pane.append(el('section', { class: 'ops' },
-    el('h2', { class: 'ops__head', text: 'Index' }),
-    opsRow('photos', String(idx.images ?? '—')),
-    opsRow('albums', String(idx.albums ?? '—')),
-    opsRow('featured', String(idx.featured ?? '—')),
-    opsRow('tags', String(idx.tags ?? '—')),
-    opsRow('originals', bytes(idx.bytes)),
-    opsRow('database', bytes(idx.db_bytes)),
-    opsRow('photos dir', paths.photos || '—'),
-    opsRow('data dir', paths.data || '—'),
-    opsRow('role', st.role || '—')));
+  /* ----- what it has built ----- */
+  grid.append(card('Index', 'what the scan has put in the database',
+    el('div', { class: 'tiles' },
+      tile('photos', String(idx.images ?? '—')),
+      tile('albums', String(idx.albums ?? '—')),
+      tile('featured', String(idx.featured ?? '—')),
+      tile('tags', String(idx.tags ?? '—')),
+      tile('originals', bytes(idx.bytes)),
+      tile('database', bytes(idx.db_bytes)))));
+
+  /* ----- where things are ----- */
+  grid.append(card('Paths', 'read once at startup — aperture/runtime.py',
+    el('dl', { class: 'facts' },
+      fact('photos', paths.photos || '—'),
+      fact('thumbnails', paths.thumbs || '—'),
+      fact('previews', paths.previews || '—'),
+      fact('data', paths.data || '—'),
+      fact('control', st.control_dir || '—'))));
+
+  /* ----- what it does to a photo ----- */
+  /* Never on this screen before, and both of these decide what leaves the
+   * server: how large a derivative is, and whether coordinates travel. */
+  grid.append(card('Derivatives and privacy', 'what the scan makes, and drops',
+    el('dl', { class: 'facts' },
+      fact('thumbnail', (paths.thumb_size || '—') + ' px'),
+      fact('preview', (paths.preview_size || '—') + ' px'),
+      fact('hide gps', paths.hide_gps ? 'yes — never served in the API' : 'no'),
+      fact('strip gps', paths.strip_gps
+        ? 'yes — removed from the originals on scan' : 'no'))));
 
   /* ----- the buttons ----- */
-  const ro = !!st.read_only;
   const albumField = el('input', {
     type: 'text', id: 'ops-album', placeholder: 'whole gallery — or one album path',
     autocomplete: 'off', disabled: ro,
@@ -603,9 +631,9 @@ function paintOps() {
     autocomplete: 'off', disabled: ro || paused,
   });
 
-  pane.append(el('section', { class: 'ops' },
-    el('h2', { class: 'ops__head', text: 'Actions' }),
-    ro ? el('p', { class: 'ops__note', text:
+  grid.append(el('div', { class: 'home__wide' }, card('Actions',
+    'a request on the control channel — the same one the CLI writes',
+    ro ? el('p', { class: 'card__quiet', text:
         'The console is mounted read-only. Nothing here can be started from the browser.' })
        : null,
     el('div', { class: 'ops__form' },
@@ -613,7 +641,7 @@ function paintOps() {
       el('label', { class: 'ops__check' }, forceBox,
         el('span', { text: 'force — re-derive even when mtimes say nothing changed' }))),
     paused ? null : el('div', { class: 'ops__form' }, reasonField),
-    el('div', { class: 'ops__buttons' },
+    el('div', { class: 'card__actions' },
       el('button', {
         type: 'button', class: 'btn btn--primary', id: 'ops-scan',
         disabled: ro || opsState.busy, text: 'Scan now',
@@ -628,41 +656,40 @@ function paintOps() {
         type: 'button', class: 'btn', disabled: opsState.busy, text: 'Run doctor',
         onclick: () => runDoctor(albumField.value.trim()),
       })),
-    el('p', { class: 'ops__note', text:
-      'A scan is a request written to the control channel — the same one ' +
-      'the CLI uses. It starts within a couple of seconds if an indexer is ' +
-      'listening, and waits if none is.' })));
+    el('p', { class: 'card__quiet', text:
+      'It starts within a couple of seconds if an indexer is listening, and ' +
+      'waits if none is.' }))));
 
-  if (opsState.doctor) pane.append(renderDoctor(opsState.doctor));
+  if (opsState.doctor) {
+    grid.append(el('div', { class: 'home__wide' }, renderDoctor(opsState.doctor)));
+  }
 }
 
 function renderDoctor(report) {
   const problems = report.problems || {};
-  const section = el('section', { class: 'ops' },
-    el('h2', { class: 'ops__head', text: 'Doctor' }),
-    opsRow('scope', report.scope || 'whole gallery'),
-    opsRow('checked', report.photos_on_disk + ' file(s) on disk · ' +
-                      report.rows + ' row(s) indexed'),
-    opsRow('result', report.total ? report.total + ' problem(s) found'
-                                  : 'no problems found',
-           report.total ? 'warn' : 'ok'));
+  const body = [el('dl', { class: 'facts' },
+    fact('scope', report.scope || 'whole gallery'),
+    fact('checked', report.photos_on_disk + ' file(s) on disk · ' +
+                    report.rows + ' row(s) indexed'),
+    fact('result', report.total ? report.total + ' problem(s) found' : 'no problems found',
+         report.total ? 'warn' : 'ok'))];
 
   for (const check of Object.keys(problems).sort()) {
     const items = problems[check];
-    section.append(el('div', { class: 'ops__finding' },
-      el('div', { class: 'ops__finding-head' },
-        el('span', { class: 'ops__label', text: check.replace(/_/g, ' ') }),
-        el('span', { class: 'ops__count', text: String(items.length) })),
-      el('ul', { class: 'ops__list' },
-        items.slice(0, 25).map((item) =>
-          el('li', {},
-            el('code', { text: item.rel_path || (item.album + ' · ' + item.key) }),
-            el('span', { class: 'ops__detail', text: item.detail || '' }))),
-        items.length > 25
-          ? el('li', { class: 'ops__more', text: (items.length - 25) + ' more' })
-          : null)));
+    body.push(el('h3', { class: 'card__sub' },
+      el('span', { text: check.replace(/_/g, ' ') }),
+      el('span', { class: 'card__sub-n', text: String(items.length) })));
+    body.push(el('div', { class: 'hrows' }, items.slice(0, 25).map((item) => homeRow(
+      item.rel_path || item.album || '—',
+      item.key || '',
+      item.detail || '',
+      item.album ? () => select({ kind: 'album', album: item.album }) : null))));
+    if (items.length > 25) {
+      body.push(el('p', { class: 'card__quiet', text: (items.length - 25) + ' more' }));
+    }
   }
-  return section;
+  return card('Doctor', 'index, files, derivatives and cfg, checked against each other',
+              ...body);
 }
 
 /* A scan is asynchronous by nature: on a large share over SMB a full pass is
@@ -803,6 +830,12 @@ function tile(label, value, tone) {
     el('span', { class: 'tile__k', text: label }));
 }
 
+/* What a finished scan did, as one line. */
+function scanSummary(res) {
+  return ['indexed', 'thumbnails', 'previews', 'removed', 'failed']
+    .filter((k) => res[k]).map((k) => res[k] + ' ' + k).join(' · ') || 'nothing to do';
+}
+
 function homeRow(where, key, detail, onclick) {
   return el('div', { class: 'hrow' + (onclick ? ' is-link' : ''), onclick: onclick || null },
     el('span', { class: 'hrow__where', text: where }),
@@ -863,22 +896,14 @@ function paintHome() {
           (st.pause.reason ? ' — ' + st.pause.reason : '')
         : live ? '' : 'no heartbeat — start the gallery to index' })),
     el('dl', { class: 'facts' },
-      el('div', {}, el('dt', { text: 'last scan' }),
-        el('dd', { text: scan
-          ? ago(scan.finished_at) + ' · ' + (scan.trigger || '?') +
-            (scan.seconds != null ? ' · ' + scan.seconds + 's' : '')
-          : 'never' })),
-      el('div', {}, el('dt', { text: 'it did' }),
-        el('dd', { text: scan
-          ? (['indexed', 'thumbnails', 'previews', 'removed', 'failed']
-              .filter((k) => res[k]).map((k) => res[k] + ' ' + k).join(' · ') || 'nothing to do')
-          : '—' })),
-      el('div', {}, el('dt', { text: 'every' }),
-        el('dd', { text: paths.scan_interval ? paths.scan_interval + 's' : 'manual only' })),
-      el('div', {}, el('dt', { text: 'watcher' }),
-        el('dd', { text: paths.watcher ? 'on' : 'off' })),
-      el('div', {}, el('dt', { text: 'role' }),
-        el('dd', { text: st.role || '—' }))),
+      fact('last scan', scan
+        ? ago(scan.finished_at) + ' · ' + (scan.trigger || '?') +
+          (scan.seconds != null ? ' · ' + scan.seconds + 's' : '')
+        : 'never'),
+      fact('it did', scan ? scanSummary(res) : '—'),
+      fact('every', paths.scan_interval ? paths.scan_interval + 's' : 'manual only'),
+      fact('watcher', paths.watcher ? 'on' : 'off'),
+      fact('role', st.role || '—')),
     el('div', { class: 'card__actions' },
       el('button', {
         type: 'button', class: 'btn btn--primary', text: 'Scan now',
