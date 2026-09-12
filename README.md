@@ -595,6 +595,15 @@ portable base sheet a third app can start from (`nebula.css`), and
 [`NEBULA.md`](nebula/NEBULA.md), the same content written as instructions to
 hand to Claude. Serve it with `python -m http.server 8123 --directory nebula`.
 
+It is **its own repository**
+([lucya-astralis/nebula](https://github.com/lucya-astralis/nebula)) checked out
+in that folder, not a part of this one — cloning the gallery does not bring it,
+and this repo ignores it rather than keeping a second copy in step:
+
+```bash
+git clone git@github.com:lucya-astralis/nebula.git nebula
+```
+
 ## API
 
 A read-only JSON view of everything the pages render — albums, photos, EXIF, tags, stats — so you can embed the gallery elsewhere or build your own front end on it. CORS is open, responses are cached for 5 minutes, errors come back as JSON (`{"error": …, "status": …}`).

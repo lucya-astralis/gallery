@@ -10,3 +10,7 @@ venv/
 .idea/
 .vscode/
 .env
+
+# Its own repository, checked out in this folder — see "Design — Nebula"
+# in the README. Not part of this repo, and not a copy to keep in step.
+nebula/
