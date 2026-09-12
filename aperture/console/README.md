@@ -10,11 +10,11 @@ ASGI app on a separate listener** — and that separation is the point. The
 public port serves pages and cannot reach a route in here; this port is where
 the one write path into the photo tree lives.
 
-Since 1.0 it also carries the **Operations** panel: the live state of the
-indexer, a scan button, pause / resume, and `doctor` — the same reports
-`python -m aperture.cli` prints, from the same functions in `aperture/ops.py`.
-Actions there are written to the flag-file control channel, exactly as the CLI
-writes them, so there is one place a scan can begin whichever front end asked.
+Since 1.0 it also drives the indexer: the live state, a scan button, pause /
+resume and `doctor` — the same reports `python -m aperture.cli` prints, from
+the same functions in `aperture/ops.py`. Actions are written to the flag-file
+control channel exactly as the CLI writes them, so there is one place a scan
+can begin whichever front end asked.
 
 Two invariants hold whatever else changes:
 
@@ -65,6 +65,31 @@ each field.
 Every file also has a **Raw file** tab if you would rather just type.
 
 ### Getting around
+
+The tool has **three places**, and they are in the header: **Home**, the
+**Gallery**'s own file, and **Operations**. Everything else is an album, and
+albums are the sidebar — which is why the sidebar holds nothing but albums. It
+used to open with a tool and a file above the list, drawn like two odd albums
+with the actual navigation below them.
+
+**Home** is what it opens on, and it is a reading rather than a form:
+
+| | |
+| --- | --- |
+| is the machine working | one lamp, the last scan and what it did, with Scan and Pause right there |
+| what is in it | six figures out of the index |
+| is anything broken | what the config check found, each line a click from the key that caused it |
+| what is still unwritten | albums that have photos but no cfg, or no text |
+| what happened here | the audit log — every write this console has made |
+
+None of it is computed on that screen. The lamp is the same `/api/ops/status`
+Operations reads, the issues are the same check the tree's red dots come from,
+and the log is the one every save has written since the door went in. A
+dashboard with figures of its own would be a second opinion to keep in step.
+
+An album opens on its **photos**, not on twenty-one settings, and its header
+says what the album is: its cover, the name it calls itself, and whether
+anyone has written about it yet.
 
 The album tree is a column on a desktop and a **drawer** on anything under
 900px — it slides in over the editor from the handle in the header and closes
@@ -278,8 +303,9 @@ silently ignore: unknown keys, a `cover` or `featured` entry matching no photo,
 a `sort = curated` with no `order` list behind it, an `effect` that isn't
 whitelisted, a `font`/`icon` naming a file that isn't in that album's
 `.album/`, an `album_order` entry with no matching folder, a `stat` line the gallery would
-drop. Errors also show as a red dot next to the album in the tree; clicking an
-issue jumps to it.
+drop. The result lands on **Home**, under *Needs attention*, where each line
+is a click from the key that caused it; errors also show as a red dot next to
+the album in the tree. It does not take over the screen you were working on.
 
 Checks resolve photos the way the gallery does, against its index, so what they
 call missing is what a visitor would not see; a photo added a second ago counts
@@ -345,6 +371,8 @@ aperture/console/
   library.py    the photo tree and the .tags sidecars, off the filesystem
   imagemeta.py  read-only EXIF for the metadata panel
   static/       style.css, app.js, bg/, logo/ (the fonts are the gallery's)
+                app.js draws five screens: home, an album, gallery.cfg,
+                Operations, and the login page's own script
   templates/    index.html
 ```
 
