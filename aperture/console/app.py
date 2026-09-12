@@ -55,6 +55,14 @@ Image.MAX_IMAGE_PIXELS = 64 * 1024 * 1024
 
 app = FastAPI(title=f"{brand.PRODUCT} console", docs_url=None, redoc_url=None,
               openapi_url=None)
+# The console's chrome is the gallery's chrome, down to the same nine font
+# files. They are served out of the gallery's static/ rather than copied
+# here: a copy of a font is a copy that goes stale quietly, and both
+# surfaces have shipped in one package since 1.0. Mounted BEFORE /static
+# so the longer path wins -- Starlette matches routes in order.
+app.mount("/static/fonts",
+          StaticFiles(directory=templating.WEB_DIR / "static" / "fonts"),
+          name="fonts")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = templating.make_templates(BASE_DIR)
 

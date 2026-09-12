@@ -11,8 +11,9 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from aperture import scanner
+from aperture import scanner, templating
 from aperture.console import security
+from aperture.console.app import BASE_DIR as CONSOLE_DIR
 from aperture.console.app import app as console_app
 from aperture.runtime import settings
 
@@ -63,3 +64,22 @@ def test_an_image_in_a_metadata_folder_gets_no_tile(console, photos_dir):
         assert not (settings.thumbs_dir / "berlin" / ".album").exists()
     finally:
         mark.unlink()
+
+
+# ----- the chrome is the gallery's ----------------------------------------
+def test_the_console_serves_the_gallerys_fonts(console):
+    """Nine woff2 files, byte for byte the gallery's, used to sit in the
+    console's own static/ because the two surfaces shipped as separate
+    images. They ship as one package, so there is one copy of each face."""
+    name = "SpaceGrotesk-400.woff2"
+    r = console.get("/static/fonts/" + name)
+    assert r.status_code == 200
+    assert r.content == (templating.WEB_DIR / "static" / "fonts" / name).read_bytes()
+    assert not (CONSOLE_DIR / "static" / "fonts").exists()
+
+
+def test_the_console_keeps_its_own_sheet_and_mark(console):
+    """The fonts mount is the more specific path; everything else under
+    /static must still come from the console's own folder."""
+    assert console.get("/static/style.css").status_code == 200
+    assert console.get("/static/logo/lucya_logo.svg").content ==         (CONSOLE_DIR / "static" / "logo" / "lucya_logo.svg").read_bytes()

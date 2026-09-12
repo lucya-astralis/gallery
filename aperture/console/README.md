@@ -194,10 +194,11 @@ The split the gallery's palette pass established holds here too: purple marks
 primary action — and everything that is merely furniture takes `--chrome` or
 `--label`. This sheet used to paint both groups purple.
 
-The fonts (Space Grotesk, JetBrains Mono, Ethnocentric) and `lucya_logo.svg`
-are **copies** under this app's own `static/`, because the two apps deploy as
-separate images and never share a mount. If the gallery's brand assets change,
-re-copy them from `app/static/`.
+The fonts (Space Grotesk, JetBrains Mono, Ethnocentric) are the gallery's own
+files, mounted at `/static/fonts` out of `aperture/gallery/static/fonts/` —
+one package, one copy of each face, and nothing to re-copy when one changes.
+`lucya_logo.svg` is this app's own: it is a different drawing, not a stale
+duplicate of the gallery's.
 
 One deliberate departure:
 
@@ -223,10 +224,9 @@ One deliberate departure:
   Nothing was ever cropped, incidentally: at any normal window the cover fit
   crops the **sides** and shows the full height.
 
-  The source lives in [`designs/nova/`](../designs/nova/); what the app serves
-  is a **copy** under `app/static/bg/`, for the same reason the fonts and the
-  logo are copies — the two apps deploy as separate images and never share a
-  mount.
+  The source lives in [`designs/nova/`](../../designs/nova/); what the app
+  serves is a copy under `static/bg/`, because `designs/` is where artwork is
+  drawn and not a folder any listener serves from.
 
 The header carries the mark, the wordmark and the two actions and nothing
 else — no mount path (it is the footer's `TARGET` stamp and never changes
@@ -344,7 +344,7 @@ aperture/console/
   security.py   the door: password, sessions, CSRF, throttle, audit log
   library.py    the photo tree and the .tags sidecars, off the filesystem
   imagemeta.py  read-only EXIF for the metadata panel
-  static/       style.css, app.js, fonts/, logo/
+  static/       style.css, app.js, bg/, logo/ (the fonts are the gallery's)
   templates/    index.html
 ```
 

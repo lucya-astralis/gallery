@@ -178,13 +178,6 @@
   --red:         #e0625f;
   --red-rgb:     224, 98, 95;
   --red-deep:    #97201d;
-  /* the names this sheet grew up with, kept pointing at the shared ones */
-  --acc-amb:     var(--amb);
-  --acc-amb-rgb: var(--amb-rgb);
-  --acc-ok:      var(--ok);
-  --acc-ok-rgb:  var(--ok-rgb);
-  --acc-red:     var(--red);
-  --acc-red-rgb: var(--red-rgb);
 
   /* ================================================================
      RULE 5 — MEASURE IS RATIONED LIKE COLOUR
@@ -814,7 +807,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .tree__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .tree__cover.has-cfg { box-shadow: inset 0 0 0 1px var(--acc-soft); }
-.tree__cover.has-err { box-shadow: inset 0 0 0 1px var(--acc-red), 0 0 6px rgba(var(--acc-red-rgb), .55); }
+.tree__cover.has-err { box-shadow: inset 0 0 0 1px var(--red), 0 0 6px rgba(var(--red-rgb), .55); }
 
 /* Bigger rows now that each carries a picture. */
 .tree__row { padding: var(--s-1) var(--s-4) var(--s-1) 0; }
@@ -1048,8 +1041,8 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
    save bar's dirty note uses it), so an edit is findable by eye without
    reading the bar's chip list. */
 .field.is-edited {
-  border-left-color: var(--acc-amb);
-  background: linear-gradient(180deg, rgba(var(--acc-amb-rgb), .06), transparent 60%), var(--surface);
+  border-left-color: var(--amb);
+  background: linear-gradient(180deg, rgba(var(--amb-rgb), .06), transparent 60%), var(--surface);
 }
 
 .field__flag {
@@ -1058,14 +1051,14 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   font-size:var(--fs-chrome-xs);
   letter-spacing: .16em;
   text-transform: uppercase;
-  color: var(--acc-amb);
+  color: var(--amb);
 }
 
 /* Jumped to from a save-bar chip. */
 .field.is-flash { animation: fieldflash 1.2s ease-out; }
 
 @keyframes fieldflash {
-  0%, 40% { box-shadow: 0 0 0 1px var(--acc-amb), 0 0 22px -6px rgba(var(--acc-amb-rgb), .8); }
+  0%, 40% { box-shadow: 0 0 0 1px var(--amb), 0 0 22px -6px rgba(var(--amb-rgb), .8); }
   100%    { box-shadow: 0 0 0 1px transparent, 0 0 0 0 transparent; }
 }
 
@@ -1098,7 +1091,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   cursor: pointer;
 }
 
-.field__unset:hover { color: var(--acc-red); }
+.field__unset:hover { color: var(--red); }
 
 .field__help {
   color: var(--text-ghost);
@@ -1358,7 +1351,7 @@ select option { background: var(--surface); color: var(--text); }
   font-size:var(--fs-chrome-sm);
   letter-spacing: .12em;
   text-transform: uppercase;
-  color: var(--acc-red);
+  color: var(--red);
 }
 
 /* ----- ordered lists (featured / order / welcome / album_order) --------- */
@@ -1404,17 +1397,17 @@ select option { background: var(--surface); color: var(--text); }
 .pickitem__label b { color: var(--text); font-weight: 600; }
 .pickitem__label span { color: var(--text-ghost); }
 
-.pickitem--missing { border-left-color: var(--acc-red); }
-.pickitem--missing .pickitem__label b { color: var(--acc-red); }
+.pickitem--missing { border-left-color: var(--red); }
+.pickitem--missing .pickitem__label b { color: var(--red); }
 
 .pickitem--group {
-  background: rgba(var(--acc-amb-rgb), .05);
-  border-left-color: var(--acc-amb);
+  background: rgba(var(--amb-rgb), .05);
+  border-left-color: var(--amb);
   border-style: dashed;
 }
 
 .pickitem--group .pickitem__label b {
-  color: var(--acc-amb);
+  color: var(--amb);
   letter-spacing:var(--tr-chrome-md);
   text-transform: uppercase;
 }
@@ -1526,8 +1519,8 @@ select option { background: var(--surface); color: var(--text); }
   font-size:var(--fs-text-md);
 }
 
-.issue--error { border-left: 2px solid var(--acc-red); }
-.issue--warn  { border-left: 2px solid var(--acc-amb); }
+.issue--error { border-left: 2px solid var(--red); }
+.issue--warn  { border-left: 2px solid var(--amb); }
 
 .issue__key {
   font-family: var(--mono);
@@ -1599,7 +1592,7 @@ select option { background: var(--surface); color: var(--text); }
 /* With edits staged the note shrinks to its label and the chips take the
    room: one chip per changed key, so eight edits are eight things you can
    jump to or undo rather than one run-on line off the end of the bar. */
-.savebar.is-dirty .savebar__note { flex: 0 0 auto; color: var(--acc-amb); }
+.savebar.is-dirty .savebar__note { flex: 0 0 auto; color: var(--amb); }
 
 .savebar__chips {
   flex: 1 1 240px;
@@ -1613,7 +1606,7 @@ select option { background: var(--surface); color: var(--text); }
 
 .savebar__acts { flex: 0 0 auto; display: flex; gap: 10px; margin-left: auto; }
 
-.chip--edit { border-left-color: var(--acc-amb); padding-left: 0; }
+.chip--edit { border-left-color: var(--amb); padding-left: 0; }
 
 .chip__go {
   appearance: none;
@@ -1626,7 +1619,7 @@ select option { background: var(--surface); color: var(--text); }
   white-space: nowrap;
 }
 
-.chip__go:hover { color: var(--acc-amb); }
+.chip__go:hover { color: var(--amb); }
 
 .savebar.is-dirty::before { opacity: 1; }
 
@@ -1786,8 +1779,8 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 .toast[hidden] { display: none; }
-.toast.is-ok  { border-left-color: var(--acc-ok);  color: var(--acc-ok); }
-.toast.is-err { border-left-color: var(--acc-red); color: var(--acc-red); }
+.toast.is-ok  { border-left-color: var(--ok);  color: var(--ok); }
+.toast.is-err { border-left-color: var(--red); color: var(--red); }
 
 /* ----- footer ---------------------------------------------------------- */
 /* The gallery's footer, kept as a bar because this is an app shell rather
@@ -2186,7 +2179,7 @@ select option { background: var(--surface); color: var(--text); }
   padding: 0 var(--s-0);
 }
 
-.chip__x:hover { color: var(--acc-red); }
+.chip__x:hover { color: var(--red); }
 
 .cell__tags {
   color: var(--acc);
@@ -2545,10 +2538,10 @@ img.is-broken { opacity: .2; }
   color: var(--label);
 }
 
-/* The one place in the tool where a message is an --acc-red: a refused
+/* The one place in the tool where a message is --red: a refused
    sign-in is a state the operator has to act on, not a note. */
 .login__error {
-  color: var(--acc-red);
+  color: var(--red);
   font-size:var(--fs-text-sm);
   margin: 0;
 }
@@ -2576,8 +2569,8 @@ img.is-broken { opacity: .2; }
   align-items: center;
   gap: var(--s-3);
   padding: var(--s-2) var(--s-4);
-  background: rgba(var(--acc-red-rgb), .14);
-  border-bottom: var(--hair) solid var(--acc-red);
+  background: rgba(var(--red-rgb), .14);
+  border-bottom: var(--hair) solid var(--red);
   color: var(--text);
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
@@ -2643,7 +2636,7 @@ img.is-broken { opacity: .2; }
 }
 .ops__value.is-ok   { color: var(--ok); }
 .ops__value.is-warn { color: var(--amb); }
-.ops__value.is-bad  { color: var(--acc-red); }
+.ops__value.is-bad  { color: var(--red); }
 
 .ops__form {
   display: flex;
