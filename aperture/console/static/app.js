@@ -115,9 +115,59 @@ async function refreshSession() {
 
 /* A session that has timed out is not an error to report in a toast — it is a
  * different page. Sending the operator back to the door beats a form that
- * silently stops saving. */
-function toLogin() {
-  window.location.replace('/login');
+ * silently stops saving.
+ *
+ * Two things travel with the bounce. The REASON, so the door can say why it
+ * is there rather than presenting a blank form to someone who was working
+ * thirty seconds ago; it is a key the server looks up in an allowlist, never
+ * text, because it rides in on a query string. And, for a timeout only, a
+ * RETURN NOTE: the console has no router, so the screen you were on is not
+ * in the URL and is simply lost across a sign-in unless something writes it
+ * down. Signing out on purpose does NOT leave one — that is a decision to
+ * stop, and dropping the next person back into the same album would be
+ * ignoring it. */
+const RETURN_KEY = 'cfgtool.return';
+
+function toLogin(reason = 'timeout') {
+  if (reason === 'timeout' && state.sel) {
+    /* sessionStorage, not local: the note belongs to THIS tab and to this
+     * one trip through the door. One-shot — boot() deletes it on the way
+     * back out, so a later plain reload still lands on home. */
+    try { sessionStorage.setItem(RETURN_KEY, JSON.stringify(state.sel)); } catch (_) { /* fine */ }
+  }
+  window.location.replace('/login?reason=' + encodeURIComponent(reason));
+}
+
+/* The note, consumed. Validated against the tree that has just loaded rather
+ * than trusted: an album can have been renamed or deleted while the door was
+ * open, and select() on a path that is no longer there is a broken screen. */
+function takeReturnNote() {
+  let raw = null;
+  try {
+    raw = sessionStorage.getItem(RETURN_KEY);
+    sessionStorage.removeItem(RETURN_KEY);
+  } catch (_) { return null; }
+  if (!raw) return null;
+  let sel = null;
+  try { sel = JSON.parse(raw); } catch (_) { return null; }
+  if (!sel || typeof sel !== 'object') return null;
+  if (sel.kind === 'gallery' || sel.kind === 'ops' || sel.kind === 'home') {
+    return { kind: sel.kind };
+  }
+  if (sel.kind === 'album' && typeof sel.album === 'string' && albumExists(sel.album)) {
+    return { kind: 'album', album: sel.album };
+  }
+  return null;
+}
+
+function albumExists(path) {
+  const stack = state.tree ? [state.tree] : [];
+  while (stack.length) {
+    const node = stack.pop();
+    if (node.path === path) return true;
+    for (const child of node.children || []) stack.push(child);
+  }
+  return false;
 }
 
 async function api(path, options = {}) {
@@ -130,7 +180,7 @@ async function api(path, options = {}) {
     headers['X-Aperture-CSRF'] = CSRF;
   }
   const res = await fetch(path, { ...options, method, headers });
-  if (res.status === 401) { toLogin(); throw new Error('signed out'); }
+  if (res.status === 401) { toLogin('timeout'); throw new Error('signed out'); }
   let payload = null;
   try { payload = await res.json(); } catch (_) { /* empty body */ }
   if (res.status === 403 && payload && /csrf/i.test(payload.detail || '')) {
@@ -193,11 +243,19 @@ async function boot() {
   try {
     state.meta = await api('/api/meta');
     await Promise.all([loadTree(), loadVocab()]);
-    select({ kind: 'home' });
+    /* Home is the landing screen on purpose — the console stopped being a
+     * form you land in the middle of. The one exception is coming back
+     * through the door after a timeout, which nobody chose. */
+    select(takeReturnNote() || { kind: 'home' });
   } catch (err) {
     $('#pane').innerHTML = '';
     $('#pane').append(el('div', { class: 'pane__empty', text: 'Cannot reach the backend: ' + err.message }));
   }
+  /* The boot screen is waiting on this: it covers the four "Loading..."
+   * strings above, so it has to know when there is something behind it. Sent
+   * on the failure path too — an error message is also something to read,
+   * and a splash that hangs over one is worse than no splash. */
+  document.dispatchEvent(new Event('aperture:ready'));
   $('#btn-reload').addEventListener('click', async () => {
     photoCache.clear();
     await Promise.all([loadTree(), loadVocab()]);
@@ -213,7 +271,7 @@ async function boot() {
   if (signout) {
     signout.addEventListener('click', async () => {
       try { await api('/api/session', { method: 'DELETE' }); } catch (_) { /* going anyway */ }
-      toLogin();
+      toLogin('signout');
     });
   }
   $('#tree-filter').addEventListener('input', renderTree);
@@ -2447,7 +2505,7 @@ function renderAssets() {
         body: form,
         headers: CSRF ? { 'X-Aperture-CSRF': CSRF } : {},
       });
-      if (res.status === 401) { toLogin(); return; }
+      if (res.status === 401) { toLogin('timeout'); return; }
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.detail || res.statusText);
       state.data.assets = payload.assets;

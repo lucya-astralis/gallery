@@ -1,0 +1,47 @@
+{#- ==================================================================
+    THE MARK
+
+    The eight polygons of the lucya wing, lifted unchanged out of
+    logo/lucya_logo.svg. It is inline SVG rather than an <img> for one
+    reason: an <img> is a closed document, and nothing outside it can
+    reach a path — no stylesheet of ours, no script of ours. The boot
+    screen draws this mark one piece at a time and the header splits it
+    into colour on hover, and neither is possible through an <img>.
+
+    `ghosts` adds two more copies of the wing, offset a couple of units
+    and blended to screen. That is the chromatic split — the RGB fringe
+    the animation is built on — and it is markup rather than a filter
+    because a filter is the expensive way to get the same edge. The
+    footer's mark does not move and does not pay for them.
+    ================================================================== -#}
+
+{%- macro pieces(cls) -%}
+      <path class="{{ cls }}" data-piece="wing-l" d="M112,148L260,217L409.69,379.66L467.26,264.53L400,222.08L400,204.02L0,0L112,148Z"/>
+      <path class="{{ cls }}" data-piece="wing-r" d="M964,0L564,204.02L564,222.08L496.74,264.53L554.31,379.66L704,217L852,148L964,0Z"/>
+      <path class="{{ cls }}" data-piece="mid-l" d="M172.93,266.68L315.8,308.65L247.36,234.28L59.81,146.84L172.93,266.68Z"/>
+      <path class="{{ cls }}" data-piece="mid-r" d="M904.19,146.84L716.64,234.28L648.2,308.65L791.07,266.68L904.19,146.84Z"/>
+      <path class="{{ cls }}" data-piece="small-l" d="M289.78,367.82L400.19,400.35L343.4,338.64L191.3,293.96L289.78,367.82Z"/>
+      <path class="{{ cls }}" data-piece="small-r" d="M772.7,293.96L620.6,338.64L563.81,400.35L674.22,367.82L772.7,293.96Z"/>
+      <path class="{{ cls }}" data-piece="head" d="M518,67L415,100L403,120L454,122L421,210.5L482,249L543,210.5L538,85L518,67Z"/>
+      <path class="{{ cls }}" data-piece="tail" d="M482,282L544.5,407L482,543L419.5,407L482,282Z"/>
+{%- endmacro -%}
+
+{%- macro mark(cls='', ghosts=false) -%}
+<span class="mark {{ cls }}" aria-hidden="true">
+  <svg class="mark__svg" viewBox="0 0 964 543" focusable="false">
+{{ pieces('piece') }}
+  </svg>
+  {%- if ghosts %}
+  <div class="mark__ghost mark__ghost--r">
+    <svg class="mark__svg" viewBox="0 0 964 543" focusable="false">
+{{ pieces('piece piece--ghost') }}
+    </svg>
+  </div>
+  <div class="mark__ghost mark__ghost--b">
+    <svg class="mark__svg" viewBox="0 0 964 543" focusable="false">
+{{ pieces('piece piece--ghost') }}
+    </svg>
+  </div>
+  {%- endif %}
+</span>
+{%- endmacro -%}

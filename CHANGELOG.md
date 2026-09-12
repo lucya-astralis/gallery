@@ -18,6 +18,73 @@ notes are never one commit apart.
 
 ---
 
+## 1.3.0 — 2026-09-12
+
+The door stops being a bare form.
+
+**New**
+
+* The door says **why** you are looking at it. A session that idles out drops
+  you there with no explanation, which reads as the tool having thrown you
+  out; it now names the reason — timed out, signed out, or twelve hours up.
+  The text is chosen server-side from a fixed list and nothing from the query
+  string is ever rendered.
+* **You land back where you were.** A timeout writes down which screen was
+  open and the console restores it once, on the way back in. Signing out on
+  purpose deliberately leaves no note — that is a decision to stop.
+* A **Caps Lock** warning, and a **Show / Hide** for the password that keeps
+  the caret where it was.
+* The lockout **counts down**. After three tries the server backs off to five
+  minutes; the door printed that number once and then stood there lying about
+  it with the button still inviting another go. The button now says how long
+  is left and comes back on its own.
+* The card carries a hidden `username` field, because one account with no name
+  is the shape a password manager cannot file — most will not offer to save
+  the credential at all without it.
+* The card fades out on the way to the console, instead of the browser
+  flashing between two documents. The mark in the card splits on hover the
+  way the header's does; it deliberately does not play the boot build.
+
+**Fixed**
+
+* `/login` had a `next` parameter that could only ever carry `/` — the console
+  has no router — so it was an open-redirect sink standing open for no
+  benefit. Removed.
+
+---
+
+## 1.2.0 — 2026-09-12
+
+The console gets a face of its own.
+
+**New**
+
+* A boot screen. The mark draws itself in one piece at a time, the signal
+  drops, and it comes back solid — the same sequence the site's own splash
+  plays, at the same timings. It covers the seconds the console spends
+  fetching what it needs, it plays **once per browser session**, any click or
+  key takes it away, and it is never shown at all to someone whose system
+  asks for less motion. Nothing of the tool is visible behind it: the
+  backdrop is the room the console already lives in, with the furniture not
+  yet in it.
+* The logo is markup now, not a picture — inline SVG in the nav, the footer,
+  the sign-in card and the boot screen. An `<img>` is a closed document and
+  nothing outside it can reach a path; that is what made the mark unable to
+  draw itself or to split into colour.
+* The mark in the header splits into its two colour flanks on hover and
+  snaps back — the animation's own language, in half a second.
+* The sign-in card carries the version. Behind a password the footer is not
+  reachable, and the version is the first thing to check when the tool
+  behaves unlike the notes for it.
+
+**Fixed**
+
+* The sign-in card kept its wordmark on a phone. The rule that drops it is
+  about the app bar — two lines of brand text plus a menu handle plus two
+  buttons do not fit across 375px — and it was never scoped to it.
+
+---
+
 ## 1.1.0 — 2026-09-12
 
 The console stops being a form you land in the middle of.

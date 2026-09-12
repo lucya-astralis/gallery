@@ -1,3 +1,4 @@
+{% import "_mark.html" as brandmark %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -22,23 +23,56 @@
     <form class="login__card" id="login-form" method="post" action="/api/session"
           autocomplete="on" novalidate>
       <span class="login__mark">
-        <img src="{{ static_url('logo/lucya_logo.svg') }}" alt="">
+        {{ brandmark.mark('mark--door', ghosts=true) }}
         <span class="brand-text">
           <span class="brand-name">lucya.systems</span>
-          <span class="brand-sub">console</span>
+          {# The version belongs on the door as much as in the footer: it is
+             the first thing to check when the tool behaves unlike the notes
+             for it, and behind a password the footer is not reachable yet. #}
+          <span class="brand-sub">console <b>{{ app_version }}</b></span>
         </span>
       </span>
 
       <h1 class="login__title">Sign in</h1>
+      {# Why you are here, when the console knows. It is NOT role="alert" —
+         that belongs to the refusal below; this is the answer to a question
+         the operator has already asked themselves on the way over. The text
+         is chosen server-side from an allowlist and never echoed from the
+         query string. #}
+      {% if reason %}<p class="login__why">{{ reason }}</p>{% endif %}
       <p class="login__note">
         The console edits the files this gallery is configured by. It is the
         only part of Aperture that writes.
       </p>
 
+      {# There is one account and it has no name, which is exactly the shape a
+         password manager cannot file: with nothing carrying
+         autocomplete="username" most of them will not offer to save the
+         credential at all, and the ones that do file it against the bare
+         origin. So the account says its own name, out of the way of the tab
+         order and of a screen reader. Managers differ in how much they
+         respect a hidden field; this is the shape they document. #}
+      <input class="u-offscreen" type="text" name="username" value="operator"
+             autocomplete="username" readonly tabindex="-1" aria-hidden="true">
+
       <label class="login__label" for="password">Operator password</label>
-      <input type="password" id="password" name="password" required
-             autocomplete="current-password" autofocus
-             aria-describedby="login-error">
+      <div class="login__field">
+        <input type="password" id="password" name="password" required
+               autocomplete="current-password" autofocus
+               aria-describedby="login-error login-caps">
+        {# type="button", or it submits the form. Hidden from the tab order is
+           NOT an option here — a reveal you can only reach with a mouse is no
+           use to the person most likely to need it. #}
+        <button type="button" class="login__reveal" id="login-reveal"
+                aria-pressed="false" aria-controls="password">Show</button>
+      </div>
+
+      {# Caps Lock: the commonest reason a password that is definitely right
+         is definitely wrong. It is a status, not an alert — it appears while
+         you are still typing and must not interrupt. #}
+      <p class="login__caps" id="login-caps" role="status" hidden>
+        Caps Lock is on.
+      </p>
 
       <p class="login__error" id="login-error" role="alert" hidden></p>
 

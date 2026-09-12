@@ -247,6 +247,11 @@
   --dur-1:   .15s;
   --dur-2:   .25s;
   --dur-3:   .35s;
+  /* The two that are longer than --dur-3 and are therefore animations, not
+     transitions: the header mark's split on hover, and the cross-fade that
+     hands the screen from the boot mark to the console. */
+  --mark-split: .5s;
+  --boot-fade:  .45s;
   --ease:     cubic-bezier(.4, 0, .2, 1);
   --ease-out: cubic-bezier(.16, 1, .3, 1);
 
@@ -513,6 +518,333 @@ body {
   background-repeat: repeat, repeat, no-repeat, no-repeat;
 }
 
+/* ================================================================
+   THE MARK
+   ----------------------------------------------------------------
+   The wing has always been a flat file dropped in an <img>. It is inline
+   SVG now (templates/_mark.html) for one reason: an <img> is a closed
+   document. Nothing outside it can reach a path, which means no
+   stylesheet and no script of ours can draw it, fill it, or split it
+   into colour.
+
+   Three instances of one drawing, and the difference between them is a
+   HEIGHT and whether they carry the ghosts:
+
+     .mark--nav     28px, splits on hover
+     .mark--door    28px, the same, on the sign-in card
+     .mark--foot    18px, still: the footer is a stamp, not a control
+     .mark--splash  the boot screen, driven by splash.js
+
+   The resting state of every one of them is the SOLID mark. The hollow
+   outline the boot draws in is a state a script asks for, never the
+   default -- a stylesheet that starts the logo invisible is one failed
+   script away from a header with a hole in it.
+   ================================================================ */
+
+.mark {
+  display: block;
+  position: relative;
+  /* the artboard's own ratio, so a variant only ever sets a height */
+  aspect-ratio: 964 / 543;
+  flex: 0 0 auto;
+}
+
+.mark__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* the ghosts sit a couple of units off the mark and must not be cut */
+  overflow: visible;
+}
+
+.piece {
+  fill: #ffffff;
+  stroke: none;
+}
+
+/* ----- the chromatic split --------------------------------------------
+   Two whole copies of the wing, offset and blended to screen. The hexes
+   are NOT palette colours and are not allowed to become any: they are the
+   accent's two flanks, one toward blue and one toward violet, which is
+   what a split signal does to an edge. They only ever appear on a COPY of
+   the mark -- never on a surface, a label or a control. */
+.mark__ghost {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: screen;
+  will-change: translate, opacity;
+}
+.mark__ghost .piece--ghost { stroke-width: 1; }
+.mark__ghost--r .piece--ghost { fill: #7aa6ff; stroke: #7aa6ff; }
+.mark__ghost--b .piece--ghost { fill: #b478ff; stroke: #b478ff; }
+
+/* ----- the chrome instances -------------------------------------------- */
+.mark--nav  { height: 28px; }
+.mark--door { height: 28px; }
+.mark--foot { height: 18px; opacity: .85; }
+
+.mark--nav, .mark--door {
+  filter: drop-shadow(0 0 12px rgba(var(--acc-rgb), .35));
+  transition: filter var(--dur-2) var(--ease);
+}
+
+/* ----- the hover: the signal splits and comes back ---------------------
+   The same thing the boot screen does at the end of its build, once and in
+   half a second: the two copies pull apart, jitter, and snap back together.
+   It is the mark's own language rather than a new one -- nothing here
+   invents a gesture the animation does not already use.
+
+   Behind (hover: hover) on the house rule: a hover that REPAINTS costs the
+   first tap on a touch screen. Nothing here is a control, but the rule is
+   the rule. `translate`, never `transform`, so it can never overwrite a
+   transform something else put on the same element. */
+@media (hover: hover) {
+  .mark--nav:hover, .mark--door:hover {
+    filter: drop-shadow(0 0 16px rgba(var(--acc-rgb), .55));
+  }
+  .mark--nav:hover .mark__ghost--r,
+  .mark--door:hover .mark__ghost--r { animation: markSplitR var(--mark-split) steps(4, end); }
+  .mark--nav:hover .mark__ghost--b,
+  .mark--door:hover .mark__ghost--b { animation: markSplitB var(--mark-split) steps(4, end); }
+  .mark--nav:hover .mark__svg,
+  .mark--door:hover .mark__svg { animation: markJitter var(--mark-split) steps(4, end); }
+}
+
+/* steps(), not a curve: a signal that slides apart smoothly is a slide.
+   The split has to arrive in frames to read as a glitch. */
+@keyframes markSplitR {
+  0%        { opacity: 0;   translate: 0 0; }
+  20%       { opacity: .85; translate: -4px 1px; }
+  55%       { opacity: .7;  translate: -2px -1px; }
+  80%       { opacity: .5;  translate: -1px 0; }
+  100%      { opacity: 0;   translate: 0 0; }
+}
+@keyframes markSplitB {
+  0%        { opacity: 0;   translate: 0 0; }
+  20%       { opacity: .85; translate: 4px -1px; }
+  55%       { opacity: .7;  translate: 2px 1px; }
+  80%       { opacity: .5;  translate: 1px 0; }
+  100%      { opacity: 0;   translate: 0 0; }
+}
+@keyframes markJitter {
+  0%, 100%  { translate: 0 0; }
+  20%       { translate: 1px 0; }
+  55%       { translate: -1px 0; }
+  80%       { translate: .5px 0; }
+}
+
+/* Someone who asked for less motion still gets the mark, and gets it
+   whole -- just none of the three above. */
+@media (prefers-reduced-motion: reduce) {
+  .mark--nav:hover .mark__ghost--r,
+  .mark--door:hover .mark__ghost--r,
+  .mark--nav:hover .mark__ghost--b,
+  .mark--door:hover .mark__ghost--b,
+  .mark--nav:hover .mark__svg,
+  .mark--door:hover .mark__svg { animation: none; }
+}
+
+/* ================================================================
+   THE BOOT SCREEN
+   ----------------------------------------------------------------
+   The mark assembles itself once, in front of the console, while the
+   console fetches what it needs. Three things earn it a place in an
+   operator tool rather than making it decoration:
+
+     it covers a REAL wait. The screen behind it is four "Loading..."
+     strings until /api/meta, /api/tree and /api/vocab answer.
+     it plays ONCE per browser session (splash.js keeps the flag), so a
+     reload in the middle of a job is not a three-second wall.
+     it is skippable with any key or any click, and it is never shown at
+     all to someone who asked for less motion.
+
+   NOTHING OF THE TOOL IS BEHIND IT. The overlay itself is transparent --
+   what hides the console is `html.is-booting`, which takes the three
+   chrome blocks to zero. So the backdrop stays the room the console
+   already lives in (the nova artwork, undisturbed, no second copy of it
+   fetched), and the hand-off is a cross-fade between the mark leaving
+   and the tool arriving rather than a curtain lifting off a lit stage.
+
+   splash.js sets that class from a script tag at the TOP of the body, so
+   it lands before the nav and the layout have been parsed -- there is no
+   frame in which the console is on screen behind the boot mark.
+
+   The sequence itself is splash.js. This sheet only says what the states
+   look like; it does not know their order.
+   ================================================================ */
+html.is-booting .nav,
+html.is-booting .layout,
+html.is-booting .foot,
+html.is-booting .openbar { opacity: 0; }
+
+.nav, .layout, .foot, .openbar {
+  transition: opacity var(--boot-fade) var(--ease);
+}
+
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: grid;
+  place-items: center;
+  /* The two things the room does not have and the drawing needs, and
+     nothing else -- the artwork behind stays the artwork behind:
+
+       a vignette, because what normally holds the backdrop down on this
+       screen is the tool sitting on top of it, and with the tool gone
+       nova's own diagonals run straight through the mark.
+       a CRT scanline field, which is what makes the signal drop in the
+       middle of the sequence read as a signal drop and not a stutter.
+
+     The scanlines are FIRST in the stack so they lie over the vignette,
+     and only the pair of them scrolls. */
+  background:
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, .05) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(to right, rgba(0, 0, 0, .25) 0 2px, transparent 2px 4px),
+    radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, .78) 100%);
+  background-repeat: repeat, repeat, no-repeat;
+  animation: bootScan 8s linear infinite;
+  /* the hand-off, and the only thing about this screen that transitions */
+  transition: opacity var(--boot-fade) var(--ease);
+}
+/* The house rule, and this screen is the one that cannot do without it: a
+   class that sets `display` beats the browser's own [hidden] rule, and a
+   boot screen that ignores `hidden` is a boot screen that is on top of the
+   console on every load AFTER the first one -- once per session is the
+   whole point, and the second load is when the script returns early and
+   leaves nothing to take it away again. */
+.boot[hidden] { display: none; }
+.boot.is-done { opacity: 0; pointer-events: none; }
+@keyframes bootScan {
+  from { background-position: 0 0, 0 0, center; }
+  to   { background-position: 0 120px, 0 0, center; }
+}
+
+.boot__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-7);
+  /* the whole block arrives, before any of its parts do anything */
+  animation: bootArrive 1.4s var(--ease-out) both;
+}
+@keyframes bootArrive {
+  from { opacity: 0; scale: .94; filter: blur(4px); }
+  to   { opacity: 1; scale: 1;   filter: blur(0); }
+}
+
+.mark--splash {
+  /* Three caps, and the third is the one that is easy to forget: a wide
+     short window (a laptop at 820x560, a phone on its side) has plenty of
+     WIDTH and no height, and 78vw there puts the wordmark off the bottom of
+     the screen. 76vh of width is 43vh of mark, which leaves the label room
+     on the shortest window worth drawing this on. */
+  width: min(620px, 78vw, 76vh);
+  height: auto;
+  filter: drop-shadow(0 0 36px rgba(var(--acc-rgb), .35));
+}
+/* The breathing glow, delayed to land on the END of the build rather than
+   fighting it. */
+.mark--splash.is-built { animation: bootBreathe 7s var(--ease) infinite; }
+@keyframes bootBreathe {
+  0%, 100% { filter: drop-shadow(0 0 20px rgba(var(--acc-rgb), .22)); }
+  50%      { filter: drop-shadow(0 0 42px rgba(var(--acc-rgb), .42))
+                     drop-shadow(0 0 70px rgba(var(--acc-rgb), .16)); }
+}
+
+/* ----- the outline the boot draws in ----------------------------------- */
+/* The boot screen's alone. The door wears the same mark and deliberately
+   does NOT build it: that screen covers a real wait and this one covers
+   nothing, and the card's job is a password field that can be typed into on
+   the first frame. The door's mark splits on hover like the header's, and
+   that is the whole of its motion.
+
+   Only ever armed once the script is running: .is-armed is what makes the wing
+   hollow, so a missing or broken script leaves a SOLID mark rather than a
+   hole in the screen. --len and --dur are written per path by whichever
+   script it is, from each path's own measured length, so every stroke
+   travels at roughly one speed.
+
+   `> .mark__svg` and not a bare descendant: the ghosts are copies of the
+   same eight paths and carry the same .piece class, so an unscoped rule
+   hollows THEM out too and the chromatic split turns into two coloured
+   outlines. The mark's own svg is a direct child; the ghosts' are one div
+   deeper, which is the whole difference and costs no specificity fight. */
+.mark--splash.is-armed > .mark__svg .piece {
+  fill: rgba(255, 255, 255, 0);
+  stroke: rgba(210, 230, 255, .78);
+  stroke-width: 1.08;
+  stroke-linejoin: round;
+  stroke-miterlimit: 2;
+  stroke-dasharray: var(--len);
+  stroke-dashoffset: var(--len);
+  transition: fill .18s var(--ease-out), stroke var(--dur-3) ease;
+}
+.mark--splash > .mark__svg .piece.drawn {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset var(--dur) cubic-bezier(.25, .46, .45, .94);
+}
+.mark--splash > .mark__svg .piece.filled {
+  fill: rgba(255, 255, 255, 1);
+  stroke: rgba(210, 230, 255, .2);
+  stroke-width: .43;
+}
+
+/* The splash's ghosts are driven frame by frame by the script, so unlike
+   the header's they need a transition rather than a keyframe. */
+.mark--splash .mark__ghost {
+  transition: opacity .12s steps(2), translate .08s linear;
+}
+
+/* ----- the wordmark ---------------------------------------------------- */
+/* It resolves rather than fading: the script lands it wide and overshoots
+   its tracking a few times before handing the value back to this sheet. */
+.boot__label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  margin: 0;
+  text-align: center;
+  opacity: 0;
+}
+.boot__name {
+  font-family: var(--display-font);
+  font-size: var(--fs-chrome-xl);
+  letter-spacing: var(--tr-chrome-xs);
+  text-transform: uppercase;
+  color: var(--text);
+}
+.boot__sub {
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-md);
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--acc-soft) 30%, var(--acc));
+  /* the wordmark glitches in; the line under it just arrives, a beat
+     later. Two things resolving at once is noise. */
+  opacity: 0;
+  transition: opacity .5s var(--ease);
+}
+.boot__sub b { font-weight: 400; color: var(--text-ghost); }
+
+@media (max-width: 620px) {
+  .boot__stage { gap: var(--s-6); }
+  .boot__name { font-size: var(--fs-chrome-lg); letter-spacing: var(--tr-chrome-sm); }
+  .boot__sub { font-size: var(--fs-chrome-xs); letter-spacing: .22em; }
+}
+
+/* splash.js never shows this screen under a reduced-motion request, so this
+   block is the belt to that script's braces: if it is on screen at all,
+   nothing on it loops. */
+@media (prefers-reduced-motion: reduce) {
+  .boot, .boot__stage, .mark--splash.is-built { animation: none; }
+  .boot__stage { opacity: 1; }
+}
+
 /* ----- nav ------------------------------------------------------------- */
 .nav {
   position: relative;
@@ -605,12 +937,6 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   min-width: 0;
 }
 
-.nav__brand img {
-  height: 28px;
-  width: auto;
-  display: block;
-  filter: drop-shadow(0 0 12px rgba(var(--acc-rgb), .35));
-}
 
 .brand-text {
   display: flex;
@@ -640,6 +966,15 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   letter-spacing: .28em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--acc-soft) 30%, var(--acc));
+}
+
+/* The version, where the lockup carries one (the door does, the nav does
+   not -- the nav has a footer under it). A number is not the name of the
+   thing, so it steps back off the accent onto the ghost step and takes no
+   weight of its own. */
+.brand-sub b {
+  font-weight: 400;
+  color: var(--text-ghost);
 }
 
 /* The mounted path lives in the footer's TARGET stamp and nowhere else — it
@@ -1807,7 +2142,6 @@ select option { background: var(--surface); color: var(--text); }
   color: var(--text-dim);
 }
 
-.foot__brand img { height: 18px; width: auto; opacity: .85; }
 
 .foot__meta {
   margin-left: auto;
@@ -2358,11 +2692,15 @@ img.is-broken { opacity: .2; }
 
   body { font-size:var(--fs-text-lg); }
 
-  /* The wordmark goes; the mark stays. Two lines of brand text plus a menu
-     handle plus two buttons do not fit across 375px, and the pane's own
-     heading says which file is open anyway. */
-  .nav__brand img { height: 24px; }
-  .brand-text { display: none; }
+  /* In the NAV the wordmark goes and the mark stays: two lines of brand
+     text plus a menu handle plus two buttons do not fit across 375px, and
+     the pane's own heading says which file is open anyway.
+
+     Scoped to the nav, which it was not. The door wears the same lockup and
+     has a whole card to itself — it was losing its wordmark on a phone for
+     a reason that only ever applied to the app bar. */
+  .mark--nav { height: 24px; }
+  .nav__brand .brand-text { display: none; }
   .u-wide-only { display: none; }
   .btn { padding:var(--s-3) var(--s-4); }
   .nav__actions .btn { padding: var(--s-3) var(--s-3); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-lg); }
@@ -2528,7 +2866,6 @@ img.is-broken { opacity: .2; }
   gap: var(--s-3);
   margin-bottom: var(--s-4);
 }
-.login__mark img { width: 28px; height: 28px; }
 
 .login__title {
   font-family: var(--sans);
@@ -2569,6 +2906,95 @@ img.is-broken { opacity: .2; }
   border-top: var(--hair) solid var(--line);
 }
 .login__foot code { font-family: var(--mono); color: var(--text-dim); }
+
+/* ----- the door's own parts -------------------------------------------- */
+/* Why you are looking at this page, when the console knows. The accent
+   carries it as a FILL and a rule; the words stay --text, because the accent
+   never sits on its own tint. */
+.login__why {
+  margin: 0 0 var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-left: 2px solid var(--acc);
+  background: rgba(var(--acc-rgb), .08);
+  color: var(--text);
+  font-size: var(--fs-text-sm);
+}
+
+/* The field and the reveal that sits inside it. The padding on the input is
+   what keeps a long password from running under the button. */
+.login__field { position: relative; }
+.login__field input { padding-right: 64px; }
+
+.login__reveal {
+  position: absolute;
+  top: 50%;
+  right: var(--s-3);
+  translate: 0 -50%;
+  background: none;
+  border: 0;
+  padding: var(--s-1) var(--s-2);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: var(--tr-chrome-xs);
+  text-transform: uppercase;
+  color: var(--text-ghost);
+  transition: color var(--dur-1) var(--ease);
+}
+/* A colour hover REPAINTS, which costs the first tap on a touch screen --
+   and this one IS a control, so the gate is not optional here. */
+@media (hover: hover) {
+  .login__reveal:hover { color: var(--chrome); }
+}
+.login__reveal:focus-visible {
+  color: var(--acc);
+  outline: var(--hair) solid rgba(var(--acc-rgb), .6);
+  outline-offset: 2px;
+}
+
+/* Amber, not red: Caps Lock is not a refusal, it is the reason the refusal
+   is about to happen. */
+.login__caps {
+  margin: 0;
+  color: var(--amb);
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-sm);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.login__caps[hidden] { display: none; }
+.login__error[hidden] { display: none; }
+
+/* The way out. Signing in is a full page load — the console is a different
+   document — and a hard navigation flashes. So the card leaves under its own
+   power first and the boot screen picks the mark up on the other side. */
+.login__card {
+  transition: opacity var(--boot-fade) var(--ease),
+              scale var(--boot-fade) var(--ease-out);
+}
+.login__card.is-out {
+  opacity: 0;
+  scale: .97;
+  pointer-events: none;
+}
+
+/* Offscreen, but still in the layout and still a field a password manager
+   can see -- display:none is what makes managers ignore it. */
+.u-offscreen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login__card.is-out { scale: 1; }
+}
+
 
 /* ----- the open console ------------------------------------------------
    No password configured. The bar is not decoration: an unauthenticated

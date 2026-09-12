@@ -246,16 +246,41 @@ async def _json_body(request: Request) -> dict:
 
 
 # ----- the door ---------------------------------------------------------
+# Why the operator is looking at the door, as an ALLOWLIST. Landing on a
+# sign-in page with no explanation reads as the tool having thrown you out
+# for no reason, and the commonest cause — half an hour away from the desk —
+# is the one worth naming. The query string is attacker-controlled and this
+# text renders on an UNAUTHENTICATED page, so nothing from it is ever echoed:
+# the parameter only picks a key here, and an unknown key says nothing at all.
+LOGIN_REASONS = {
+    "timeout": "That session had been idle for %d minutes, so it ended."
+               % (security.IDLE_TIMEOUT // 60),
+    "signout": "Signed out. The console is closed until you sign in again.",
+    "expired": "That session reached its twelve-hour limit and ended.",
+}
+
+
 @app.get("/login")
-def login_page(request: Request, next: str = "/"):
+def login_page(request: Request, reason: str = ""):
     """The one page a signed-out visitor can see. Deliberately its own
     document rather than a modal on the app: nothing of the console — not the
     album tree, not the photo counts, not the mount path — renders before
-    there is a session."""
+    there is a session.
+
+    It took a `next` until 1.3.0. The console has no router — no pushState, no
+    hash, `/` is its only URL — so the parameter could never carry anything
+    but `/`, which made it an open-redirect sink standing open for no benefit.
+    What is actually lost across the door is which SCREEN you were on, and
+    that is remembered on the console's side of it (app.js, the return note).
+    """
     if security.open_access() or security.current(request):
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(request, "login.html", {
         "vendor": brand.CONTEXT,
+        # the same stamp the console's footer carries, because behind a
+        # password the footer is not reachable yet
+        "app_version": brand.VERSION,
+        "reason": LOGIN_REASONS.get(reason, ""),
     })
 
 
