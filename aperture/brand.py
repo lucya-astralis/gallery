@@ -46,12 +46,23 @@ NAME = "lucya.systems"
 URL = "https://lucya.systems"
 PRODUCT = f"{NAME} aperture"
 
-# Aperture's own release version, shown in the nav and the footer. It starts
-# at 1.0 rather than continuing the gallery's 7.2: the gallery and the
-# configurator were two programs, this is one, and a version is a promise
-# about a thing. Distinct from API_VERSION (gallery/api.py), which versions the JSON
-# API contract and did NOT reset — the endpoints kept their shape.
-VERSION = "1.0"
+# Aperture's own release version — THE one place it is written. The nav, the
+# footer, /humans.txt, X-Powered-By, <meta name="generator">, the EXIF
+# Software tag and the CLI masthead all derive from this line, so a release is
+# one edit and cannot half-happen.
+#
+# MAJOR.MINOR.PATCH, read as a promise to whoever runs it: MAJOR = the program
+# is a different shape (read the changelog first), MINOR = something new to
+# see or to set (drop-in unless the entry names a step), PATCH = fixes and
+# internals. Bump it in the same commit as the change that earns it, and write
+# that commit's entry in CHANGELOG.md; the rules are in README → Versions and
+# tests/test_version.py holds the two to each other.
+#
+# It started at 1.0 rather than continuing the gallery's 7.2: the gallery and
+# the configurator were two programs, this is one, and a version is a promise
+# about a thing. Distinct from API_VERSION (gallery/api.py), which versions the
+# JSON API contract and did NOT reset — the endpoints kept their shape.
+VERSION = "1.1.0"
 
 # One-line form, shared by <meta name="generator">, the X-Powered-By header
 # and the EXIF `Software` tag so all three can never drift apart.

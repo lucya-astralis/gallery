@@ -1414,6 +1414,52 @@ All GET, all public:
 - `GET /api` + `/api/stats` + `/api/albums` + `/api/album/{album}` + `/api/photos` + `/api/photo/{rel_path}` + `/api/tags` + `/api/showcase` + `/api/shuffle` — the JSON API, CORS-enabled (see [API](#api))
 - `GET /api/trip-weather?trip=…` — current conditions per trip stop plus today's high/low, served as a same-origin proxy to [Open-Meteo](https://open-meteo.com/) (weather data CC BY 4.0). Server-side cache (15 min); the visitor's browser never contacts a third party, so no cookies and no consent banner are involved.
 
+## Versions
+
+The version is one constant: `VERSION` in `aperture/brand.py`. The nav, the
+footer, `/humans.txt`, `X-Powered-By`, `<meta name="generator">`, the EXIF
+`Software` tag written into derived JPEGs and the CLI masthead all derive from
+it, so a release is one edit and cannot half-happen. What each release
+actually changed is in [CHANGELOG.md](CHANGELOG.md).
+
+`MAJOR.MINOR.PATCH`, and each part is a promise to whoever runs the thing
+rather than a category of code change:
+
+| | what it says | what the operator does |
+|---|---|---|
+| **MAJOR** | the program is a different shape than it was — surfaces, ports, where the data lives, what the container is | read the entry before pulling |
+| **MINOR** | something new to see or to set: a page, a config key, a command, a visible behaviour | pull; the entry names any required step under **Before you upgrade** |
+| **PATCH** | fixes, refactors, docs, tests — nothing new to learn | pull |
+
+A required step (the container's uid, a new mandatory setting) does **not**
+force a MAJOR. It goes in the entry, in bold, where an operator reads it
+before upgrading; reserving the big number for "this is a different program"
+keeps it meaningful, and 1.0 was the last time it happened.
+
+### The other numbers, which are not this one
+
+* **`API_VERSION`** (`aperture/gallery/api.py`) versions the JSON contract and
+  moves only when that contract breaks for a consumer. It did not reset when
+  the product did.
+* **Static assets** are cache-busted per file by mtime (`static_url`), so a
+  release is not a cache key and a stylesheet fix ships without one.
+* **Nebula** (the design language) is its own repository with its own
+  version. A restyle here is a change in aperture, not in Nebula.
+* **The config grammar** has no version: `aperture/schema.py` is the registry,
+  and a key is added or removed in a release entry like anything else.
+
+### Making a release
+
+1. Bump `VERSION` and write the `CHANGELOG.md` entry **in the commit that
+   earns it** — never as a separate "release" commit, so the number and the
+   notes can never be one commit apart.
+2. `python -m pytest` — `tests/test_version.py` checks the constant against the
+   changelog's newest heading, the format, and that the entries descend.
+3. `git tag v$(python -c "from aperture import brand; print(brand.VERSION)")`
+   if the release is worth pointing at later. The deployment itself tracks
+   `main`, so the tag is a bookmark, not a trigger.
+
+
 ## Local development (without Docker)
 
 ```bash
