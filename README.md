@@ -26,7 +26,7 @@ decided by `APERTURE_ROLE` — `all` for one container with both, or `public` an
 - **Showcase:** flag photos (`featured = …`) or a whole album (`showcase = true`) in the album's `album.cfg` to surface them on the welcome screen, on the album overview, and via `/api/showcase` JSON for embedding on other sites.
 - **Public statistics (`/stats`):** what the archive holds, charted — a monthly timeline, the largest albums (each bar links into its album), cameras, focal lengths, apertures, ISO, tags, a 24-hour **polar dial** for time of day (the hours are cyclical, so they are drawn round), a weekday column chart, and a **stacked proportion bar** for orientation (the one series whose parts add up to every photo). Everything is measured from the photos' own capture dates and EXIF; no visitor is counted and nothing is logged, so the page is safe to share. Server-rendered SVG geometry — no JavaScript, no chart library. Linked from the archive readout under the welcome hero and from the footer.
 - **Search & sort:** top bar searches album, file, and tag names; sort by date, name or size on every list view — plus a "Curated" order defined in `album.cfg` / `gallery.cfg`, which can also preselect the default sort.
-- **By day:** an album whose photos span more than one day also offers a **By day** sort — newest day first, with the grid split into a framed section per capture day (day counter, weekday, photo count). On an album with a trip configured (`TRIPS` in `aperture/main.py`) the counter is the trip day, counted from the outbound flight, and each day carries a chip naming the leg it falls into — sub-albums of that trip inherit both.
+- **By day:** an album whose photos span more than one day also offers a **By day** sort — newest day first, with the grid split into a framed section per capture day (day counter, weekday, photo count). On an album with a trip configured (`TRIPS` in `aperture/trips.py`) the counter is the trip day, counted from the outbound flight, and each day carries a chip naming the leg it falls into — sub-albums of that trip inherit both.
 - **Three languages (EN / DE / JP):** selector in the top-right corner, cookie-backed with an `Accept-Language` fallback. Album descriptions are per-language markdown files (`album_en.md` / `album_de.md` / `album_jp.md`); UI strings live in `aperture/i18n.py`. See [Languages](#languages--i18n).
 - **Mobile-friendly:** responsive grid, large touch targets, keyboard navigation (← → ESC) on desktop.
 - **Read-only where it faces the public:** the gallery app has no route that is not a `GET` — no write endpoints, no uploads, no tag editing. The one write path in the product belongs to the console, on the other port, and reaches only the `.album/` and `.gallery/` metadata folders. See [Security / hosting](#security--hosting).
@@ -152,7 +152,7 @@ menu, EXIF labels, trip countdown, empty states, OG descriptions. The
 decorative camera-HUD tokens (REC, FRM, SIG /, ONLINE, T-x DAYS, …)
 intentionally stay English in every language, like the HUD of an actual
 Japanese camera. UI strings live in `aperture/i18n.py` (server) and in the
-`UI_STRINGS` table at the top of `aperture/static/app.js` (client) — keep both
+`UI_STRINGS` table at the top of `aperture/gallery/static/app.js` (client) — keep both
 in sync when adding text.
 
 **Caching:** because the same URL serves different languages, all HTML is
@@ -250,7 +250,7 @@ every one of those places without per-page tuning. Served from
 ever served and the filename never travels in the URL.
 
 **Japanese font subset:** the site ships a glyph subset of Noto Sans JP
-(`aperture/static/fonts/NotoSansJP-subset.woff2`, ~120 KB instead of the 8.8 MB
+(`aperture/gallery/static/fonts/NotoSansJP-subset.woff2`, ~120 KB instead of the 8.8 MB
 variable TTF). Every JP glyph the site can render must be baked in — after
 changing/adding Japanese text anywhere (album_jp.md, i18n.py, app.js,
 templates), rebuild it or new characters show as tofu:
@@ -286,7 +286,7 @@ python tools/build_display_faces.py   # needs: pip install fonttools brotli
 ```
 
 **Logo raster:** the terminal CLI can draw the real logo as a picture (see
-[Terminals](#terminals)), which needs a bitmap. `aperture/static/logo/lucya_logo.png`
+[Terminals](#terminals)), which needs a bitmap. `aperture/gallery/static/logo/lucya_logo.png`
 is rasterised from the SVG on a developer machine, so the container needs no
 SVG stack at all — Pillow and nothing else:
 
@@ -537,7 +537,7 @@ Rules for the hand-picked welcome list:
 The look has a name, because two surfaces wear it: the gallery, and the
 [console](aperture/console/) that edits its config files. **Nebula**, after
 the accent it rations — `#5865F2`, "Nebula Blue". Six rules, and everything
-in `aperture/static/style.css` is one of them:
+in `aperture/gallery/static/style.css` is one of them:
 
 1. **Black ground, grey furniture, one purple accent.** `--acc` marks *state*
    and nothing else — links, focus, active/selected/open, the featured mark.
@@ -584,7 +584,7 @@ is the software's.
 The console carries the same tokens and the same controls rather than a
 lookalike of them; its README lists which of its objects comes from which of
 the gallery's. They ship in one image now, but still as **two stylesheets** —
-`aperture/static/style.css` and `aperture/console/static/style.css` — so a
+`aperture/gallery/static/style.css` and `aperture/console/static/style.css` — so a
 change to the language still has to be made in both. Collapsing them onto one
 shared `nebula.css` is a later milestone.
 
@@ -859,10 +859,15 @@ Inside the package:
 
 | Path                | Purpose                                             |
 |---------------------|-----------------------------------------------------|
-| `aperture/main.py`  | the gallery app and its routes                      |
+| `aperture/gallery/` | the public app: pages, the JSON API, the media routes, its static files and templates |
+| `aperture/console/` | the console app, its static files and templates     |
+| `aperture/albums.py`, `photos.py`, `theme.py`, `config.py`, `branding.py`, … | what an album, a photo, a theme and a cfg ARE. No route and no template reaches in from here, and nothing here imports the web layer — a test asserts that direction |
+| `aperture/schema.py` + `cfgio.py` | which keys a cfg file may hold, and the grammar that reads and rewrites it |
+| `aperture/checks.py`| what is wrong with a cfg file — one implementation, asked by `doctor`, the CLI and the console |
+| `aperture/scanner.py` + `indexer.py` | the walk that fills the index and writes the derivatives, and the loop that schedules it |
+| `aperture/ops.py`   | the operations surface the CLI and the console's `/api/ops/*` share |
 | `aperture/server.py`| the process: which listeners open, and shutdown     |
 | `aperture/runtime.py`| the one place that reads the environment            |
-| `aperture/console/` | the console app, its static files and templates     |
 | `aperture/cli.py` + `termui.py` | the operator CLI and its terminal vocabulary |
 | `tests/`            | the characterization net (`python -m pytest`)       |
 
@@ -1055,7 +1060,7 @@ for the same reason; `--logo blocks` covers them. Into a pipe or a log file
 image data — and `kitty`/`iterm` are skipped inside a frame, because those
 protocols move the cursor themselves and would tear the box apart.
 
-The picture comes from `aperture/static/logo/lucya_logo.png`; if it is missing,
+The picture comes from `aperture/gallery/static/logo/lucya_logo.png`; if it is missing,
 run `python tools/render_logo.py` (see above) — `term` says so too. Its
 transparency is preserved in every mode: the logo sits on your terminal
 background, not in a white box.
@@ -1214,7 +1219,7 @@ screenful of tiles.
 **Sized for where it is shown.** A file the config names is served at the size
 the page draws it at, not at whatever size it happens to be: the operator
 portrait is a 34 px avatar and was a 539x539 PNG, 350 KB on every page of the
-archive, now a 128 px WebP of 4 KB (`_brand_render`). Showcase covers carry a
+archive, now a 128 px WebP of 4 KB (`branding.brand_render`). Showcase covers carry a
 `srcset` across the two photo tiers, so a card that is a third of the page wide
 takes the grid tile rather than the 1600 px preview.
 
@@ -1256,7 +1261,7 @@ wordmark and the album's title face too. See the Cloudflare notes under
 - No write API, no uploads, no tag editing — the gallery app answers `GET`,
   `HEAD` and `OPTIONS` and has no other method on any route. That is asserted
   by a test (`tests/test_runtime.py`), not just intended.
-- Path traversal blocked (`_safe_rel`); the four routes that turn a URL into a
+- Path traversal blocked (`media.safe_rel`); the four routes that turn a URL into a
   filesystem path have their own test file (`tests/test_paths.py`)
 - GPS stripping on (`HIDE_GPS=1`)
 - Tags, thumbnails and the index live in `data/` and `thumbnails/` — none of it
@@ -1329,7 +1334,7 @@ of writing them as bullets.
 address travels in clear, and the console says so in the log. Put it behind
 WireGuard, Tailscale or an SSH tunnel rather than exposing it.
 
-**Built-in security headers** (set by middleware in `aperture/main.py`):
+**Built-in security headers** (set by middleware in `aperture/gallery/app.py`):
 
 - `Content-Security-Policy` — strict `'self'`-only policy, no inline scripts/styles, no external resources. `frame-ancestors 'none'` (clickjacking protection)
 - `X-Frame-Options: DENY` — same, for older browsers
