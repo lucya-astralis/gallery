@@ -7,7 +7,7 @@ from datetime import datetime
 from fractions import Fraction
 from pathlib import Path
 
-from PIL import Image, ExifTags
+from PIL import Image, ExifTags, ImageOps
 
 from . import brand, db, marks
 from . import schema
@@ -38,6 +38,24 @@ except ImportError:
     log.warning("pillow-heif not installed; HEIC/HEIF support disabled")
 
 JPEG_CONVERT_EXTS = {".heic", ".heif"}
+
+# EXIF Orientation 5-8 mean the stored pixel buffer is a quarter turn away
+# from how the photo is meant to be shown -- how every portrait from a
+# phone arrives. Everything written below is written UPRIGHT, and the
+# indexed dimensions are stored upright with it: a derivative carries no
+# Orientation tag of its own (see _derivative_exif), so a browser cannot
+# put a sideways one right, and the tile sizes itself from those numbers.
+_SWAPPED_ORIENTATIONS = {5, 6, 7, 8}
+
+
+def _orientation(exif: dict) -> int:
+    """The EXIF Orientation as a plain int; 1 ("as it lies") when the tag
+    is absent or unreadable."""
+    try:
+        return int(float(exif.get("Orientation")))
+    except (TypeError, ValueError):
+        return 1
+
 
 # The format each derivative tier is written in. The grid thumbnail is WebP:
 # an album page asks for hundreds of them and they are the one tier a visitor
@@ -310,6 +328,7 @@ def make_thumbnail(src: Path, dst: Path, size: int) -> bool:
     try:
         dst.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(src) as img:
+            img = ImageOps.exif_transpose(img)   # upright, see the note above
             img.thumbnail((size, size), Image.LANCZOS)
             if img.mode in ("RGBA", "P", "LA"):
                 bg = Image.new("RGB", img.size, (20, 20, 20))
@@ -364,6 +383,7 @@ def make_brand_thumb(src: Path, dst: Path, size: int) -> bool:
     try:
         dst.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(src) as img:
+            img = ImageOps.exif_transpose(img)
             img.thumbnail((size, size), Image.LANCZOS)
             if img.mode not in ("RGB", "RGBA"):
                 img = img.convert("RGBA" if "A" in img.getbands() else "RGB")
@@ -378,6 +398,8 @@ def make_full_jpeg(src: Path, dst: Path) -> bool:
     try:
         dst.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(src) as img:
+            # The HEIC path, which is exactly where rotated phone photos arrive.
+            img = ImageOps.exif_transpose(img)
             if img.mode in ("RGBA", "P", "LA"):
                 bg = Image.new("RGB", img.size, (20, 20, 20))
                 bg.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
@@ -518,6 +540,10 @@ def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
                 exif, taken = extract_exif(img)
             except Exception as e:
                 log.warning("exif failed for %s: %s", file, e)
+            if _orientation(exif) in _SWAPPED_ORIENTATIONS:
+                # Stored as the photo is SHOWN, which is what the derivatives
+                # are written as and what the tile is sized from.
+                width, height = height, width
     except Exception as e:
         log.warning("open failed for %s: %s: %s", file, type(e).__name__, e)
         return False

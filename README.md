@@ -1145,6 +1145,23 @@ everywhere else in this project.
 | generated thumbnails/previews | `scan`, `thumbs --rebuild`, `thumbs --prune --apply` (deletes) |
 | the control files | `pause`, `resume`, `scan` |
 
+### Derivatives are written upright
+
+A phone writes a portrait photo as a landscape buffer plus an EXIF
+`Orientation` tag saying "turn this". The generated thumbnails and previews
+carry no such tag of their own — they get `Software` and your `credit` and
+nothing else — so a browser cannot turn them, and the grid tile is sized from
+the width and height in the index. Both are therefore corrected when they are
+written: the pixels by the scanner, the stored dimensions with them.
+
+An archive indexed before this rule only needs catching up if it holds such
+photos (`doctor` will not flag them — they are not broken, only sideways):
+
+```bash
+python -m aperture.cli scan --force        # re-read the dimensions
+python -m aperture.cli thumbs --rebuild --all   # rewrite the files
+```
+
 ### Examples
 
 ```bash

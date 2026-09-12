@@ -42,7 +42,17 @@ TREE = {
         ("desk.jpg", "2026:02:11 20:15:00", (1000, 750)),
         ("rack.jpg", "2026:02:12 08:00:00", (750, 1000)),
     ],
+    # The phone case: a landscape buffer that EXIF says is a quarter turn off,
+    # which is how every portrait from a phone arrives. See ORIENTED below and
+    # tests/test_orientation.py.
+    "phone": [
+        ("portrait.jpg", "2026:03:02 18:30:00", (900, 600)),
+    ],
 }
+
+# album -> EXIF Orientation for its photos. 1 means "as it lies"; 6 is the
+# quarter turn a phone writes when it is held upright.
+ORIENTED = {"phone": 6}
 
 GALLERY_CFG = """\
 # fixture gallery.cfg
@@ -72,7 +82,7 @@ featured = desk.jpg
 """
 
 
-def _jpeg(path: Path, size, taken_at: str) -> None:
+def _jpeg(path: Path, size, taken_at: str, orientation: int = 1) -> None:
     """A real JPEG with a real DateTimeOriginal — the scanner reads both."""
     w, h = size
     img = Image.new("RGB", (w, h))
@@ -86,6 +96,7 @@ def _jpeg(path: Path, size, taken_at: str) -> None:
                 for dx in range(min(4, w - x)):
                     px[x + dx, y + dy] = c
     exif = img.getexif()
+    exif[0x0112] = orientation          # Orientation
     exif[0x0110] = "Fixture Cam"        # Model
     exif[0x010F] = "Fixture Optics"     # Make
     ifd = exif.get_ifd(0x8769)          # ExifIFD
@@ -101,7 +112,7 @@ def _jpeg(path: Path, size, taken_at: str) -> None:
 def _build_tree() -> None:
     for album, files in TREE.items():
         for name, taken, size in files:
-            _jpeg(PHOTOS / album / name, size, taken)
+            _jpeg(PHOTOS / album / name, size, taken, ORIENTED.get(album, 1))
 
     meta = PHOTOS / ".gallery"
     meta.mkdir(parents=True, exist_ok=True)

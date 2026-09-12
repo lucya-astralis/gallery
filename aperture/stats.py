@@ -28,11 +28,6 @@ import math
 from collections import Counter
 from datetime import date, datetime
 
-# EXIF Orientation values 5-8 mean the stored pixel buffer is rotated a
-# quarter turn away from how the photo is meant to be shown, so width and
-# height have to be swapped before anything is called "portrait".
-_SWAPPED_ORIENTATIONS = {5, 6, 7, 8}
-
 # ISO is continuous and phone cameras land on arbitrary values (320, 500,
 # 1250 …), so it is the one capture fact that is bucketed rather than
 # counted per exact value. Upper bounds, inclusive; the last row catches
@@ -250,11 +245,10 @@ def collect(conn, month_name, weekday_name, more_label: str = "+{n} more") -> di
             isos[label] += 1
 
         # ---- shape ------------------------------------------------------
+        # Upright already: the scanner swaps the two for EXIF Orientation
+        # 5-8 when it indexes the photo, so what is stored is what is shown.
         w, h = r["width"], r["height"]
         if w and h:
-            orient = _num(exif.get("Orientation"))
-            if orient and int(orient) in _SWAPPED_ORIENTATIONS:
-                w, h = h, w
             pixels += w * h
             ratio = w / h
             shapes["landscape" if ratio > 1.02 else "portrait" if ratio < 0.98 else "square"] += 1
