@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 from PIL import Image
+from PIL.TiffImagePlugin import IFDRational
 
 # ----- the tree ---------------------------------------------------------
 ROOT = Path(tempfile.mkdtemp(prefix="aperture-tests-"))
@@ -99,12 +100,18 @@ def _jpeg(path: Path, size, taken_at: str, orientation: int = 1) -> None:
     exif[0x0112] = orientation          # Orientation
     exif[0x0110] = "Fixture Cam"        # Model
     exif[0x010F] = "Fixture Optics"     # Make
-    ifd = exif.get_ifd(0x8769)          # ExifIFD
-    ifd[0x9003] = taken_at              # DateTimeOriginal
-    ifd[0x829A] = (1, 250)              # ExposureTime
-    ifd[0x829D] = (28, 10)              # FNumber
-    ifd[0x8827] = 400                   # ISO
-    ifd[0x920A] = (35, 1)               # FocalLength
+    # The capture facts live in the Exif sub-IFD. Pillow only writes that IFD
+    # when it is assigned as a dict (edits to a get_ifd() copy are dropped on
+    # save), and a rational tag needs an IFDRational, not a tuple. The fixture
+    # used to do both the other way, so its photos carried neither a date nor
+    # an aperture.
+    exif[0x8769] = {                    # ExifIFD
+        0x9003: taken_at,               # DateTimeOriginal
+        0x829A: IFDRational(1, 250),    # ExposureTime
+        0x829D: IFDRational(28, 10),    # FNumber
+        0x8827: 400,                    # ISO
+        0x920A: IFDRational(35, 1),     # FocalLength
+    }
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(path, "JPEG", quality=70, exif=exif)
 

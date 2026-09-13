@@ -29,7 +29,12 @@
   <ol class="ch-bars">
     {% for r in rows %}
       <li class="ch-bar{% if r.peak %} is-peak{% else %} is-b{{ r.band }}{% endif %}">
-        <span class="ch-bar__label" title="{{ r.label }}">{{ r.label }}</span>
+        {# a row carrying `q` (a search, see search.py) links to its photos #}
+        {% if r.q %}
+          <a class="ch-bar__label ch-bar__label--link" href="/search?q={{ r.q | urlencode }}" title="{{ r.label }}">{{ r.label }}</a>
+        {% else %}
+          <span class="ch-bar__label" title="{{ r.label }}">{{ r.label }}</span>
+        {% endif %}
         <span class="ch-bar__meter" aria-hidden="true">
           <svg viewBox="0 0 100 1" preserveAspectRatio="none" focusable="false"><rect class="ch-bar__fill" x="0" y="0" width="{{ r.pct }}" height="1"></rect></svg>
         </span>

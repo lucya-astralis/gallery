@@ -25,9 +25,12 @@ are still serialised by `lock()`, because sqlite allows one at a time and the
 CLI writes from a second process.
 """
 
+import json
 import sqlite3
 import threading
 from pathlib import Path
+
+from . import capture
 
 # Writers only. Readers hold no lock — with a connection each they don't need
 # one, which is the whole point of the split.
@@ -93,6 +96,43 @@ def _connect(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+# The capture facts (capture.py) and their column types. Their own columns so
+# a search never parses exif_json; scanner.index_image writes them.
+CAPTURE_COLUMNS = (("camera", "TEXT"), ("lens", "TEXT"), ("focal", "INTEGER"),
+                   ("aperture", "REAL"), ("iso", "INTEGER"))
+
+
+def migrate(conn: sqlite3.Connection) -> None:
+    """Additive migrations: the columns a newer version reads, added to a
+    database an older one created. Safe to run on every start; the caller
+    commits."""
+    existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(images)").fetchall()}
+    if "is_showcase" not in existing_cols:
+        conn.execute("ALTER TABLE images ADD COLUMN is_showcase INTEGER NOT NULL DEFAULT 0")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_images_showcase ON images(is_showcase)")
+
+    added = [col for col, kind in CAPTURE_COLUMNS if col not in existing_cols]
+    for col, kind in CAPTURE_COLUMNS:
+        if col in added:
+            conn.execute(f"ALTER TABLE images ADD COLUMN {col} {kind}")
+    if added:
+        # Rows indexed before the columns existed would otherwise stay
+        # unsearchable until their file changed -- the scan skips a photo
+        # whose mtime says nothing happened. The EXIF is already stored, so
+        # the facts are read out of it here, once.
+        for row in conn.execute("SELECT id, exif_json FROM images").fetchall():
+            try:
+                exif = json.loads(row["exif_json"]) if row["exif_json"] else {}
+            except (ValueError, TypeError):
+                exif = {}
+            fact = capture.facts(exif)
+            conn.execute(
+                "UPDATE images SET camera = ?, lens = ?, focal = ?, aperture = ?, iso = ? "
+                "WHERE id = ?",
+                (fact["camera"], fact["lens"], fact["focal"], fact["aperture"], fact["iso"],
+                 row["id"]))
+
+
 def init(data_dir: Path) -> sqlite3.Connection:
     """Create the database if it isn't there, bring the schema up to date, and
     hand back this thread's connection. conn() calls it on first use; the
@@ -104,13 +144,7 @@ def init(data_dir: Path) -> sqlite3.Connection:
     conn = _connect(_db_path)
 
     conn.executescript(SCHEMA)
-
-    # additive migrations
-    existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(images)").fetchall()}
-    if "is_showcase" not in existing_cols:
-        conn.execute("ALTER TABLE images ADD COLUMN is_showcase INTEGER NOT NULL DEFAULT 0")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_images_showcase ON images(is_showcase)")
-
+    migrate(conn)
     conn.commit()
     _local.conn = conn
     return conn

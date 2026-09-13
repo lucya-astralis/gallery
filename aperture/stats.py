@@ -28,6 +28,8 @@ import math
 from collections import Counter
 from datetime import date, datetime
 
+from . import search
+
 # ISO is continuous and phone cameras land on arbitrary values (320, 500,
 # 1250 …), so it is the one capture fact that is bucketed rather than
 # counted per exact value. Upper bounds, inclusive; the last row catches
@@ -45,7 +47,7 @@ TOP_N_ALBUMS = 10
 MONTHS_WINDOW = 24
 
 
-def _num(v):
+def exif_number(v):
     """EXIF numbers arrive as int, float or Rational depending on the tag and
     the writer. Anything that is not a real, positive number is not a fact."""
     if isinstance(v, bool) or not isinstance(v, (int, float)):
@@ -80,15 +82,20 @@ def clean_device(make: str | None, model: str | None) -> str | None:
     return f"{make} {model}" if make else model
 
 
-def _rank(counter: Counter, top: int = TOP_N, other_label: str | None = None) -> list[dict]:
+def _rank(counter: Counter, top: int = TOP_N, other_label: str | None = None,
+          link=None) -> list[dict]:
     """Counter -> descending rows with a percentage of the series maximum.
     Everything past `top` collapses into one trailing row when `other_label`
-    is given, so a long tail reads as "and 14 more" instead of scrolling."""
+    is given, so a long tail reads as "and 14 more" instead of scrolling.
+    `link(key)` gives each ranked row its search; the folded row has none."""
     items = counter.most_common()
     head, tail = items[:top], items[top:]
+    queries = [link(k) for k, _ in head] if link else None
     if tail and other_label:
         head.append((other_label.format(n=len(tail)), sum(n for _, n in tail)))
-    return _rows([(str(k), n) for k, n in head])
+        if queries is not None:
+            queries.append(None)
+    return _rows([(str(k), n) for k, n in head], queries)
 
 
 # One month with 435 photos next to twenty months with three or four is a
@@ -123,16 +130,18 @@ def _band(n: int, top: int) -> int:
     return 3 if share >= 55 else 2 if share >= 20 else 1
 
 
-def _rows(pairs: list[tuple[str, int]]) -> list[dict]:
+def _rows(pairs: list[tuple[str, int]], queries: list[str | None] | None = None) -> list[dict]:
     """Shared row shape for every chart: a label, a raw value, and the value
     as a percentage of the series MAXIMUM (never of the total — these are bar
     lengths, not slices of a pie). The single highest row is marked `peak` so
     exactly one bar per chart can carry the accent instead of all of them
-    shouting equally; ties go to the first, which is the ranked winner."""
+    shouting equally; ties go to the first, which is the ranked winner.
+    `queries`, parallel to `pairs`, is the search each row links to (the
+    bars macro turns a row's `q` into a link to those photos)."""
     top = max((n for _, n in pairs), default=0)
     marked = False
     out = []
-    for label, n in pairs:
+    for i, (label, n) in enumerate(pairs):
         is_peak = not marked and n == top and n > 0
         marked = marked or is_peak
         out.append({
@@ -141,6 +150,7 @@ def _rows(pairs: list[tuple[str, int]]) -> list[dict]:
             "pct": _pct(n, top),
             "peak": is_peak,
             "band": _band(n, top),
+            "q": queries[i] if queries else None,
         })
     return out
 
@@ -229,13 +239,13 @@ def collect(conn, month_name, weekday_name, more_label: str = "+{n} more") -> di
         dev = clean_device(exif.get("Make"), exif.get("Model"))
         if dev:
             devices[dev] += 1
-        fl = _num(exif.get("FocalLengthIn35mmFilm")) or _num(exif.get("FocalLength"))
+        fl = exif_number(exif.get("FocalLengthIn35mmFilm")) or exif_number(exif.get("FocalLength"))
         if fl:
             focals[round(fl)] += 1
-        fn = _num(exif.get("FNumber"))
+        fn = exif_number(exif.get("FNumber"))
         if fn:
             apertures[round(fn, 1)] += 1
-        iso = _num(exif.get("ISOSpeedRatings"))
+        iso = exif_number(exif.get("ISOSpeedRatings"))
         if iso:
             label = _ISO_OVER
             for hi, name in _ISO_BUCKETS:
@@ -300,6 +310,19 @@ def collect(conn, month_name, weekday_name, more_label: str = "+{n} more") -> di
 
     busiest_day, busiest_n = (per_day.most_common(1) or [(None, 0)])[0]
 
+    kept_focals = [(k, n) for k, n in sorted(focals.items())
+                   if n >= max(1, total // 200)][:12]
+    # each ISO bucket links to the range it counts: "401–800" is iso:401-800
+    iso_pairs, iso_queries, below = [], [], 0
+    for hi, name in _ISO_BUCKETS:
+        if isos.get(name):
+            iso_pairs.append((name, isos[name]))
+            iso_queries.append(search.term("iso", f"{below + 1 if below else ''}-{hi}"))
+        below = hi
+    if isos.get(_ISO_OVER):
+        iso_pairs.append((_ISO_OVER, isos[_ISO_OVER]))
+        iso_queries.append(search.term("iso", f"{below + 1}-"))
+
     return {
         "total": total,
         "featured": featured,
@@ -317,12 +340,13 @@ def collect(conn, month_name, weekday_name, more_label: str = "+{n} more") -> di
         "months": months,
         "weekdays": weekdays,
         "hours": hours,
-        "cameras": _rank(devices, TOP_N, more_label),
-        "focals": _rows([(f"{k} mm", n) for k, n in sorted(focals.items())
-                         if n >= max(1, total // 200)][:12]),
-        "apertures": _rows([(f"ƒ{fmt_num(k)}", n) for k, n in sorted(apertures.items())]),
-        "isos": _rows([(name, isos[name]) for _, name in _ISO_BUCKETS if isos.get(name)]
-                      + ([(_ISO_OVER, isos[_ISO_OVER])] if isos.get(_ISO_OVER) else [])),
+        "cameras": _rank(devices, TOP_N, more_label,
+                         link=lambda name: search.term("camera", name)),
+        "focals": _rows([(f"{k} mm", n) for k, n in kept_focals],
+                        [search.term("mm", k) for k, _ in kept_focals]),
+        "apertures": _rows([(f"ƒ{fmt_num(k)}", n) for k, n in sorted(apertures.items())],
+                           [search.term("f", fmt_num(k)) for k in sorted(apertures)]),
+        "isos": _rows(iso_pairs, iso_queries),
         "shapes_raw": shapes,
     }
 

@@ -1186,6 +1186,15 @@ section{
 /* the photo half is capped (SEARCH_PHOTO_LIMIT); say so under the grid
    instead of silently showing a truncated result */
 .search-group__capped{ margin-top:14px; }
+/* the filters a search was narrowed by (search.py), one chip each; a chip is
+   the same search without it */
+.search-filters{
+  display:flex; flex-wrap:wrap; gap:var(--s-2);
+  margin:var(--s-4) 0 0; padding:0;
+  list-style:none;
+}
+.search-filter .fa{ margin-left:var(--s-2); }
+.search-filter.is-bad{ color:var(--text-dim); text-decoration:line-through; }
 /* parent-album link before the title (e.g. "↑ japan / tokyo"). Hidden on every
    viewport now that the pathbar "‹ Back to <parent>" button is always shown —
    the inline link would just duplicate it. */

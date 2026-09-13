@@ -18,6 +18,44 @@ notes are never one commit apart.
 
 ---
 
+## 1.6.0 — 2026-09-13
+
+Search by what a photo was shot with.
+
+**New**
+
+* **The search reads EXIF.** A word now matches the camera and the lens as
+  well as the album, file name and tag, and filters narrow what the words
+  found: `camera:x100v`, `lens:"35mm f/2"`, `iso:3200` or a range like
+  `iso:800-3200` and `iso:1600-`, `f:2.8` (also typed as `f/2.8` or `ƒ2.8`),
+  `mm:35` or `mm:24-70`, and `date:2026`, `date:2026-08`, `date:2026-08-15`
+  or `date:2026-08-01..2026-08-20`. A bare date is a date too. Each filter
+  shows as a chip under the search header, and a chip leads to the same
+  search without it; a filter the search cannot read is struck through and
+  ignored instead of emptying the results.
+* **EXIF values link to their photos.** On a photo page the camera, lens,
+  capture date, aperture, ISO and focal length each open the search for
+  every photo that shares them, and so do the bars of the camera, focal
+  length, aperture and ISO charts on `/stats`.
+* The same grammar answers `q` on `/api/photos` and
+  `python -m aperture.cli search`, which also lists the filters it ignored.
+
+**Fixed**
+
+* `q` on `/api/photos` no longer treats `%` and `_` as wildcards.
+
+**Before you upgrade**
+
+* Nothing to do. The first start adds five columns to the index and fills
+  them from the EXIF it already holds, once; on a library of a few thousand
+  photos that takes seconds.
+
+**For maintainers**
+
+* The test fixture's photos now really carry their capture date, aperture,
+  focal length and ISO: Pillow dropped the Exif sub-IFD the fixture wrote,
+  so none of those had ever reached the index in a test.
+
 ## 1.5.1 — 2026-09-13
 
 A scan that finds nothing no longer empties the gallery, and the photo viewer

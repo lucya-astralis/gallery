@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PIL import Image, ExifTags, ImageOps
 
-from . import brand, db, marks
+from . import brand, capture, db, marks
 from . import schema
 from .runtime import settings
 
@@ -553,15 +553,21 @@ def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
     # deliberately leave the column untouched here so a re-index never
     # clobbers a computed flag: new rows default to 0, existing rows keep
     # their value.
+    # the searchable facts, in columns of their own (see capture.py)
+    fact = capture.facts(exif)
     with db.lock():
         c.execute(
-            """INSERT INTO images (album, filename, rel_path, mtime, size, width, height, exif_json, taken_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """INSERT INTO images (album, filename, rel_path, mtime, size, width, height, exif_json, taken_at,
+                                   camera, lens, focal, aperture, iso)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(rel_path) DO UPDATE SET
                  album=excluded.album, filename=excluded.filename, mtime=excluded.mtime,
                  size=excluded.size, width=excluded.width, height=excluded.height,
-                 exif_json=excluded.exif_json, taken_at=excluded.taken_at""",
-            (album, filename, rel, effective_mtime, stat.st_size, width, height, json.dumps(exif), taken),
+                 exif_json=excluded.exif_json, taken_at=excluded.taken_at,
+                 camera=excluded.camera, lens=excluded.lens, focal=excluded.focal,
+                 aperture=excluded.aperture, iso=excluded.iso""",
+            (album, filename, rel, effective_mtime, stat.st_size, width, height, json.dumps(exif), taken,
+             fact["camera"], fact["lens"], fact["focal"], fact["aperture"], fact["iso"]),
         )
         image_id = c.execute("SELECT id FROM images WHERE rel_path = ?", (rel,)).fetchone()["id"]
         c.commit()

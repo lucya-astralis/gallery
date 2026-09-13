@@ -134,7 +134,9 @@ def api_index(request: Request):
             {"path": "/api/photos", "about": "photo query", "params": {
                 "album": "scope to an album (collection-aware)",
                 "subtree": "0|1 — override that scope",
-                "tag": "photo tag", "q": "search album / filename / tag",
+                "tag": "photo tag",
+                "q": "search: words (album / filename / tag / camera / lens) "
+                     "plus camera: lens: iso: f: mm: date: filters",
                 "featured": "1 = featured photos only",
                 "sort": "|".join(photos.SORT_IMAGE_SQL), "random": "1 = random order",
                 "tags": "1 = include each photo's tags",

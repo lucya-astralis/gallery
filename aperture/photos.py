@@ -8,9 +8,10 @@ the API, and the EXIF readout.
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 
-from . import albums, cfgio, config, db, i18n, scanner, trips
+from . import albums, capture, cfgio, config, db, i18n, scanner, search, stats, trips
 
 
 def showcase_rows(album: str | None = None, limit: int = 50, random_order: bool = False,
@@ -378,11 +379,10 @@ def photo_rows(*, album: str | None = None, subtree: bool | None = None,
                      "WHERE it.image_id = i.id AND t.name = ?)")
         params.append(tag)
     if q:
-        like = f"%{q}%"
-        where.append("(i.album LIKE ? OR i.filename LIKE ? OR EXISTS ("
-                     "SELECT 1 FROM image_tags it2 JOIN tags t2 ON t2.id = it2.tag_id "
-                     "WHERE it2.image_id = i.id AND t2.name LIKE ?))")
-        params += [like, like, like]
+        # the grammar the /search page uses (search.py): words plus filters
+        cond, cond_params = search.condition(search.parse(q), "i")
+        where.append(f"({cond})")
+        params += cond_params
     clause = ("WHERE " + " AND ".join(where)) if where else ""
     c = db.conn()
     total = c.execute(f"SELECT COUNT(*) AS n FROM images i {clause}", params).fetchone()["n"]
@@ -422,8 +422,19 @@ def extract_description(exif: dict) -> str | None:
 
 
 def prettify_exif(exif: dict, lang: str = i18n.DEFAULT_LANG) -> list[tuple[str, str]]:
+    """The EXIF readout as (label, value) pairs -- the API and CLI shape."""
+    return [(row["key"], row["val"]) for row in exif_rows(exif, lang)]
+
+
+def exif_rows(exif: dict, lang: str = i18n.DEFAULT_LANG) -> list[dict]:
+    """The EXIF readout as {key, val, q} rows. `q` is the search that finds
+    every photo sharing that value (search.py), None where the value is not
+    one of the searchable facts. The facts come from capture.facts, the same
+    reading the index stores, so a link always finds at least this photo."""
     if not exif:
         return []
+    fact = capture.facts(exif)
+    has_35mm = stats.exif_number(exif.get("FocalLengthIn35mmFilm")) is not None
     keys = [
         ("Make", "exif.make"),
         ("Model", "exif.model"),
@@ -441,10 +452,11 @@ def prettify_exif(exif: dict, lang: str = i18n.DEFAULT_LANG) -> list[tuple[str, 
         ("Orientation", "exif.orientation"),
         ("Software", "exif.software"),
     ]
-    out: list[tuple[str, str]] = []
+    out: list[dict] = []
     for k, label_key in keys:
         if k in exif and exif[k] not in (None, "", []):
             v = exif[k]
+            q = None
             if k == "ExposureTime" and isinstance(v, (int, float)) and v > 0:
                 if v < 1:
                     v = f"1/{round(1/v)} s"
@@ -454,13 +466,29 @@ def prettify_exif(exif: dict, lang: str = i18n.DEFAULT_LANG) -> list[tuple[str, 
                 v = f"f/{v:.1f}"
             elif k in ("FocalLength", "FocalLengthIn35mmFilm") and isinstance(v, (int, float)):
                 v = f"{v:.0f} mm"
-            out.append((i18n.t(lang, label_key), str(v)))
+            if k == "Model" and fact["camera"]:
+                q = search.term("camera", fact["camera"])
+            elif k == "LensModel" and fact["lens"]:
+                q = search.term("lens", fact["lens"])
+            elif k == "FNumber" and fact["aperture"]:
+                q = search.term("f", stats.fmt_num(fact["aperture"]))
+            elif k == "ISOSpeedRatings" and fact["iso"]:
+                q = search.term("iso", fact["iso"])
+            # the index keeps the 35 mm equivalent when there is one, so only
+            # that line links -- the real focal length would find nothing
+            elif k == "FocalLengthIn35mmFilm" and fact["focal"]:
+                q = search.term("mm", fact["focal"])
+            elif k == "FocalLength" and fact["focal"] and not has_35mm:
+                q = search.term("mm", fact["focal"])
+            elif k == "DateTimeOriginal" and isinstance(v, str) and re.match(r"\d{4}:\d{2}:\d{2}", v):
+                q = search.term("date", v[:10].replace(":", "-"))
+            out.append({"key": i18n.t(lang, label_key), "val": str(v), "q": q})
     gps = exif.get("GPSInfo")
     if isinstance(gps, dict):
         lat = _gps_to_deg(gps.get("GPSLatitude"), gps.get("GPSLatitudeRef"))
         lon = _gps_to_deg(gps.get("GPSLongitude"), gps.get("GPSLongitudeRef"))
         if lat is not None and lon is not None:
-            out.append((i18n.t(lang, "exif.gps"), f"{lat:.6f}, {lon:.6f}"))
+            out.append({"key": i18n.t(lang, "exif.gps"), "val": f"{lat:.6f}, {lon:.6f}", "q": None})
     return out
 
 

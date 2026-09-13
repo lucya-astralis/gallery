@@ -10,8 +10,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from .. import (
-    albums, brand, branding, cfgio, config, db, i18n, photos, schema, stats, theme, trips,
-    welcome,
+    albums, brand, branding, cfgio, config, db, i18n, photos, schema, search, stats, theme,
+    trips, welcome,
 )
 from ..runtime import settings
 from . import context, media
@@ -389,7 +389,8 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
     idx = rel_list.index(rel) if rel in rel_list else -1
     prev_rel = rel_list[idx - 1] if idx > 0 else None
     next_rel = rel_list[idx + 1] if 0 <= idx < len(rel_list) - 1 else None
-    pretty_exif = photos.prettify_exif(exif, context.request_lang(request))
+    # rows carry the search each value links to (EXIF panel, image.html)
+    pretty_exif = photos.exif_rows(exif, context.request_lang(request))
     description = photos.extract_description(exif)
     return context.templates.TemplateResponse(
         request, "image.html",
@@ -446,9 +447,11 @@ def humans_txt(request: Request):
 
 
 # ----- search ------------------------------------------------------------
-# One field over three things a visitor might remember: what the album is
-# CALLED, what the file is called, and what it was tagged. Results come back
-# as albums first (the thing you were probably after) and photos below.
+# One field over what a visitor might remember: what the album is CALLED,
+# what the file is called, what it was tagged, and what it was shot with —
+# plus filters (iso:, f:, mm:, date:, …) in the grammar search.py defines.
+# Results come back as albums first (the thing you were probably after) and
+# photos below.
 #
 # Both halves are capped. A query is free-form and a short one matches most of
 # the library, which as one un-paginated page meant hundreds of KB of markup
@@ -466,7 +469,7 @@ def _matches(needle: str, haystack: str | None) -> bool:
 
 
 @router.get("/search", response_class=HTMLResponse)
-def search(request: Request, q: str = "", sort: str | None = None):
+def search_page(request: Request, q: str = "", sort: str | None = None):
     q = q.strip()
     c = db.conn()
     if not q:
@@ -481,10 +484,13 @@ def search(request: Request, q: str = "", sort: str | None = None):
     # display name (album.cfg `name = …`) and the album's own tags here is what
     # makes the search hint ("searches album names") true. The tree is a few
     # dozen entries and every cfg is cached, so this is a dict lookup, not IO.
+    # Only the query's words name albums; a filter is about photos.
+    query = search.parse(q)
+    text = query.text
     matched_albums = [
         a for a in albums.albums_with_ancestors()
-        if _matches(q, a) or _matches(q, config.album_display_name(a))
-        or any(_matches(q, tag) for tag in config.album_tags(a))
+        if text and (_matches(text, a) or _matches(text, config.album_display_name(a))
+                     or any(_matches(text, tag) for tag in config.album_tags(a)))
     ]
     # A matched album stands for everything under it: naming a collection has
     # to bring back its sub-albums' photos too, or "Japan 2026" would find the
@@ -495,22 +501,14 @@ def search(request: Request, q: str = "", sort: str | None = None):
         if node == a or node.startswith(a + "/")
     })
 
-    needle = q.casefold()
-    where = ["instr(lower(i.album), ?) > 0",
-             "instr(lower(i.filename), ?) > 0",
-             "instr(lower(t.name), ?) > 0"]
-    params: list = [needle, needle, needle]
-    if scope_albums:
-        where.append("i.album IN (%s)" % ",".join("?" * len(scope_albums)))
-        params += scope_albums
-    # instr(), not LIKE: `%` and `_` are LIKE wildcards, so typing either one
-    # used to match the entire library (798 of 798 photos for a single "%").
-    # Same case-insensitivity as LIKE had — both are ASCII-only in sqlite.
+    # The words match album, file, tag, camera and lens; an album found by its
+    # display name adds everything inside it. Filters narrow what that found.
+    also = (("i.album IN (%s)" % ",".join("?" * len(scope_albums)), scope_albums)
+            if scope_albums else None)
+    where, params = search.condition(query, "i", also)
     rows = c.execute(
-        f"""SELECT DISTINCT i.* FROM images i
-           LEFT JOIN image_tags it ON it.image_id = i.id
-           LEFT JOIN tags t ON t.id = it.tag_id
-           WHERE {" OR ".join(where)}
+        f"""SELECT i.* FROM images i
+           WHERE {where}
            ORDER BY {qualified_sql}
            LIMIT ?""",
         (*params, SEARCH_PHOTO_LIMIT + 1),
@@ -528,6 +526,9 @@ def search(request: Request, q: str = "", sort: str | None = None):
         request, "search.html",
         {
             "query": q,
+            # one chip per filter; each links to the same search without it
+            "filters": [{"label": f.label, "ok": f.ok, "rest": query.without(f)}
+                        for f in query.filters],
             "albums": album_cards,
             "images": images,
             "capped": capped,

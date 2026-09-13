@@ -129,8 +129,9 @@
         <h2><i class="fa fa-camera" aria-hidden="true"></i>EXIF</h2>
         {% if exif %}
           <dl class="kv">
-            {% for label, value in exif %}
-              <dt>{{ label }}</dt><dd>{{ value }}</dd>
+            {# a value the search knows links to every photo sharing it #}
+            {% for row in exif %}
+              <dt>{{ row.key }}</dt><dd>{% if row.q %}<a href="/search?q={{ row.q | urlencode }}">{{ row.val }}</a>{% else %}{{ row.val }}{% endif %}</dd>
             {% endfor %}
           </dl>
           <details>

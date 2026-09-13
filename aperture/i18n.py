@@ -35,7 +35,7 @@ STRINGS: dict[str, tuple[str, str, str]] = {
         "Persönliches Fotoarchiv.",
         "個人写真アーカイブ。",
     ),
-    "nav.search_ph": ("Search albums, files and tags", "Alben, Dateien und Tags durchsuchen", "検索 / アルバム・ファイル・タグ"),
+    "nav.search_ph": ("Search albums, files, tags, cameras", "Alben, Dateien, Tags, Kameras durchsuchen", "検索 / アルバム・ファイル・タグ・カメラ"),
     # short form swapped in on phones (app.js), where the full hint is too long
     # for the narrow field — see the data-ph-short attribute in base.html
     "nav.search_ph_short": ("Search", "Suchen", "検索"),
@@ -286,13 +286,17 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "search.hits_one": ("match", "Treffer", "件"),
     "search.hits_many": ("matches", "Treffer", "件"),
     "search.hint": (
-        "Searches album names, filenames and tags.",
-        "Durchsucht Albumnamen, Dateinamen und Tags.",
-        "アルバム名・ファイル名・タグを検索します。",
+        "Searches album names, filenames, tags, cameras and lenses. Narrow it with camera:, lens:, iso:, f:, mm: or date: — for example iso:1600- or date:2026-08.",
+        "Durchsucht Albumnamen, Dateinamen, Tags, Kameras und Objektive. Eingrenzen mit camera:, lens:, iso:, f:, mm: oder date: — zum Beispiel iso:1600- oder date:2026-08.",
+        "アルバム名・ファイル名・タグ・カメラ・レンズを検索します。camera: lens: iso: f: mm: date: で絞り込めます（例：iso:1600- や date:2026-08）。",
     ),
     # results are grouped: the albums a query names first, its photos below
     "search.albums_head": ("Albums", "Alben", "アルバム"),
     "search.photos_head": ("Photos", "Fotos", "写真"),
+    # the filter chips under the search header (search.py grammar)
+    "search.filters": ("Filters", "Filter", "フィルター"),
+    "search.filter_bad": ("Not understood, so ignored", "Nicht verstanden, daher ignoriert", "解釈できないため無視しました"),
+    "search.filter_remove": ("Remove {f}", "{f} entfernen", "{f} を解除"),
     # shown when the photo half hit its cap — see SEARCH_PHOTO_LIMIT
     "search.capped": (
         "Showing the first {n}. Narrow the search for a shorter list.",

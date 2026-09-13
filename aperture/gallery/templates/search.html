@@ -27,6 +27,18 @@
       <span class="section__stat-sep" aria-hidden="true">·</span>
       <span class="section__stat-q">{{ query }}</span>
     </p>
+    {# the filters the search was narrowed by; each chip is the same search
+       without it, and one the grammar could not read is marked, not hidden #}
+    {% if filters %}
+      <ul class="search-filters" aria-label="{{ t('search.filters') }}">
+        {% for f in filters %}
+          <li><a class="tag search-filter{% if not f.ok %} is-bad{% endif %}"
+                 href="{% if f.rest %}/search?q={{ f.rest | urlencode }}{% else %}/albums{% endif %}"
+                 {% if not f.ok %}title="{{ t('search.filter_bad') }}"{% endif %}
+                 aria-label="{{ t('search.filter_remove', f=f.label) }}">{{ f.label }}<i class="fa fa-xmark" aria-hidden="true"></i></a></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
   </header>
 
   {% if not images and not albums %}

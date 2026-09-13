@@ -9,7 +9,7 @@ than a second opinion about it. None of them writes anything.
 import json
 import re
 
-from .. import albums, cfgio, checks, config, db, i18n, ops, photos, scanner, schema, templating, termui as ui, theme, trips, welcome
+from .. import albums, cfgio, checks, config, db, i18n, ops, photos, scanner, schema, search, templating, termui as ui, theme, trips, welcome
 from ..runtime import settings
 from PIL import Image
 from datetime import datetime
@@ -593,21 +593,21 @@ def cmd_album(args) -> int:
 
 # ----- search -----------------------------------------------------------
 def cmd_search(args) -> int:
-    """The same query the /search page runs, so what this lists is what the
-    page would list."""
+    """The query the /search page runs, in the same grammar (search.py:
+    words plus camera: lens: iso: f: mm: date: filters), so what this lists is
+    what the page would list."""
     c = db.conn()
     query = (args.query or "").strip()
     if not query:
         return fail("nothing to search for")
-    like = f"%{query}%"
+    parsed = search.parse(query)
+    where, params = search.condition(parsed, "i")
     rows = c.execute(
-        """SELECT DISTINCT i.rel_path, i.album, i.filename, i.taken_at
-           FROM images i
-           LEFT JOIN image_tags it ON it.image_id = i.id
-           LEFT JOIN tags t ON t.id = it.tag_id
-           WHERE i.album LIKE ? OR i.filename LIKE ? OR t.name LIKE ?
+        f"""SELECT i.rel_path, i.album, i.filename, i.taken_at
+           FROM images i WHERE {where}
            ORDER BY i.taken_at IS NULL, i.taken_at DESC, i.filename""",
-        (like, like, like)).fetchall()
+        params).fetchall()
+    ignored = [f.label for f in parsed.filters if not f.ok]
 
     album = ops.norm_album(args.album)
     if album:
@@ -616,13 +616,17 @@ def cmd_search(args) -> int:
 
     if args.json:
         dump({"query": query, "album": album, "matches": len(rows),
+              "ignored": ignored,
               "photos": [dict(r) for r in rows[:args.limit]]})
         return 0 if rows else 1
 
     kv("query", query + (f" · in {album}" if album else ""))
     kv("matches", f"{len(rows)} photo(s)")
+    if ignored:
+        kv("ignored", ui.state(", ".join(ignored) + " — not understood", "warn"))
     if not rows:
-        hint("  the page matches album name, file name and tag — nothing else")
+        hint("  words match album, file name, tag, camera and lens; "
+             "narrow with camera: lens: iso: f: mm: date:")
         return 1
     head("matches")
     ui.columns([(r["rel_path"], (r["taken_at"] or "undated")[:10])
