@@ -47,11 +47,19 @@
    * Focus is put back on the field with the caret where it was: a reveal
    * that dumps you at the start of what you typed is worse than no reveal. */
   if (reveal) {
+    // The word and the glyph are separate nodes: a textContent write on the
+    // button itself would take the icon with it.
+    const revealLabel = reveal.querySelector('.login__reveal-label') || reveal;
+    const revealIcon = reveal.querySelector('.fa');
     reveal.addEventListener('click', () => {
       const shown = field.type === 'text';
       const at = field.selectionStart;
       field.type = shown ? 'password' : 'text';
-      reveal.textContent = shown ? 'Show' : 'Hide';
+      revealLabel.textContent = shown ? 'Show' : 'Hide';
+      if (revealIcon) {
+        revealIcon.classList.toggle('fa-eye', shown);
+        revealIcon.classList.toggle('fa-eye-slash', !shown);
+      }
       reveal.setAttribute('aria-pressed', String(!shown));
       field.focus();
       try { field.setSelectionRange(at, at); } catch (_) { /* not all types allow it */ }
@@ -65,6 +73,8 @@
    * it, with the button still inviting another go. A count that runs down is
    * the difference between "locked out" and "broken". */
   let ticking = null;
+  // the label, not the button: the button also holds the icon
+  const submitLabel = submit.querySelector('.login__submit-label') || submit;
 
   function lockFor(seconds) {
     clearInterval(ticking);
@@ -72,7 +82,7 @@
     submit.disabled = true;
     field.disabled = true;
     const paint = () => {
-      submit.textContent = 'Locked — ' + left + 's';
+      submitLabel.textContent = 'Locked — ' + left + 's';
       error.textContent = 'Too many attempts. The door is shut for a moment.';
       error.hidden = false;
     };
@@ -84,7 +94,7 @@
       ticking = null;
       submit.disabled = false;
       field.disabled = false;
-      submit.textContent = 'Sign in';
+      submitLabel.textContent = 'Sign in';
       error.hidden = true;
       field.focus();
     }, 1000);

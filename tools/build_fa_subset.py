@@ -15,8 +15,9 @@ How an icon gets in:
   * write it in the markup as  <i class="fa fa-camera" aria-hidden="true"></i>
   * re-run this script.
 
-The scan reads aperture/gallery/templates/*.html, aperture/gallery/static/app.js and aperture/*.py and
-picks up every `fa-<name>` token. A name that Font Awesome doesn't know is a
+The scan reads both surfaces -- aperture/{gallery,console}/templates/*.html,
+the two apps' scripts and aperture/*.py -- and picks up every `fa-<name>`
+token. The console serves this same generated sheet (console/app.py). A name that Font Awesome doesn't know is a
 hard error rather than a silently blank box — check the spelling against
 tools/fa-icons.json (name -> codepoint, extracted from the upstream package).
 
@@ -97,6 +98,10 @@ def collect_names() -> dict:
     """Every fa-<name> token used in the site, mapped to the files using it."""
     files = sorted((ROOT / "aperture" / "gallery" / "templates").glob("*.html"))
     files += [ROOT / "aperture" / "gallery" / "static" / "app.js"]
+    # The console wears the same sheet, so its markup and scripts are part of
+    # what the subset has to cover.
+    files += sorted((ROOT / "aperture" / "console" / "templates").glob("*.html"))
+    files += [ROOT / "aperture" / "console" / "static" / n for n in ("app.js", "login.js")]
     files += sorted(p for p in (ROOT / "aperture").rglob("*.py") if "console" not in p.parts)
 
     # class attributes only — a bare fa-* search over the whole file also

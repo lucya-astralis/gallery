@@ -5,9 +5,13 @@ when the logo stopped being an <img> and started being markup the stylesheet
 and a script can reach into.
 """
 
+import importlib.util
 import re
+from pathlib import Path
 
 from aperture import brand
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_the_mark_is_markup_now_and_not_a_picture(console):
@@ -239,3 +243,39 @@ def test_the_door_wears_the_mark_but_does_not_build_it(console):
     assert ".mark--door:hover .mark__ghost--r" in sheet
     # and the build states stay the splash's own, scoped off the ghosts
     assert ".mark--splash.is-armed > .mark__svg .piece {" in sheet
+
+
+def test_every_icon_either_surface_uses_is_in_the_subset(console):
+    """Both surfaces draw on one glyph subset, and a class nobody rebuilt it
+    for renders as an empty box -- silently, on the very control a person
+    reads to know what a click will do. The build script's own scan is the
+    list of what is in use; the generated sheet has to name every one, and
+    the console has to hand that sheet and its font out."""
+    spec = importlib.util.spec_from_file_location(
+        "build_fa_subset", ROOT / "tools" / "build_fa_subset.py")
+    build = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build)
+    used = build.collect_names()
+    assert any("login.js" in files for files in used.values())
+
+    sheet = console.get("/static/fa-icons.css")
+    assert sheet.status_code == 200
+    missing = sorted(n for n in used if f".fa-{n}{{" not in sheet.text)
+    assert not missing, "run python tools/build_fa_subset.py -- " + ", ".join(missing)
+    assert console.get("/static/fonts/fa-solid-subset.woff2").status_code == 200
+    assert 'href="/static/fa-icons.css"' in console.get("/").text
+
+
+def test_nothing_keyed_on_the_scroll_changes_a_size(console):
+    """The pane header folds by a negative sticky `top` and keeps one height
+    in the flow. The classes the script flips on scroll may repaint the bars
+    and nothing else: when one dropped the path and shrank the title, the
+    page under the header jumped 40px at the threshold and flickered around
+    it."""
+    sheet = re.sub(r"/\*.*?\*/", "", console.get("/static/style.css").text, flags=re.S)
+    allowed = {"background-color", "box-shadow", "opacity"}
+    rules = re.findall(r"([^{}]*scrolled[^{}]*)\{([^{}]*)\}", sheet)
+    assert rules
+    for selector, body in rules:
+        props = {decl.split(":", 1)[0].strip() for decl in body.split(";") if ":" in decl}
+        assert props <= allowed, (selector.strip(), props - allowed)

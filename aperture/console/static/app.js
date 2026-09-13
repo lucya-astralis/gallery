@@ -64,11 +64,32 @@ function syncHelpClass() {
 }
 
 /* ----- helpers ---------------------------------------------------------- */
+/* A Font Awesome glyph from the gallery's subset. Decorative by rule: the
+ * control it sits in carries the words -- a label, a title or an aria-label.
+ * The name is always written whole, `icon: 'fa-floppy-disk'`, never glued
+ * together: tools/build_fa_subset.py decides which glyphs to keep by reading
+ * the string literals in this file, and a name built at runtime is one it
+ * cannot see, so it would ship as an empty box. */
+function ico(name, end = false) {
+  return el('i', { class: 'fa ' + name + (end ? ' is-end' : ''), 'aria-hidden': 'true' });
+}
+
+/* A filter field with the gallery's magnifier in it. It takes the input's
+ * own attributes, so it swaps in for `el('input', ...)` with nothing else
+ * changing. */
+function searchbox(attrs) {
+  return el('label', { class: 'searchbox' }, ico('fa-magnifying-glass'), el('input', attrs));
+}
+
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
+  let icon = null;
+  let iconEnd = null;
   for (const [k, v] of Object.entries(attrs)) {
     if (v === null || v === undefined || v === false) continue;
-    if (k === 'class') node.className = v;
+    if (k === 'icon') icon = v;
+    else if (k === 'iconEnd') iconEnd = v;
+    else if (k === 'class') node.className = v;
     else if (k === 'text') node.textContent = v;
     else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
     else if (v === true) node.setAttribute(k, '');
@@ -78,6 +99,10 @@ function el(tag, attrs = {}, ...children) {
     if (child === null || child === undefined || child === false) continue;
     node.append(child.nodeType ? child : document.createTextNode(child));
   }
+  // `text` above has already replaced the node's content, so the glyphs go
+  // on last: one before the words, one after.
+  if (icon) node.prepend(ico(icon));
+  if (iconEnd) node.append(ico(iconEnd, true));
   return node;
 }
 
@@ -281,9 +306,9 @@ async function boot() {
   document.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape' && drawerOpen()) setDrawer(false);
   });
-  // The pane's own header sticks; past the first line of scroll it drops the
-  // file path and shrinks, so a long settings page keeps its tabs without
-  // spending 90px on them.
+  // The pane's own header sticks, and folds by CSS alone (a negative sticky
+  // top, see .pane__top). The script only tells the bar that content runs
+  // under it, which changes its paint and never its size.
   wirePaneShrink();
   wireModal();
 }
@@ -296,7 +321,7 @@ function wirePaneShrink() {
     pending = true;
     requestAnimationFrame(() => {
       pending = false;
-      const scrolled = pane.scrollTop > 18;
+      const scrolled = pane.scrollTop > 4;
       pane.classList.toggle('is-scrolled', scrolled);
       // the gallery brightens its nav hairline the moment the bar floats
       // over content; here the pane is the thing that scrolls under it
@@ -384,7 +409,7 @@ function renderNode(node, depth, filter) {
   },
     el('span', {
       class: 'tree__twisty' + (kids.length ? '' : ' is-leaf') + (open ? ' is-open' : ''),
-      text: '▶',
+      icon: 'fa-chevron-right',
       onclick: (ev) => {
         ev.stopPropagation();
         if (state.openPaths.has(node.path)) state.openPaths.delete(node.path);
@@ -614,8 +639,8 @@ function paintOps() {
       el('div', { class: 'head__line' },
         el('h1', { class: 'head__title', text: 'Operations' }),
         el('div', { class: 'head__meta' },
-          el('span', { class: 'pill', text: 'role ' + (st.role || '—') }),
-          ro ? el('span', { class: 'pill pill--warn', text: 'read-only' }) : null)))));
+          el('span', { class: 'pill', icon: 'fa-server', text: 'role ' + (st.role || '—') }),
+          ro ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null)))));
 
   if (st.error) {
     pane.append(el('div', { class: 'pane__empty', text: st.error }));
@@ -628,7 +653,7 @@ function paintOps() {
   /* ----- the indexer, in full ----- */
   const tone = paused ? 'warn' : live ? 'ok' : 'bad';
   const word = paused ? 'paused' : scanning ? 'scanning' : live ? 'running' : 'not running';
-  grid.append(card('Indexer', 'one writer, whoever asks',
+  grid.append(card('fa-microchip', 'Indexer', 'one writer, whoever asks',
     el('div', { class: 'lamp' },
       el('span', { class: 'lamp__dot is-' + tone }),
       el('span', { class: 'lamp__word is-' + tone, text: word }),
@@ -650,7 +675,7 @@ function paintOps() {
       fact('watcher', paths.watcher ? 'on' : 'off'))));
 
   /* ----- what it has built ----- */
-  grid.append(card('Index', 'what the scan has put in the database',
+  grid.append(card('fa-database', 'Index', 'what the scan has put in the database',
     el('div', { class: 'tiles' },
       tile('photos', String(idx.images ?? '—')),
       tile('albums', String(idx.albums ?? '—')),
@@ -660,7 +685,7 @@ function paintOps() {
       tile('database', bytes(idx.db_bytes)))));
 
   /* ----- where things are ----- */
-  grid.append(card('Paths', 'read once at startup — aperture/runtime.py',
+  grid.append(card('fa-folder-tree', 'Paths', 'read once at startup — aperture/runtime.py',
     el('dl', { class: 'facts' },
       fact('photos', paths.photos || '—'),
       fact('thumbnails', paths.thumbs || '—'),
@@ -671,7 +696,7 @@ function paintOps() {
   /* ----- what it does to a photo ----- */
   /* Never on this screen before, and both of these decide what leaves the
    * server: how large a derivative is, and whether coordinates travel. */
-  grid.append(card('Derivatives and privacy', 'what the scan makes, and drops',
+  grid.append(card('fa-shield-halved', 'Derivatives and privacy', 'what the scan makes, and drops',
     el('dl', { class: 'facts' },
       fact('thumbnail', (paths.thumb_size || '—') + ' px'),
       fact('preview', (paths.preview_size || '—') + ' px'),
@@ -693,7 +718,7 @@ function paintOps() {
     autocomplete: 'off', disabled: ro || paused,
   });
 
-  grid.append(el('div', { class: 'home__wide' }, card('Actions',
+  grid.append(el('div', { class: 'home__wide' }, card('fa-bolt', 'Actions',
     'a request on the control channel — the same one the CLI writes',
     ro ? el('p', { class: 'card__quiet', text:
         'The console is mounted read-only. Nothing here can be started from the browser.' })
@@ -706,16 +731,17 @@ function paintOps() {
     el('div', { class: 'card__actions' },
       el('button', {
         type: 'button', class: 'btn btn--primary', id: 'ops-scan',
-        disabled: ro || opsState.busy, text: 'Scan now',
+        disabled: ro || opsState.busy, icon: 'fa-arrows-rotate', text: 'Scan now',
         onclick: () => startScan(albumField.value.trim(), forceBox.checked),
       }),
       el('button', {
         type: 'button', class: 'btn', disabled: ro || opsState.busy,
+        icon: paused ? 'fa-play' : 'fa-pause',
         text: paused ? 'Resume indexing' : 'Pause indexing',
         onclick: () => (paused ? doResume() : doPause(reasonField.value.trim())),
       }),
       el('button', {
-        type: 'button', class: 'btn', disabled: opsState.busy, text: 'Run doctor',
+        type: 'button', class: 'btn', disabled: opsState.busy, icon: 'fa-stethoscope', text: 'Run doctor',
         onclick: () => runDoctor(albumField.value.trim()),
       })),
     el('p', { class: 'card__quiet', text:
@@ -750,7 +776,7 @@ function renderDoctor(report) {
       body.push(el('p', { class: 'card__quiet', text: (items.length - 25) + ' more' }));
     }
   }
-  return card('Doctor', 'index, files, derivatives and cfg, checked against each other',
+  return card('fa-stethoscope', 'Doctor', 'index, files, derivatives and cfg, checked against each other',
               ...body);
 }
 
@@ -878,10 +904,10 @@ async function renderHome() {
   paintHome();
 }
 
-function card(title, note, ...body) {
+function card(icon, title, note, ...body) {
   return el('section', { class: 'card' },
     el('header', { class: 'card__head' },
-      el('h2', { class: 'card__title', text: title }),
+      el('h2', { class: 'card__title', icon, text: title }),
       note ? el('span', { class: 'card__note', text: note }) : null),
     el('div', { class: 'card__body' }, ...body));
 }
@@ -942,7 +968,7 @@ function paintHome() {
       el('div', { class: 'head__line' },
         el('h1', { class: 'head__title', text: title }),
         el('div', { class: 'head__meta' },
-          ro ? el('span', { class: 'pill pill--warn', text: 'read-only' }) : null)))));
+          ro ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null)))));
 
   const grid = el('div', { class: 'home' });
   pane.append(grid);
@@ -950,7 +976,7 @@ function paintHome() {
   /* ---- is the machine working ---- */
   const tone = paused ? 'warn' : live ? 'ok' : 'bad';
   const word = paused ? 'paused' : scanning ? 'scanning' : live ? 'running' : 'not running';
-  grid.append(card('Indexer', st.control_dir ? 'via the control channel' : null,
+  grid.append(card('fa-microchip', 'Indexer', st.control_dir ? 'via the control channel' : null,
     el('div', { class: 'lamp' },
       el('span', { class: 'lamp__dot is-' + tone }),
       el('span', { class: 'lamp__word is-' + tone, text: word }),
@@ -969,21 +995,22 @@ function paintHome() {
       fact('role', st.role || '—')),
     el('div', { class: 'card__actions' },
       el('button', {
-        type: 'button', class: 'btn btn--primary', text: 'Scan now',
+        type: 'button', class: 'btn btn--primary', icon: 'fa-arrows-rotate', text: 'Scan now',
         disabled: ro || opsState.busy, onclick: () => startScan('', false),
       }),
       el('button', {
         type: 'button', class: 'btn', disabled: ro || opsState.busy,
+        icon: paused ? 'fa-play' : 'fa-pause',
         text: paused ? 'Resume' : 'Pause',
         onclick: () => (paused ? doResume() : doPause('')),
       }),
       el('button', {
-        type: 'button', class: 'btn btn--ghost', text: 'Operations →',
+        type: 'button', class: 'btn btn--ghost', text: 'Operations', iconEnd: 'fa-arrow-right',
         onclick: () => select({ kind: 'ops' }),
       }))));
 
   /* ---- what is in it ---- */
-  grid.append(card('Archive', 'what the index holds',
+  grid.append(card('fa-box-archive', 'Archive', 'what the index holds',
     el('div', { class: 'tiles' },
       tile('photos', String(idx.images ?? '—')),
       tile('albums', String(idx.albums ?? '—')),
@@ -996,7 +1023,7 @@ function paintHome() {
   const issues = home.issues;
   const list = (issues && issues.issues) || [];
   const shown = list.slice(0, 6);
-  grid.append(el('div', { class: 'home__wide' }, card('Needs attention',
+  grid.append(el('div', { class: 'home__wide' }, card('fa-triangle-exclamation', 'Needs attention',
     issues ? issues.errors + ' error(s) · ' + issues.warnings + ' warning(s)' : null,
     !issues
       ? el('p', { class: 'card__quiet', text: 'The check did not run.' })
@@ -1014,7 +1041,7 @@ function paintHome() {
                   text: 'and ' + (list.length - shown.length) + ' more' })
       : null,
     el('div', { class: 'card__actions' },
-      el('button', { type: 'button', class: 'btn', text: 'Check again', onclick: checkAll })))));
+      el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'Check again', onclick: checkAll })))));
 
   /* ---- what is still unwritten ---- */
   const albums = [];
@@ -1023,7 +1050,7 @@ function paintHome() {
   })(state.tree || { children: [] });
   const noCfg = albums.filter((a) => a.own_photos && !a.has_cfg);
   const noText = albums.filter((a) => a.own_photos && !a.has_desc);
-  grid.append(card('Unwritten', albums.length + ' album(s) in the tree',
+  grid.append(card('fa-pen-to-square', 'Unwritten', albums.length + ' album(s) in the tree',
     !noCfg.length && !noText.length
       ? el('p', { class: 'card__quiet', text: 'Every album with photos has a cfg and a text.' })
       : el('div', { class: 'hrows' }, [
@@ -1039,7 +1066,7 @@ function paintHome() {
       : null));
 
   /* ---- what happened here ---- */
-  grid.append(card('Recent changes', 'this console, not the gallery',
+  grid.append(card('fa-clock-rotate-left', 'Recent changes', 'this console, not the gallery',
     !home.audit.length
       ? el('p', { class: 'card__quiet', text: 'Nothing has been saved here yet.' })
       : el('div', { class: 'hrows' }, home.audit.map((entry) => {
@@ -1061,9 +1088,11 @@ function renderPane() {
   pane.innerHTML = '';
 
   const tabs = isGallery
-    ? [['settings', 'Settings'], ['assets', 'Files'], ['raw', 'Raw file']]
-    : [['photos', 'Photos'], ['settings', 'Settings'], ['text', 'Description'],
-       ['assets', 'Files'], ['raw', 'Raw file']];
+    ? [['settings', 'Settings', 'fa-sliders'], ['assets', 'Files', 'fa-folder-open'],
+       ['raw', 'Raw file', 'fa-file-code']]
+    : [['photos', 'Photos', 'fa-images'], ['settings', 'Settings', 'fa-sliders'],
+       ['text', 'Description', 'fa-align-left'], ['assets', 'Files', 'fa-folder-open'],
+       ['raw', 'Raw file', 'fa-file-code']];
   if (!tabs.some(([id]) => id === state.tab)) state.tab = tabs[0][0];
 
   /* Header and tabs travel together as one sticky block: on a settings page
@@ -1071,10 +1100,10 @@ function renderPane() {
    * tab with it. */
   pane.append(el('div', { class: 'pane__top' },
     renderHead(isGallery),
-    el('div', { class: 'tabs' }, tabs.map(([id, label]) =>
+    el('div', { class: 'tabs' }, tabs.map(([id, label, icon]) =>
       el('button', {
         class: 'tab' + (state.tab === id ? ' is-active' : ''),
-        type: 'button', text: label,
+        type: 'button', icon, text: label,
         onclick: () => { state.tab = id; renderPane(); },
       })))));
 
@@ -1114,25 +1143,26 @@ function renderHead(isGallery) {
   const data = state.data;
   const meta = [el('span', {
     class: 'pill ' + (data.exists ? 'pill--ok' : ''),
+    icon: data.exists ? 'fa-circle-check' : 'fa-file',
     text: data.exists ? 'cfg present' : 'no cfg yet',
   })];
   if (!isGallery) {
-    meta.push(el('span', { class: 'pill', text: data.own_count + ' here' }));
+    meta.push(el('span', { class: 'pill', icon: 'fa-image', text: data.own_count + ' here' }));
     if (data.photo_count !== data.own_count) {
-      meta.push(el('span', { class: 'pill', text: data.photo_count + ' subtree' }));
+      meta.push(el('span', { class: 'pill', icon: 'fa-folder-tree', text: data.photo_count + ' subtree' }));
     }
     /* Whether anyone has written about this album. It is the one thing the
      * header could not say, and the thing most often still undone. */
     const langs = Object.keys(data.descriptions || {})
       .filter((lang) => (data.descriptions[lang] || '').trim());
     meta.push(langs.length
-      ? el('span', { class: 'pill', text: 'text ' + langs.join(' ') })
-      : el('span', { class: 'pill', text: 'no text yet' }));
+      ? el('span', { class: 'pill', icon: 'fa-align-left', text: 'text ' + langs.join(' ') })
+      : el('span', { class: 'pill', icon: 'fa-align-left', text: 'no text yet' }));
   }
   const errors = (data.issues || []).filter((i) => i.level === 'error').length;
   const warns = (data.issues || []).filter((i) => i.level === 'warn').length;
-  if (errors) meta.push(el('span', { class: 'pill pill--err', text: errors + ' errors' }));
-  if (warns) meta.push(el('span', { class: 'pill pill--warn', text: warns + ' warnings' }));
+  if (errors) meta.push(el('span', { class: 'pill pill--err', icon: 'fa-circle-exclamation', text: errors + ' errors' }));
+  if (warns) meta.push(el('span', { class: 'pill pill--warn', icon: 'fa-triangle-exclamation', text: warns + ' warnings' }));
   if (!isGallery && !READ_ONLY) meta.push(linkButton(state.sel.album, 'Link…'));
 
   const path = isGallery
@@ -1140,7 +1170,7 @@ function renderHead(isGallery) {
     : state.meta.photos_dir + '/' + state.sel.album + '/.album/album.cfg';
 
   /* Title and pills share one line so the sticky block stays short; the file
-   * path is the first thing dropped once the pane is scrolled. */
+   * path is the part that folds away under the pane's edge on scroll. */
   /* The album's own name for itself, when it has one: the folder name is in
    * the path above, and repeating it in the title says nothing twice. */
   const named = !isGallery && (data.values.name || []).join(', ').trim();
@@ -1219,7 +1249,7 @@ function renderSettings(groups) {
           toggleGroup(title);
         },
       },
-        el('span', { class: 'group__twisty', text: '▶' }),
+        el('span', { class: 'group__twisty', icon: 'fa-chevron-right' }),
         el('div', { class: 'group__text' },
           el('h2', { class: 'group__title', text: title }),
           el('p', { class: 'group__blurb', text: blurb })),
@@ -1251,26 +1281,26 @@ function renderSettingsBar(groups, setTotal, total, shown) {
   const allFolded = groups.every(([title]) => state.collapsed.has(groupId(title)));
   const filtering = !!q || state.setOnly;
 
-  const sw = (on, label, title, onclick) => el('button', {
-    class: 'chipbtn' + (on ? ' is-on' : ''), type: 'button', text: label,
+  const sw = (on, icon, label, title, onclick) => el('button', {
+    class: 'chipbtn' + (on ? ' is-on' : ''), type: 'button', icon, text: label,
     title, 'aria-pressed': on ? 'true' : 'false', onclick,
   });
 
   return el('div', { class: 'stoolbar' },
     el('div', { class: 'stoolbar__find' },
-      el('input', {
+      searchbox({
         type: 'search', class: 'fieldsearch', 'data-fk': '__q', value: state.query,
         placeholder: 'Find a setting — name or description…', autocomplete: 'off',
         oninput: (ev) => { state.query = ev.target.value; renderPane(); },
       })),
     el('div', { class: 'stoolbar__switches' },
-      sw(state.setOnly, 'Only set', 'show just the keys this file writes', () => {
+      sw(state.setOnly, 'fa-filter', 'Only set', 'show just the keys this file writes', () => {
         state.setOnly = !state.setOnly; savePrefs(); renderPane();
       }),
-      sw(state.showHelp, 'Help', 'show the description under each key', () => {
+      sw(state.showHelp, 'fa-circle-info', 'Help', 'show the description under each key', () => {
         state.showHelp = !state.showHelp; syncHelpClass(); savePrefs(); renderPane();
       }),
-      sw(false, allFolded ? 'Unfold all' : 'Fold all', 'fold every group', () => {
+      sw(false, allFolded ? 'fa-angles-down' : 'fa-angles-up', allFolded ? 'Unfold all' : 'Fold all', 'fold every group', () => {
         if (allFolded) state.collapsed.clear();
         else for (const [title] of groups) state.collapsed.add(groupId(title));
         savePrefs(); renderPane();
@@ -1296,7 +1326,7 @@ function renderField(key) {
       edited ? el('span', { class: 'field__flag', text: 'edited',
                             title: 'changed here, not yet written to the file' }) : null,
       unset || READ_ONLY ? null : el('button', {
-        class: 'field__unset', type: 'button', text: '✕',
+        class: 'field__unset', type: 'button', icon: 'fa-xmark',
         title: 'unset — remove this line from the file',
         onclick: () => setValue(key, null),
       })),
@@ -1449,14 +1479,14 @@ function listControl(key) {
         },
       }),
       READ_ONLY ? null : el('button', {
-        class: 'btn btn--sm btn--ghost btn--icon', type: 'button', text: '✕',
+        class: 'btn btn--sm btn--ghost btn--icon', type: 'button', icon: 'fa-xmark', title: 'remove',
         onclick: () => setValue(key, items.filter((_, i) => i !== index)),
       })));
   });
   if (!items.length) box.append(el('div', { class: 'empty-note', text: 'None.' }));
   if (!READ_ONLY) {
     box.append(el('div', { class: 'row' }, el('button', {
-      class: 'btn btn--sm', type: 'button', text: '+ Add',
+      class: 'btn btn--sm', type: 'button', icon: 'fa-plus', text: 'Add',
       onclick: () => setValue(key, items.concat([''])),
     })));
   }
@@ -1499,7 +1529,7 @@ function kvListControl(key) {
         oninput: edit(1),
       }),
       READ_ONLY ? null : el('button', {
-        class: 'btn btn--sm btn--ghost btn--icon', type: 'button', text: '✕',
+        class: 'btn btn--sm btn--ghost btn--icon', type: 'button', icon: 'fa-xmark', title: 'remove',
         onclick: () => commit(pairs.filter((_, i) => i !== index)),
       })));
   });
@@ -1511,7 +1541,7 @@ function kvListControl(key) {
   }
   if (!READ_ONLY) {
     box.append(el('div', { class: 'row' }, el('button', {
-      class: 'btn btn--sm', type: 'button', text: '+ Add attribute',
+      class: 'btn btn--sm', type: 'button', icon: 'fa-plus', text: 'Add attribute',
       onclick: () => commit(pairs.concat([['', '']])),
     })));
   }
@@ -1536,7 +1566,7 @@ function coverControl(key) {
           el('b', { text: name }), ' ', el('span', { text: folder }))
       : el('div', { class: 'empty-note', text: 'Auto — newest photo in the album.' }),
     READ_ONLY ? null : el('button', {
-      class: 'btn btn--sm', type: 'button', text: current ? 'Change…' : 'Pick a cover…',
+      class: 'btn btn--sm', type: 'button', icon: 'fa-image', text: current ? 'Change…' : 'Pick a cover…',
       onclick: () => openPicker({
         title: 'Cover photo', root: album, single: true,
         picked: current ? [strip(current)] : [],
@@ -1565,7 +1595,7 @@ function photoListControl(key) {
   if (!READ_ONLY) {
     box.append(el('div', { class: 'row' },
       el('button', {
-        class: 'btn btn--sm', type: 'button', text: '+ Pick photos…',
+        class: 'btn btn--sm', type: 'button', icon: 'fa-images', text: 'Pick photos…',
         onclick: () => openPicker({
           title: key === 'featured' ? 'Featured photos' : 'Curated photo order',
           root: album, picked: items.map(strip),
@@ -1573,7 +1603,7 @@ function photoListControl(key) {
         }),
       }),
       items.length ? el('button', {
-        class: 'btn btn--sm btn--ghost', type: 'button', text: 'Clear',
+        class: 'btn btn--sm btn--ghost', type: 'button', icon: 'fa-eraser', text: 'Clear',
         onclick: () => setValue(key, null),
       }) : null));
   }
@@ -1620,7 +1650,7 @@ function sortableRow({ index, items, key, thumb, label, group, extraClass }) {
       setValue(key, next);
     },
   });
-  row.append(el('span', { class: 'pickitem__grip', title: 'drag to reorder', text: '⠿' }));
+  row.append(el('span', { class: 'pickitem__grip', title: 'drag to reorder', icon: 'fa-grip-vertical' }));
   if (thumb) {
     row.append(el('img', {
       class: 'pickitem__thumb', src: thumb, alt: '', loading: 'lazy', draggable: 'false',
@@ -1631,7 +1661,7 @@ function sortableRow({ index, items, key, thumb, label, group, extraClass }) {
   if (!READ_ONLY) {
     // Keyboard equivalent of the drag, so reordering does not need a mouse.
     row.append(el('button', {
-      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', text: '↑',
+      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', icon: 'fa-arrow-up',
       title: 'move up', disabled: index === 0,
       onclick: () => {
         const next = items.slice();
@@ -1640,7 +1670,7 @@ function sortableRow({ index, items, key, thumb, label, group, extraClass }) {
       },
     }));
     row.append(el('button', {
-      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', text: '↓',
+      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', icon: 'fa-arrow-down',
       title: 'move down', disabled: index === items.length - 1,
       onclick: () => {
         const next = items.slice();
@@ -1649,7 +1679,7 @@ function sortableRow({ index, items, key, thumb, label, group, extraClass }) {
       },
     }));
     row.append(el('button', {
-      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', text: '✕', title: 'remove',
+      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', icon: 'fa-xmark', title: 'remove',
       onclick: () => setValue(key, items.filter((_, i) => i !== index)),
     }));
   }
@@ -1690,7 +1720,7 @@ function welcomeControl(key) {
 
   if (!READ_ONLY) {
     box.append(el('div', { class: 'row' }, el('button', {
-      class: 'btn btn--sm', type: 'button', text: '+ Pick photos…',
+      class: 'btn btn--sm', type: 'button', icon: 'fa-images', text: 'Pick photos…',
       onclick: () => openPicker({
         title: key.replace(/_/g, ' '), root: '', gallery: true,
         picked: items.map(strip),
@@ -1738,14 +1768,14 @@ function albumOrderControl(key) {
       el('option', { value: '', text: unused.length ? '+ Add album…' : '(all top-level albums listed)' }),
       unused.map((a) => el('option', { value: a, text: a }))),
     el('button', {
-      class: 'btn btn--sm', type: 'button', text: '+ Group header',
+      class: 'btn btn--sm', type: 'button', icon: 'fa-heading', text: 'Group header',
       onclick: () => {
         const label = prompt('Group label (frames the albums listed below it):', 'trips');
         if (label && label.trim()) setValue(key, items.concat(['#' + label.trim()]));
       },
     }),
     items.length ? el('button', {
-      class: 'btn btn--sm btn--ghost', type: 'button', text: 'Clear',
+      class: 'btn btn--sm btn--ghost', type: 'button', icon: 'fa-eraser', text: 'Clear',
       onclick: () => setValue(key, null),
     }) : null));
   return box;
@@ -1936,18 +1966,18 @@ function renderSaveBar() {
           onclick: () => revealField(key),
         }),
         el('button', {
-          class: 'chip__x', type: 'button', text: '✕', title: 'undo this change',
+          class: 'chip__x', type: 'button', icon: 'fa-xmark', title: 'undo this change',
           onclick: () => { delete state.edits[key]; renderPane(); },
         })))));
   }
 
   bar.append(el('div', { class: 'savebar__acts' },
     changed.length ? el('button', {
-      class: 'btn', type: 'button', text: 'Discard all',
+      class: 'btn', type: 'button', icon: 'fa-rotate-left', text: 'Discard all',
       onclick: () => { state.edits = {}; renderPane(); },
     }) : null,
     el('button', {
-      class: 'btn btn--primary', type: 'button', text: 'Save',
+      class: 'btn btn--primary', type: 'button', icon: 'fa-floppy-disk', text: 'Save',
       disabled: READ_ONLY || !changed.length, onclick: saveSettings,
     })));
   return bar;
@@ -1998,11 +2028,11 @@ function renderRaw() {
       el('span', { class: 'savebar__note',
         text: READ_ONLY ? 'readonly mount · saving disabled' : 'whole-file write' }),
       el('button', {
-        class: 'btn', type: 'button', text: 'Revert',
+        class: 'btn', type: 'button', icon: 'fa-rotate-left', text: 'Revert',
         onclick: () => { area.value = state.data.raw || ''; },
       }),
       el('button', {
-        class: 'btn btn--primary', type: 'button', text: 'Save file', disabled: READ_ONLY,
+        class: 'btn btn--primary', type: 'button', icon: 'fa-floppy-disk', text: 'Save file', disabled: READ_ONLY,
         onclick: async () => {
           try {
             const payload = await api(
@@ -2172,6 +2202,7 @@ function fillBrowser(body, b, payload) {
                        (payload.photos.length === 1 ? '' : 's') + ' here' }),
     READ_ONLY ? null : el('button', {
       class: 'btn btn--sm', type: 'button',
+      icon: 'fa-check-double',
       text: allPicked ? 'Deselect all here' : 'Select all here',
       onclick: () => {
         if (allPicked) rels.forEach((r) => b.selected.delete(r));
@@ -2258,7 +2289,7 @@ function renderDetail(rel) {
   box.append(el('div', { class: 'detail__head' },
     el('span', { class: 'detail__name', text: splitPath(rel)[1] }),
     el('button', {
-      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', text: '✕',
+      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', icon: 'fa-xmark', title: 'close',
       onclick: () => { state.browse.detail = null; renderPane(); },
     })));
   const body = el('div', { class: 'detail__body' },
@@ -2286,7 +2317,7 @@ function renderDetail(rel) {
       'Read-only — the console never rewrites a photo file.' }));
     if (!READ_ONLY) body.append(el('div', { class: 'row' }, linkButton(rel, 'Pretty link…')));
 
-    body.append(el('h3', { class: 'detail__sub', text: 'Tags' }));
+    body.append(el('h3', { class: 'detail__sub', icon: 'fa-tags', text: 'Tags' }));
     body.append(tagChips(info.tags, READ_ONLY ? null : (next) =>
       applyTags({ photos: [rel], set: next })));
     if (!READ_ONLY) {
@@ -2311,7 +2342,7 @@ function renderTagBar(b) {
     el('span', { class: 'detail__name',
                  text: count + ' photo' + (count === 1 ? '' : 's') + ' selected' }),
     el('button', {
-      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', text: '✕',
+      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', icon: 'fa-xmark',
       title: 'deselect all',
       onclick: () => { b.selected.clear(); renderPane(); },
     })));
@@ -2328,24 +2359,24 @@ function renderTagBar(b) {
     }
   }
   if (common.size) {
-    body.append(el('h3', { class: 'detail__sub', text: 'Tags in the selection' }));
+    body.append(el('h3', { class: 'detail__sub', icon: 'fa-tags', text: 'Tags in the selection' }));
     body.append(el('div', { class: 'chips' }, [...common.entries()]
       .sort((a, c) => c[1] - a[1] || a[0].localeCompare(c[0]))
       .map(([tag, n]) => el('span', { class: 'chip' },
         tag + (n < count ? ' (' + n + '/' + count + ')' : ''),
         READ_ONLY ? null : el('button', {
-          class: 'chip__x', type: 'button', text: '✕',
+          class: 'chip__x', type: 'button', icon: 'fa-xmark',
           title: 'remove from all ' + count,
           onclick: () => applyTags({ photos: picked, remove: [tag] }),
         })))));
   }
 
   if (!READ_ONLY) {
-    body.append(el('h3', { class: 'detail__sub', text: 'Add to all' }));
+    body.append(el('h3', { class: 'detail__sub', icon: 'fa-plus', text: 'Add to all' }));
     body.append(tagInput('Type a tag, press ↵', (tag) =>
       applyTags({ photos: picked, add: [tag] })));
     body.append(el('button', {
-      class: 'btn btn--sm btn--ghost btn--danger', type: 'button', text: 'Clear every tag',
+      class: 'btn btn--sm btn--ghost btn--danger', type: 'button', icon: 'fa-eraser', text: 'Clear every tag',
       onclick: () => {
         if (confirm('Remove every tag from the ' + count + ' selected photos?')) {
           applyTags({ photos: picked, set: [] });
@@ -2392,7 +2423,7 @@ function tagChips(tags, onChange) {
   return el('div', { class: 'chips' }, tags.map((tag) =>
     el('span', { class: 'chip' }, tag,
       onChange ? el('button', {
-        class: 'chip__x', type: 'button', text: '✕', title: 'remove',
+        class: 'chip__x', type: 'button', icon: 'fa-xmark', title: 'remove',
         onclick: () => onChange(tags.filter((t) => t !== tag)),
       }) : null)));
 }
@@ -2448,7 +2479,7 @@ function renderDescriptions() {
     el('div', { class: 'savebar' },
       el('span', { class: 'savebar__note', text: 'editing album_' + state.descLang + '.md' }),
       el('button', {
-        class: 'btn btn--primary', type: 'button', text: 'Save description', disabled: READ_ONLY,
+        class: 'btn btn--primary', type: 'button', icon: 'fa-floppy-disk', text: 'Save description', disabled: READ_ONLY,
         onclick: async () => {
           try {
             const payload = await api('/api/album/description', {
@@ -2485,7 +2516,7 @@ function renderAssets() {
     onchange: (ev) => { if (ev.target.files.length) upload(ev.target.files[0]); },
   });
   const drop = el('div', {
-    class: 'dropzone',
+    class: 'dropzone', icon: 'fa-upload',
     text: READ_ONLY ? 'Read-only — uploads are disabled.'
       : gallery
         ? 'Drop a mark, a badge, a display face or a backdrop here, or click to choose. Accepted: ' +
@@ -2558,14 +2589,14 @@ function renderAssetRow(asset) {
        * a face, the cfg itself — gets "Aa". It used to put ANY .gallery/ file
        * in an <img>, back when that folder only held marks; a font or the
        * gallery.cfg then rendered as a broken image and a 415 in the console. */
-      VIDEO_RE.test(asset.name) ? '▶'
+      VIDEO_RE.test(asset.name) ? ico('fa-film')
         : IMAGE_RE.test(asset.name) ? el('img', { src: url, alt: '' })
         : 'Aa'),
     el('span', { class: 'asset__name', text: asset.name }),
-    assetInUse(asset) ? el('span', { class: 'pill pill--ok', text: 'in use' }) : null,
+    assetInUse(asset) ? el('span', { class: 'pill pill--ok', icon: 'fa-check', text: 'in use' }) : null,
     el('span', { class: 'asset__meta', text: bytes(asset.size) }),
     READ_ONLY ? null : el('button', {
-      class: 'btn btn--sm btn--ghost btn--danger', type: 'button', text: 'Delete',
+      class: 'btn btn--sm btn--ghost btn--danger', type: 'button', icon: 'fa-trash', text: 'Delete',
       onclick: async () => {
         if (!confirm('Delete ' + asset.name + ' from ' + folder + '?')) return;
         try {
@@ -2740,7 +2771,7 @@ const blankDraft = (seed = {}) => ({
  * form already pointing at this album or photo. */
 function linkButton(target, label) {
   return el('button', {
-    type: 'button', class: 'btn btn--sm', text: label,
+    type: 'button', class: 'btn btn--sm', icon: 'fa-link', text: label,
     title: 'A short address on the public site for this ' + (PHOTO_RE.test(target) ? 'photo' : 'album'),
     onclick: () => select({ kind: 'links', draft: { target } }),
   });
@@ -2799,10 +2830,10 @@ function paintLinks() {
       el('div', { class: 'head__line' },
         el('h1', { class: 'head__title', text: 'Links' }),
         el('div', { class: 'head__meta' },
-          el('span', { class: 'pill' + (d.links.length ? ' pill--ok' : ''),
+          el('span', { class: 'pill' + (d.links.length ? ' pill--ok' : ''), icon: 'fa-link',
                        text: d.links.length + (d.links.length === 1 ? ' link' : ' links') }),
-          broken ? el('span', { class: 'pill pill--err', text: broken + ' broken' }) : null,
-          READ_ONLY ? el('span', { class: 'pill pill--warn', text: 'read-only' }) : null)))));
+          broken ? el('span', { class: 'pill pill--err', icon: 'fa-link-slash', text: broken + ' broken' }) : null,
+          READ_ONLY ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null)))));
 
   const grid = el('div', { class: 'home' });
   pane.append(grid);
@@ -2821,7 +2852,7 @@ function linkForm() {
   const hint = el('p', { class: 'links__hint' });
   const thumb = el('span', { class: 'links__thumb' });
   const save = el('button', {
-    type: 'button', class: 'btn btn--primary', text: editing ? 'Save link' : 'Create link',
+    type: 'button', class: 'btn btn--primary', icon: editing ? 'fa-floppy-disk' : 'fa-plus', text: editing ? 'Save link' : 'Create link',
     onclick: () => saveLink(),
   });
   const onEnter = (ev) => { if (ev.key === 'Enter' && !save.disabled) saveLink(); };
@@ -2872,7 +2903,8 @@ function linkForm() {
   }
   sync();
 
-  return card(editing ? 'Edit ' + links.data.prefix + draft.was : 'New link',
+  return card(editing ? 'fa-pen' : 'fa-link',
+    editing ? 'Edit ' + links.data.prefix + draft.was : 'New link',
     'one album or one photo, at a short address',
     el('div', { class: 'links__form' },
       thumb,
@@ -2887,7 +2919,7 @@ function linkForm() {
         el('div', { class: 'links__target' },
           targetField,
           el('button', {
-            type: 'button', class: 'btn', text: 'Pick a photo…',
+            type: 'button', class: 'btn', icon: 'fa-image', text: 'Pick a photo…',
             onclick: () => openPicker({
               title: 'Link to one photo', root: '', single: true, gallery: true,
               picked: PHOTO_RE.test(draft.target) ? [draft.target] : [],
@@ -2900,7 +2932,8 @@ function linkForm() {
       save,
       editing || draft.slug || draft.target
         ? el('button', {
-            type: 'button', class: 'btn btn--ghost', text: editing ? 'Cancel' : 'Clear',
+            type: 'button', class: 'btn btn--ghost', icon: editing ? 'fa-xmark' : 'fa-eraser',
+            text: editing ? 'Cancel' : 'Clear',
             onclick: () => { links.draft = blankDraft(); paintLinks(); },
           })
         : null));
@@ -2924,10 +2957,10 @@ function linkList() {
   }
   draw();
 
-  return card('Every link',
+  return card('fa-list', 'Every link',
     d.base || 'set PUBLIC_BASE_URL to show and open full addresses',
     d.links.length > 6
-      ? el('input', {
+      ? searchbox({
           type: 'search', class: 'fieldsearch links__filter', value: links.filter,
           placeholder: 'Filter links…', autocomplete: 'off',
           oninput: (ev) => { links.filter = ev.target.value.trim(); draw(); },
@@ -2952,15 +2985,16 @@ function linkRow(link) {
       bad ? el('div', { class: 'linkrow__issue', text: link.issues.map((i) => i.detail).join(' · ') })
           : null),
     el('div', { class: 'linkrow__actions' },
-      el('button', { type: 'button', class: 'btn btn--sm', text: 'Copy', onclick: () => copyLink(url) }),
+      el('button', { type: 'button', class: 'btn btn--sm', icon: 'fa-copy', text: 'Copy', onclick: () => copyLink(url) }),
       /* Only with a known public address: a bare /name opened from here
        * would ask the console's own port, which has no such page. */
       links.data.base && link.destination
         ? el('a', { class: 'btn btn--sm btn--ghost', href: url, target: '_blank',
-                    rel: 'noopener noreferrer', text: 'Open ↗' })
+                    rel: 'noopener noreferrer', text: 'Open',
+                    iconEnd: 'fa-arrow-up-right-from-square' })
         : null,
       READ_ONLY ? null : el('button', {
-        type: 'button', class: 'btn btn--sm btn--ghost', text: 'Edit',
+        type: 'button', class: 'btn btn--sm btn--ghost', icon: 'fa-pen', text: 'Edit',
         onclick: () => {
           links.draft = { slug: link.slug, target: link.target, was: link.slug, touched: true };
           paintLinks();
@@ -2968,7 +3002,7 @@ function linkRow(link) {
         },
       }),
       READ_ONLY ? null : el('button', {
-        type: 'button', class: 'btn btn--sm btn--ghost btn--danger', text: 'Delete',
+        type: 'button', class: 'btn btn--sm btn--ghost btn--danger', icon: 'fa-trash', text: 'Delete',
         onclick: () => deleteLink(link.slug),
       })));
 }

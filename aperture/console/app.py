@@ -55,6 +55,16 @@ Image.MAX_IMAGE_PIXELS = 64 * 1024 * 1024
 
 app = FastAPI(title=f"{brand.PRODUCT} console", docs_url=None, redoc_url=None,
               openapi_url=None)
+# The icon sheet is the gallery's too, generated next to the glyph subset it
+# names (tools/build_fa_subset.py scans both surfaces). Served from where it is
+# built for the same reason as the fonts below; a route, because a mount
+# cannot hold one file, and declared BEFORE /static so it wins.
+@app.get("/static/fa-icons.css", include_in_schema=False)
+def fa_icons():
+    return FileResponse(templating.WEB_DIR / "static" / "fa-icons.css",
+                        media_type="text/css")
+
+
 # The console's chrome is the gallery's chrome, down to the same nine font
 # files. They are served out of the gallery's static/ rather than copied
 # here: a copy of a font is a copy that goes stale quietly, and both

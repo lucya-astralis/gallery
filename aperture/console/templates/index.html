@@ -8,6 +8,10 @@
   <title>Console — lucya.systems aperture</title>
   <link rel="icon" type="image/svg+xml" href="{{ static_url('logo/lucya_logo.svg') }}">
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
+  {# The gallery's icon sheet and its glyph subset, served from where
+     tools/build_fa_subset.py writes them -- see app.py. #}
+  <link rel="stylesheet" href="/static/fa-icons.css">
+  <link rel="preload" href="/static/fonts/fa-solid-subset.woff2" as="font" type="font/woff2" crossorigin>
 </head>
 <body>
   {# The backdrop. Same construction as the gallery's: a real element rather
@@ -57,7 +61,7 @@
        above every screen is a banner people learn to stop seeing. The short
        form carries the fact, the long form carries the consequence, and the
        command is desktop-only because nobody fixes this from a phone. #}
-    <span>No password</span>
+    <span><i class="fa fa-triangle-exclamation" aria-hidden="true"></i>No password</span>
     <span class="u-wide-only">— anyone who reaches this port can edit the gallery</span>
     <code class="u-wide-only">python -m aperture.cli passwd</code>
   </div>
@@ -81,25 +85,25 @@
       {# The places this tool has. They used to sit in the album list, which
          made a tool and a file look like two odd albums. #}
       <div class="places" role="group" aria-label="Sections">
-        <button type="button" class="place" data-place="home">Home</button>
-        <button type="button" class="place" data-place="gallery">Gallery</button>
-        <button type="button" class="place" data-place="links">Links</button>
-        <button type="button" class="place" data-place="ops">Operations</button>
+        <button type="button" class="place" data-place="home"><i class="fa fa-house" aria-hidden="true"></i>Home</button>
+        <button type="button" class="place" data-place="gallery"><i class="fa fa-images" aria-hidden="true"></i>Gallery</button>
+        <button type="button" class="place" data-place="links"><i class="fa fa-link" aria-hidden="true"></i>Links</button>
+        <button type="button" class="place" data-place="ops"><i class="fa fa-gauge-high" aria-hidden="true"></i>Operations</button>
       </div>
 
       <div class="nav__actions">
         {# Only the read-only case is worth a mark: it is the one that changes
            what the tool can do. A "READWRITE" lamp on every normal session was
            a green light reporting that nothing is wrong. #}
-        {% if read_only %}<span class="pill pill--warn" title="the photo mount is read-only — every write is disabled">read-only</span>{% endif %}
-        <button type="button" class="btn" id="btn-check">Check<span class="u-wide-only"> all</span></button>
-        <button type="button" class="btn" id="btn-reload">Reload</button>
+        {% if read_only %}<span class="pill pill--warn" title="the photo mount is read-only — every write is disabled"><i class="fa fa-lock" aria-hidden="true"></i>read-only</span>{% endif %}
+        <button type="button" class="btn" id="btn-check"><i class="fa fa-list-check" aria-hidden="true"></i>Check<span class="u-wide-only"> all</span></button>
+        <button type="button" class="btn" id="btn-reload"><i class="fa fa-rotate" aria-hidden="true"></i>Reload</button>
         {# Only shown when there IS a session to end. An open console has no
            sign-out, and pretending otherwise would be the same lie as a
            "READWRITE" lamp. #}
         {% if auth_mode == "password" %}
         <button type="button" class="btn btn--ghost" id="btn-signout"
-                title="End this session">Sign out</button>
+                title="End this session"><i class="fa fa-right-from-bracket" aria-hidden="true"></i>Sign out</button>
         {% endif %}
       </div>
     </div>
@@ -110,13 +114,13 @@
 
     <nav class="sidebar" id="sidebar">
       <div class="sidebar__head">
-        <span class="sidebar__title">Albums</span>
+        <span class="sidebar__title"><i class="fa fa-folder-tree" aria-hidden="true"></i>Albums</span>
         <span class="sidebar__count" id="tree-count"></span>
       </div>
       <div class="sidebar__search">
-        <input type="search" id="tree-filter" class="fieldsearch" placeholder="Filter albums&hellip;" autocomplete="off">
+        <label class="searchbox"><i class="fa fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="tree-filter" class="fieldsearch" placeholder="Filter albums&hellip;" autocomplete="off"></label>
         <button type="button" class="btn btn--ghost btn--icon sidebar__close" id="btn-menu-close"
-                aria-label="Close the album list">&times;</button>
+                aria-label="Close the album list"><i class="fa fa-xmark" aria-hidden="true"></i></button>
       </div>
       <ul class="tree" id="tree"><li class="tree__empty">Loading&hellip;</li></ul>
     </nav>
@@ -145,14 +149,14 @@
     <div class="modal__box" role="dialog" aria-modal="true">
       <header class="modal__head">
         <h2 id="modal-title">Pick photos</h2>
-        <button type="button" class="btn btn--ghost btn--icon modal__x" data-close aria-label="Close">&times;</button>
-        <input type="search" id="modal-filter" class="fieldsearch" placeholder="Filter by name or folder&hellip;" autocomplete="off">
+        <button type="button" class="btn btn--ghost btn--icon modal__x" data-close aria-label="Close"><i class="fa fa-xmark" aria-hidden="true"></i></button>
+        <label class="searchbox"><i class="fa fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="modal-filter" class="fieldsearch" placeholder="Filter by name or folder&hellip;" autocomplete="off"></label>
       </header>
       <div class="modal__body" id="modal-body"></div>
       <footer class="modal__foot">
         <span class="modal__count" id="modal-count"></span>
-        <button type="button" class="btn" data-close>Cancel</button>
-        <button type="button" class="btn btn--primary" id="modal-ok">Apply</button>
+        <button type="button" class="btn" data-close><i class="fa fa-xmark" aria-hidden="true"></i>Cancel</button>
+        <button type="button" class="btn btn--primary" id="modal-ok"><i class="fa fa-check" aria-hidden="true"></i>Apply</button>
       </footer>
     </div>
   </div>

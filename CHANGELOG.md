@@ -18,6 +18,33 @@ notes are never one commit apart.
 
 ---
 
+## 1.5.0 — 2026-09-13
+
+The console wears the gallery's icons, and its header folds instead of jumping.
+
+**New**
+
+* **Icons across the console**, from the same Font Awesome subset the gallery
+  draws on: the places and actions in the header, every tab, status mark, card
+  heading and button, a magnifier in each filter field, and the sign-in door.
+  The ✕ ▶ ↑ ↓ ⠿ ↗ → characters that stood in for icons are icons now.
+
+**Fixed**
+
+* **The pane header no longer jumps on scroll.** Past 18px it used to swap to
+  a layout 40px shorter, so the page under it lurched, and near that point it
+  could flicker between the two. It keeps its height now: the file path slides
+  up under the pane's edge as you scroll and comes back down as you return,
+  and only the bar's shade and shadow change once content runs under it. The
+  title no longer steps down in size.
+
+**For maintainers**
+
+* `tools/build_fa_subset.py` scans the console's templates and scripts too,
+  and the console serves the gallery's generated `fa-icons.css`.
+
+---
+
 ## 1.4.1 — 2026-09-13
 
 Pretty links move under `/s/`.
