@@ -18,87 +18,10 @@ notes are never one commit apart.
 
 ---
 
-## 1.9.0 — 2026-09-13
-
-The console carries its own release notes.
-
-**New**
-
-* **A Changelog place in the console**, next to Operations: every release
-  this build knows about, the newest open and each older one a click away,
-  and which version this build is. It says who makes the software —
-  [lucya.sh](https://lucya.sh), with a picture — and links to the code on
-  [GitHub](https://github.com/lucya-astralis/gallery).
-
-**Before you upgrade**
-
-* The image now carries `CHANGELOG.md`. Rebuild it rather than restarting
-  the old one, or the place reports that the notes are not part of the build.
-
-**For maintainers**
-
-* `brand.REPO_URL`, `brand.MAKER_NAME` and `brand.MAKER_URL` hold the links.
-  The console renders the notes on the server, at `/api/about`; only a
-  `## X.Y.Z — date` heading counts as a release.
-
----
-
-## 1.8.0 — 2026-09-13
-
-Unlisted albums.
-
-**New**
-
-* **`unlisted = true` in an album.cfg** takes the album, and every album under
-  it, out of every list the gallery draws: `/albums`, the sub-album cards of
-  its parent, the search, `/stats`, the welcome screen's counts and random
-  feed, and the lists of the JSON API (`/api/albums`, `/api/photos`,
-  `/api/showcase`, `/api/shuffle`, `/api/tags`, `/api/stats`). A parent shown
-  as a whole collection stops at it, and none of its photos becomes a
-  parent's cover.
-* Its page, its photos and a `/s/` link to it keep working for whoever has
-  the address, and those pages ask search engines not to index them. Asked
-  for by name, the API answers the way the page does.
-* The console offers the switch with the album's other basics.
-* It is a way to share an album with the people who have the link, not a
-  lock: anyone with the address can open it.
-
-**For maintainers**
-
-* `albums.unlisted_clause()` is the one SQL condition for it, and
-  `albums.is_unlisted()` the one question; a new listing that counts or shows
-  photos across albums should use them. A saved `unlisted` shows within two
-  seconds, which is how long the answer is kept.
-
----
-
-## 1.7.0 — 2026-09-13
-
-Long lists open up instead of stopping at "and N more".
-
-**New**
-
-* **The album, camera and tag charts on `/stats` fold instead of summing.**
-  They show their top rows and put the rest behind *+N more*, which opens in
-  place and names every album, camera and tag — the tail used to be a single
-  row that added them up and named none. It opens without JavaScript, and a
-  folded bar is still as long as its count says against the whole chart.
-* **The console's long lists open too.** The Doctor report, *Needs
-  attention* and *Unwritten* show their first rows and a button for the
-  rest. A list you opened stays open while the home screen refreshes during
-  a scan. *Unwritten* now lists every album that has photos but no cfg or no
-  text, where it used to stop at four of each.
-
-**For maintainers**
-
-* `stats.collect()` no longer takes `more_label` and `stats.album_rows()` no
-  longer takes `other_label`. Rows past a chart's limit are marked `extra`
-  (`stats.fold`), and the `bars` / `album_bars` macros take the label of the
-  disclosure instead.
-
 ## 1.6.0 — 2026-09-13
 
-Search by what a photo was shot with.
+Search by what a photo was shot with, long lists that open up, unlisted
+albums, and the release notes inside the console.
 
 **New**
 
@@ -114,9 +37,32 @@ Search by what a photo was shot with.
 * **EXIF values link to their photos.** On a photo page the camera, lens,
   capture date, aperture, ISO and focal length each open the search for
   every photo that shares them, and so do the bars of the camera, focal
-  length, aperture and ISO charts on `/stats`.
-* The same grammar answers `q` on `/api/photos` and
-  `python -m aperture.cli search`, which also lists the filters it ignored.
+  length, aperture and ISO charts on `/stats`. The same grammar answers `q`
+  on `/api/photos` and `python -m aperture.cli search`, which also lists the
+  filters it ignored.
+* **Long lists open up instead of stopping at "and N more".** The album,
+  camera and tag charts on `/stats` show their top rows and put the rest
+  behind *+N more*, which opens in place and names every one — the tail used
+  to be a single row that added them up. It needs no JavaScript, and a folded
+  bar is still as long as its count says against the whole chart. In the
+  console, the Doctor report, *Needs attention* and *Unwritten* show their
+  first rows and a button for the rest, and a list you opened stays open
+  while the home screen refreshes during a scan.
+* **Unlisted albums.** `unlisted = true` in an album.cfg takes the album, and
+  every album under it, out of every list the gallery draws: `/albums`, the
+  sub-album cards of its parent, the search, `/stats`, the welcome screen's
+  counts and random feed, and the lists of the JSON API (`/api/albums`,
+  `/api/photos`, `/api/showcase`, `/api/shuffle`, `/api/tags`, `/api/stats`).
+  A parent shown as a whole collection stops at it, and none of its photos
+  becomes a parent's cover. Its page, its photos and a `/s/` link to it keep
+  working for whoever has the address, and those pages ask search engines
+  not to index them. It is a way to share an album, not a lock. The console
+  offers the switch with the album's other basics.
+* **A Changelog place in the console**, next to Operations: every release
+  this build knows about, the newest open and each older one a click away,
+  and which version this build is. It says who makes the software —
+  [lucya.sh](https://lucya.sh), with a picture — and links to the code on
+  [GitHub](https://github.com/lucya-astralis/gallery).
 
 **Fixed**
 
@@ -124,15 +70,34 @@ Search by what a photo was shot with.
 
 **Before you upgrade**
 
-* Nothing to do. The first start adds five columns to the index and fills
-  them from the EXIF it already holds, once; on a library of a few thousand
-  photos that takes seconds.
+* The image now carries `CHANGELOG.md`. Rebuild it rather than restarting
+  the old one, or the console's Changelog place reports that the notes are
+  not part of the build.
+* The first start adds five columns to the index and fills them from the
+  EXIF it already holds, once; on a library of a few thousand photos that
+  takes seconds.
 
 **For maintainers**
 
+* Camera, lens, focal length, aperture and ISO are index columns now
+  (`capture.facts`, `db.migrate`), and `aperture/search.py` is the one search
+  grammar.
+* `stats.collect()` no longer takes `more_label` and `stats.album_rows()` no
+  longer takes `other_label`. Rows past a chart's limit are marked `extra`
+  (`stats.fold`), and the `bars` / `album_bars` macros take the label of the
+  disclosure instead.
+* `albums.unlisted_clause()` is the one SQL condition for unlisted albums and
+  `albums.is_unlisted()` the one question; a new listing that counts or shows
+  photos across albums should use them. A saved `unlisted` shows within two
+  seconds, which is how long the answer is kept.
+* `brand.REPO_URL`, `brand.MAKER_NAME` and `brand.MAKER_URL` hold the links of
+  the Changelog place, which renders the notes on the server at `/api/about`;
+  only a `## X.Y.Z — date` heading counts as a release there.
 * The test fixture's photos now really carry their capture date, aperture,
   focal length and ISO: Pillow dropped the Exif sub-IFD the fixture wrote,
   so none of those had ever reached the index in a test.
+
+---
 
 ## 1.5.1 — 2026-09-13
 
@@ -154,6 +119,8 @@ can be used from the keyboard alone.
   links that cannot be seen; closing it hands focus back to what opened it.
 * **A skip link.** The first Tab on every page offers *Skip to content*, which
   jumps past the header straight into the page.
+
+---
 
 ## 1.5.0 — 2026-09-13
 
