@@ -2719,12 +2719,12 @@ function updateModalCount() {
 
 /* ----- pretty links ----------------------------------------------------- */
 /* photos/.gallery/links.cfg as a screen: a short address on the public site
- * for one album or one photo — `/tokyo` instead of `/album/japan_2026/tokyo`.
+ * for one album or one photo — `/s/tokyo` instead of `/album/japan_2026/tokyo`.
  *
  * The server decides what a name may be and whether a target exists
  * (aperture/links.py), and says so on every write. The rule is mirrored here
  * only so a typo shows while it is typed rather than after a round trip; the
- * reserved names come from the server rather than from a second list. */
+ * `/s/` prefix comes from the server rather than being spelled a second time. */
 const LINK_SLUG = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 const PHOTO_RE = /\.(jpe?g|png|webp|gif|bmp|tiff?|heic|heif)$/i;
 const links = { data: null, draft: null, filter: '' };
@@ -2763,16 +2763,15 @@ function slugProblem(slug, was) {
   if (!LINK_SLUG.test(slug) || slug.includes('--')) {
     return 'lower-case letters, digits and single hyphens — starting and ending with a letter or digit';
   }
-  if (d.reserved.includes(slug)) return '/' + slug + ' is one of the gallery’s own addresses';
   if (slug !== was && d.links.some((l) => l.slug === slug)) {
-    return '/' + slug + ' already exists — edit it below instead';
+    return d.prefix + slug + ' already exists — edit it below instead';
   }
   return null;
 }
 
 /* The address a visitor types. The console is on its own port and cannot
  * know it unless PUBLIC_BASE_URL says; without that it is a path. */
-const publicUrl = (slug) => (links.data.base || '') + '/' + slug;
+const publicUrl = (slug) => (links.data.base || '') + links.data.prefix + slug;
 
 async function renderLinks(seed) {
   try {
@@ -2873,14 +2872,14 @@ function linkForm() {
   }
   sync();
 
-  return card(editing ? 'Edit /' + draft.was : 'New link',
+  return card(editing ? 'Edit ' + links.data.prefix + draft.was : 'New link',
     'one album or one photo, at a short address',
     el('div', { class: 'links__form' },
       thumb,
       el('div', { class: 'links__field' },
         el('span', { class: 'links__label', text: 'Name' }),
         el('div', { class: 'links__addr' },
-          el('span', { class: 'links__base', text: (links.data.base || '') + '/',
+          el('span', { class: 'links__base', text: (links.data.base || '') + links.data.prefix,
                        title: links.data.base || 'set PUBLIC_BASE_URL to show the full address' }),
           slugField)),
       el('div', { class: 'links__field' },
@@ -2946,7 +2945,7 @@ function linkRow(link) {
                     onerror: (ev) => ev.target.remove() })
       : null),
     el('div', { class: 'linkrow__main' },
-      el('div', { class: 'linkrow__slug', text: '/' + link.slug, title: url }),
+      el('div', { class: 'linkrow__slug', text: links.data.prefix + link.slug, title: url }),
       el('div', { class: 'linkrow__target' },
         el('span', { class: 'linkrow__kind', text: link.kind }),
         el('span', { class: 'linkrow__path', text: link.target || '—' })),
@@ -2991,7 +2990,7 @@ async function saveLink() {
 }
 
 async function deleteLink(slug) {
-  if (!confirm('Delete /' + slug + '? Anyone who follows it gets a 404 from now on.')) return;
+  if (!confirm('Delete ' + links.data.prefix + slug + '? Anyone who follows it gets a 404 from now on.')) return;
   try {
     links.data = await api('/api/links?slug=' + encodeURIComponent(slug), { method: 'DELETE' });
   } catch (err) {
@@ -2999,7 +2998,7 @@ async function deleteLink(slug) {
     return;
   }
   if (links.draft.was === slug) links.draft = blankDraft();
-  toast('Deleted /' + slug);
+  toast('Deleted ' + links.data.prefix + slug);
   paintLinks();
 }
 

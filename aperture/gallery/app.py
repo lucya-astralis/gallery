@@ -124,6 +124,5 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 app.include_router(pages.router)
 app.include_router(api.router)
 app.include_router(media.router)
-# LAST, always: its `/{slug}` would otherwise answer for every one-segment
-# route registered after it. See gallery/shortlinks.py.
+# pretty links, all under /s/ — see gallery/shortlinks.py
 app.include_router(shortlinks.router)

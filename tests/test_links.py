@@ -4,14 +4,11 @@ One claim per test, in the order a link lives: written by the console into
 `photos/.gallery/links.cfg`, followed by a visitor on the public port, and
 reported by "Check all" and `doctor` when its target is gone.
 
-The public half matters most, because it adds a route that matches ANY
-one-segment path. Two tests below exist only to keep that from ever eating a
-real page: every gallery route's first segment is a reserved name, and the
-link router is the last one the app consults.
+Links live under `/s/` and nowhere else, so no page the gallery has or will
+have can collide with one. A test below keeps that prefix to links alone.
 """
 
 import pytest
-from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from aperture import checks, links, ops, runtime
@@ -41,7 +38,7 @@ def write(text: str) -> None:
 # ============================================================
 def test_a_link_to_an_album_redirects_to_it(client):
     write("winter = berlin\n")
-    r = client.get("/winter", follow_redirects=False)
+    r = client.get("/s/winter", follow_redirects=False)
     assert r.status_code == 302
     assert r.headers["location"] == "/album/berlin"
     # never a cached, permanent redirect: the point is that it can be re-pointed
@@ -50,18 +47,18 @@ def test_a_link_to_an_album_redirects_to_it(client):
 
 def test_a_link_to_a_photo_redirects_to_its_page(client):
     write("dome = berlin/mitte/dome.jpg\n")
-    r = client.get("/dome", follow_redirects=False)
+    r = client.get("/s/dome", follow_redirects=False)
     assert r.status_code == 302
     assert r.headers["location"] == "/image/berlin/mitte/dome.jpg"
-    assert client.get("/dome").status_code == 200        # and it lands on a page
+    assert client.get("/s/dome").status_code == 200      # and it lands on a page
 
 
 def test_a_link_is_found_whatever_the_casing(client):
     write("gate = berlin/gate.jpg\n")
-    assert client.get("/GATE", follow_redirects=False).headers["location"] == "/image/berlin/gate.jpg"
+    assert client.get("/s/GATE", follow_redirects=False).headers["location"] == "/image/berlin/gate.jpg"
 
 
-@pytest.mark.parametrize("path", ["/no-such-link", "/robots.txt", "/gone"])
+@pytest.mark.parametrize("path", ["/s/no-such-link", "/s/robots.txt", "/s/gone", "/s/", "/gone"])
 def test_what_is_not_a_live_link_is_the_ordinary_404(client, path):
     write("gone = berlin/not-there.jpg\n")
     r = client.get(path, follow_redirects=False)
@@ -69,30 +66,21 @@ def test_what_is_not_a_live_link_is_the_ordinary_404(client, path):
     assert r.headers["content-type"].startswith("text/html")
 
 
-def test_a_link_never_shadows_a_page_of_the_gallery(client):
-    """Even when the file asks for it — the console refuses these names, but
-    the file can be edited by hand."""
+def test_a_link_may_share_a_name_with_a_page_of_the_gallery(client):
+    """The point of the prefix: /s/albums is a link, /albums stays the page."""
     write("albums = tech\nstats = tech\napi = tech\n")
+    assert client.get("/s/albums", follow_redirects=False).headers["location"] == "/album/tech"
     assert client.get("/albums", follow_redirects=False).status_code == 200
     assert client.get("/stats", follow_redirects=False).status_code == 200
     assert client.get("/api", follow_redirects=False).json()["product_version"]
 
 
-def test_every_gallery_route_is_a_reserved_name():
-    """A route added later without a line in links.RESERVED would let the
-    console save a link that can never be reached."""
-    firsts = set()
-    for route in public_app.routes:
-        segment = route.path.strip("/").split("/", 1)[0]
-        if links.SLUG.fullmatch(segment):
-            firsts.add(segment)
-    assert firsts <= links.RESERVED, sorted(firsts - links.RESERVED)
-
-
-def test_the_link_route_is_the_last_one_consulted():
-    routes = [r for r in public_app.routes if isinstance(r, APIRoute)]
-    assert routes[-1].path == "/{slug}"
-    assert sum(1 for r in routes if r.path == "/{slug}") == 1
+def test_the_s_prefix_belongs_to_links_alone():
+    """A later route under /s/ would be the collision the prefix exists to
+    rule out — in either direction."""
+    under = [r.path for r in public_app.routes
+             if r.path == links.PREFIX.rstrip("/") or r.path.startswith(links.PREFIX)]
+    assert under == [links.PREFIX + "{slug}"], under
 
 
 def test_a_destination_survives_a_non_latin_folder_name():
@@ -106,7 +94,6 @@ def test_a_destination_survives_a_non_latin_folder_name():
 BROKEN = """\
 # hand-edited
 Bad_Name = berlin
-albums = berlin
 lost = berlin/not-there.jpg
 nowhere = atlantis
 twice = berlin, tech
@@ -117,7 +104,7 @@ fine = tech
 def test_the_check_names_every_link_that_answers_404(indexed):
     write(BROKEN)
     issues = checks.pretty_links()
-    assert {i["key"] for i in issues} == {"bad_name", "albums", "lost", "nowhere", "twice"}
+    assert {i["key"] for i in issues} == {"bad_name", "lost", "nowhere", "twice"}
     assert all(i["scope"] == "links" and i["level"] == "error" for i in issues)
 
 
@@ -144,7 +131,7 @@ def test_the_console_creates_the_file_and_logs_the_write(console):
 
     newest = console.get("/api/audit?limit=1").json()["entries"][0]
     assert newest["target"] == ".gallery/links.cfg"
-    assert newest["action"] == "link added (/winter)"
+    assert newest["action"] == "link added (/s/winter)"
 
 
 def test_the_console_lists_what_a_photo_link_resolves_to(console):
@@ -162,7 +149,6 @@ def test_the_console_lists_what_a_photo_link_resolves_to(console):
     ("-edge", "berlin"),
     ("double--hyphen", "berlin"),
     ("x" * 65, "berlin"),
-    ("albums", "berlin"),                 # a gallery route
     ("ok", ""),
     ("ok", "atlantis"),                   # no such album
     ("ok", "berlin/not-there.jpg"),       # no such photo

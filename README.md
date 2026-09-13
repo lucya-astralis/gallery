@@ -340,8 +340,8 @@ Optional file in the album's **`.album/` folder** (see above):
 ### Pretty links (`links.cfg`)
 
 A short address on the public site for one album or one photo —
-`https://archive.example/tokyo` instead of `/album/japan_2026/tokyo`. The list
-is one more file in **`photos/.gallery/`**, next to `gallery.cfg`:
+`https://archive.example/s/tokyo` instead of `/album/japan_2026/tokyo`. The
+list is one more file in **`photos/.gallery/`**, next to `gallery.cfg`:
 
 ```ini
 # photos/.gallery/links.cfg
@@ -350,16 +350,18 @@ fuji  = japan_2026/hakone/fuji.jpg  # one photo
 ```
 
 - A **name** is lower-case letters, digits and single hyphens, up to 64
-  characters. The request is lower-cased, so `/Tokyo` works too.
+  characters. The request is lower-cased, so `/s/Tokyo` works too.
 - A **target** is an album path, or a photo's path inside its album; the
   extension decides which. Both are resolved against the index when someone
   follows the link.
 - The gallery answers with a **302 and `no-store`**, never a 301 — a browser
   keeps a permanent redirect for good, and a link is meant to be re-pointable.
 - A name that is not a link, or a link whose target has gone, gets the
-  ordinary 404 page. The names of the gallery's own pages (`albums`, `stats`,
-  `api`, …) can never be links: the real page always answers first, and the
-  console refuses them.
+  ordinary 404 page.
+- Every link lives under **`/s/`**, and nothing else of the gallery ever will.
+  So any name is free — `/s/albums` is a link, `/albums` stays the page — and
+  a page the gallery gains in a later release can never take over an address
+  that is already printed somewhere.
 - `Check all` in the console and `doctor` report every link that would
   answer 404.
 
@@ -1440,7 +1442,7 @@ All GET, all public:
 - `GET /site-wallpaper/{desktop|mobile}` — the backdrop `gallery.cfg` names, for every page no album has dressed
 - `GET /brand/{logo|favicon|pfp}` + `GET /brand/badge/{index}` — the operator's marks and footer badges from `photos/.gallery/`; the index is the position in the *rendered* row
 - `GET /search?q=…` — search (`?sort=`)
-- `GET /{name}` — a pretty link from `photos/.gallery/links.cfg`: a 302 to the album or photo it names, 404 otherwise (see [Pretty links](#pretty-links-linkscfg)). Matched after every other route, so it never shadows one
+- `GET /s/{name}` — a pretty link from `photos/.gallery/links.cfg`: a 302 to the album or photo it names, 404 otherwise (see [Pretty links](#pretty-links-linkscfg)). `/s/` holds links and nothing else
 - `GET /lang/{en|de|jp}?next=…` — set the language cookie, 303 back to `next` (relative paths only)
 - `GET /api` + `/api/stats` + `/api/albums` + `/api/album/{album}` + `/api/photos` + `/api/photo/{rel_path}` + `/api/tags` + `/api/showcase` + `/api/shuffle` — the JSON API, CORS-enabled (see [API](#api))
 - `GET /api/trip-weather?trip=…` — current conditions per trip stop plus today's high/low, served as a same-origin proxy to [Open-Meteo](https://open-meteo.com/) (weather data CC BY 4.0). Server-side cache (15 min); the visitor's browser never contacts a third party, so no cookies and no consent banner are involved.

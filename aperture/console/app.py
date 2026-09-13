@@ -852,7 +852,7 @@ def _links_payload(cfg_file: cfgio.CfgFile) -> dict:
         # The console is on its own port and cannot know the address visitors
         # use; PUBLIC_BASE_URL is what the gallery already calls it.
         "base": settings.public_base_url or None,
-        "reserved": sorted(links.RESERVED),
+        "prefix": links.PREFIX,
         "slug_max": links.SLUG_MAX,
     }
 
@@ -883,15 +883,16 @@ async def api_links_write(request: Request):
     cfg_file = (cfgio.CfgFile.load(path) if path.is_file()
                 else cfgio.CfgFile(links.HEADER))
     if slug != was and cfg_file.has(slug):
-        raise HTTPException(409, "/%s already points at %r — edit that link instead"
-                            % (slug, cfgio.joined(cfg_file.values(), slug)))
+        raise HTTPException(409, "%s already points at %r — edit that link instead"
+                            % (links.address(slug), cfgio.joined(cfg_file.values(), slug)))
 
     before = security.sha256_of(path)
     if was and was != slug:
         cfg_file.unset(was)
-        action = "link renamed (/%s -> /%s)" % (was, slug)
+        action = "link renamed (%s -> %s)" % (links.address(was), links.address(slug))
     else:
-        action = "link %s (/%s)" % ("changed" if cfg_file.has(slug) else "added", slug)
+        action = "link %s (%s)" % ("changed" if cfg_file.has(slug) else "added",
+                                   links.address(slug))
     cfg_file.set(slug, [target])
     _backup(path, "links")
     cfg_file.save(path)
@@ -911,7 +912,7 @@ def api_links_delete(request: Request, slug: str = ""):
     _backup(path, "links")
     cfg_file.unset(slug)
     cfg_file.save(path)
-    _writes(request, "link removed (/%s)" % slug, path, before)
+    _writes(request, "link removed (%s)" % links.address(slug), path, before)
     return _links_payload(cfg_file)
 
 

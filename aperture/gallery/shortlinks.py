@@ -1,11 +1,9 @@
-"""Pretty links: /<name> -> an album or a photo. What a link is, where the
+"""Pretty links: /s/<name> -> an album or a photo. What a link is, where the
 list lives and why it redirects the way it does: aperture/links.py.
 
-A router of its own because of where it has to sit. `/{slug}` matches ANY
-one-segment path, `/api` and `/stats` included, so it is included last in
-gallery/app.py: every real route gets the request first, and this only ever
-sees a path nothing else claimed — which, before it existed, was the 404 page.
-It still is, for a name that is not a link.
+Everything under `/s/` belongs to links and nothing else is ever routed there,
+so this router can sit anywhere in gallery/app.py and a page the gallery gains
+later can never collide with a link somebody has already printed.
 """
 
 from __future__ import annotations
@@ -18,7 +16,7 @@ from .. import links
 router = APIRouter()
 
 
-@router.get("/{slug}", include_in_schema=False)
+@router.get(links.PREFIX + "{slug}", include_in_schema=False)
 def follow_link(slug: str):
     destination = links.resolve(slug)
     if destination is None:

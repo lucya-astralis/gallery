@@ -18,6 +18,26 @@ notes are never one commit apart.
 
 ---
 
+## 1.4.1 — 2026-09-13
+
+Pretty links move under `/s/`.
+
+**Changed**
+
+* A link is now **`/s/<name>`** instead of `/<name>`. At the root, links and
+  the gallery's own pages shared one namespace: every page a later release
+  added was a name some link might already use, which 1.4.0 held off with a
+  list of reserved names. `/s/` belongs to links alone, so the list is gone —
+  `albums`, `stats` and `api` are ordinary link names now — and no future
+  page can take over an address that is already printed somewhere.
+
+**Before you upgrade**
+
+* A link handed out as `/<name>` under 1.4.0 is `/s/<name>` now; the old
+  address answers 404. `links.cfg` itself does not change.
+
+---
+
 ## 1.4.0 — 2026-09-13
 
 Pretty links.

@@ -1,7 +1,7 @@
 """Pretty links: a short address on the public site for one album or one photo.
 
-    https://archive.example/tokyo   ->  /album/japan_2026/tokyo
-    https://archive.example/fuji    ->  /image/japan_2026/hakone/fuji.jpg
+    https://archive.example/s/tokyo   ->  /album/japan_2026/tokyo
+    https://archive.example/s/fuji    ->  /image/japan_2026/hakone/fuji.jpg
 
 The list is a file, `photos/.gallery/links.cfg`, in the grammar every other cfg
 file uses — one `slug = target` line per link:
@@ -15,6 +15,12 @@ request, and the index stays untouched: a link is configuration, not data, so
 adding one needs no scan, no restart and no second writer on the database. It
 is also what makes a link survive a rebuild of `data/` — it lives with the
 photos it points at.
+
+Every link lives under ONE prefix, `/s/`, and nowhere else. 1.4.0 served them
+at the root (`/tokyo`), which meant a link and a page of the gallery shared one
+namespace: every route the gallery gained later was a name some operator might
+already have printed on a card. A prefix owned by links alone ends that for
+good — no list of reserved names to keep, no route order to protect.
 
 A target is an album path, or a photo's path inside the photo tree; which of
 the two is decided by the extension, the same rule the scanner uses. Both are
@@ -39,29 +45,22 @@ from urllib.parse import quote
 from . import albums, cfgio, db, schema
 from .runtime import settings
 
+# The one path segment the gallery gives to links. Nothing else may ever be
+# routed under it; tests/test_links.py checks the public app for that.
+PREFIX = "/s/"
+
 # Lower-case letters, digits and single inner hyphens, 1-64 long. Deliberately
 # narrow: it is spoken, typed on a phone and printed on paper, so nothing in it
 # may need escaping, and nothing may look like a file (`.`) or a path (`/`).
 SLUG = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?")
 SLUG_MAX = 64
 
-# The first path segment of every slug-shaped route the gallery itself answers.
-# A link by one of these names would never be reached — the real route is
-# matched first — so it is refused up front instead of saved as a dead link.
-# tests/test_links.py compares this against the public app's actual routes, so
-# a route added later without a line here fails the suite.
-RESERVED = frozenset({
-    "album", "albums", "image", "thumb", "preview", "full", "api", "static",
-    "stats", "search", "lang", "brand", "site-font", "site-wallpaper",
-    "album-font", "album-icon", "album-wallpaper",
-})
-
 PATH = settings.photos_dir / schema.GALLERY_META_DIR / schema.LINKS_CFG_NAME
 
 # What a freshly created links.cfg starts with. The shipped cfg files are their
 # own documentation; a file the console creates should not be the exception.
 HEADER = """\
-# links.cfg — pretty links: https://<your site>/<name> -> an album or a photo
+# links.cfg — pretty links: https://<your site>/s/<name> -> an album or a photo
 #
 #   name = album/path                 an album
 #   name = album/path/photo.jpg       one photo
@@ -98,9 +97,15 @@ def load() -> dict[str, list[str]]:
 
 # ----- the two halves of a link -------------------------------------------
 def normalize_slug(raw) -> str:
-    """What a slug is compared as: trimmed, lower-case, no leading slash. The
-    gallery lower-cases the request the same way, so `/Tokyo` finds `tokyo`."""
+    """What a slug is compared as: trimmed, lower-case, no outer slashes. The
+    gallery lower-cases the request the same way, so `/s/Tokyo` finds `tokyo`."""
     return str(raw or "").strip().strip("/").lower()
+
+
+def address(slug: str) -> str:
+    """The path a visitor types for `slug` — what the audit log and every
+    message call a link, so they all name it the way it is used."""
+    return PREFIX + slug
 
 
 def slug_problem(slug: str) -> str | None:
@@ -112,8 +117,6 @@ def slug_problem(slug: str) -> str | None:
     if not SLUG.fullmatch(slug) or "--" in slug:
         return (f"{slug!r} is not a link name — lower-case letters, digits and "
                 "single hyphens, starting and ending with a letter or digit")
-    if slug in RESERVED:
-        return f"/{slug} is one of the gallery's own addresses — the link would never be reached"
     return None
 
 
@@ -175,8 +178,8 @@ def _quoted(path: str) -> str:
 
 
 def resolve(slug: str) -> str | None:
-    """Where /<slug> goes, or None when there is no such link or its target is
-    gone. Only a slug-shaped request is looked up at all."""
+    """Where /s/<slug> goes, or None when there is no such link or its target
+    is gone. Only a slug-shaped request is looked up at all."""
     slug = normalize_slug(slug)
     if slug_problem(slug) is not None:
         return None
