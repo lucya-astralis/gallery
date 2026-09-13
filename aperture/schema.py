@@ -137,6 +137,7 @@ KEY_SPEC: dict[str, dict] = {
     "name": {"type": "text", "joined": True},
     "collection": {"type": "bool"},
     "showcase": {"type": "bool"},
+    "unlisted": {"type": "bool"},
     "cover": {"type": "photo"},
     "featured": {"type": "photo_list", "multiline": True},
     "order": {"type": "photo_list", "multiline": True},
@@ -193,7 +194,7 @@ KEY_SPEC: dict[str, dict] = {
     "credit": {"type": "text", "joined": True},
 }
 
-ALBUM_KEYS = ["name", "collection", "showcase", "cover", "featured", "order",
+ALBUM_KEYS = ["name", "collection", "showcase", "unlisted", "cover", "featured", "order",
               "reel", "sort", "tags", "effect", "icon", "font", "font_scale",
               "accent", "wallpaper", "wallpaper_mobile", "wallpaper_tint",
               "wallpaper_dim", "loc", "stat", "stats"]
@@ -239,6 +240,7 @@ HELP: dict[str, str] = {
     "name": "Display name, used everywhere the album is named -- cards, breadcrumbs, hero title. The folder name stays the URL. Empty means the folder name with underscores as spaces. Commas are fine here -- the gallery rejoins them.",
     "collection": "Show every photo in the subtree (own + sub-folders) as one flat collection.",
     "showcase": "Showcase album -- gets the star rail on /albums and the welcome page.",
+    "unlisted": "Keep this album and every album under it out of all listings -- /albums, the search, /stats, the welcome page and the lists of the API. Its page, its photos and a /s/ link still open for whoever has the address, marked noindex. Not a lock.",
     "cover": "Pin the album cover instead of auto-picking the newest photo.",
     "featured": "Featured photos: welcome hero, /api/showcase, and this album's reel.",
     "order": "Curated photo order. Adds the “Curated” entry to this album's sort menu.",

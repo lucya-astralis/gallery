@@ -27,8 +27,9 @@ def showcase_rows(album: str | None = None, limit: int = 50, random_order: bool 
         where_simple, _join, params, _coll, _wide = photo_scope(album, subtree)
         where = f"WHERE is_showcase = 1 AND {where_simple}"
     else:
-        where = "WHERE is_showcase = 1"
-        params = ()
+        listed, listed_params = albums.unlisted_clause()
+        where = f"WHERE is_showcase = 1 AND {listed}"
+        params = tuple(listed_params)
     order = (
         "ORDER BY RANDOM()"
         if random_order
@@ -106,12 +107,16 @@ def photo_scope(album: str, subtree: bool | None = None) -> tuple[str, str, tupl
     substr() (not LIKE) so `_`/`%` in album names can't act as wildcards."""
     collection = config.album_collection(album)
     wide = collection if subtree is None else bool(subtree)
-    if wide:
-        prefix = album + "/"
-        return ("(album = ? OR substr(album, 1, ?) = ?)",
-                "(i.album = ? OR substr(i.album, 1, ?) = ?)",
-                (album, len(prefix), prefix), collection, True)
-    return ("album = ?", "i.album = ?", (album,), collection, False)
+    if not wide:
+        return ("album = ?", "i.album = ?", (album,), collection, False)
+    # a whole subtree stops at any unlisted album inside it
+    # (albums.unlisted_clause), unless this album is one of them
+    prefix = album + "/"
+    listed, listed_params = albums.unlisted_clause("album", keep=album)
+    listed_i, _same = albums.unlisted_clause("i.album", keep=album)
+    return (f"(album = ? OR substr(album, 1, ?) = ?) AND {listed}",
+            f"(i.album = ? OR substr(i.album, 1, ?) = ?) AND {listed_i}",
+            (album, len(prefix), prefix, *listed_params), collection, True)
 
 
 # ----- album stats (auto EXIF/size readouts + editorial cfg facts) -------
@@ -334,10 +339,11 @@ def random_subtree_rows(album: str, limit: int = 8) -> list[dict]:
     """Random photos from an album's whole subtree, for album.cfg
     `reel = random`."""
     prefix = album + "/"
+    listed, listed_params = albums.unlisted_clause(keep=album)
     rows = db.conn().execute(
         "SELECT * FROM images WHERE (album = ? OR substr(album, 1, ?) = ?) "
-        "ORDER BY RANDOM() LIMIT ?",
-        (album, len(prefix), prefix, limit),
+        f"AND {listed} ORDER BY RANDOM() LIMIT ?",
+        (album, len(prefix), prefix, *listed_params, limit),
     ).fetchall()
     return [dict(r) for r in rows]
 
@@ -372,6 +378,12 @@ def photo_rows(*, album: str | None = None, subtree: bool | None = None,
         where.append(where_join)
         params += list(scope_params)
         scope.update(collection=collection, subtree=wide)
+    else:
+        # the gallery at large leaves unlisted albums out; asked for by name,
+        # an unlisted album answers like its page does
+        listed, listed_params = albums.unlisted_clause("i.album")
+        where.append(listed)
+        params += listed_params
     if featured:
         where.append("i.is_showcase = 1")
     if tag:

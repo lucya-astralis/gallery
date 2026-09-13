@@ -18,6 +18,35 @@ notes are never one commit apart.
 
 ---
 
+## 1.8.0 — 2026-09-13
+
+Unlisted albums.
+
+**New**
+
+* **`unlisted = true` in an album.cfg** takes the album, and every album under
+  it, out of every list the gallery draws: `/albums`, the sub-album cards of
+  its parent, the search, `/stats`, the welcome screen's counts and random
+  feed, and the lists of the JSON API (`/api/albums`, `/api/photos`,
+  `/api/showcase`, `/api/shuffle`, `/api/tags`, `/api/stats`). A parent shown
+  as a whole collection stops at it, and none of its photos becomes a
+  parent's cover.
+* Its page, its photos and a `/s/` link to it keep working for whoever has
+  the address, and those pages ask search engines not to index them. Asked
+  for by name, the API answers the way the page does.
+* The console offers the switch with the album's other basics.
+* It is a way to share an album with the people who have the link, not a
+  lock: anyone with the address can open it.
+
+**For maintainers**
+
+* `albums.unlisted_clause()` is the one SQL condition for it, and
+  `albums.is_unlisted()` the one question; a new listing that counts or shows
+  photos across albums should use them. A saved `unlisted` shows within two
+  seconds, which is how long the answer is kept.
+
+---
+
 ## 1.7.0 — 2026-09-13
 
 Long lists open up instead of stopping at "and N more".

@@ -43,11 +43,15 @@ def set_lang(code: str, next: str = "/"):
 def welcome_page(request: Request):
     c = db.conn()
     feed, feed_label, feed_mode = welcome.welcome_feed(mobile=context.is_mobile_request(request))
-    counts = c.execute("SELECT COUNT(*) AS images FROM images").fetchone()
+    # what the gallery holds, without its unlisted albums
+    listed, listed_params = albums.unlisted_clause()
+    counts = c.execute(f"SELECT COUNT(*) AS images FROM images WHERE {listed}",
+                       listed_params).fetchone()
     # "Albums" = top-level folders (parents of nested albums count once).
     top_level_albums = len(albums.child_album_names(None))
     showcase_count = c.execute(
-        "SELECT COUNT(*) AS n FROM images WHERE is_showcase = 1"
+        f"SELECT COUNT(*) AS n FROM images WHERE is_showcase = 1 AND {listed}",
+        listed_params,
     ).fetchone()
     showcase_albums = albums.showcase_album_rows(limit=6)
     return context.templates.TemplateResponse(
@@ -125,6 +129,8 @@ def stats_page(request: Request):
         c,
         month_name=partial(i18n.month_short, lang),
         weekday_name=partial(i18n.weekday_index, lang),
+        # unlisted albums are not part of what the archive shows it holds
+        where=albums.unlisted_clause(),
     )
 
     # Album bars are rolled up to TOP-LEVEL albums, counting each one's whole
@@ -146,16 +152,20 @@ def stats_page(request: Request):
         label_of=lambda k: i18n.t(lang, f"stats.shape.{k}"),
     ))
 
+    listed_i, listed_params = albums.unlisted_clause("i.album")
     tag_rows = c.execute(
-        """SELECT t.name AS name, COUNT(*) AS n
+        f"""SELECT t.name AS name, COUNT(*) AS n
              FROM image_tags it JOIN tags t ON t.id = it.tag_id
-            GROUP BY t.id ORDER BY n DESC, t.name"""
+             JOIN images i ON i.id = it.image_id
+            WHERE {listed_i}
+            GROUP BY t.id ORDER BY n DESC, t.name""",
+        listed_params,
     ).fetchall()
     # one lonely tag is a fact, not a distribution — the chart only earns its
     # card once there is something to compare. Past a dozen the rest folds.
     tags = (stats.fold(stats.rows([(r["name"], r["n"]) for r in tag_rows]), TAGS_SHOWN)
             if len(tag_rows) >= 3 else [])
-    tag_total = c.execute("SELECT COUNT(*) AS n FROM tags").fetchone()["n"]
+    tag_total = len(tag_rows)
 
     no_exif = data["total"] - sum(r["value"] for r in data["cameras"])
     cover = photos.showcase_rows(limit=1, random_order=True)
@@ -166,7 +176,7 @@ def stats_page(request: Request):
             "figs": {
                 "photos": data["total"],
                 "albums": len(albums.child_album_names(None)),
-                "folders": len(albums.all_album_nodes()),
+                "folders": len([n for n in albums.all_album_nodes() if not albums.is_unlisted(n)]),
                 "featured": data["featured"],
                 "tags": tag_total,
                 "days": data["active_days"],
@@ -288,6 +298,8 @@ def album_view(request: Request, album: str, tag: str | None = None, sort: str |
         request, "album.html",
         {
             "album": album,
+            # album.cfg `unlisted`: the page answers, but asks not to be indexed
+            "unlisted": albums.is_unlisted(album),
             # base.html paints the backdrop from this; a sub-album with no
             # wallpaper of its own inherits its nearest ancestor's
             "bg_album": album,
@@ -361,8 +373,11 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
         and config.album_collection(col_root)
     ):
         prefix = col_root + "/"
-        where_scope = "(album = ? OR substr(album, 1, ?) = ?)"
-        scope_params: tuple = (col_root, len(prefix), prefix)
+        # the walk skips unlisted albums inside the collection, unless this
+        # photo lives in one (albums.unlisted_clause)
+        listed, listed_params = albums.unlisted_clause(keep=album)
+        where_scope = f"(album = ? OR substr(album, 1, ?) = ?) AND {listed}"
+        scope_params: tuple = (col_root, len(prefix), prefix, *listed_params)
     else:
         col_root = ""  # absent / forged / no longer a collection: folder scope
         where_scope = "album = ?"
@@ -397,6 +412,7 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
         request, "image.html",
         {
             "image": dict(row),
+            "unlisted": albums.is_unlisted(row["album"]),
             "bg_album": row["album"],
             "breadcrumbs": albums.album_breadcrumbs(row["album"]),
             "exif": pretty_exif,
@@ -490,7 +506,8 @@ def search_page(request: Request, q: str = "", sort: str | None = None):
     text = query.text
     matched_albums = [
         a for a in albums.albums_with_ancestors()
-        if text and (_matches(text, a) or _matches(text, config.album_display_name(a))
+        if text and not albums.is_unlisted(a)
+        and (_matches(text, a) or _matches(text, config.album_display_name(a))
                      or any(_matches(text, tag) for tag in config.album_tags(a)))
     ]
     # A matched album stands for everything under it: naming a collection has
@@ -507,12 +524,13 @@ def search_page(request: Request, q: str = "", sort: str | None = None):
     also = (("i.album IN (%s)" % ",".join("?" * len(scope_albums)), scope_albums)
             if scope_albums else None)
     where, params = search.condition(query, "i", also)
+    listed, listed_params = albums.unlisted_clause("i.album")
     rows = c.execute(
         f"""SELECT i.* FROM images i
-           WHERE {where}
+           WHERE ({where}) AND {listed}
            ORDER BY {qualified_sql}
            LIMIT ?""",
-        (*params, SEARCH_PHOTO_LIMIT + 1),
+        (*params, *listed_params, SEARCH_PHOTO_LIMIT + 1),
     ).fetchall()
     # One row over the limit is fetched purely to tell "exactly this many" from
     # "this many and more" — a broad query used to render every matching row,

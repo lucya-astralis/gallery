@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from collections import Counter
 
 from . import cfgio, config, db, i18n, photos, schema, stats, theme
@@ -74,7 +75,9 @@ def child_album_names(parent: str | None, all_albums: list[str] | None = None) -
         if full not in seen:
             seen.add(full)
             out.append(full)
-    return out
+    # an unlisted child stays off its parent's list -- unless the parent sits
+    # in the same unlisted subtree, so an unlisted album still lists its own
+    return [a for a in out if not hidden_from(a, parent)]
 
 
 def album_cover_rel(album: str) -> str | None:
@@ -85,10 +88,13 @@ def album_cover_rel(album: str) -> str | None:
     if cover_rel:
         return cover_rel
     prefix = album + "/"
+    # never a photo from an unlisted album further down (unlisted_clause)
+    listed, listed_params = unlisted_clause(keep=album)
     row = db.conn().execute(
         "SELECT rel_path FROM images WHERE (album = ? OR substr(album, 1, ?) = ?) "
+        f"AND {listed} "
         "ORDER BY taken_at IS NULL, taken_at DESC, mtime DESC LIMIT 1",
-        (album, len(prefix), prefix),
+        (album, len(prefix), prefix, *listed_params),
     ).fetchone()
     return row["rel_path"] if row else None
 
@@ -100,8 +106,9 @@ def album_card(album: str, all_albums: list[str] | None = None) -> dict:
     subtree prefix so album names containing `_`/`%` don't act as wildcards."""
     c = db.conn()
     prefix = album + "/"
-    cond = "(album = ? OR substr(album, 1, ?) = ?)"
-    params = (album, len(prefix), prefix)
+    listed, listed_params = unlisted_clause(keep=album)
+    cond = f"(album = ? OR substr(album, 1, ?) = ?) AND {listed}"
+    params = (album, len(prefix), prefix, *listed_params)
     agg = c.execute(
         f"SELECT COUNT(*) AS count, MAX(taken_at) AS latest FROM images WHERE {cond}",
         params,
@@ -495,6 +502,77 @@ def refresh_featured_on_cfg_change(album: str) -> None:
             _cfg_seen_mtimes[album] = mtime
     if stale:
         recompute_featured()
+
+
+# ----- unlisted albums ---------------------------------------------------
+# album.cfg `unlisted = true` keeps an album -- and every album under it -- out
+# of each list the gallery draws: /albums, a parent's sub-album cards, the
+# search, /stats, the welcome counters and feed, and the API's lists. Its own
+# page, its photos and a /s/ link still answer, so it can be shared with
+# whoever has the address. It is not a lock; the pages only say noindex.
+#
+# The question is asked many times per page (every album card counts its
+# sub-albums), and each answer stats every album's cfg -- on an SMB share
+# that is the slow part. So the answer is kept for a moment.
+UNLISTED_TTL = 2.0
+_unlisted_lock = threading.Lock()
+_unlisted_cache: tuple[float, list[str]] | None = None
+
+
+def forget_unlisted() -> None:
+    """Drop the kept answer, so the next question reads the cfgs again."""
+    global _unlisted_cache
+    with _unlisted_lock:
+        _unlisted_cache = None
+
+
+def unlisted_roots() -> list[str]:
+    """The topmost albums whose own album.cfg sets `unlisted`, sorted. The
+    albums under them are unlisted with them and are not repeated here."""
+    global _unlisted_cache
+    now = time.monotonic()
+    with _unlisted_lock:
+        if _unlisted_cache is not None and now - _unlisted_cache[0] < UNLISTED_TTL:
+            return _unlisted_cache[1]
+    flagged = [a for a in all_album_nodes()
+               if cfgio.as_bool(cfgio.first(config.album_config(a), "unlisted"))]
+    roots = [a for a in flagged if not any(a.startswith(other + "/") for other in flagged)]
+    with _unlisted_lock:
+        _unlisted_cache = (now, roots)
+    return roots
+
+
+def _within(album: str, root: str) -> bool:
+    return album == root or album.startswith(root + "/")
+
+
+def is_unlisted(album: str | None) -> bool:
+    """Whether `album` is unlisted, by its own cfg or an ancestor's."""
+    return bool(album) and any(_within(album, root) for root in unlisted_roots())
+
+
+def hidden_from(album: str, viewer: str | None) -> bool:
+    """Whether `album` stays off what `viewer` lists (an album, or None for the
+    gallery at large): it lies in an unlisted subtree `viewer` is not inside."""
+    return any(_within(album, root) and not (viewer and _within(viewer, root))
+               for root in unlisted_roots())
+
+
+def unlisted_clause(column: str = "album", keep: str | None = None) -> tuple[str, list]:
+    """(sql, params) that leaves the photos of unlisted subtrees out, over
+    `column`. `keep` is the album being looked at: the unlisted subtree it lives
+    in stays in, so an unlisted album's own page still shows its photos. "1"
+    when nothing is unlisted. substr() rather than LIKE, as everywhere here, so
+    `_` and `%` in a folder name stay literal."""
+    parts: list[str] = []
+    params: list = []
+    for root in unlisted_roots():
+        if keep and _within(keep, root):
+            continue
+        prefix = root + "/"
+        parts.append(f"NOT ({column} = ? OR substr({column}, 1, ?) = ?)")
+        params += [root, len(prefix), prefix]
+    return (" AND ".join(parts) or "1"), params
 
 
 def all_album_nodes() -> list[str]:

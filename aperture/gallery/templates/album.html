@@ -6,6 +6,8 @@
 {% block title %}{{ album_label }} — {{ brand.title }}{% endblock %}
 {% block body_class %}page-album{% if trip %} trip-{{ trip.key }}{% endif %}{% if album_font_css %} album-font{% endif %}{% endblock %}
 {% block head_extra %}
+{# album.cfg `unlisted`: reachable by its address, kept out of search engines #}
+{% if unlisted %}<meta name="robots" content="noindex">{% endif %}
   {# The album's own title face (album.cfg `font = ...`): a generated sheet
      carrying the @font-face + --album-title-font, which style.css reads.
      Loaded here, after style.css, and only on albums that configure one.

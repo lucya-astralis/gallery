@@ -191,15 +191,17 @@ def _parse_ts(raw) -> datetime | None:
         return None
 
 
-def collect(conn, month_name, weekday_name) -> dict:
+def collect(conn, month_name, weekday_name, where: tuple[str, list] = ("1", [])) -> dict:
     """Every dataset the /stats page draws.
 
     `month_name(year, month)` and `weekday_name(idx)` are injected so the
     labels come out in the viewer's language without this module importing
-    i18n (idx 0 = Monday).
+    i18n (idx 0 = Monday). `where` is an (sql, params) over `images` that
+    narrows what is counted -- the page leaves unlisted albums out.
     """
     rows = conn.execute(
-        "SELECT album, size, width, height, taken_at, exif_json, is_showcase FROM images"
+        "SELECT album, size, width, height, taken_at, exif_json, is_showcase FROM images "
+        f"WHERE {where[0]}", list(where[1]),
     ).fetchall()
 
     total = len(rows)

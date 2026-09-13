@@ -530,7 +530,7 @@ function restoreFocus(fk, start, end) {
  * what an album *is*, how it presents itself, which photos it leans on, and
  * the editorial text. Each group is the answer to one question. */
 const ALBUM_GROUPS = [
-  ['The album', 'What it is called, and what this folder is to the gallery.', ['name', 'collection', 'showcase', 'cover']],
+  ['The album', 'What it is called, and what this folder is to the gallery.', ['name', 'collection', 'showcase', 'unlisted', 'cover']],
   ['Photos it leans on', 'Which photos get pulled out of the grid.', ['featured', 'order', 'reel', 'sort']],
   ['Look', 'Its own mark, title face, accent colour and page effect.',
     ['icon', 'font', 'font_scale', 'accent', 'effect']],

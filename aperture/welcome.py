@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from . import config, db, photos, schema
+from . import albums, config, db, photos, schema
 
 log = logging.getLogger("aperture.welcome")
 WELCOME_FEED_MAX = 24
@@ -60,10 +60,13 @@ def welcome_feed(mobile: bool = False) -> tuple[list[dict], str, str]:
                 for r in showcase_feed
             ]
             return feed, "FEATURED", "showcase"
+    listed, listed_params = albums.unlisted_clause()
     feed = [
         dict(r)
         for r in db.conn().execute(
-            "SELECT album, filename, rel_path FROM images ORDER BY RANDOM() LIMIT 8"
+            f"SELECT album, filename, rel_path FROM images WHERE {listed} "
+            "ORDER BY RANDOM() LIMIT 8",
+            listed_params,
         ).fetchall()
     ]
     return feed, "RANDOM", "random"

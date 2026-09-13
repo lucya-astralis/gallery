@@ -172,19 +172,27 @@ def api_stats(request: Request, lang: str | None = None):
     totals that are only interesting to an API client."""
     code = _api_lang(request, lang)
     c = db.conn()
+    # the gallery at large: unlisted albums are not part of what it holds
+    listed, listed_params = albums.unlisted_clause()
     row = c.execute(
-        """SELECT COUNT(*) AS images, COALESCE(SUM(size), 0) AS bytes,
+        f"""SELECT COUNT(*) AS images, COALESCE(SUM(size), 0) AS bytes,
                   COALESCE(SUM(is_showcase), 0) AS featured,
                   MIN(taken_at) AS first, MAX(taken_at) AS last
-           FROM images"""
+           FROM images WHERE {listed}""",
+        listed_params,
     ).fetchone()
-    tags = c.execute("SELECT COUNT(*) AS n FROM tags").fetchone()["n"]
+    listed_i, _same = albums.unlisted_clause("i.album")
+    tags = c.execute(
+        f"""SELECT COUNT(DISTINCT it.tag_id) AS n FROM image_tags it
+           JOIN images i ON i.id = it.image_id WHERE {listed_i}""",
+        listed_params,
+    ).fetchone()["n"]
     return context.json_cors({
         "images": row["images"],
         "featured": row["featured"],
         "albums": {
             "top_level": len(albums.child_album_names(None)),
-            "total": len(albums.all_album_nodes()),
+            "total": len([n for n in albums.all_album_nodes() if not albums.is_unlisted(n)]),
             "showcase": len(albums.showcase_album_rows()),
         },
         "tags": tags,
@@ -463,7 +471,8 @@ def api_tags(request: Request, album: str | None = None, subtree: bool | None = 
     how many photos carry each, most-used first. Scoped to an album — again
     collection-aware — when `album` is given. An album's own display tags are
     a different thing and live on /api/album."""
-    where, params = "", []
+    listed, listed_params = albums.unlisted_clause("i.album")
+    where, params = f"WHERE {listed}", list(listed_params)
     scope = {"album": None, "collection": False, "subtree": False}
     if album:
         resolved = albums.resolve_album_path(album)
