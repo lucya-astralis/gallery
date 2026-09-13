@@ -3515,8 +3515,73 @@ img.is-broken { opacity: .2; }
 .searchbox > .fieldsearch { padding-left: calc(var(--s-4) + 11px + var(--s-3)); }
 .sidebar__search > .searchbox { flex: 1 1 auto; }
 
-/* The four places share one row across a phone, and their words already fill
-   it: with a glyph each, OPERATIONS ran off the edge at 375px. The words stay. */
+/* The five places share one row across a phone, and their words already fill
+   it: with a glyph each, OPERATIONS ran off the edge at 375px. The words stay.
+   Since the fifth (Changelog) the side padding steps down one notch as well,
+   or CHANGELOG ends on the edge -- the words and the tap height do not change. */
 @media (max-width: 480px) {
   .place > .fa { display: none; }
+  .place { padding-left: var(--s-2); padding-right: var(--s-2); }
+}
+
+/* ----- changelog: who makes it, and the release notes ------------------ */
+/* The maker card mirrors the gallery's operator card (.foot__op): a square
+   picture in a hairline frame, the name in the mono voice. */
+.maker { display: flex; align-items: center; gap: var(--s-5); }
+.maker__pfp {
+  display: block;
+  flex: none;
+  width: 64px; height: 64px;
+  border: var(--hair) solid var(--line-strong);
+  border-radius: var(--radius);
+}
+.maker__text { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; }
+.maker__name,
+.maker__repo {
+  font-family: var(--mono);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: color var(--dur-1) ease;
+}
+.maker__name { font-size: var(--fs-chrome-lg); color: var(--text); }
+.maker__repo { font-size: var(--fs-chrome-sm); color: var(--text-dim); }
+.maker__name .fa,
+.maker__repo .fa { color: var(--text-ghost); margin: 0 var(--s-2); }
+.maker__repo .fa:first-child { margin-left: 0; }
+@media (hover: hover) {
+  .maker__name:hover,
+  .maker__repo:hover { color: var(--chrome); }
+}
+
+/* the notes themselves: markdown the server rendered from CHANGELOG.md */
+.notes { color: var(--text-dim); font-size: var(--fs-text-md); line-height: 1.6; }
+.notes > :first-child { margin-top: 0; }
+.notes > :last-child { margin-bottom: 0; }
+.notes p,
+.notes ul { margin: 0 0 var(--s-4); }
+.notes ul { padding-left: var(--s-6); }
+.notes li + li { margin-top: var(--s-2); }
+.notes strong { color: var(--text); font-weight: 600; }
+.notes code { font-family: var(--mono); font-size: .92em; color: var(--text); }
+.notes a { color: var(--text); text-decoration-color: var(--line-strong); }
+@media (hover: hover) {
+  .notes a:hover { color: var(--chrome); }
+}
+
+/* an older release, folded */
+.release__toggle {
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-sm);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+}
+.release__toggle::-webkit-details-marker { display: none; }
+.release__toggle .fa { margin-right: var(--s-2); transition: rotate var(--dur-1) ease; }
+.release[open] .release__toggle { margin-bottom: var(--s-4); }
+.release[open] .release__toggle .fa { rotate: 180deg; }
+@media (hover: hover) {
+  .release__toggle:hover { color: var(--chrome); }
 }

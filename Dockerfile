@@ -12,6 +12,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY aperture/ ./aperture/
+# the release notes the console's Changelog place reads
+COPY CHANGELOG.md ./
 
 # The process writes into /data (index, control channel, console state) and
 # into /thumbnails and /previews. Nothing else needs to be writable, and

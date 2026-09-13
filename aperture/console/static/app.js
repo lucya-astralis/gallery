@@ -176,7 +176,7 @@ function takeReturnNote() {
   let sel = null;
   try { sel = JSON.parse(raw); } catch (_) { return null; }
   if (!sel || typeof sel !== 'object') return null;
-  if (['gallery', 'ops', 'home', 'links'].includes(sel.kind)) {
+  if (['gallery', 'ops', 'home', 'links', 'changelog'].includes(sel.kind)) {
     return { kind: sel.kind };
   }
   if (sel.kind === 'album' && typeof sel.album === 'string' && albumExists(sel.album)) {
@@ -462,6 +462,10 @@ async function select(sel, keepTab = false) {
   }
   if (sel.kind === 'links') {
     await renderLinks(sel.draft);
+    return;
+  }
+  if (sel.kind === 'changelog') {
+    await renderChangelog();
     return;
   }
   try {
@@ -883,6 +887,69 @@ async function runDoctor(album) {
  * dashboard with figures of its own is a second opinion to keep in step.
  */
 const home = { issues: null, audit: [], gallery: null };
+
+/* ----- changelog -----------------------------------------------------------
+ * The release notes this build ships with, where its code lives and who makes
+ * it. The notes arrive as HTML the server rendered from CHANGELOG.md -- this
+ * repo's own file, so it is set as markup; the console's CSP still runs no
+ * script but its own. The newest release is open, every older one folds. */
+async function renderChangelog() {
+  let about = null;
+  try {
+    about = await api('/api/about');
+  } catch (err) {
+    $('#pane').innerHTML = '';
+    $('#pane').append(el('div', { class: 'pane__empty', text: err.message }));
+    return;
+  }
+  if (!state.sel || state.sel.kind !== 'changelog') return;   /* navigated away */
+  const pane = $('#pane');
+  pane.innerHTML = '';
+  pane.append(el('div', { class: 'pane__top' },
+    el('div', { class: 'head' },
+      el('div', { class: 'head__crumb', text: about.repo }),
+      el('div', { class: 'head__line' },
+        el('h1', { class: 'head__title', text: 'Changelog' }),
+        el('div', { class: 'head__meta' },
+          el('span', { class: 'pill', icon: 'fa-code-branch', text: about.product + ' ' + about.version }))))));
+
+  const grid = el('div', { class: 'home' });
+  pane.append(grid);
+
+  const maker = about.maker || {};
+  const outward = { target: '_blank', rel: 'noopener' };
+  grid.append(el('div', { class: 'home__wide' }, card('fa-user-pen', 'Made by', 'who builds this software',
+    el('div', { class: 'maker' },
+      maker.pfp ? el('img', { class: 'maker__pfp', src: maker.pfp, alt: '', width: '64', height: '64' }) : null,
+      el('div', { class: 'maker__text' },
+        el('a', { class: 'maker__name', href: maker.url, ...outward, text: maker.name,
+                  iconEnd: 'fa-arrow-up-right-from-square' }),
+        el('a', { class: 'maker__repo', href: about.repo, ...outward, icon: 'fa-code-branch',
+                  text: about.repo.replace(/^https?:\/\//, '') }))))));
+
+  const releases = about.releases || [];
+  if (!releases.length) {
+    grid.append(el('div', { class: 'home__wide' }, card('fa-scroll', 'Releases', null,
+      el('p', { class: 'card__quiet', text: 'CHANGELOG.md is not part of this build.' }))));
+    return;
+  }
+  releases.forEach((release, i) => {
+    const notes = el('div', { class: 'notes' });
+    notes.innerHTML = release.html;
+    notes.querySelectorAll('a[href^="http"]').forEach((a) => {
+      a.target = '_blank';
+      a.rel = 'noopener';
+    });
+    const current = release.version === about.version;
+    const body = i === 0 ? notes
+      : el('details', { class: 'release' },
+          el('summary', { class: 'release__toggle', icon: 'fa-chevron-down', text: 'Read the notes' }),
+          notes);
+    grid.append(el('div', { class: 'home__wide' },
+      card(i === 0 ? 'fa-scroll' : null, release.version,
+           release.date + (current ? ' · this build' : ''), body)));
+  });
+}
 
 async function renderHome() {
   const pane = $('#pane');

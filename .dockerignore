@@ -13,3 +13,4 @@ nebula
 designs
 tools
 *.md
+!CHANGELOG.md

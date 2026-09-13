@@ -61,6 +61,7 @@
 .fa-circle-exclamation{ --fa:"\f06a"; }
 .fa-circle-info{ --fa:"\f05a"; }
 .fa-clock-rotate-left{ --fa:"\f1da"; }
+.fa-code-branch{ --fa:"\f126"; }
 .fa-copy{ --fa:"\f0c5"; }
 .fa-database{ --fa:"\f1c0"; }
 .fa-download{ --fa:"\f019"; }
@@ -102,6 +103,7 @@
 .fa-rotate-right{ --fa:"\f2f9"; }
 .fa-route{ --fa:"\f4d7"; }
 .fa-scale-balanced{ --fa:"\f24e"; }
+.fa-scroll{ --fa:"\f70e"; }
 .fa-server{ --fa:"\f233"; }
 .fa-shield-halved{ --fa:"\f3ed"; }
 .fa-shuffle{ --fa:"\f074"; }
@@ -113,4 +115,5 @@
 .fa-trash{ --fa:"\f1f8"; }
 .fa-triangle-exclamation{ --fa:"\f071"; }
 .fa-upload{ --fa:"\f093"; }
+.fa-user-pen{ --fa:"\f4ff"; }
 .fa-xmark{ --fa:"\f00d"; }

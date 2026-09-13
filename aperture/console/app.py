@@ -21,11 +21,13 @@ here shows up on its next page load with nothing to restart.
 from __future__ import annotations
 
 import hashlib
+import re
 import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import markdown
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -63,6 +65,19 @@ app = FastAPI(title=f"{brand.PRODUCT} console", docs_url=None, redoc_url=None,
 def fa_icons():
     return FileResponse(templating.WEB_DIR / "static" / "fa-icons.css",
                         media_type="text/css")
+
+
+# The maker's picture on the Changelog place. It ships with the gallery's
+# static files; a route for the same reason as the icon sheet above, and
+# declared before /static for the same reason too.
+MAKER_PFP = templating.WEB_DIR / "static" / "pfp.webp"
+
+
+@app.get("/static/maker.webp", include_in_schema=False)
+def maker_pfp():
+    if not MAKER_PFP.is_file():
+        raise HTTPException(404, "no picture")
+    return FileResponse(MAKER_PFP, media_type="image/webp")
 
 
 # The console's chrome is the gallery's chrome, down to the same nine font
@@ -373,6 +388,58 @@ def api_meta():
 
 
 # ----- tree -------------------------------------------------------------
+# ----- about ------------------------------------------------------------
+# The Changelog place: the release notes this build ships with, where the code
+# lives and who makes it. CHANGELOG.md sits next to the package -- the image
+# copies it there (see the Dockerfile) -- and is rendered here rather than in
+# the browser, which under this app's CSP runs no script but its own.
+CHANGELOG_PATH = BASE_DIR.parents[1] / "CHANGELOG.md"
+_HEADING = re.compile(r"^## (.+?)\s*$", re.MULTILINE)
+_RELEASE = re.compile(r"(\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})")
+_RELATIVE_HREF = re.compile(r'href="(?!https?:|#|mailto:)([^"]+)"')
+
+
+def _release_notes(text: str) -> list[dict]:
+    """CHANGELOG.md -> [{version, date, html}], in the file's order (newest
+    first). Only a `## X.Y.Z — date` heading is a release; any other `##`
+    heading ends the release above it without being one. A link relative to
+    the repository points at it on GitHub, where it resolves."""
+    headings = list(_HEADING.finditer(text))
+    out: list[dict] = []
+    for i, heading in enumerate(headings):
+        release = _RELEASE.fullmatch(heading.group(1))
+        if not release:
+            continue
+        end = headings[i + 1].start() if i + 1 < len(headings) else len(text)
+        # the rule that separates one entry from the next is not part of it
+        body = re.sub(r"\n-{3,}\s*$", "", text[heading.end():end].strip()).strip()
+        html = markdown.markdown(body, extensions=["extra", "sane_lists"], output_format="html5")
+        html = _RELATIVE_HREF.sub(
+            lambda m: 'href="%s/blob/main/%s"' % (brand.REPO_URL, m.group(1)), html)
+        out.append({"version": release.group(1), "date": release.group(2), "html": html})
+    return out
+
+
+@app.get("/api/about")
+def api_about():
+    """What the Changelog place shows. Behind the door like every route here."""
+    try:
+        text = CHANGELOG_PATH.read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    return {
+        "product": brand.PRODUCT,
+        "version": brand.VERSION,
+        "repo": brand.REPO_URL,
+        "maker": {
+            "name": brand.MAKER_NAME,
+            "url": brand.MAKER_URL,
+            "pfp": "/static/maker.webp" if MAKER_PFP.is_file() else None,
+        },
+        "releases": _release_notes(text),
+    }
+
+
 @app.get("/api/tree")
 def api_tree():
     if not settings.photos_dir.is_dir():

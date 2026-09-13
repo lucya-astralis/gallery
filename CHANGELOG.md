@@ -18,6 +18,31 @@ notes are never one commit apart.
 
 ---
 
+## 1.9.0 — 2026-09-13
+
+The console carries its own release notes.
+
+**New**
+
+* **A Changelog place in the console**, next to Operations: every release
+  this build knows about, the newest open and each older one a click away,
+  and which version this build is. It says who makes the software —
+  [lucya.sh](https://lucya.sh), with a picture — and links to the code on
+  [GitHub](https://github.com/lucya-astralis/gallery).
+
+**Before you upgrade**
+
+* The image now carries `CHANGELOG.md`. Rebuild it rather than restarting
+  the old one, or the place reports that the notes are not part of the build.
+
+**For maintainers**
+
+* `brand.REPO_URL`, `brand.MAKER_NAME` and `brand.MAKER_URL` hold the links.
+  The console renders the notes on the server, at `/api/about`; only a
+  `## X.Y.Z — date` heading counts as a release.
+
+---
+
 ## 1.8.0 — 2026-09-13
 
 Unlisted albums.

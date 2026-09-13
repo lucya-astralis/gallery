@@ -46,6 +46,13 @@ NAME = "lucya.systems"
 URL = "https://lucya.systems"
 PRODUCT = f"{NAME} aperture"
 
+# Where the code lives and who makes it. The console's Changelog place shows
+# both next to the release notes: the maker is the person behind the software,
+# the vendor above is the label it ships under.
+REPO_URL = "https://github.com/lucya-astralis/gallery"
+MAKER_NAME = "lucya.sh"
+MAKER_URL = "https://lucya.sh"
+
 # Aperture's own release version — THE one place it is written. The nav, the
 # footer, /humans.txt, X-Powered-By, <meta name="generator">, the EXIF
 # Software tag and the CLI masthead all derive from this line, so a release is
@@ -62,7 +69,7 @@ PRODUCT = f"{NAME} aperture"
 # the configurator were two programs, this is one, and a version is a promise
 # about a thing. Distinct from API_VERSION (gallery/api.py), which versions the
 # JSON API contract and did NOT reset — the endpoints kept their shape.
-VERSION = "1.8.0"
+VERSION = "1.9.0"
 
 # One-line form, shared by <meta name="generator">, the X-Powered-By header
 # and the EXIF `Software` tag so all three can never drift apart.
