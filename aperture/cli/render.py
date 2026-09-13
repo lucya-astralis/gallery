@@ -89,6 +89,8 @@ def _render_system(st: dict | None, live: bool, pause: dict | None) -> None:
                 bits = ", ".join(f"{res[k]} {k}" for k in
                                  ("indexed", "thumbnails", "previews", "removed", "failed")
                                  if res.get(k)) or "no changes"
+                if res.get("held"):
+                    bits += " · " + ui.state("HELD: no photos found, index kept", "warn")
                 scope = f" [{last['album']}]" if last.get("album") else ""
                 err = f" · {ui.state('ERROR ' + str(last['error']), 'bad')}" if last.get("error") else ""
                 kv("scan", f"idle · last {last.get('trigger')}{scope} {ops.ago(last.get('finished_at'))} "

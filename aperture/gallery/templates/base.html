@@ -70,6 +70,7 @@
   {% block head_extra %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">{{ t('aria.skip') }}</a>
   {# Fixed site backdrop as a single real element (NOT body::before/::after):
        iOS Safari mispositions fixed *pseudo-elements* of the flex <body> during
        scroll, so the grid + wallpaper are painted here instead and stay pinned.
@@ -121,7 +122,7 @@
       </div>
     </div>
   </nav>
-  <main>
+  <main id="main" tabindex="-1">
     {% block content %}{% endblock %}
   </main>
   <footer class="foot">

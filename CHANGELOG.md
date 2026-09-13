@@ -18,6 +18,27 @@ notes are never one commit apart.
 
 ---
 
+## 1.5.1 — 2026-09-13
+
+A scan that finds nothing no longer empties the gallery, and the photo viewer
+can be used from the keyboard alone.
+
+**Fixed**
+
+* **An unmounted share no longer wipes the index.** When the photo share is
+  not there, a `nofail` mount leaves an empty folder, and the periodic scan
+  used to read that as every photo having been deleted — the site went empty
+  until the share came back and a scan re-indexed it. A whole-gallery scan
+  that finds no photo at all while the index still holds some now changes
+  nothing and says so: a warning in the log, `held` in the scan result, and a
+  mark in `status`, `scan` and the console's scan readout. `scan --force` is
+  the way to clear the index when the gallery really is empty.
+* **The fullscreen viewer keeps focus.** Opening it moves focus to its close
+  button and makes the page behind it inert, so Tab no longer walks out into
+  links that cannot be seen; closing it hands focus back to what opened it.
+* **A skip link.** The first Tab on every page offers *Skip to content*, which
+  jumps past the header straight into the page.
+
 ## 1.5.0 — 2026-09-13
 
 The console wears the gallery's icons, and its header folds instead of jumping.

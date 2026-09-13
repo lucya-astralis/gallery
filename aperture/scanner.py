@@ -677,10 +677,25 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         else:
             existing = [r["rel_path"] for r in c.execute("SELECT rel_path FROM images").fetchall()]
         removed = 0
-        for rel in existing:
-            if rel not in seen:
-                c.execute("DELETE FROM images WHERE rel_path = ?", (rel,))
-                removed += 1
+        # A whole-tree walk that found no photo at all while the index still
+        # holds rows is an unmounted share far more often than an emptied
+        # gallery: a `nofail` CIFS mount that did not come up leaves an empty
+        # directory, and dropping every row would read as an empty site until
+        # the share is back and a scan re-indexes. So the rows stay and the
+        # scan says why. A scoped walk needs no such guard — a missing album
+        # folder already returns above — and `force` is how an operator says
+        # the gallery really is empty now.
+        held = not root and not seen and bool(existing) and not force
+        if held:
+            log.warning("scan found no photos under %s but the index holds %d; "
+                        "left the index as it is (share not mounted?) -- "
+                        "`scan --force` clears it if the gallery really is empty",
+                        photos_dir, len(existing))
+        else:
+            for rel in existing:
+                if rel not in seen:
+                    c.execute("DELETE FROM images WHERE rel_path = ?", (rel,))
+                    removed += 1
         c.commit()
     # once per scan, not once per photo — see prune_tags()
     prune_tags()
@@ -691,6 +706,8 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         "removed": removed,
         "failed": failed,
         "total_seen": len(seen),
+        # True when the empty-walk guard above kept the index as it was
+        "held": held,
         "root": root,
     }
 

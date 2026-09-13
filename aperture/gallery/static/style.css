@@ -4803,6 +4803,26 @@ body.page-welcome{ --page-max: 2400px; }
   border:0;
 }
 
+/* skip link: the first stop for Tab on every page, off screen until it has
+   focus, then the one accent-filled control in the top corner. */
+.skip-link{
+  position:fixed;
+  top:var(--s-3); left:var(--s-3);
+  z-index:2000;
+  padding:var(--s-3) var(--s-5);
+  background:var(--acc);
+  color:var(--on-acc);
+  font-family:var(--mono);
+  font-size:var(--fs-chrome-md);
+  text-decoration:none;
+  translate:0 calc(-100% - var(--s-5));
+}
+/* :focus, not :focus-visible — a screen reader that moves focus here is
+   not a keyboard in the browser's eyes, and the link must still show */
+.skip-link:focus{ translate:0 0; outline:none; }
+/* <main> takes focus only as the skip link's landing spot */
+#main:focus{ outline:none; }
+
 @media (max-width:760px){
   .st-lead{ font-size:var(--fs-text-md); margin-bottom:18px; }
   .st-figs{ margin-bottom:18px; }

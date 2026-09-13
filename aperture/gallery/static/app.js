@@ -288,6 +288,18 @@ document.addEventListener('submit', (e) => {
   if (e.defaultPrevented || (e.target && e.target.target)) return;
   navProgress.start();
 });
+
+// The skip link moves focus itself instead of following #main. A fragment
+// jump is a history entry and fires popstate, and the photo page reads every
+// popstate as "back" and leaves for the album. Without a script neither the
+// jump's side effect nor that handler exists, so the plain link is enough.
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('.skip-link');
+  const main = a && document.getElementById('main');
+  if (!main) return;
+  e.preventDefault();
+  main.focus();
+}, true);
 // bfcache restore brings the page back exactly as it left — bar included
 window.addEventListener('pageshow', (e) => { if (e.persisted) navProgress.reset(); });
 
@@ -2126,9 +2138,23 @@ document.addEventListener('DOMContentLoaded', () => {
     imgEl.style.transform = '';
     lb.hidden = false;
     document.body.classList.add('lightbox-open');
+    // A modal in fact, not just in its role: focus moves in, and the page
+    // behind goes inert so Tab cannot walk out into 400 photo links nobody
+    // can see. The viewer lives directly under <body> (reparented above),
+    // so its siblings are exactly "everything else".
+    returnFocus = document.activeElement;
+    setPageInert(true);
+    if (closeBtn) closeBtn.focus({ preventScroll: true });
     render();
     flipIn();
     bumpIdle();
+  }
+
+  let returnFocus = null;
+  function setPageInert(on) {
+    for (const node of document.body.children) {
+      if (node !== lb) node.inert = on;
+    }
   }
 
   let closing = false;
@@ -2141,6 +2167,14 @@ document.addEventListener('DOMContentLoaded', () => {
       lb.classList.remove('is-closing');
       lb.hidden = true;
       document.body.classList.remove('lightbox-open');
+      setPageInert(false);
+      // back to whatever opened the viewer — after a flip-through the page
+      // underneath was swapped, so that element may be gone; the trigger on
+      // the new page is the same place
+      const back = returnFocus && returnFocus.isConnected
+        ? returnFocus : document.getElementById('open-fullscreen-btn');
+      returnFocus = null;
+      if (back) back.focus({ preventScroll: true });
       setLoading(false);
       imgEl.classList.remove('is-flip');
       imgEl.style.transform = '';

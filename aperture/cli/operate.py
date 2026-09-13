@@ -82,6 +82,10 @@ def _print_scan_result(summary: dict) -> None:
     if res.get("failed"):
         kv("note", "unreadable files stay in the gallery without a thumbnail — "
                    "see `doctor`")
+    if res.get("held"):
+        kv("held", ui.state("the walk found no photos, so the index was left "
+                            "as it is — is the share mounted? `scan --force` "
+                            "clears it if the gallery really is empty", "warn"))
 
 
 def cmd_scan(args) -> int:

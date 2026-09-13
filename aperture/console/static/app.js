@@ -669,7 +669,7 @@ function paintOps() {
         ? ago(scan.finished_at) + ' · ' + (scan.trigger || '?') +
           (scan.seconds != null ? ' · ' + scan.seconds + 's' : '')
         : 'never'),
-      fact('it did', scan ? scanSummary(res) : '—', res.failed ? 'warn' : null),
+      fact('it did', scan ? scanSummary(res) : '—', res.failed || res.held ? 'warn' : null),
       scan && scan.error ? fact('last error', scan.error, 'bad') : null,
       fact('every', paths.scan_interval ? paths.scan_interval + 's' : 'manual only'),
       fact('watcher', paths.watcher ? 'on' : 'off'))));
@@ -920,8 +920,10 @@ function tile(label, value, tone) {
 
 /* What a finished scan did, as one line. */
 function scanSummary(res) {
-  return ['indexed', 'thumbnails', 'previews', 'removed', 'failed']
+  const done = ['indexed', 'thumbnails', 'previews', 'removed', 'failed']
     .filter((k) => res[k]).map((k) => res[k] + ' ' + k).join(' · ') || 'nothing to do';
+  // the empty-walk guard: no photos found, so the index was left alone
+  return res.held ? done + ' · held: no photos found, index kept (share mounted?)' : done;
 }
 
 function homeRow(where, key, detail, onclick) {

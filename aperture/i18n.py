@@ -345,6 +345,8 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "aria.next": ("Next", "Weiter", "次へ"),
     "aria.close": ("Close (Esc)", "Schließen (Esc)", "閉じる (Esc)"),
     "aria.lightbox": ("Fullscreen viewer", "Vollbild-Ansicht", "全画面ビューア"),
+    # the first thing Tab reaches on every page, visible only while focused
+    "aria.skip": ("Skip to content", "Zum Inhalt springen", "本文へスキップ"),
 
     # ---- EXIF labels (photos.prettify_exif) ----------------------------------
     "exif.make": ("Camera make", "Kamerahersteller", "メーカー"),
