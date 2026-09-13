@@ -24,45 +24,49 @@
    colour computed here would have to arrive as an inline style and the CSP
    would drop it. #}
 
-{# ---- ranked horizontal bars: label / bar / value ------------------- #}
-{% macro bars(rows) %}
-  <ol class="ch-bars">
-    {% for r in rows %}
-      <li class="ch-bar{% if r.peak %} is-peak{% else %} is-b{{ r.band }}{% endif %}">
-        {# a row carrying `q` (a search, see search.py) links to its photos #}
-        {% if r.q %}
-          <a class="ch-bar__label ch-bar__label--link" href="/search?q={{ r.q | urlencode }}" title="{{ r.label }}">{{ r.label }}</a>
-        {% else %}
-          <span class="ch-bar__label" title="{{ r.label }}">{{ r.label }}</span>
-        {% endif %}
-        <span class="ch-bar__meter" aria-hidden="true">
-          <svg viewBox="0 0 100 1" preserveAspectRatio="none" focusable="false"><rect class="ch-bar__fill" x="0" y="0" width="{{ r.pct }}" height="1"></rect></svg>
-        </span>
-        <span class="ch-bar__val">{{ r.value }}</span>
-      </li>
-    {% endfor %}
-  </ol>
+{# ---- ranked horizontal bars: label / bar / value -------------------
+   A row's label links when it can: into its album (album_bars), or into the
+   search for its photos when the row carries `q` (search.py). Rows marked
+   `extra` (stats.fold) sit past the fold of a long ranking: they render in a
+   native <details> under the list, so the tail opens without a script and
+   every name in it stays readable. `more` is the summary's label, with {n}
+   for how many rows it folds. #}
+{% macro _bar(r, album) %}
+  <li class="ch-bar{% if r.peak %} is-peak{% else %} is-b{{ r.band }}{% endif %}">
+    {% if album and r.album %}
+      <a class="ch-bar__label ch-bar__label--link" href="/album/{{ r.album }}" title="{{ r.label }}">{{ r.label }}</a>
+    {% elif r.q %}
+      <a class="ch-bar__label ch-bar__label--link" href="/search?q={{ r.q | urlencode }}" title="{{ r.label }}">{{ r.label }}</a>
+    {% else %}
+      <span class="ch-bar__label" title="{{ r.label }}">{{ r.label }}</span>
+    {% endif %}
+    <span class="ch-bar__meter" aria-hidden="true">
+      <svg viewBox="0 0 100 1" preserveAspectRatio="none" focusable="false"><rect class="ch-bar__fill" x="0" y="0" width="{{ r.pct }}" height="1"></rect></svg>
+    </span>
+    <span class="ch-bar__val">{{ r.value }}</span>
+  </li>
 {% endmacro %}
 
-{# same, but each row links into the album it measures. The folded "+n more"
-   tail row has no album and stays plain text. #}
-{% macro album_bars(rows) %}
+{% macro _bar_list(rows, more, album) %}
+  {% set shown = rows | rejectattr('extra') | list %}
+  {% set folded = rows | selectattr('extra') | list %}
   <ol class="ch-bars">
-    {% for r in rows %}
-      <li class="ch-bar{% if r.peak %} is-peak{% else %} is-b{{ r.band }}{% endif %}">
-        {% if r.album %}
-          <a class="ch-bar__label ch-bar__label--link" href="/album/{{ r.album }}" title="{{ r.label }}">{{ r.label }}</a>
-        {% else %}
-          <span class="ch-bar__label" title="{{ r.label }}">{{ r.label }}</span>
-        {% endif %}
-        <span class="ch-bar__meter" aria-hidden="true">
-          <svg viewBox="0 0 100 1" preserveAspectRatio="none" focusable="false"><rect class="ch-bar__fill" x="0" y="0" width="{{ r.pct }}" height="1"></rect></svg>
-        </span>
-        <span class="ch-bar__val">{{ r.value }}</span>
-      </li>
-    {% endfor %}
+    {% for r in shown %}{{ _bar(r, album) }}{% endfor %}
   </ol>
+  {% if folded %}
+    <details class="ch-more">
+      <summary class="ch-more__toggle"><i class="fa fa-chevron-down ch-more__ico" aria-hidden="true"></i>{{ more | replace('{n}', folded | length) }}</summary>
+      <ol class="ch-bars" start="{{ (shown | length) + 1 }}">
+        {% for r in folded %}{{ _bar(r, album) }}{% endfor %}
+      </ol>
+    </details>
+  {% endif %}
 {% endmacro %}
+
+{% macro bars(rows, more='+{n}') %}{{ _bar_list(rows, more, False) }}{% endmacro %}
+
+{# same, but each row links into the album it measures #}
+{% macro album_bars(rows, more='+{n}') %}{{ _bar_list(rows, more, True) }}{% endmacro %}
 
 {# ---- columns: value on top, bar, label underneath -------------------
    `dense` (the 24-hour axis) moves the numbers out of sight but keeps them

@@ -18,6 +18,30 @@ notes are never one commit apart.
 
 ---
 
+## 1.7.0 — 2026-09-13
+
+Long lists open up instead of stopping at "and N more".
+
+**New**
+
+* **The album, camera and tag charts on `/stats` fold instead of summing.**
+  They show their top rows and put the rest behind *+N more*, which opens in
+  place and names every album, camera and tag — the tail used to be a single
+  row that added them up and named none. It opens without JavaScript, and a
+  folded bar is still as long as its count says against the whole chart.
+* **The console's long lists open too.** The Doctor report, *Needs
+  attention* and *Unwritten* show their first rows and a button for the
+  rest. A list you opened stays open while the home screen refreshes during
+  a scan. *Unwritten* now lists every album that has photos but no cfg or no
+  text, where it used to stop at four of each.
+
+**For maintainers**
+
+* `stats.collect()` no longer takes `more_label` and `stats.album_rows()` no
+  longer takes `other_label`. Rows past a chart's limit are marked `extra`
+  (`stats.fold`), and the `bars` / `album_bars` macros take the label of the
+  disclosure instead.
+
 ## 1.6.0 — 2026-09-13
 
 Search by what a photo was shot with.

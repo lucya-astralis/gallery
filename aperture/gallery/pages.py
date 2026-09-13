@@ -103,6 +103,10 @@ def albums_index(request: Request, sort: str | None = None):
     )
 
 
+# how many tags the /stats chart shows before the rest folds
+TAGS_SHOWN = 12
+
+
 @router.get("/stats", response_class=HTMLResponse)
 def stats_page(request: Request):
     """Public statistics: what the archive holds, charted.
@@ -121,9 +125,6 @@ def stats_page(request: Request):
         c,
         month_name=partial(i18n.month_short, lang),
         weekday_name=partial(i18n.weekday_index, lang),
-        # left unformatted on purpose — stats.collect() fills {n} once it
-        # knows how long the tail it folded away actually is
-        more_label=i18n.t(lang, "stats.more"),
     )
 
     # Album bars are rolled up to TOP-LEVEL albums, counting each one's whole
@@ -139,7 +140,6 @@ def stats_page(request: Request):
     album_chart = stats.album_rows(
         by_top,
         label_of=config.album_display_name,
-        other_label=i18n.t(lang, "stats.more"),
     )
     shapes = stats.stack(stats.shape_rows(
         data["shapes_raw"],
@@ -149,11 +149,12 @@ def stats_page(request: Request):
     tag_rows = c.execute(
         """SELECT t.name AS name, COUNT(*) AS n
              FROM image_tags it JOIN tags t ON t.id = it.tag_id
-            GROUP BY t.id ORDER BY n DESC, t.name LIMIT 12"""
+            GROUP BY t.id ORDER BY n DESC, t.name"""
     ).fetchall()
     # one lonely tag is a fact, not a distribution — the chart only earns its
-    # card once there is something to compare
-    tags = stats.rows([(r["name"], r["n"]) for r in tag_rows]) if len(tag_rows) >= 3 else []
+    # card once there is something to compare. Past a dozen the rest folds.
+    tags = (stats.fold(stats.rows([(r["name"], r["n"]) for r in tag_rows]), TAGS_SHOWN)
+            if len(tag_rows) >= 3 else [])
     tag_total = c.execute("SELECT COUNT(*) AS n FROM tags").fetchone()["n"]
 
     no_exif = data["total"] - sum(r["value"] for r in data["cameras"])

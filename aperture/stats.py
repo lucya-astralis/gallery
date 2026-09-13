@@ -82,20 +82,14 @@ def clean_device(make: str | None, model: str | None) -> str | None:
     return f"{make} {model}" if make else model
 
 
-def _rank(counter: Counter, top: int = TOP_N, other_label: str | None = None,
-          link=None) -> list[dict]:
+def _rank(counter: Counter, top: int = TOP_N, link=None) -> list[dict]:
     """Counter -> descending rows with a percentage of the series maximum.
-    Everything past `top` collapses into one trailing row when `other_label`
-    is given, so a long tail reads as "and 14 more" instead of scrolling.
-    `link(key)` gives each ranked row its search; the folded row has none."""
+    Every row is kept; the ones past `top` are marked `extra`, and the chart
+    folds them behind a disclosure (see fold). `link(key)` gives each row
+    its search."""
     items = counter.most_common()
-    head, tail = items[:top], items[top:]
-    queries = [link(k) for k, _ in head] if link else None
-    if tail and other_label:
-        head.append((other_label.format(n=len(tail)), sum(n for _, n in tail)))
-        if queries is not None:
-            queries.append(None)
-    return _rows([(str(k), n) for k, n in head], queries)
+    queries = [link(k) for k, _ in items] if link else None
+    return fold(_rows([(str(k), n) for k, n in items], queries), top)
 
 
 # One month with 435 photos next to twenty months with three or four is a
@@ -151,6 +145,8 @@ def _rows(pairs: list[tuple[str, int]], queries: list[str | None] | None = None)
             "peak": is_peak,
             "band": _band(n, top),
             "q": queries[i] if queries else None,
+            # past the fold of a long ranking (see fold)
+            "extra": False,
         })
     return out
 
@@ -159,6 +155,19 @@ def rows(pairs: list[tuple[str, int]]) -> list[dict]:
     """Public entry to the row shape above, for the one dataset the route
     builds itself (tags come from a join, not from the images table)."""
     return _rows(pairs)
+
+
+def fold(rows: list[dict], keep: int) -> list[dict]:
+    """Mark every row past the first `keep` as `extra`.
+
+    A ranking used to end in one "+14 more" row that summed the tail and
+    named none of it. The rows stay now, and the bars macro shows the first
+    `keep` and folds the rest into a <details> -- a native disclosure, so it
+    opens without a script. `pct` is untouched: a folded bar is still
+    measured against the whole series, not against what is left."""
+    for row in rows[keep:]:
+        row["extra"] = True
+    return rows
 
 
 def _month_key(d: date) -> str:
@@ -182,13 +191,12 @@ def _parse_ts(raw) -> datetime | None:
         return None
 
 
-def collect(conn, month_name, weekday_name, more_label: str = "+{n} more") -> dict:
+def collect(conn, month_name, weekday_name) -> dict:
     """Every dataset the /stats page draws.
 
     `month_name(year, month)` and `weekday_name(idx)` are injected so the
     labels come out in the viewer's language without this module importing
-    i18n (idx 0 = Monday); `more_label` is the translated "+{n} more" row that
-    closes a truncated ranking.
+    i18n (idx 0 = Monday).
     """
     rows = conn.execute(
         "SELECT album, size, width, height, taken_at, exif_json, is_showcase FROM images"
@@ -340,8 +348,7 @@ def collect(conn, month_name, weekday_name, more_label: str = "+{n} more") -> di
         "months": months,
         "weekdays": weekdays,
         "hours": hours,
-        "cameras": _rank(devices, TOP_N, more_label,
-                         link=lambda name: search.term("camera", name)),
+        "cameras": _rank(devices, TOP_N, link=lambda name: search.term("camera", name)),
         "focals": _rows([(f"{k} mm", n) for k, n in kept_focals],
                         [search.term("mm", k) for k, _ in kept_focals]),
         "apertures": _rows([(f"ƒ{fmt_num(k)}", n) for k, n in sorted(apertures.items())],
@@ -440,22 +447,15 @@ def stack(rows: list[dict]) -> list[dict]:
     return out
 
 
-def album_rows(counter: Counter, label_of, top: int = TOP_N_ALBUMS,
-               other_label: str | None = None) -> list[dict]:
+def album_rows(counter: Counter, label_of, top: int = TOP_N_ALBUMS) -> list[dict]:
     """Album counts -> chart rows carrying the album path as well, so each bar
     can link into the album it measures. `label_of(path)` supplies the display
-    name."""
+    name. Rows past `top` are folded, not dropped (see fold)."""
     items = counter.most_common()
-    head, tail = items[:top], items[top:]
-    pairs = [(label_of(path), n) for path, n in head]
-    paths = [path for path, _ in head]
-    if tail and other_label:
-        pairs.append((other_label.format(n=len(tail)), sum(n for _, n in tail)))
-        paths.append(None)
-    out = _rows(pairs)
-    for row, path in zip(out, paths):
+    out = _rows([(label_of(path), n) for path, n in items])
+    for row, (path, _) in zip(out, items):
         row["album"] = path
-    return out
+    return fold(out, top)
 
 
 def shape_rows(shapes: Counter, label_of) -> list[dict]:

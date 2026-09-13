@@ -4592,6 +4592,26 @@ body.page-welcome{ --page-max: 2400px; }
    and not only as the longest bar (the fills themselves come from the
    magnitude ramp further down this section) */
 .ch-bar.is-peak .ch-bar__label{ color:var(--text); }
+/* the tail of a long ranking, folded: a native <details>, so it opens
+   without a script under the strict CSP. The bars inside keep lengths
+   measured against the whole series (stats.fold), not against the rest. */
+.ch-more{ margin-top:var(--s-3); }
+.ch-more > .ch-bars{ margin-top:var(--s-3); }
+.ch-more__toggle{
+  display:inline-flex; align-items:center; gap:var(--s-2);
+  list-style:none;
+  cursor:pointer;
+  font-family:var(--mono);
+  font-size:var(--fs-chrome-sm);
+  color:var(--text-dim);
+}
+.ch-more__toggle::-webkit-details-marker{ display:none; }
+.ch-more__toggle:focus-visible{ outline:var(--hair) solid var(--acc); outline-offset:2px; }
+.ch-more__ico{ transition:rotate var(--dur-1) var(--ease); }
+.ch-more[open] .ch-more__ico{ rotate:180deg; }
+@media (hover: hover){
+  .ch-more__toggle:hover{ color:var(--acc); }
+}
 .ch-bar__val{
   font-family:var(--mono);
   font-size:var(--fs-chrome-md); letter-spacing:var(--tr-num);

@@ -767,14 +767,11 @@ function renderDoctor(report) {
     body.push(el('h3', { class: 'card__sub' },
       el('span', { text: check.replace(/_/g, ' ') }),
       el('span', { class: 'card__sub-n', text: String(items.length) })));
-    body.push(el('div', { class: 'hrows' }, items.slice(0, 25).map((item) => homeRow(
+    body.push(...foldedRows('doctor:' + check, items, 25, (item) => homeRow(
       item.rel_path || item.album || '—',
       item.key || '',
       item.detail || '',
-      item.album ? () => select({ kind: 'album', album: item.album }) : null))));
-    if (items.length > 25) {
-      body.push(el('p', { class: 'card__quiet', text: (items.length - 25) + ' more' }));
-    }
+      item.album ? () => select({ kind: 'album', album: item.album }) : null)));
   }
   return card('fa-stethoscope', 'Doctor', 'index, files, derivatives and cfg, checked against each other',
               ...body);
@@ -926,6 +923,34 @@ function scanSummary(res) {
   return res.held ? done + ' · held: no photos found, index kept (share mounted?)' : done;
 }
 
+/* A report list that shows its first `limit` rows and folds the rest behind
+ * one button, so a long list is complete without pushing everything under it
+ * off the screen. Open lists are remembered by name: the home screen repaints
+ * on every poll while a scan runs, and would otherwise fold them up again. */
+const unfolded = new Set();
+function foldedRows(name, items, limit, row) {
+  const list = el('div', { class: 'hrows' });
+  if (items.length <= limit) {
+    list.append(...items.map(row));
+    return [list];
+  }
+  const toggle = el('button', { type: 'button', class: 'btn' });
+  const paint = () => {
+    const open = unfolded.has(name);
+    list.replaceChildren(...(open ? items : items.slice(0, limit)).map(row));
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.replaceChildren(ico(open ? 'fa-chevron-up' : 'fa-chevron-down'),
+      open ? 'show fewer' : (items.length - limit) + ' more');
+  };
+  toggle.addEventListener('click', () => {
+    if (unfolded.has(name)) unfolded.delete(name);
+    else unfolded.add(name);
+    paint();
+  });
+  paint();
+  return [list, el('div', { class: 'card__actions' }, toggle)];
+}
+
 function homeRow(where, key, detail, onclick) {
   return el('div', { class: 'hrow' + (onclick ? ' is-link' : ''), onclick: onclick || null },
     el('span', { class: 'hrow__where', text: where }),
@@ -1024,7 +1049,6 @@ function paintHome() {
   /* ---- is anything broken ---- */
   const issues = home.issues;
   const list = (issues && issues.issues) || [];
-  const shown = list.slice(0, 6);
   grid.append(el('div', { class: 'home__wide' }, card('fa-triangle-exclamation', 'Needs attention',
     issues ? issues.errors + ' error(s) · ' + issues.warnings + ' warning(s)' : null,
     !issues
@@ -1032,16 +1056,12 @@ function paintHome() {
       : !list.length
         ? el('p', { class: 'card__quiet',
                     text: 'Every config file checks out — nothing the gallery would ignore.' })
-        : el('div', { class: 'hrows' }, shown.map((issue) => homeRow(
+        : foldedRows('issues', list, 6, (issue) => homeRow(
             issue.scope === 'gallery' ? 'gallery.cfg'
               : issue.scope === 'links' ? 'links.cfg' : issue.album,
             issue.key, issue.detail,
             () => select(issue.scope === 'album'
-              ? { kind: 'album', album: issue.album } : { kind: issue.scope })))),
-    list.length > shown.length
-      ? el('p', { class: 'card__quiet',
-                  text: 'and ' + (list.length - shown.length) + ' more' })
-      : null,
+              ? { kind: 'album', album: issue.album } : { kind: issue.scope }))),
     el('div', { class: 'card__actions' },
       el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'Check again', onclick: checkAll })))));
 
@@ -1055,17 +1075,11 @@ function paintHome() {
   grid.append(card('fa-pen-to-square', 'Unwritten', albums.length + ' album(s) in the tree',
     !noCfg.length && !noText.length
       ? el('p', { class: 'card__quiet', text: 'Every album with photos has a cfg and a text.' })
-      : el('div', { class: 'hrows' }, [
-          ...noCfg.slice(0, 4).map((a) => homeRow(a.path, 'no cfg',
-            a.own_photos + ' photo(s), nothing configured',
-            () => select({ kind: 'album', album: a.path }))),
-          ...noText.slice(0, 4).map((a) => homeRow(a.path, 'no text',
-            a.own_photos + ' photo(s), no album_<lang>.md',
-            () => select({ kind: 'album', album: a.path }))),
-        ]),
-    (noCfg.length > 4 || noText.length > 4)
-      ? el('p', { class: 'card__quiet', text: 'and more — the tree marks them' })
-      : null));
+      : foldedRows('unwritten', [
+          ...noCfg.map((a) => [a, 'no cfg', a.own_photos + ' photo(s), nothing configured']),
+          ...noText.map((a) => [a, 'no text', a.own_photos + ' photo(s), no album_<lang>.md']),
+        ], 8, ([a, key, detail]) => homeRow(a.path, key, detail,
+          () => select({ kind: 'album', album: a.path })))));
 
   /* ---- what happened here ---- */
   grid.append(card('fa-clock-rotate-left', 'Recent changes', 'this console, not the gallery',
