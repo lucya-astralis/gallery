@@ -434,7 +434,7 @@ def doctor(album: str | None = None, limit_slow: int = 50,
         for issue in checks.album(a):
             note("config", issue)
     if album is None:
-        for issue in checks.gallery():
+        for issue in checks.gallery() + checks.pretty_links():
             note("config", issue)
 
     # --- featured drift ---

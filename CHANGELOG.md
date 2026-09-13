@@ -18,6 +18,38 @@ notes are never one commit apart.
 
 ---
 
+## 1.4.0 — 2026-09-13
+
+Pretty links.
+
+**New**
+
+* **A short address for an album or a photo.** `https://<site>/tokyo` instead
+  of `/album/japan_2026/tokyo`, and `/fuji` for one picture. The list is a new
+  file, `photos/.gallery/links.cfg` — one `name = target` line per link, in the
+  grammar every other cfg file uses — so it lives with the photos, survives a
+  rebuild of `data/`, and needs no scan and no restart.
+* The console has a fourth place, **Links**: name a link, point it at an album
+  (the field completes album paths) or pick a photo, then copy or open the
+  address. An album's header and a photo's metadata panel each carry a
+  **Link…** button that opens the form already pointing at them. Renaming,
+  re-pointing and deleting are there too; every write gets a backup and an
+  audit line like any other.
+* The gallery answers `/<name>` with a **302 and `no-store`** — never a 301,
+  which a browser keeps for good — so a link can be re-pointed later. A name
+  that is not a link, or a link whose target has gone, is the ordinary 404.
+* **Check all** and `doctor` report a link that would answer 404: a target
+  that no longer resolves in the index, a name that is not a link name, a
+  name the gallery already uses for a page of its own.
+
+**Before you upgrade**
+
+* Set `PUBLIC_BASE_URL` if you want the console to show and open full
+  addresses. Without it the Links screen still works and shows `/name`: the
+  console is on its own port and cannot know the address visitors use.
+
+---
+
 ## 1.3.0 — 2026-09-12
 
 The door stops being a bare form.

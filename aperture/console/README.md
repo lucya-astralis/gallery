@@ -50,6 +50,7 @@ refuses to open the socket. Details in
 | `gallery.cfg` | `photos/.gallery/` | welcome hero pickers (desktop / mobile / shared), a drag-sortable `album_order` with group headers, `album_sort`, the branding block, and the site's own **Look** and **Backdrop** — accent, display face and page backdrop |
 | `album.cfg` | `<album>/.album/` | every documented key as a real control — cover picker, drag-sortable `featured` / `order`, reel/sort/effect dropdowns, tags, custom attributes, icon & font pickers |
 | `album_en/de/jp.md` | `<album>/.album/` | a markdown editor per language; saving an empty one deletes the file |
+| `links.cfg` | `photos/.gallery/` | the **Links** screen: pretty links — `/<name>` on the public site for one album or one photo. A name, a target (album paths complete as you type, photos come from the picker), copy and open. An album's header and a photo's metadata panel carry a **Link…** button that opens the form pointing at them |
 | `icon.svg`, `*.otf` … | `<album>/.album/` | upload, preview (the font is loaded and shown set in the album's name), delete |
 | `logo.svg`, `*.otf`, `bg.mp4` … | `photos/.gallery/` | the same, for the gallery's own marks, badges, display face and backdrop |
 
@@ -66,8 +67,8 @@ Every file also has a **Raw file** tab if you would rather just type.
 
 ### Getting around
 
-The tool has **three places**, and they are in the header: **Home**, the
-**Gallery**'s own file, and **Operations**. Everything else is an album, and
+The tool has **four places**, and they are in the header: **Home**, the
+**Gallery**'s own file, **Links**, and **Operations**. Everything else is an album, and
 albums are the sidebar — which is why the sidebar holds nothing but albums. It
 used to open with a tool and a file above the list, drawn like two odd albums
 with the actual navigation below them.

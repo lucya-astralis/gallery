@@ -18,7 +18,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import brand, compress, indexer, templating
 from ..runtime import ensure_dirs
-from . import api, context, media, pages
+from . import api, context, media, pages, shortlinks
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 
@@ -124,3 +124,6 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 app.include_router(pages.router)
 app.include_router(api.router)
 app.include_router(media.router)
+# LAST, always: its `/{slug}` would otherwise answer for every one-segment
+# route registered after it. See gallery/shortlinks.py.
+app.include_router(shortlinks.router)

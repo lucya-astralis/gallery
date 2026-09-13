@@ -16,8 +16,8 @@ four things and nothing else.
 
 Every issue is a dict:
 
-    scope   "album" | "gallery"
-    album   the album path, or None for gallery.cfg
+    scope   "album" | "gallery" | "links"
+    album   the album path, or None for gallery.cfg and links.cfg
     level   "error"  the gallery ignores or drops what the file says
             "warn"   it works, but not the way the file suggests
     key     the cfg key
@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import albums, branding, cfgio, config, db, schema, theme, welcome
+from . import albums, branding, cfgio, config, db, links, schema, theme, welcome
 
 # Said after an extension error where the whitelist alone would not explain
 # itself.
@@ -165,9 +165,39 @@ def gallery(cfg: dict[str, list[str]] | None = None) -> list[dict]:
     return out
 
 
+def pretty_links(cfg: dict[str, list[str]] | None = None) -> list[dict]:
+    """Everything wrong with links.cfg — every entry the gallery would answer
+    with a 404 instead of a redirect. Empty when the file is fine or absent.
+    `cfg` as for album(). Issues carry scope "links", and the slug as `key`.
+
+    Worth a check of its own because a dead link is the quietest failure
+    there is: nothing on the site shows it, only the person who follows it
+    finds out — usually from a link printed somewhere it cannot be fixed."""
+    cfg = links.load() if cfg is None else cfg
+    out: list[dict] = []
+
+    def add(level: str, key: str, detail: str) -> None:
+        out.append({"scope": "links", "album": None, "level": level, "key": key, "detail": detail})
+
+    for slug, values in cfg.items():
+        problem = links.slug_problem(slug)
+        if problem:
+            add("error", slug, problem)
+            continue
+        if len(values) > 1:
+            add("error", slug, "more than one target (a comma, or the name written twice) "
+                "— the link answers 404")
+            continue
+        problem = links.target_problem(links.normalize_target(cfgio.joined(cfg, slug)))
+        if problem:
+            add("error", slug, problem + " — the link answers 404")
+    return out
+
+
 def everything() -> list[dict]:
-    """gallery.cfg, then every album that can carry an album.cfg."""
-    out = gallery()
+    """gallery.cfg, the pretty links, then every album that can carry an
+    album.cfg."""
+    out = gallery() + pretty_links()
     for name in albums.albums_with_ancestors():
         out += album(name)
     return out

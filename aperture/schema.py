@@ -79,6 +79,9 @@ GALLERY_CFG_NAME = "gallery.cfg"
 # badges — live in photos/.gallery/, the gallery-wide mirror of
 # an album's .album/ folder.
 GALLERY_META_DIR = ".gallery"
+# The pretty-link list, beside gallery.cfg — `name = album` or
+# `name = album/photo.jpg`, one line per link. See aperture/links.py.
+LINKS_CFG_NAME = "links.cfg"
 # Both, for the guards that ask "is this path metadata?" -- the scanner
 # walking the tree, and the write resolver in aperture/paths.py.
 META_DIRS = (ALBUM_META_DIR, GALLERY_META_DIR)

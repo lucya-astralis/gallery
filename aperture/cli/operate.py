@@ -203,7 +203,8 @@ def cmd_doctor(args) -> int:
         head(f"{check}  ({len(items)})")
         for item in items[:args.limit]:
             if check == "config":
-                out(f"  [{item['level']}] {item['album'] or 'gallery.cfg'} · {item['key']}: {item['detail']}")
+                where = item['album'] or ('links.cfg' if item['scope'] == 'links' else 'gallery.cfg')
+                out(f"  [{item['level']}] {where} · {item['key']}: {item['detail']}")
             else:
                 out(f"  {item['rel_path']}")
                 out(f"      {item['detail']}")

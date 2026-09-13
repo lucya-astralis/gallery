@@ -3311,6 +3311,112 @@ img.is-broken { opacity: .2; }
 }
 .hrow__detail { color: var(--text-ghost); overflow-wrap: anywhere; }
 
+/* ----- pretty links ---------------------------------------------------- */
+/* The Links screen: one form and one list, both inside the .card every other
+   screen uses. The row is .hrow's rhythm with a thumbnail in front, because
+   a link is easier to recognise by what it shows than by the path it names. */
+.links__form {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: var(--s-4);
+  align-items: end;
+}
+.links__thumb,
+.linkrow__thumb {
+  display: block;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  background: var(--surface);
+  border: var(--hair) solid var(--line);
+}
+.links__thumb img,
+.linkrow__thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.links__field { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; }
+.links__label {
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.links__addr, .links__target { display: flex; gap: var(--s-2); min-width: 0; }
+.links__addr input, .links__target input { flex: 1 1 auto; min-width: 0; }
+/* The site's own address in front of the name, so what is typed reads as the
+   URL it becomes. It gives way first on a narrow screen. */
+.links__base {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-sm);
+  color: var(--text-ghost);
+}
+.links__hint {
+  margin: var(--s-4) 0 0;
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-sm);
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.links__hint.is-bad { color: var(--red); }
+.links__filter { width: 100%; margin-bottom: var(--s-3); }
+/* only ever on screen for the length of one copy command */
+.links__copy { position: fixed; top: 0; left: 0; opacity: 0; }
+
+.linkrows { display: flex; flex-direction: column; }
+.linkrow {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  gap: var(--s-4);
+  align-items: center;
+  padding: var(--s-3) 0;
+  border-bottom: var(--hair) solid var(--line);
+}
+.linkrow:last-child { border-bottom: 0; }
+.linkrow.is-bad .linkrow__thumb { border-color: rgba(var(--red-rgb), .5); }
+.linkrow__main { min-width: 0; }
+.linkrow__slug {
+  font-family: var(--mono);
+  font-size: var(--fs-text-md);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.linkrow__target {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  margin-top: var(--s-1);
+  font-size: var(--fs-text-sm);
+  color: var(--text-ghost);
+  min-width: 0;
+}
+.linkrow__kind {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.linkrow__path { overflow-wrap: anywhere; }
+.linkrow__issue { margin-top: var(--s-1); font-size: var(--fs-text-sm); color: var(--red); }
+.linkrow__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--s-2); }
+.linkrow__actions a.btn { text-decoration: none; }
+
+@media (max-width: 760px) {
+  .links__form { grid-template-columns: 1fr; }
+  .links__thumb:empty { display: none; }
+  .linkrow { grid-template-columns: 48px minmax(0, 1fr); }
+  .linkrow__thumb { width: 48px; height: 48px; }
+  .linkrow__actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
 @media (max-width: 1100px) {
   .home { grid-template-columns: 1fr; }
 }

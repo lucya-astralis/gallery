@@ -16,7 +16,7 @@ const state = {
   meta: null,
   tree: null,
   issuesByAlbum: {},
-  sel: null,          // {kind: 'gallery'|'album', album}
+  sel: null,          // {kind: 'home'|'gallery'|'links'|'ops'|'album', album}
   data: null,         // payload for the current selection
   edits: {},          // config key -> value staged for the next save
   tab: 'settings',
@@ -151,7 +151,7 @@ function takeReturnNote() {
   let sel = null;
   try { sel = JSON.parse(raw); } catch (_) { return null; }
   if (!sel || typeof sel !== 'object') return null;
-  if (sel.kind === 'gallery' || sel.kind === 'ops' || sel.kind === 'home') {
+  if (['gallery', 'ops', 'home', 'links'].includes(sel.kind)) {
     return { kind: sel.kind };
   }
   if (sel.kind === 'album' && typeof sel.album === 'string' && albumExists(sel.album)) {
@@ -433,6 +433,10 @@ async function select(sel, keepTab = false) {
   }
   if (sel.kind === 'ops') {
     await renderOps();
+    return;
+  }
+  if (sel.kind === 'links') {
+    await renderLinks(sel.draft);
     return;
   }
   try {
@@ -904,6 +908,7 @@ function homeRow(where, key, detail, onclick) {
 /* An audit line names a file; the console navigates by album. */
 function auditTarget(target) {
   const value = String(target || '');
+  if (value === '.gallery/links.cfg') return { kind: 'links' };
   if (value.startsWith('.gallery/')) return { kind: 'gallery' };
   const cut = value.indexOf('/.album/');
   if (cut > 0) return { kind: 'album', album: value.slice(0, cut) };
@@ -999,10 +1004,11 @@ function paintHome() {
         ? el('p', { class: 'card__quiet',
                     text: 'Every config file checks out — nothing the gallery would ignore.' })
         : el('div', { class: 'hrows' }, shown.map((issue) => homeRow(
-            issue.scope === 'gallery' ? 'gallery.cfg' : issue.album,
+            issue.scope === 'gallery' ? 'gallery.cfg'
+              : issue.scope === 'links' ? 'links.cfg' : issue.album,
             issue.key, issue.detail,
-            () => select(issue.scope === 'gallery'
-              ? { kind: 'gallery' } : { kind: 'album', album: issue.album })))),
+            () => select(issue.scope === 'album'
+              ? { kind: 'album', album: issue.album } : { kind: issue.scope })))),
     list.length > shown.length
       ? el('p', { class: 'card__quiet',
                   text: 'and ' + (list.length - shown.length) + ' more' })
@@ -1127,6 +1133,7 @@ function renderHead(isGallery) {
   const warns = (data.issues || []).filter((i) => i.level === 'warn').length;
   if (errors) meta.push(el('span', { class: 'pill pill--err', text: errors + ' errors' }));
   if (warns) meta.push(el('span', { class: 'pill pill--warn', text: warns + ' warnings' }));
+  if (!isGallery && !READ_ONLY) meta.push(linkButton(state.sel.album, 'Link…'));
 
   const path = isGallery
     ? state.meta.photos_dir + '/gallery.cfg'
@@ -2277,6 +2284,7 @@ function renderDetail(rel) {
     ])));
     body.append(el('p', { class: 'field__help field__hint', text:
       'Read-only — the console never rewrites a photo file.' }));
+    if (!READ_ONLY) body.append(el('div', { class: 'row' }, linkButton(rel, 'Pretty link…')));
 
     body.append(el('h3', { class: 'detail__sub', text: 'Tags' }));
     body.append(tagChips(info.tags, READ_ONLY ? null : (next) =>
@@ -2707,6 +2715,309 @@ function updateModalCount() {
   $('#modal-count').textContent = picker.single
     ? (picker.picked.length ? picker.picked[0] : 'nothing selected')
     : picker.picked.length + ' selected · click order becomes list order';
+}
+
+/* ----- pretty links ----------------------------------------------------- */
+/* photos/.gallery/links.cfg as a screen: a short address on the public site
+ * for one album or one photo — `/tokyo` instead of `/album/japan_2026/tokyo`.
+ *
+ * The server decides what a name may be and whether a target exists
+ * (aperture/links.py), and says so on every write. The rule is mirrored here
+ * only so a typo shows while it is typed rather than after a round trip; the
+ * reserved names come from the server rather than from a second list. */
+const LINK_SLUG = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
+const PHOTO_RE = /\.(jpe?g|png|webp|gif|bmp|tiff?|heic|heif)$/i;
+const links = { data: null, draft: null, filter: '' };
+
+const blankDraft = (seed = {}) => ({
+  slug: seed.target ? suggestSlug(seed.target) : '',
+  target: seed.target || '',
+  was: null,
+  touched: false,       // the name was typed, so a new target stops renaming it
+});
+
+/* The button the album header and the photo panel carry: open Links with the
+ * form already pointing at this album or photo. */
+function linkButton(target, label) {
+  return el('button', {
+    type: 'button', class: 'btn btn--sm', text: label,
+    title: 'A short address on the public site for this ' + (PHOTO_RE.test(target) ? 'photo' : 'album'),
+    onclick: () => select({ kind: 'links', draft: { target } }),
+  });
+}
+
+/* A name out of a folder or file name: `Mt. Fuji_02.jpg` -> `mt-fuji-02`.
+ * A name that is not Latin comes out empty, which leaves the field to type. */
+function suggestSlug(target) {
+  const leaf = String(target || '').split('/').filter(Boolean).pop() || '';
+  return leaf.replace(PHOTO_RE, '')
+    .normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '').slice(0, 64).replace(/-+$/, '');
+}
+
+function slugProblem(slug, was) {
+  const d = links.data;
+  if (!slug) return null;
+  if (slug.length > d.slug_max) return 'at most ' + d.slug_max + ' characters';
+  if (!LINK_SLUG.test(slug) || slug.includes('--')) {
+    return 'lower-case letters, digits and single hyphens — starting and ending with a letter or digit';
+  }
+  if (d.reserved.includes(slug)) return '/' + slug + ' is one of the gallery’s own addresses';
+  if (slug !== was && d.links.some((l) => l.slug === slug)) {
+    return '/' + slug + ' already exists — edit it below instead';
+  }
+  return null;
+}
+
+/* The address a visitor types. The console is on its own port and cannot
+ * know it unless PUBLIC_BASE_URL says; without that it is a path. */
+const publicUrl = (slug) => (links.data.base || '') + '/' + slug;
+
+async function renderLinks(seed) {
+  try {
+    links.data = await api('/api/links');
+  } catch (err) {
+    $('#pane').innerHTML = '';
+    $('#pane').append(el('div', { class: 'pane__empty', text: err.message }));
+    return;
+  }
+  if (!state.sel || state.sel.kind !== 'links') return;   /* navigated away */
+  links.draft = blankDraft(seed);
+  links.filter = '';
+  paintLinks();
+}
+
+function paintLinks() {
+  const pane = $('#pane');
+  const d = links.data;
+  const broken = d.links.filter((l) => l.issues.length).length;
+  pane.innerHTML = '';
+
+  pane.append(el('div', { class: 'pane__top' },
+    el('div', { class: 'head' },
+      el('div', { class: 'head__crumb', text: state.meta.photos_dir + '/.gallery/links.cfg' }),
+      el('div', { class: 'head__line' },
+        el('h1', { class: 'head__title', text: 'Links' }),
+        el('div', { class: 'head__meta' },
+          el('span', { class: 'pill' + (d.links.length ? ' pill--ok' : ''),
+                       text: d.links.length + (d.links.length === 1 ? ' link' : ' links') }),
+          broken ? el('span', { class: 'pill pill--err', text: broken + ' broken' }) : null,
+          READ_ONLY ? el('span', { class: 'pill pill--warn', text: 'read-only' }) : null)))));
+
+  const grid = el('div', { class: 'home' });
+  pane.append(grid);
+  if (!READ_ONLY) grid.append(el('div', { class: 'home__wide' }, linkForm()));
+  grid.append(el('div', { class: 'home__wide' }, linkList()));
+}
+
+function linkForm() {
+  const draft = links.draft;
+  const editing = !!draft.was;
+  const albums = [];
+  (function walk(node) {
+    for (const child of node.children || []) { albums.push(child.path); walk(child); }
+  })(state.tree || { children: [] });
+
+  const hint = el('p', { class: 'links__hint' });
+  const thumb = el('span', { class: 'links__thumb' });
+  const save = el('button', {
+    type: 'button', class: 'btn btn--primary', text: editing ? 'Save link' : 'Create link',
+    onclick: () => saveLink(),
+  });
+  const onEnter = (ev) => { if (ev.key === 'Enter' && !save.disabled) saveLink(); };
+
+  const slugField = el('input', {
+    type: 'text', value: draft.slug, placeholder: 'tokyo', maxlength: '64',
+    autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Link name',
+    oninput: (ev) => {
+      draft.slug = ev.target.value.trim().toLowerCase();
+      draft.touched = true;
+      sync();
+    },
+    onkeydown: onEnter,
+  });
+  const targetField = el('input', {
+    type: 'text', value: draft.target, list: 'links-albums',
+    placeholder: 'an album — or album/photo.jpg', autocomplete: 'off', spellcheck: 'false',
+    'aria-label': 'Where the link goes',
+    oninput: (ev) => retarget(ev.target.value.trim()),
+    onkeydown: onEnter,
+  });
+
+  function retarget(next) {
+    draft.target = next;
+    targetField.value = next;
+    if (!draft.touched && !editing) {
+      draft.slug = suggestSlug(next);
+      slugField.value = draft.slug;
+    }
+    sync();
+  }
+
+  function sync() {
+    const problem = slugProblem(draft.slug, draft.was);
+    hint.classList.toggle('is-bad', !!problem);
+    hint.textContent = problem
+      || (draft.slug && draft.target ? publicUrl(draft.slug) + '  →  ' + draft.target
+        : 'The name is the address: ' + publicUrl(draft.slug || 'name'));
+    save.disabled = !draft.slug || !draft.target || !!problem;
+    /* What the link will show, when it is a photo or an album the tree knows. */
+    const cover = PHOTO_RE.test(draft.target) ? draft.target
+      : (treeNode(draft.target) || {}).cover;
+    thumb.innerHTML = '';
+    if (cover) {
+      thumb.append(el('img', { src: thumbUrl(cover), alt: '', loading: 'lazy',
+                               onerror: (ev) => ev.target.remove() }));
+    }
+  }
+  sync();
+
+  return card(editing ? 'Edit /' + draft.was : 'New link',
+    'one album or one photo, at a short address',
+    el('div', { class: 'links__form' },
+      thumb,
+      el('div', { class: 'links__field' },
+        el('span', { class: 'links__label', text: 'Name' }),
+        el('div', { class: 'links__addr' },
+          el('span', { class: 'links__base', text: (links.data.base || '') + '/',
+                       title: links.data.base || 'set PUBLIC_BASE_URL to show the full address' }),
+          slugField)),
+      el('div', { class: 'links__field' },
+        el('span', { class: 'links__label', text: 'Goes to' }),
+        el('div', { class: 'links__target' },
+          targetField,
+          el('button', {
+            type: 'button', class: 'btn', text: 'Pick a photo…',
+            onclick: () => openPicker({
+              title: 'Link to one photo', root: '', single: true, gallery: true,
+              picked: PHOTO_RE.test(draft.target) ? [draft.target] : [],
+              onApply: (list) => { if (list[0]) retarget(list[0]); },
+            }),
+          }))),
+      el('datalist', { id: 'links-albums' }, albums.map((path) => el('option', { value: path })))),
+    hint,
+    el('div', { class: 'card__actions' },
+      save,
+      editing || draft.slug || draft.target
+        ? el('button', {
+            type: 'button', class: 'btn btn--ghost', text: editing ? 'Cancel' : 'Clear',
+            onclick: () => { links.draft = blankDraft(); paintLinks(); },
+          })
+        : null));
+}
+
+function linkList() {
+  const d = links.data;
+  const box = el('div', { class: 'linkrows' });
+
+  /* Filtering redraws the rows only, so the field keeps its focus. */
+  function draw() {
+    const f = links.filter.toLowerCase();
+    const rows = d.links.filter((l) => !f || l.slug.includes(f) || l.target.toLowerCase().includes(f));
+    box.innerHTML = '';
+    if (!rows.length) {
+      box.append(el('p', { class: 'card__quiet', text: d.links.length
+        ? 'No link matches.'
+        : 'No links yet. Name an album or a photo above — or use “Link…” in an album’s header.' }));
+    }
+    rows.forEach((link) => box.append(linkRow(link)));
+  }
+  draw();
+
+  return card('Every link',
+    d.base || 'set PUBLIC_BASE_URL to show and open full addresses',
+    d.links.length > 6
+      ? el('input', {
+          type: 'search', class: 'fieldsearch links__filter', value: links.filter,
+          placeholder: 'Filter links…', autocomplete: 'off',
+          oninput: (ev) => { links.filter = ev.target.value.trim(); draw(); },
+        })
+      : null,
+    box);
+}
+
+function linkRow(link) {
+  const url = publicUrl(link.slug);
+  const bad = link.issues.length > 0;
+  return el('div', { class: 'linkrow' + (bad ? ' is-bad' : '') },
+    el('span', { class: 'linkrow__thumb' }, link.thumb
+      ? el('img', { src: thumbUrl(link.thumb), alt: '', loading: 'lazy',
+                    onerror: (ev) => ev.target.remove() })
+      : null),
+    el('div', { class: 'linkrow__main' },
+      el('div', { class: 'linkrow__slug', text: '/' + link.slug, title: url }),
+      el('div', { class: 'linkrow__target' },
+        el('span', { class: 'linkrow__kind', text: link.kind }),
+        el('span', { class: 'linkrow__path', text: link.target || '—' })),
+      bad ? el('div', { class: 'linkrow__issue', text: link.issues.map((i) => i.detail).join(' · ') })
+          : null),
+    el('div', { class: 'linkrow__actions' },
+      el('button', { type: 'button', class: 'btn btn--sm', text: 'Copy', onclick: () => copyLink(url) }),
+      /* Only with a known public address: a bare /name opened from here
+       * would ask the console's own port, which has no such page. */
+      links.data.base && link.destination
+        ? el('a', { class: 'btn btn--sm btn--ghost', href: url, target: '_blank',
+                    rel: 'noopener noreferrer', text: 'Open ↗' })
+        : null,
+      READ_ONLY ? null : el('button', {
+        type: 'button', class: 'btn btn--sm btn--ghost', text: 'Edit',
+        onclick: () => {
+          links.draft = { slug: link.slug, target: link.target, was: link.slug, touched: true };
+          paintLinks();
+          $('#pane').scrollTo({ top: 0, behavior: 'instant' });
+        },
+      }),
+      READ_ONLY ? null : el('button', {
+        type: 'button', class: 'btn btn--sm btn--ghost btn--danger', text: 'Delete',
+        onclick: () => deleteLink(link.slug),
+      })));
+}
+
+async function saveLink() {
+  const draft = links.draft;
+  try {
+    links.data = await api('/api/links', {
+      method: 'PUT',
+      body: JSON.stringify({ slug: draft.slug, target: draft.target, was: draft.was }),
+    });
+  } catch (err) {
+    toast(err.message, 'err');
+    return;
+  }
+  toast((draft.was ? 'Saved ' : 'Created ') + publicUrl(draft.slug));
+  links.draft = blankDraft();
+  paintLinks();
+}
+
+async function deleteLink(slug) {
+  if (!confirm('Delete /' + slug + '? Anyone who follows it gets a 404 from now on.')) return;
+  try {
+    links.data = await api('/api/links?slug=' + encodeURIComponent(slug), { method: 'DELETE' });
+  } catch (err) {
+    toast(err.message, 'err');
+    return;
+  }
+  if (links.draft.was === slug) links.draft = blankDraft();
+  toast('Deleted /' + slug);
+  paintLinks();
+}
+
+/* The clipboard API needs a secure context, and a console reached over plain
+ * http on the LAN is not one; the fallback selects a hidden field and copies. */
+async function copyLink(url) {
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('Copied ' + url);
+    return;
+  } catch (_) { /* fall through */ }
+  const field = el('input', { type: 'text', value: url, class: 'links__copy', readonly: true });
+  document.body.append(field);
+  field.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (_) { /* not supported */ }
+  field.remove();
+  toast(ok ? 'Copied ' + url : 'Copy this: ' + url, ok ? 'ok' : 'warn');
 }
 
 /* ----- whole-gallery check ---------------------------------------------- */

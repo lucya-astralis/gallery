@@ -34,7 +34,7 @@ from .. import brand, checks, scanner
 from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
-from .. import cfgio, schema, templating
+from .. import cfgio, links, schema, templating
 from . import imagemeta, opsapi, security
 from .library import Library, asset_kinds
 
@@ -824,6 +824,95 @@ def api_asset_delete(request: Request, path: str = "", name: str = "",
     target.unlink()
     _writes(request, "asset deleted", target, before)
     return {"ok": True, "assets": _asset_listing(scope, path)}
+
+
+# ----- pretty links -----------------------------------------------------
+# photos/.gallery/links.cfg — `name = album` or `name = album/photo.jpg`, one
+# line per link. What a link is and how the gallery answers one lives in
+# aperture/links.py; here it is only edited, through the same resolver, backup
+# and audit line as gallery.cfg, into the same folder.
+def _links_target() -> Path:
+    return _target(None, schema.LINKS_CFG_NAME, scope="gallery")
+
+
+def _links_payload(cfg_file: cfgio.CfgFile) -> dict:
+    """The list as the Links screen draws it. Built from the parse the caller
+    holds — after a write, the file it has just saved — for the same reason
+    checks.album() takes one: a same-size edit inside one mtime tick would
+    otherwise read back as the version before it."""
+    values = cfg_file.values()
+    issues = checks.pretty_links(values)
+    entries = links.entries(values)
+    for entry in entries:
+        entry["issues"] = [i for i in issues if i["key"] == entry["slug"]]
+    return {
+        "exists": links.PATH.is_file(),
+        "links": entries,
+        "issues": issues,
+        # The console is on its own port and cannot know the address visitors
+        # use; PUBLIC_BASE_URL is what the gallery already calls it.
+        "base": settings.public_base_url or None,
+        "reserved": sorted(links.RESERVED),
+        "slug_max": links.SLUG_MAX,
+    }
+
+
+@app.get("/api/links")
+def api_links():
+    return _links_payload(cfgio.CfgFile.load(links.PATH))
+
+
+@app.put("/api/links")
+async def api_links_write(request: Request):
+    """Create a link, re-point one, or rename one.
+
+    `was` names the link being edited. Without it a name that already exists
+    is a 409 rather than an overwrite: two links are made from two places in
+    the UI, and the second one silently taking over the first is exactly the
+    kind of edit nobody meant."""
+    _guard_write()
+    body = await _json_body(request)
+    slug = links.normalize_slug(body.get("slug"))
+    was = links.normalize_slug(body.get("was")) or None
+    target = links.normalize_target(body.get("target"))
+    problem = links.slug_problem(slug) or links.target_problem(target)
+    if problem:
+        raise HTTPException(400, problem)
+
+    path = _links_target()
+    cfg_file = (cfgio.CfgFile.load(path) if path.is_file()
+                else cfgio.CfgFile(links.HEADER))
+    if slug != was and cfg_file.has(slug):
+        raise HTTPException(409, "/%s already points at %r — edit that link instead"
+                            % (slug, cfgio.joined(cfg_file.values(), slug)))
+
+    before = security.sha256_of(path)
+    if was and was != slug:
+        cfg_file.unset(was)
+        action = "link renamed (/%s -> /%s)" % (was, slug)
+    else:
+        action = "link %s (/%s)" % ("changed" if cfg_file.has(slug) else "added", slug)
+    cfg_file.set(slug, [target])
+    _backup(path, "links")
+    cfg_file.save(path)
+    _writes(request, action, path, before)
+    return _links_payload(cfg_file)
+
+
+@app.delete("/api/links")
+def api_links_delete(request: Request, slug: str = ""):
+    _guard_write()
+    slug = links.normalize_slug(slug)
+    path = _links_target()
+    cfg_file = cfgio.CfgFile.load(path)
+    if not slug or not cfg_file.has(slug):
+        raise HTTPException(404, "no such link: %r" % slug)
+    before = security.sha256_of(path)
+    _backup(path, "links")
+    cfg_file.unset(slug)
+    cfg_file.save(path)
+    _writes(request, "link removed (/%s)" % slug, path, before)
+    return _links_payload(cfg_file)
 
 
 # ----- what changed here ------------------------------------------------
