@@ -85,6 +85,26 @@ LINKS_CFG_NAME = "links.cfg"
 # Both, for the guards that ask "is this path metadata?" -- the scanner
 # walking the tree, and the write resolver in aperture/paths.py.
 META_DIRS = (ALBUM_META_DIR, GALLERY_META_DIR)
+# Folders a NAS, a file manager or an operating system drops into a share for
+# its own use. A Synology writes `@eaDir/<photo>/SYNOPHOTO_THUMB_*.jpg` next to
+# every photo it has seen, and those are images by extension, so a scan used
+# to index each one as a photo of an album called `<album>/@eaDir/<photo>`.
+# Nothing in the gallery ever looks inside one of these, at any depth: the
+# scan and the watcher skip them, the console does not list them, and no
+# console write may land in one. Matched without regard to case — the share
+# may be served by a filesystem that has none.
+SYSTEM_DIRS = frozenset({
+    "@eadir", "@tmp", "@sharebin", "#recycle", "#snapshot",   # Synology
+    "@recycle", "@recently-snapshot", ".@__thumb",           # QNAP
+    ".appledouble", ".trashes", ".spotlight-v100", ".fseventsd",  # macOS
+    "$recycle.bin", "system volume information",             # Windows
+    "lost+found",
+})
+
+
+def is_system_dir(name: str) -> bool:
+    """True for a folder name in SYSTEM_DIRS, whatever its case."""
+    return name.lower() in SYSTEM_DIRS
 BRAND_EXTS = ICON_EXTS
 # Everything that folder may now hold. It started as marks only; the theme
 # block one tier down (`font`, `wallpaper`, `wallpaper_mobile` in gallery.cfg)

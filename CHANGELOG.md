@@ -18,6 +18,29 @@ notes are never one commit apart.
 
 ---
 
+## 1.6.1 — 2026-09-14
+
+The folders a NAS keeps for itself stay out of the gallery.
+
+**Fixed**
+
+* **`@eaDir` is not an album.** A Synology writes its own thumbnails of every
+  photo into `@eaDir/<photo>/SYNOPHOTO_THUMB_*.jpg`, and because those are
+  JPEGs the scan indexed each one as a photo of an album called
+  `<album>/@eaDir/<photo>` — in the album list, the search and `/stats`. Such
+  folders are now ignored at any depth and in any case: Synology's `@eaDir`,
+  `@tmp`, `@sharebin`, `#recycle` and `#snapshot`, QNAP's `@Recycle`,
+  `@Recently-Snapshot` and `.@__thumb`, the ones macOS and Windows leave on a
+  share, and `lost+found`. The scan no longer walks into them at all, which
+  also spares it a round trip per NAS thumbnail on an SMB share; the watcher
+  drops their events, `doctor` does not count them, the media routes do not
+  serve them, the console does not list them and refuses to write into one.
+  The first scan after the upgrade takes the rows that got in out of the
+  index; `thumbs --prune --apply` then clears the thumbnails that were built
+  for them.
+
+---
+
 ## 1.6.0 — 2026-09-13
 
 Search by what a photo was shot with, long lists that open up, unlisted

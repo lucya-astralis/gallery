@@ -13,9 +13,10 @@ from pathlib import Path
 
 from .. import cfgio, schema
 
-# Metadata folders and the junk file managers leave behind.
-_SKIP_DIRS = {schema.ALBUM_META_DIR, schema.GALLERY_META_DIR,
-              "@eaDir", "#recycle", "__pycache__"}
+# Metadata folders, and the folders a NAS or a file manager keeps for itself
+# (schema.SYSTEM_DIRS — the scanner skips the same list, so the tree and the
+# index agree on what is an album).
+_SKIP_DIRS = {schema.ALBUM_META_DIR, schema.GALLERY_META_DIR, "__pycache__"}
 _SKIP_FILES = {".DS_Store", "Thumbs.db", "desktop.ini"}
 
 
@@ -46,7 +47,8 @@ def asset_kinds(name: str) -> list[str]:
 
 
 def _visible_dir(name: str) -> bool:
-    return name not in _SKIP_DIRS and not name.startswith(".")
+    return (name not in _SKIP_DIRS and not name.startswith(".")
+            and not schema.is_system_dir(name))
 
 
 @dataclass

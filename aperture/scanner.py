@@ -20,10 +20,27 @@ GPS_IFD_TAG = 0x8825
 
 def is_meta_path(relp: Path) -> bool:
     """True for a path (relative to photos_dir) inside a metadata folder —
-    an album's `.album/` or the gallery's own `.gallery/`. Never indexed: an
-    image in either is metadata (a mark, a font specimen, a screenshot of the
-    cfg), not a gallery photo."""
-    return any(d in relp.parts for d in schema.META_DIRS)
+    an album's `.album/`, the gallery's own `.gallery/`, or a folder a NAS
+    keeps for itself (`@eaDir`, `#recycle`, … — schema.SYSTEM_DIRS) at any
+    depth. Never indexed: an image in any of them is metadata (a mark, a font
+    specimen, the NAS's own thumbnail), not a gallery photo."""
+    return any(d in relp.parts for d in schema.META_DIRS) or \
+        any(schema.is_system_dir(part) for part in relp.parts)
+
+
+def walk_photo_tree(base: Path) -> list[Path]:
+    """Every file under `base`, sorted, without ever descending into a folder
+    in schema.SYSTEM_DIRS.
+
+    Pruned rather than filtered afterwards: a Synology keeps several
+    thumbnails of its own per photo in `@eaDir`, and over SMB every one of
+    them is a round trip the scan has no use for. The metadata folders are
+    still walked — the callers skip their files with is_meta_path."""
+    found: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = [d for d in dirnames if not schema.is_system_dir(d)]
+        found.extend(Path(dirpath) / name for name in filenames)
+    return sorted(found)
 
 
 # iPhone photos are HEIC; without the plugin they cannot be opened at all,
@@ -628,7 +645,7 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
             return _empty_scan(root)
     # Walk the whole tree so albums can nest (photos/japan/tokyo/img.jpg).
     # Files sitting directly in photos_dir (no album folder) are skipped.
-    for file in sorted(base.rglob("*")):
+    for file in walk_photo_tree(base):
         if not file.is_file() or not schema.is_image(file):
             continue
         relp = file.relative_to(photos_dir)

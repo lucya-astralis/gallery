@@ -897,6 +897,15 @@ Everything this software is trusted with lives under `data/`, never in the
 photo tree — the gallery *serves* files out of `photos/.gallery/`, so a secret
 placed there would be a secret published.
 
+Folders a NAS or an operating system keeps for itself are ignored at any depth,
+in any case: Synology's `@eaDir`, `@tmp`, `@sharebin`, `#recycle` and
+`#snapshot`, QNAP's `@Recycle`, `@Recently-Snapshot` and `.@__thumb`, macOS's
+`.AppleDouble`, `.Trashes`, `.Spotlight-V100` and `.fseventsd`, Windows's
+`$RECYCLE.BIN` and `System Volume Information`, and `lost+found`. The scan does
+not walk into them, the watcher drops their events, the console does not list
+them and cannot write into them, and nothing in them is served. The list is
+`SYSTEM_DIRS` in `aperture/schema.py`.
+
 Inside the package:
 
 | Path                | Purpose                                             |

@@ -117,6 +117,8 @@ def album_segments(raw: str) -> list[str]:
     for p in parts:
         if p.startswith("."):
             raise PathRefused(f"{p!r} is a metadata folder, not an album")
+        if schema.is_system_dir(p):
+            raise PathRefused(f"{p!r} is a folder the NAS keeps for itself, not an album")
     return parts
 
 
