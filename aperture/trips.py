@@ -11,7 +11,7 @@ import threading
 import time
 import urllib.request
 
-from . import albums, brand, i18n, theme
+from . import albums, brand, i18n
 
 
 # ----- trip dashboard ---------------------------------------------------
@@ -34,10 +34,9 @@ TRIPS: dict[str, dict] = {
         # Hokkaido -> Sapporo, Kanto -> Tokyo) — they feed the
         # /api/trip-weather proxy (see below) and the route map's dot, both
         # of which need one point. The map's highlight is the whole region
-        # (tools/generate_trip_map.py). The civic emblem on a stop is NOT
-        # configured here — it is the `icon = …` of the region's own album
-        # (see the per-album icon section), so the mark travels with the
-        # album wherever it is named.
+        # (tools/generate_trip_map.py). A leg card carries no album icon:
+        # the region album's `icon = …` shows on its card, hero and
+        # breadcrumb, but the timeline is the trip's, not the albums'.
         "stops": [
             # A stop's end / the next stop's start is the domestic flight's
             # departure (JST wall-clock), so the countdown runs to the gate
@@ -70,8 +69,6 @@ def trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
         stops.append({
             "city": s["city"],
             "jp": s.get("jp", ""),
-            # the stop's mark is the stop album's own `icon = …`
-            "icon": theme.album_icon_url(sub),
             "start": s["start"],
             "end": s["end"],
             "start_h": i18n.fmt_date(lang, s["start"]),

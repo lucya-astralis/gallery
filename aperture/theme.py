@@ -345,10 +345,10 @@ def theme_css_url(album: str | None = None) -> str | None:
 # ----- per-album icon (album.cfg `icon = ...`) --------------------------
 # Any album can carry a small mark of its own — a civic emblem, a crest, a
 # logo — rendered wherever the album is named: its card in the grids, the
-# hero title, the breadcrumb, and the stops of the trip timeline. That
-# last one is where this started, as three hard-coded SVGs under
-# /static/emblems; the mark now belongs to the album instead, so every
-# album gets one for free and the timeline simply reads its stops' albums.
+# hero title and the breadcrumb. It started as three hard-coded SVGs under
+# /static/emblems on the trip timeline's stops; the mark now belongs to the
+# album instead, so every album gets one for free — and the timeline, which
+# is the trip's rather than the albums', no longer shows it.
 #
 # Same shape as the title font: drop the file into the album's `.album/`
 # folder, name it in album.cfg

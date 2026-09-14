@@ -1247,8 +1247,8 @@ section{
 
 /* ---- per-album icon (album.cfg `icon = ...`) ------------------------
    One mark per album, rendered wherever that album is named: the grid
-   cards, the showcase rail, this breadcrumb trail, the hero title and the
-   trip timeline's city stops. Sized in em so it tracks whatever type it
+   cards, the showcase rail, this breadcrumb trail and the hero title (not
+   the trip timeline's leg cards). Sized in em so it tracks whatever type it
    sits in instead of needing a rule per place, and set inline with a
    baseline nudge so it reads as part of the name rather than a floating
    badge. The drop-shadow keeps colored civic emblems legible where the
@@ -5181,7 +5181,7 @@ body.page-welcome{ --page-max: 2400px; }
 /* ---- itinerary timeline (image-backed leg cards; each links into its
    region sub-album). The cover fills the whole card behind a left-heavy
    shade, so the text column reads over any photo; content is head row
-   (state dot / emblem / region / kanji), the date span, and a footer that
+   (state dot / region / kanji), the date span, and a footer that
    pairs the live weather block with the day counter. ---- */
 .trip__line{
   list-style:none; margin:0; padding:0;
@@ -5256,15 +5256,6 @@ body.page-welcome{ --page-max: 2400px; }
   text-shadow:0 1px 6px rgba(0, 0, 0, .55);
 }
 .trip__stop-head{ display:flex; align-items:center; gap:var(--s-3); min-width:0; }
-/* civic emblem of the destination, leading the region name — the region
-   album's own `icon = …` (album.cfg), like everywhere else the album is
-   named (.album-ico). The drop-shadow keeps the coloured marks legible over
-   the stop's photo cover. Falls back gracefully when a stop has no icon. */
-.trip__stop-emblem{
-  flex:0 0 auto; align-self:center;
-  width:18px; height:18px; object-fit:contain;
-  filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));
-}
 .trip__stop-city{
   font-family:"Space Grotesk", sans-serif; font-weight:600;
   font-size:var(--fs-text-lg); letter-spacing:.02em; color:var(--text);

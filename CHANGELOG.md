@@ -18,6 +18,18 @@ notes are never one commit apart.
 
 ---
 
+## 1.7.1 — 2026-09-14
+
+The trip timeline shows the trip, not the albums' marks.
+
+**Fixed**
+
+* **No album icons on the trip's leg cards.** A region album's `icon = …`
+  (Kansai, Hokkaido, Kanto) was also drawn in front of its name on the trip
+  timeline. It still shows on the album's card, hero title and breadcrumb.
+
+---
+
 ## 1.7.0 — 2026-09-14
 
 Everything the CLI can do, in the console — and what the thumbnails cost on
