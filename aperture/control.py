@@ -7,6 +7,8 @@ through small JSON files under `DATA_DIR/control/`:
 
     paused.json         written by the CLI  -> read by the server
     scan.request.json   written by the CLI  -> consumed by the server
+    jobs/<id>.json      written by the CLI  -> consumed by the server
+    jobs/<id>.done.json written by the server -> read by the CLI
     status.json         written by the server -> read by the CLI
 
 The server's control loop (indexer._control_loop) ticks every CONTROL_TICK
@@ -30,6 +32,8 @@ State semantics:
 
 import json
 import os
+import re
+import secrets
 import time
 from pathlib import Path
 
@@ -37,6 +41,13 @@ CONTROL_DIR_NAME = "control"
 PAUSE_FILE = "paused.json"
 SCAN_REQUEST_FILE = "scan.request.json"
 STATUS_FILE = "status.json"
+JOBS_DIR = "jobs"
+# How many finished jobs keep their result file. A poller reads its own within
+# seconds; the rest is only there so "what did that rebuild do" has an answer.
+JOBS_KEPT = 20
+# A job id is also a file name, and it arrives in a URL. Anything that is not
+# this shape never reaches the filesystem.
+JOB_ID_RE = re.compile(r"^[0-9a-f]{1,16}-[0-9a-f]{1,16}$")
 
 # How often the server's control loop looks at this directory. Also the upper
 # bound on "how long until a manual scan actually starts".
@@ -135,7 +146,7 @@ def _sweep_tmp() -> None:
         return
     cutoff = time.time() - TMP_STALE_AFTER
     try:
-        entries = list(_dir.glob("*.tmp*"))
+        entries = list(_dir.glob("*.tmp*")) + list((_dir / JOBS_DIR).glob("*.tmp*"))
     except OSError:
         return
     for f in entries:
@@ -232,6 +243,120 @@ def take_scan_request() -> dict | None:
     except OSError:
         pass
     return payload if isinstance(payload, dict) else {"id": None, "album": None, "force": False}
+
+
+# ----- jobs -------------------------------------------------------------
+# The work that is not a scan but still writes what only the indexer writes:
+# rebuilding or pruning derivatives, recomputing the featured flags, stripping
+# coordinates. Unlike a scan these queue -- "rebuild berlin" and then "prune"
+# are two different things to do, not one request replacing another -- so each
+# is its own file, and the server writes its summary back next to it. What a
+# kind means is aperture/ops.py's business; this module only carries it.
+def _jobs_dir() -> Path:
+    d = control_dir() / JOBS_DIR
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    return d
+
+
+def request_job(kind: str, params: dict | None = None, by: str = "cli") -> dict:
+    job = {
+        # the random tail: two requests in the same millisecond from the same
+        # process are two jobs, not one file written twice
+        "id": f"{int(_now() * 1000):x}-{secrets.token_hex(3)}",
+        "kind": kind,
+        "params": dict(params or {}),
+        "requested_at": _now(),
+        "by": by,
+    }
+    _jobs_dir()
+    _write(f"{JOBS_DIR}/{job['id']}.json", job)
+    return job
+
+
+def _pending_files() -> list[Path]:
+    try:
+        files = [p for p in (control_dir() / JOBS_DIR).glob("*.json")
+                 if not p.name.endswith(".done.json")]
+    except (OSError, RuntimeError):
+        return []
+    # the id starts with the request time in hex, all the same width for the
+    # next few thousand years, so the name is the queue order
+    return sorted(files, key=lambda p: p.name)
+
+
+def pending_jobs() -> list[dict]:
+    """Queued jobs, oldest first, without consuming them."""
+    jobs = []
+    for path in _pending_files():
+        payload = _read(f"{JOBS_DIR}/{path.name}")
+        if payload:
+            jobs.append(payload)
+    return jobs
+
+
+def has_pending_jobs() -> bool:
+    return bool(_pending_files())
+
+
+def take_job() -> dict | None:
+    """Consume the oldest queued job. Same rename-first dance as a scan
+    request, so a file is either taken whole or left for the next tick."""
+    for src in _pending_files():
+        taken = src.with_suffix(".taken")
+        try:
+            os.replace(src, taken)
+        except OSError:
+            continue
+        try:
+            payload = json.loads(taken.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            payload = None
+        try:
+            taken.unlink()
+        except OSError:
+            pass
+        if isinstance(payload, dict):
+            return payload
+    return None
+
+
+def finish_job(summary: dict) -> bool:
+    """Server side: publish one job's summary, and forget the oldest ones."""
+    job_id = str(summary.get("id") or "")
+    if not JOB_ID_RE.match(job_id):
+        return False
+    _jobs_dir()
+    ok = _write(f"{JOBS_DIR}/{job_id}.done.json", summary)
+    try:
+        done = sorted((control_dir() / JOBS_DIR).glob("*.done.json"), key=lambda p: p.name)
+    except (OSError, RuntimeError):
+        return ok
+    for old in done[:-JOBS_KEPT]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+    return ok
+
+
+def job_result(job_id: str) -> dict | None:
+    """The summary of a finished job, or None while it is queued or running
+    -- and for an id that is not an id at all."""
+    if not JOB_ID_RE.match(job_id or ""):
+        return None
+    return _read(f"{JOBS_DIR}/{job_id}.done.json")
+
+
+def job_is_pending(job_id: str) -> bool:
+    if not JOB_ID_RE.match(job_id or ""):
+        return False
+    try:
+        return (control_dir() / JOBS_DIR / f"{job_id}.json").exists()
+    except (OSError, RuntimeError):
+        return False
 
 
 # ----- status -----------------------------------------------------------

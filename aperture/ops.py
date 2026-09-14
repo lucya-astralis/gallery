@@ -12,8 +12,12 @@ own container) it can read the index and write the control channel, which is
 all any of this needs. So the computation moved here and the two front ends
 are exactly that:
 
-    cli.py          renders these payloads to a terminal
-    console/ops.py  serves them over HTTP
+    cli/            renders these payloads to a terminal
+    console/opsapi.py  serves them over HTTP
+
+The reports that only look (a cfg, a photo, the tags, the export…) live next
+door in `aperture/reports.py`; this module keeps the live state, `doctor`, and
+everything that ends in a write — the scan, the pause and the jobs.
 
 Nothing in this module prints, and nothing in it imports the terminal layer.
 The only formatting that survived is the handful of strings that are part of a
@@ -29,6 +33,8 @@ keeps working for free.
 
 from __future__ import annotations
 
+import os
+import shutil
 import time
 from datetime import datetime
 from pathlib import Path
@@ -114,7 +120,7 @@ def photo_files(root: str | None = None):
     if not base.is_dir():
         return []
     found = []
-    for file in sorted(base.rglob("*")):
+    for file in scanner.walk_photo_tree(base):
         if not file.is_file() or not schema.is_image(file):
             continue
         relp = file.relative_to(settings.photos_dir)
@@ -216,6 +222,232 @@ def index_counts(c) -> dict:
     }
 
 
+# ----- disk -------------------------------------------------------------
+def _tree_usage(root: Path, skip: Path | None = None) -> dict:
+    """Files and bytes under one directory, split by extension. os.walk and
+    DirEntry.stat rather than rglob: on a tree of tens of thousands of
+    thumbnails the difference is the scandir cache."""
+    files = total = 0
+    formats: dict[str, dict] = {}
+    if not root.is_dir():
+        return {"files": 0, "bytes": 0, "formats": formats}
+    skip_s = os.path.normcase(str(skip)) if skip else None
+    for dirpath, dirnames, _ in os.walk(root):
+        if skip_s:
+            dirnames[:] = [d for d in dirnames
+                           if os.path.normcase(os.path.join(dirpath, d)) != skip_s]
+        try:
+            entries = list(os.scandir(dirpath))
+        except OSError:
+            continue
+        for entry in entries:
+            try:
+                if not entry.is_file(follow_symlinks=False):
+                    continue
+                size = entry.stat(follow_symlinks=False).st_size
+            except OSError:
+                continue
+            files += 1
+            total += size
+            ext = os.path.splitext(entry.name)[1].lower() or "(none)"
+            slot = formats.setdefault(ext, {"files": 0, "bytes": 0})
+            slot["files"] += 1
+            slot["bytes"] += size
+    return {"files": files, "bytes": total, "formats": formats}
+
+
+def disk_usage() -> dict:
+    """What the generated trees cost on disk, next to what they are made from.
+
+    Walks the thumbnail, preview and HEIC-conversion trees (the last sits
+    inside the previews by default and is counted once, as its own tier), and
+    asks each volume involved how full it is. Formats are split out because a
+    tier that changed format keeps its old files until `thumbs --prune --apply`
+    — which is exactly the kind of space this is here to find.
+    """
+    started = time.monotonic()
+    fulls_inside = settings.previews_dir in settings.fulls_dir.parents
+    specs = (
+        ("thumbnails", settings.thumbs_dir, None, scanner.THUMB_EXT),
+        ("previews", settings.previews_dir,
+         settings.fulls_dir if fulls_inside else None, scanner.PREVIEW_EXT),
+        ("fulls", settings.fulls_dir, None, ".jpg"),
+    )
+    counts = index_counts(db.conn())
+    photos = counts["images"]
+    tiers = []
+    for key, path, skip, current in specs:
+        usage = _tree_usage(path, skip)
+        tiers.append({
+            "key": key, "path": str(path), "exists": path.is_dir(),
+            "format": current, **usage,
+            # files in a format this tier no longer writes: prune leftovers
+            "stale_formats": sorted(ext for ext in usage["formats"]
+                                    if ext != current and ext in scanner.DERIVATIVE_EXTS),
+            "per_photo": round(usage["bytes"] / photos) if photos else None,
+        })
+    derived = sum(t["bytes"] for t in tiers)
+
+    volumes: dict = {}
+    for label, path in [("photos", settings.photos_dir), ("data", settings.data_dir)] + \
+                       [(t["key"], Path(t["path"])) for t in tiers]:
+        try:
+            dev = path.stat().st_dev
+            if dev not in volumes:
+                total, used, free = shutil.disk_usage(path)
+                volumes[dev] = {"path": str(path), "total": total, "used": used,
+                                "free": free, "holds": []}
+            volumes[dev]["holds"].append(label)
+        except OSError:
+            continue
+
+    return {
+        "tiers": tiers,
+        "derivatives": {"files": sum(t["files"] for t in tiers), "bytes": derived},
+        "originals": {"files": photos, "bytes": counts["bytes"]},
+        "database": {"bytes": counts["db_bytes"]},
+        # how much of the originals' size the generated trees add on top
+        "ratio": round(derived / counts["bytes"], 4) if counts["bytes"] else None,
+        "volumes": list(volumes.values()),
+        "took_ms": int((time.monotonic() - started) * 1000),
+    }
+
+
+# ----- derivatives --------------------------------------------------------
+def orphan_derivatives(disk: list[str] | None = None) -> list[Path]:
+    """Generated files no photo maps to any more, over the whole tree. Only
+    ever asked for the whole gallery: in an album scope every other album's
+    files would look orphaned."""
+    disk = photo_files() if disk is None else disk
+    expected = {p for rel in disk for p in derivatives(rel).values()}
+    orphans: list[Path] = []
+    for d in (settings.thumbs_dir, settings.previews_dir, settings.fulls_dir):
+        if not d.is_dir():
+            continue
+        for f in derivative_files(d):
+            # FULLS_DIR sits inside PREVIEWS_DIR by default — don't report its
+            # contents twice, or as orphans of the previews tree
+            if d is settings.previews_dir and settings.fulls_dir in f.parents:
+                continue
+            if f not in expected:
+                orphans.append(f)
+    return orphans
+
+
+def _derivative_todo(disk: list[str], rebuild_all: bool) -> list[dict]:
+    todo = []
+    for rel in disk:
+        for kind, state in derivative_state(rel).items():
+            if kind == "full":
+                continue  # built on demand, never eagerly
+            if rebuild_all or state in ("missing", "stale"):
+                todo.append({"rel_path": rel, "kind": kind, "state": state})
+    return todo
+
+
+def derivatives_report(album: str | None = None, rebuild_all: bool = False) -> dict:
+    """`thumbs` without flags: what is missing or stale, and what is left
+    over. Reads only."""
+    album = norm_album(album)
+    disk = photo_files(album)
+    todo = _derivative_todo(disk, rebuild_all)
+    orphans = orphan_derivatives(disk) if album is None else []
+    by_state: dict[str, int] = {}
+    for item in todo:
+        if item["state"] != "ok":
+            by_state[f"{item['state']}_{item['kind']}"] = by_state.get(f"{item['state']}_{item['kind']}", 0) + 1
+    orphan_bytes = 0
+    for f in orphans:
+        try:
+            orphan_bytes += f.stat().st_size
+        except OSError:
+            pass
+    return {"scope": album, "photos": len(disk), "to_build": len(todo),
+            "all": bool(rebuild_all), "by_state": by_state,
+            "pending": [i for i in todo if i["state"] != "ok"],
+            "orphans": [str(p) for p in orphans], "orphan_bytes": orphan_bytes,
+            "orphans_checked": album is None}
+
+
+def rebuild_derivatives(album: str | None = None, rebuild_all: bool = False,
+                        progress=None) -> dict:
+    """`thumbs --rebuild`: build every missing or stale thumbnail and preview
+    in scope (with `rebuild_all`, every one)."""
+    album = norm_album(album)
+    disk = photo_files(album)
+    todo = _derivative_todo(disk, rebuild_all)
+    built = failed = 0
+    broken: list[str] = []
+    for done, item in enumerate(todo, 1):
+        rel, kind = item["rel_path"], item["kind"]
+        size = settings.thumb_size if kind == "thumb" else settings.preview_size
+        if scanner.make_thumbnail(settings.photos_dir / rel, derivatives(rel)[kind], size):
+            built += 1
+        else:
+            failed += 1
+            broken.append(f"{rel} ({kind})")
+        if progress is not None:
+            # the name trails the meter, so a slow share shows where it is
+            progress(Path(rel).name, done, len(todo))
+    return {"scope": album, "photos": len(disk), "to_build": len(todo),
+            "all": bool(rebuild_all), "built": built, "failed": failed, "broken": broken}
+
+
+def prune_derivatives(progress=None) -> dict:
+    """`thumbs --prune --apply`: delete the generated files no photo maps to."""
+    orphans = orphan_derivatives()
+    pruned = freed = 0
+    errors: list[str] = []
+    for done, f in enumerate(orphans, 1):
+        try:
+            size = f.stat().st_size
+            f.unlink()
+            pruned += 1
+            freed += size
+        except OSError as e:
+            errors.append(f"{f}: {e}")
+        if progress is not None and (done % 25 == 0 or done == len(orphans)):
+            progress("deleting orphans", done, len(orphans))
+    return {"orphans": len(orphans), "pruned": pruned, "freed_bytes": freed,
+            "errors": errors}
+
+
+# ----- gps --------------------------------------------------------------
+def gps_audit(album: str | None = None, strip: bool = False, progress=None) -> dict:
+    """Which originals still carry coordinates — and, with `strip`, remove
+    them in place. The only thing in the operations surface that rewrites a
+    photograph, which is why it is a job the indexer runs and never a route."""
+    album = norm_album(album)
+    base = (settings.photos_dir / album) if album else settings.photos_dir
+    files = [p for p in scanner.walk_photo_tree(base)
+             if p.is_file() and schema.is_image(p)
+             and not scanner.is_meta_path(p.relative_to(settings.photos_dir))] \
+        if base.is_dir() else []
+    carrying: list[str] = []
+    stripped: list[str] = []
+    unreadable: list[str] = []
+    for seen, path in enumerate(files, 1):
+        if progress is not None and (seen % 25 == 0 or seen == len(files)):
+            progress("reading EXIF", seen, len(files))
+        rel = path.relative_to(settings.photos_dir).as_posix()
+        try:
+            with Image.open(path) as img:
+                has = scanner._has_gps(img.getexif())
+        except Exception as exc:
+            unreadable.append(f"{rel} — {exc}")
+            continue
+        if not has:
+            continue
+        carrying.append(rel)
+        if strip and scanner.strip_gps_inplace(path):
+            stripped.append(rel)
+    return {"album": album, "checked": len(files),
+            "with_gps": carrying, "stripped": stripped,
+            "unreadable": unreadable,
+            "settings": {"hide_gps": bool(settings.hide_gps),
+                         "strip_gps": bool(settings.strip_gps)}}
+
+
 # ----- featured provenance ---------------------------------------------
 def featured_map() -> tuple[dict[str, list[tuple[str, str]]], list[dict]]:
     """Which album.cfg entry featured which photo.
@@ -251,6 +483,32 @@ def featured_map() -> tuple[dict[str, list[tuple[str, str]]], list[dict]]:
             for rel in rels:
                 by_photo.setdefault(rel, []).append((album, item))
     return by_photo, unresolved
+
+
+def featured_report(album: str | None = None) -> dict:
+    """`featured`: which entry features which photo, per album.cfg, and where
+    the DB flags have drifted from that."""
+    c = db.conn()
+    by_photo, unresolved = featured_map()
+    album = norm_album(album)
+    by_album: dict[str, dict[str, list[str]]] = {}
+    for rel, sources in by_photo.items():
+        for src_album, entry in sources:
+            if album and src_album != album and not src_album.startswith(album + "/"):
+                continue
+            by_album.setdefault(src_album, {}).setdefault(entry, []).append(rel)
+    flagged = {r["rel_path"] for r in c.execute("SELECT rel_path FROM images WHERE is_showcase = 1")}
+    known = {r["rel_path"] for r in c.execute("SELECT rel_path FROM images")}
+    expected = {rel for rel in by_photo if rel in known}
+    return {"albums": {a: {e: sorted(v) for e, v in entries.items()}
+                       for a, entries in by_album.items()},
+            "showcase_albums": [a for a in albums.albums_with_ancestors()
+                                if albums.album_is_showcase(a)],
+            "unresolved": unresolved,
+            "flagged": sorted(flagged),
+            "db_flagged": len(flagged), "expected": len(expected),
+            "drift": {"not_flagged": sorted(expected - flagged),
+                      "flagged_without_rule": sorted(flagged - expected)}}
 
 
 def wallpaper_line(album: str, variant: str) -> str:
@@ -326,6 +584,68 @@ def resume() -> bool:
     return control.resume()
 
 
+# ----- jobs -------------------------------------------------------------
+# The writes that are not a scan, by name. The console and the CLI both queue
+# them on the control channel and the indexer runs them through run_job below,
+# so the process that owns the index is still the only one that writes it —
+# and the derivative trees, and (for gps_strip) the originals.
+JOBS = {
+    "rebuild": "build missing and stale thumbnails and previews (`all`: every one)",
+    "prune": "delete generated files no photo maps to any more",
+    "featured": "rewrite the featured flags from the album.cfg files",
+    "gps_strip": "remove the GPS block from every original that has one — rewrites the photos",
+}
+
+
+def request_job(kind: str, album: str | None = None, rebuild_all: bool = False,
+                by: str = "cli") -> dict:
+    """Queue one job. Raises ValueError for a kind that does not exist and
+    UnknownAlbum for a scope that matches nothing."""
+    if kind not in JOBS:
+        raise ValueError(f"no such job: {kind!r}")
+    params: dict = {}
+    if kind in ("rebuild", "gps_strip"):
+        album = norm_album(album)
+        if album and not (settings.photos_dir / album).is_dir():
+            raise UnknownAlbum(album)
+        params["album"] = album
+    if kind == "rebuild":
+        params["all"] = bool(rebuild_all)
+    return control.request_job(kind, params, by=by)
+
+
+def run_job(kind: str, params: dict, progress=None) -> dict:
+    """What a job does. Called by the indexer (indexer.run_job) with the scan
+    lock held; never by a front end."""
+    if kind == "rebuild":
+        return rebuild_derivatives(params.get("album"), bool(params.get("all")), progress)
+    if kind == "prune":
+        return prune_derivatives(progress)
+    if kind == "featured":
+        if progress is not None:
+            progress("recomputing featured flags")
+        albums.recompute_featured()
+        report = featured_report()
+        return {"db_flagged": report["db_flagged"], "expected": report["expected"],
+                "unresolved": len(report["unresolved"])}
+    if kind == "gps_strip":
+        result = gps_audit(params.get("album"), strip=True, progress=progress)
+        # the rewritten files have a new mtime, so a plain scan re-reads them
+        result["scan_requested"] = bool(result["stripped"])
+        if result["stripped"]:
+            control.request_scan(album=result["album"], by="job")
+        return result
+    raise ValueError(f"no such job: {kind!r}")
+
+
+def job(job_id: str) -> dict:
+    """Where one job is: queued, running (with its progress), or done."""
+    st = control.read_status() or {}
+    running = st.get("job") if (st.get("job") or {}).get("id") == job_id else None
+    return {"id": job_id, "result": control.job_result(job_id),
+            "pending": control.job_is_pending(job_id), "running": running}
+
+
 def last_scan() -> dict | None:
     return ((control.read_status() or {}).get("last_scan")) or None
 
@@ -388,31 +708,19 @@ def doctor(album: str | None = None, limit_slow: int = 50,
                                      "detail": f"index mtime {stamp(stored)} vs file {stamp(disk_mtime)}"})
 
     # --- derivatives ---
-    expected: set[Path] = set()
     for seen, rel in enumerate(disk, 1):
         if seen % 25 == 0 or seen == len(disk):
             _tick_progress(seen, len(disk), "derivatives")
-        for kind, path in derivatives(rel).items():
-            expected.add(path)
         for kind, state in derivative_state(rel).items():
             if state != "ok" and not (kind == "full" and state == "missing"):
                 # a missing `full` is normal: HEIC conversions are built on
                 # first request, not up front
                 note(f"{state}_{kind}", {"rel_path": rel, "detail": f"{kind} is {state}"})
 
-    derivative_dirs = [settings.thumbs_dir, settings.previews_dir, settings.fulls_dir]
     _tick("looking for orphaned derivatives")
     if album is None:  # orphan sweep only makes sense over the whole tree
-        for d in derivative_dirs:
-            if not d.is_dir():
-                continue
-            for f in derivative_files(d):
-                # FULLS_DIR sits inside PREVIEWS_DIR by default — don't report
-                # its contents twice, or as orphans of the previews tree
-                if d is settings.previews_dir and settings.fulls_dir in f.parents:
-                    continue
-                if f not in expected:
-                    note("orphan_derivative", {"rel_path": str(f), "detail": "no photo maps to this file"})
+        for f in orphan_derivatives(disk):
+            note("orphan_derivative", {"rel_path": str(f), "detail": "no photo maps to this file"})
 
     # --- unreadable sources (bounded: only where a thumb never built) ---
     checked = 0

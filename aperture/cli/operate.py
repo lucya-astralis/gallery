@@ -3,8 +3,8 @@
 `status`, `scan`, `pause` and `resume` talk to the running server the only way
 anything does -- the flag-file channel in DATA_DIR/control (aperture/control.py),
 never an HTTP call, so there is one place a scan can begin whoever asked.
-`doctor`, `thumbs` and `featured` work on the index and the derivative trees;
-`passwd` sets the console's password.
+`doctor`, `thumbs`, `featured` and `disk` work on the index and the derivative
+trees; `passwd` sets the console's password.
 """
 
 import sys
@@ -12,7 +12,6 @@ import time
 
 from .. import albums, control, db, ops, scanner, termui as ui
 from ..runtime import settings
-from pathlib import Path
 
 from .render import _render_system, _screen, dump, fail, head, kv, out
 
@@ -227,66 +226,44 @@ def cmd_doctor(args) -> int:
 
 
 def cmd_thumbs(args) -> int:
+    """Inspect, rebuild and prune in this process. The console queues the
+    same two writes as jobs for the indexer (ops.JOBS); the work itself is
+    ops.rebuild_derivatives / ops.prune_derivatives either way."""
     db.conn()
-    album = ops.norm_album(args.album)
-    disk = ops.photo_files(album)
-    todo: list[tuple[str, str]] = []      # (rel, kind)
-    for rel in disk:
-        for kind, state in ops.derivative_state(rel).items():
-            if kind == "full":
-                continue  # built on demand, never eagerly
-            if args.all or state in ("missing", "stale"):
-                todo.append((rel, kind))
-
-    expected = {p for rel in disk for p in ops.derivatives(rel).values()}
-    orphans: list[Path] = []
-    if album is None:
-        for d in (settings.thumbs_dir, settings.previews_dir, settings.fulls_dir):
-            if not d.is_dir():
-                continue
-            for f in ops.derivative_files(d):
-                if d is settings.previews_dir and settings.fulls_dir in f.parents:
-                    continue
-                if f not in expected:
-                    orphans.append(f)
+    report = ops.derivatives_report(args.album, rebuild_all=args.all)
+    album, orphans = report["scope"], report["orphans"]
 
     built = failed = pruned = 0
-    broken: list[str] = []
     if args.rebuild:
         live = ui.Live("building", enabled=not args.json)
-        for done, (rel, kind) in enumerate(todo, 1):
-            src = settings.photos_dir / rel
-            size = settings.thumb_size if kind == "thumb" else settings.preview_size
-            dst = ops.derivatives(rel)[kind]
-            if scanner.make_thumbnail(src, dst, size):
-                built += 1
-            else:
-                failed += 1
-                broken.append(f"{rel} ({kind})")
-            # the name trails the meter, so you can see where a slow share is
-            live.progress(done, len(todo), Path(rel).name)
-        live.done()
-        for item in broken:
+        try:
+            res = ops.rebuild_derivatives(album, args.all,
+                                          progress=lambda label, done, total:
+                                              live.progress(done, total, label))
+        finally:
+            live.done()
+        built, failed = res["built"], res["failed"]
+        for item in res["broken"]:
             ui.warn(f"  failed: {item}")
-    if args.prune and args.apply:
-        for f in orphans:
-            try:
-                f.unlink()
-                pruned += 1
-            except OSError as e:
-                out(f"  could not delete {f}: {e}")
+    if args.prune and args.apply and album is None:
+        res = ops.prune_derivatives()
+        pruned = res["pruned"]
+        for error in res["errors"]:
+            out(f"  could not delete {error}")
 
     if args.json:
-        dump({"scope": album, "photos": len(disk), "to_build": len(todo),
+        dump({"scope": album, "photos": report["photos"], "to_build": report["to_build"],
               "built": built, "failed": failed,
-              "orphans": [str(p) for p in orphans], "pruned": pruned,
+              "orphans": orphans, "pruned": pruned,
               "applied": bool(args.apply)})
         return 0
 
+    todo = report["to_build"]
     kv("scope", album or "whole gallery")
-    kv("photos", str(len(disk)))
-    kv("to build", f"{len(todo)} derivative(s)" + (" (--all: rebuilding everything)" if args.all else ""))
+    kv("photos", str(report["photos"]))
+    kv("to build", f"{todo} derivative(s)" + (" (--all: rebuilding everything)" if args.all else ""))
     kv("orphans", f"{len(orphans)} generated file(s) without a source photo"
+                  f" · {ops.bytes_h(report['orphan_bytes'])}"
                   if album is None else "not checked (album scope)")
     if args.rebuild:
         kv("built", f"{built} ok, {failed} failed")
@@ -306,37 +283,22 @@ def cmd_thumbs(args) -> int:
 
 
 def cmd_featured(args) -> int:
-    c = db.conn()
+    db.conn()
     if args.recompute:
         albums.recompute_featured()
-    by_photo, unresolved = ops.featured_map()
-    album = ops.norm_album(args.album)
-
-    by_album: dict[str, dict[str, list[str]]] = {}
-    for rel, sources in by_photo.items():
-        for src_album, entry in sources:
-            if album and src_album != album and not src_album.startswith(album + "/"):
-                continue
-            by_album.setdefault(src_album, {}).setdefault(entry, []).append(rel)
-
-    flagged = {r["rel_path"] for r in c.execute("SELECT rel_path FROM images WHERE is_showcase = 1")}
-    known = set(r["rel_path"] for r in c.execute("SELECT rel_path FROM images"))
-    expected = {rel for rel in by_photo if rel in known}
-    drift_missing = sorted(expected - flagged)
-    drift_extra = sorted(flagged - expected)
-
-    showcase_albums = [a for a in albums.albums_with_ancestors() if albums.album_is_showcase(a)]
+    report = ops.featured_report(args.album)
+    by_album, unresolved = report["albums"], report["unresolved"]
+    flagged = set(report["flagged"])
+    drift_missing = report["drift"]["not_flagged"]
+    drift_extra = report["drift"]["flagged_without_rule"]
+    showcase_albums = report["showcase_albums"]
 
     if args.json:
-        dump({"albums": {a: {e: sorted(v) for e, v in entries.items()} for a, entries in by_album.items()},
-              "showcase_albums": showcase_albums,
-              "unresolved": unresolved,
-              "db_flagged": len(flagged), "expected": len(expected),
-              "drift": {"not_flagged": drift_missing, "flagged_without_rule": drift_extra},
+        dump({**{k: v for k, v in report.items() if k != "flagged"},
               "recomputed": bool(args.recompute)})
         return 0
 
-    kv("featured", f"{len(expected)} photo(s) from {len(by_album)} album.cfg file(s)")
+    kv("featured", f"{report['expected']} photo(s) from {len(by_album)} album.cfg file(s)")
     kv("db flag", f"{len(flagged)} row(s) with is_showcase = 1")
     kv("showcase", f"{len(showcase_albums)} album(s): {', '.join(showcase_albums) or '—'}")
     if args.recompute:
@@ -363,6 +325,42 @@ def cmd_featured(args) -> int:
             out(f"  ! {rel} — flag is 1, but nothing features it")
         kv("fix", "`featured --recompute`, or any scan")
     return 1 if (unresolved or drift_missing or drift_extra) else 0
+
+
+def cmd_disk(args) -> int:
+    """What the generated trees cost on disk, and how full their volumes are."""
+    report = ops.disk_usage()
+    if args.json:
+        dump(report)
+        return 0
+    originals = report["originals"]["bytes"]
+    for tier in report["tiers"]:
+        if not tier["exists"]:
+            kv(tier["key"], ui.state("not there", "idle") + f" · {tier['path']}")
+            continue
+        per = f" · {ops.bytes_h(tier['per_photo'])}/photo" if tier["per_photo"] else ""
+        kv(tier["key"], f"{tier['files']} file(s) · {ops.bytes_h(tier['bytes'])}{per}")
+        kv("", tier["path"])
+        for ext in tier["stale_formats"]:
+            old = tier["formats"][ext]
+            kv("", ui.state(f"{old['files']} {ext} file(s), {ops.bytes_h(old['bytes'])} "
+                            f"— a format this tier no longer writes", "warn"))
+    head("against the originals")
+    ratio = report["ratio"]
+    kv("generated", f"{ops.bytes_h(report['derivatives']['bytes'])}"
+                    + (f" · {ratio * 100:.1f}% of the originals" if ratio is not None else ""))
+    kv("originals", f"{report['originals']['files']} photo(s) · {ops.bytes_h(originals)}")
+    kv("database", ops.bytes_h(report["database"]["bytes"]))
+    head("volumes")
+    for vol in report["volumes"]:
+        used = vol["used"] / vol["total"] * 100 if vol["total"] else 0
+        kv(", ".join(vol["holds"]), f"{ops.bytes_h(vol['free'])} free of "
+                                    f"{ops.bytes_h(vol['total'])} · {used:.0f}% used",
+           ui.C.ye if used >= 90 else "")
+    if any(t["stale_formats"] for t in report["tiers"]):
+        kv("fix", "`thumbs --prune` lists the old-format files, `--apply` deletes them")
+    hint(f"  walked in {report['took_ms']} ms")
+    return 0
 
 
 def cmd_passwd(args) -> int:

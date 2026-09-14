@@ -205,6 +205,16 @@ def assert_safe_binding(bind: str | None = None, port: int | None = None) -> Non
     )
 
 
+def may_run_open(bind: str | None = None) -> bool:
+    """Whether this console would be allowed to start without a password --
+    the rule assert_safe_binding enforces, as a question. Clearing the
+    password from the browser is only offered where the answer is yes: on any
+    other bind it would open the console to the network until the next start,
+    and then keep it from starting at all."""
+    bind = settings.console_bind if bind is None else bind
+    return _is_loopback(bind) or bool(settings.console_allow_open)
+
+
 def open_access() -> bool:
     """True when the console is running without a password. The UI says so;
     the guard below lets everything through."""
@@ -270,7 +280,14 @@ def note_failure(ip: str) -> None:
         record[1] = now + min(2.0 ** (record[0] - FREE_TRIES), MAX_BACKOFF)
 
 
-def login(request: Request, password: str) -> tuple[str, Session]:
+def check_password(request: Request, password: str, *, status: int = 401) -> None:
+    """The password, asked for with the door's own throttle. Signing in uses
+    it, and so does anything that asks for the password again from inside a
+    session (changing it, clearing it) -- a stolen session cookie must not be
+    a way to brute-force the password it is standing behind.
+
+    `status` is 403 for the second case: a 401 in the console means "signed
+    out", and the client would send the operator to the door for a typo."""
     ip = _client_ip(request)
     now = time.time()
     wait = _retry_after(ip, now)
@@ -279,9 +296,15 @@ def login(request: Request, password: str) -> tuple[str, Session]:
                             headers={"Retry-After": str(int(wait) + 1)})
     if not verify_password(password):
         note_failure(ip)
-        log.warning("console: failed login from %s", ip)
-        raise HTTPException(401, "wrong password")
+        log.warning("console: wrong password from %s", ip)
+        raise HTTPException(status, "wrong password")
     _failures.pop(ip, None)
+
+
+def login(request: Request, password: str) -> tuple[str, Session]:
+    check_password(request, password)
+    ip = _client_ip(request)
+    now = time.time()
     sid = secrets.token_urlsafe(32)
     sess = Session(csrf=secrets.token_urlsafe(32), created=now, seen=now, ip=ip)
     _sessions[sid] = sess

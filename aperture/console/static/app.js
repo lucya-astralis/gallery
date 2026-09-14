@@ -578,14 +578,43 @@ function keepPaneScroll() {
 /* ============================================================
    OPERATIONS
    ------------------------------------------------------------
-   The CLI's `status`, `scan`, `pause`/`resume` and `doctor`, in the browser.
-   Nothing here talks to the indexer directly: a scan is a request written to
-   the control channel and picked up by whichever process owns the indexer,
-   which is the same path `python -m aperture.cli scan` takes. So this view
-   works identically whether the gallery is in this process or in another
-   container — and there is still exactly one place a scan can begin.
+   Every CLI command that means anything outside a terminal, in the browser,
+   one tab each — the reports from the same functions the CLI renders
+   (aperture/ops.py, aperture/reports.py). Nothing here talks to the indexer
+   directly: a scan, and every job that writes what the indexer owns
+   (derivatives, featured flags, coordinates), is a request written to the
+   control channel and picked up by whichever process owns the indexer. So
+   this view works identically whether the gallery is in this process or in
+   another container — and there is still exactly one writer.
    ============================================================ */
-const opsState = { status: null, doctor: null, busy: false, poll: null };
+const opsState = {
+  status: null, busy: false, poll: null,
+  tab: 'overview',
+  disk: null, archive: null,   // the overview's two walks, loaded after the status
+  reports: {},                 // tab -> the payload its route answered (or {error})
+  urls: {},                    // tab -> the request that produced it, to ask again
+  loading: {},                 // tab -> true while its request is out
+  inputs: {},                  // field -> what was typed, so a repaint keeps it
+  job: null,                   // {id, kind, state} of the job this console queued last
+  jobPoll: null,
+  lookup: null,                // {kind, value} of the Lookup tab's last question
+};
+
+/* One tab per CLI command that means anything outside a terminal. `menu`,
+ * `help` and `term` are about the terminal itself, so they have none. */
+const OPS_TABS = [
+  ['overview', 'Overview', 'fa-gauge'],
+  ['doctor', 'Doctor', 'fa-stethoscope'],
+  ['derivatives', 'Derivatives', 'fa-images'],
+  ['featured', 'Featured', 'fa-star'],
+  ['tags', 'Tags', 'fa-tags'],
+  ['gps', 'GPS', 'fa-location-dot'],
+  ['frontpage', 'Front page', 'fa-house'],
+  ['lookup', 'Lookup', 'fa-magnifying-glass'],
+  ['i18n', 'Translations', 'fa-language'],
+  ['export', 'Export', 'fa-box-archive'],
+  ['access', 'Password', 'fa-key'],
+];
 
 const ago = (ts) => {
   if (typeof ts !== 'number') return 'never';
@@ -615,26 +644,119 @@ async function loadOpsStatus() {
   }
 }
 
+/* ----- small parts ------------------------------------------------------ */
+const qs = (params) => Object.entries(params)
+  .filter(([, v]) => v !== '' && v !== null && v !== undefined && v !== false)
+  .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v === true ? 'true' : v))
+  .join('&');
+const opsValue = (id) => String(opsState.inputs[id] ?? '').trim();
+const onEnter = (fn) => (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); fn(); } };
+const wide = (node) => el('div', { class: 'home__wide' }, node);
+const quiet = (text) => el('p', { class: 'card__quiet', text });
+const sizeOr0 = (n) => (n ? bytes(n) : '0 B');
+const onOps = () => state.sel && state.sel.kind === 'ops';
+
+/* A field whose value outlives a repaint: a job finishing repaints the whole
+ * screen, and a half-typed album path should still be there afterwards. */
+function opsInput(id, attrs = {}) {
+  const input = el('input', { type: 'text', autocomplete: 'off', ...attrs,
+                              id: 'ops-' + id, value: opsState.inputs[id] ?? '' });
+  input.addEventListener('input', () => { opsState.inputs[id] = input.value; });
+  return input;
+}
+
+function opsCheck(id, label, attrs = {}) {
+  const box = el('input', { type: 'checkbox', ...attrs, id: 'ops-' + id,
+                            checked: !!opsState.inputs[id] });
+  box.addEventListener('change', () => { opsState.inputs[id] = box.checked; });
+  return el('label', { class: 'ops__check' }, box, el('span', { text: label }));
+}
+
+/* A figure read against its neighbours. SVG, because the bar's length is a
+ * geometry attribute there -- under style-src 'self' an inline width would be
+ * dropped without a word. */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function meter(value, max, tone) {
+  const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'meter' + (tone ? ' is-' + tone : ''));
+  svg.setAttribute('viewBox', '0 0 100 4');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const [cls, width] of [['meter__track', 100], ['meter__fill', pct]]) {
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    rect.setAttribute('class', cls);
+    rect.setAttribute('width', String(width));
+    rect.setAttribute('height', '4');
+    svg.append(rect);
+  }
+  return svg;
+}
+
+function barRow(label, value, max, shown, tone, onclick) {
+  return el('div', { class: 'brow' + (onclick ? ' is-link' : ''), onclick: onclick || null, title: label },
+    el('span', { class: 'brow__k', text: label }),
+    meter(value, max, tone),
+    el('span', { class: 'brow__v', text: shown }));
+}
+
+function lineRow(text, onclick) {
+  return el('div', { class: 'hrow hrow--line' + (onclick ? ' is-link' : ''), onclick: onclick || null },
+    el('span', { class: 'hrow__detail', text }));
+}
+
+function sub(title, count) {
+  return el('h3', { class: 'card__sub' },
+    el('span', { text: title }),
+    count === undefined ? null : el('span', { class: 'card__sub-n', text: String(count) }));
+}
+
+/* Ask a report route, keep the answer under its tab, and repaint if the
+ * operator is still here to see it. */
+async function opsLoad(tab, url, { quiet: silent = false } = {}) {
+  opsState.loading[tab] = true;
+  opsState.urls[tab] = url;
+  if (!silent && onOps()) paintOps();
+  try {
+    opsState.reports[tab] = await api(url);
+  } catch (err) {
+    opsState.reports[tab] = { error: err.message };
+  } finally {
+    opsState.loading[tab] = false;
+  }
+  if (onOps()) paintOps();
+}
+
+/* Load a tab's report the first time it is shown; the reports that walk the
+ * whole share (doctor, derivatives, gps) wait for a button instead. */
+function opsAuto(tab, url) {
+  if (!opsState.reports[tab] && !opsState.loading[tab]) opsLoad(tab, url, { quiet: true });
+}
+
+/* The report as it stands: a note while it loads, its error, or nothing yet. */
+function opsPending(tab, icon, title, idle) {
+  if (opsState.loading[tab]) return wide(card(icon, title, null, quiet('Asking…')));
+  const report = opsState.reports[tab];
+  if (report && report.error) return wide(card(icon, title, null, quiet(report.error)));
+  if (!report && idle) return wide(card(icon, title, null, quiet(idle)));
+  return null;
+}
+
+/* ----- the screen ------------------------------------------------------- */
 async function renderOps() {
   const pane = $('#pane');
   pane.innerHTML = '';
   pane.append(el('div', { class: 'pane__empty', text: 'Reading the control channel…' }));
   await loadOpsStatus();
-  if (state.sel.kind !== 'ops') return;   /* navigated away while we waited */
+  if (!onOps()) return;   /* navigated away while we waited */
   paintOps();
 }
 
 function paintOps() {
   const pane = $('#pane');
   const st = opsState.status || {};
-  const paths = st.paths || {};
-  const idx = st.index || {};
-  const scan = (st.server && st.server.last_scan) || null;
-  const res = (scan && scan.result) || {};
-  const live = !!st.live;
-  const paused = !!st.paused;
-  const scanning = !!(st.server && st.server.scanning);
-  const ro = !!st.read_only;
+  const ro = !!st.read_only || READ_ONLY;
+  const scroll = pane.scrollTop;
   pane.innerHTML = '';
 
   pane.append(el('div', { class: 'pane__top' },
@@ -644,7 +766,13 @@ function paintOps() {
         el('h1', { class: 'head__title', text: 'Operations' }),
         el('div', { class: 'head__meta' },
           el('span', { class: 'pill', icon: 'fa-server', text: 'role ' + (st.role || '—') }),
-          ro ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null)))));
+          ro ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null))),
+    el('div', { class: 'tabs tabs--many', role: 'tablist' }, OPS_TABS.map(([id, label, icon]) =>
+      el('button', {
+        class: 'tab' + (opsState.tab === id ? ' is-active' : ''),
+        type: 'button', role: 'tab', 'aria-selected': String(opsState.tab === id), icon, text: label,
+        onclick: () => { opsState.tab = id; paintOps(); $('#pane').scrollTop = 0; },
+      })))));
 
   if (st.error) {
     pane.append(el('div', { class: 'pane__empty', text: st.error }));
@@ -653,10 +781,40 @@ function paintOps() {
 
   const grid = el('div', { class: 'home' });
   pane.append(grid);
+  const job = jobCard();
+  if (job) grid.append(el('div', { class: 'home__wide', id: 'ops-job' }, job));
+  (OPS_PAINT[opsState.tab] || paintOpsOverview)(grid, st, ro);
+  pane.scrollTop = scroll;
+}
+
+/* ----- overview --------------------------------------------------------- */
+async function loadOverview() {
+  if (opsState.loading.overview) return;
+  opsState.loading.overview = true;
+  const [disk, archive] = await Promise.all([
+    api('/api/ops/disk').catch((err) => ({ error: err.message })),
+    api('/api/ops/archive').catch((err) => ({ error: err.message })),
+  ]);
+  opsState.disk = disk;
+  opsState.archive = archive;
+  opsState.loading.overview = false;
+  if (onOps() && opsState.tab === 'overview') paintOps();
+}
+
+function paintOpsOverview(grid, st, ro) {
+  const paths = st.paths || {};
+  const idx = st.index || {};
+  const scan = (st.server && st.server.last_scan) || null;
+  const res = (scan && scan.result) || {};
+  const live = !!st.live;
+  const paused = !!st.paused;
+  const scanning = !!(st.server && st.server.scanning);
+  if (!opsState.disk || !opsState.archive) loadOverview();
 
   /* ----- the indexer, in full ----- */
   const tone = paused ? 'warn' : live ? 'ok' : 'bad';
   const word = paused ? 'paused' : scanning ? 'scanning' : live ? 'running' : 'not running';
+  const pending = (st.server && st.server.pending_jobs) || [];
   grid.append(card('fa-microchip', 'Indexer', 'one writer, whoever asks',
     el('div', { class: 'lamp' },
       el('span', { class: 'lamp__dot is-' + tone }),
@@ -675,6 +833,7 @@ function paintOps() {
         : 'never'),
       fact('it did', scan ? scanSummary(res) : '—', res.failed || res.held ? 'warn' : null),
       scan && scan.error ? fact('last error', scan.error, 'bad') : null,
+      pending.length ? fact('jobs queued', String(pending.length), 'warn') : null,
       fact('every', paths.scan_interval ? paths.scan_interval + 's' : 'manual only'),
       fact('watcher', paths.watcher ? 'on' : 'off'))));
 
@@ -688,6 +847,35 @@ function paintOps() {
       tile('originals', bytes(idx.bytes)),
       tile('database', bytes(idx.db_bytes)))));
 
+  /* ----- what the generated trees cost ----- */
+  grid.append(wide(diskCard(ro)));
+
+  /* ----- the buttons ----- */
+  grid.append(wide(card('fa-bolt', 'Actions',
+    'a request on the control channel — the same one the CLI writes',
+    ro ? quiet('The console is mounted read-only. Nothing here can be started from the browser.') : null,
+    el('div', { class: 'ops__form' },
+      opsInput('album', { placeholder: 'whole gallery — or one album path', disabled: ro,
+                          onkeydown: onEnter(() => startScan(opsValue('album'), !!opsState.inputs.force)) }),
+      opsCheck('force', 'force — re-derive even when mtimes say nothing changed', { disabled: ro })),
+    el('div', { class: 'ops__form' },
+      paused
+        ? opsCheck('resume-scan', 'and scan right away', { disabled: ro })
+        : opsInput('reason', { placeholder: 'why — shown in status while paused', disabled: ro })),
+    el('div', { class: 'card__actions' },
+      el('button', {
+        type: 'button', class: 'btn btn--primary', id: 'ops-scan',
+        disabled: ro || opsState.busy, icon: 'fa-arrows-rotate', text: 'Scan now',
+        onclick: () => startScan(opsValue('album'), !!opsState.inputs.force),
+      }),
+      el('button', {
+        type: 'button', class: 'btn', disabled: ro || opsState.busy,
+        icon: paused ? 'fa-play' : 'fa-pause',
+        text: paused ? 'Resume indexing' : 'Pause indexing',
+        onclick: () => (paused ? doResume(!!opsState.inputs['resume-scan']) : doPause(opsValue('reason'))),
+      })),
+    quiet('It starts within a couple of seconds if an indexer is listening, and waits if none is.'))));
+
   /* ----- where things are ----- */
   grid.append(card('fa-folder-tree', 'Paths', 'read once at startup — aperture/runtime.py',
     el('dl', { class: 'facts' },
@@ -698,8 +886,6 @@ function paintOps() {
       fact('control', st.control_dir || '—'))));
 
   /* ----- what it does to a photo ----- */
-  /* Never on this screen before, and both of these decide what leaves the
-   * server: how large a derivative is, and whether coordinates travel. */
   grid.append(card('fa-shield-halved', 'Derivatives and privacy', 'what the scan makes, and drops',
     el('dl', { class: 'facts' },
       fact('thumbnail', (paths.thumb_size || '—') + ' px'),
@@ -708,53 +894,124 @@ function paintOps() {
       fact('strip gps', paths.strip_gps
         ? 'yes — removed from the originals on scan' : 'no'))));
 
-  /* ----- the buttons ----- */
-  const albumField = el('input', {
-    type: 'text', id: 'ops-album', placeholder: 'whole gallery — or one album path',
-    autocomplete: 'off', disabled: ro,
-  });
-  const forceBox = el('input', { type: 'checkbox', id: 'ops-force', disabled: ro });
-  /* A field rather than a window.prompt(): a prompt is disabled outright in a
-   * sandboxed frame, and a reason that shows up in `status` afterwards is
-   * worth typing where you can see it. */
-  const reasonField = el('input', {
-    type: 'text', id: 'ops-reason', placeholder: 'why — shown in status while paused',
-    autocomplete: 'off', disabled: ro || paused,
-  });
+  grid.append(wide(archiveCard()));
+}
 
-  grid.append(el('div', { class: 'home__wide' }, card('fa-bolt', 'Actions',
-    'a request on the control channel — the same one the CLI writes',
-    ro ? el('p', { class: 'card__quiet', text:
-        'The console is mounted read-only. Nothing here can be started from the browser.' })
-       : null,
-    el('div', { class: 'ops__form' },
-      albumField,
-      el('label', { class: 'ops__check' }, forceBox,
-        el('span', { text: 'force — re-derive even when mtimes say nothing changed' }))),
-    paused ? null : el('div', { class: 'ops__form' }, reasonField),
-    el('div', { class: 'card__actions' },
-      el('button', {
-        type: 'button', class: 'btn btn--primary', id: 'ops-scan',
-        disabled: ro || opsState.busy, icon: 'fa-arrows-rotate', text: 'Scan now',
-        onclick: () => startScan(albumField.value.trim(), forceBox.checked),
-      }),
-      el('button', {
-        type: 'button', class: 'btn', disabled: ro || opsState.busy,
-        icon: paused ? 'fa-play' : 'fa-pause',
-        text: paused ? 'Resume indexing' : 'Pause indexing',
-        onclick: () => (paused ? doResume() : doPause(reasonField.value.trim())),
-      }),
-      el('button', {
-        type: 'button', class: 'btn', disabled: opsState.busy, icon: 'fa-stethoscope', text: 'Run doctor',
-        onclick: () => runDoctor(albumField.value.trim()),
-      })),
-    el('p', { class: 'card__quiet', text:
-      'It starts within a couple of seconds if an indexer is listening, and ' +
-      'waits if none is.' }))));
+const TIER_WORDS = { thumbnails: 'thumbnails', previews: 'previews', fulls: 'HEIC conversions' };
 
-  if (opsState.doctor) {
-    grid.append(el('div', { class: 'home__wide' }, renderDoctor(opsState.doctor)));
+function diskCard(ro) {
+  const d = opsState.disk;
+  const title = 'Disk';
+  const note = 'what thumbnails and previews cost, next to what they are made from';
+  if (!d) return card('fa-hard-drive', title, note, quiet('Walking the thumbnail and preview trees…'));
+  if (d.error) return card('fa-hard-drive', title, note, quiet(d.error));
+  const tiers = d.tiers || [];
+  const by = Object.fromEntries(tiers.map((t) => [t.key, t]));
+  const biggest = Math.max(1, ...tiers.map((t) => t.bytes));
+  const stale = tiers.filter((t) => t.stale_formats && t.stale_formats.length);
+
+  const body = [
+    el('div', { class: 'tiles' },
+      tile('thumbnails', sizeOr0(by.thumbnails && by.thumbnails.bytes)),
+      tile('previews', sizeOr0(by.previews && by.previews.bytes)),
+      tile('conversions', sizeOr0(by.fulls && by.fulls.bytes)),
+      tile('generated', sizeOr0(d.derivatives.bytes)),
+      tile('originals', sizeOr0(d.originals.bytes)),
+      tile('of originals', d.ratio == null ? '—' : (d.ratio * 100).toFixed(1) + '%')),
+    sub('per tier'),
+    el('div', { class: 'brows' }, tiers.map((t) => barRow(
+      TIER_WORDS[t.key] || t.key, t.bytes, biggest,
+      !t.exists ? 'not there'
+        : sizeOr0(t.bytes) + ' · ' + t.files + ' file(s)' +
+          (t.per_photo ? ' · ' + bytes(t.per_photo) + '/photo' : '')))),
+  ];
+  if (stale.length) {
+    body.push(sub('left in an old format'));
+    body.push(el('div', { class: 'hrows' }, stale.flatMap((t) => t.stale_formats.map((ext) =>
+      homeRow(TIER_WORDS[t.key] || t.key, ext,
+        t.formats[ext].files + ' file(s) · ' + sizeOr0(t.formats[ext].bytes) +
+        ' in a format this tier no longer writes — Derivatives deletes them',
+        () => { opsState.tab = 'derivatives'; paintOps(); })))));
   }
+  const volumes = d.volumes || [];
+  if (volumes.length) {
+    body.push(sub('volumes'));
+    body.push(el('div', { class: 'brows' }, volumes.map((v) => {
+      const used = v.total ? v.used / v.total : 0;
+      return barRow(v.holds.join(', '), v.used, v.total,
+        sizeOr0(v.free) + ' free of ' + sizeOr0(v.total),
+        used >= 0.95 ? 'bad' : used >= 0.85 ? 'warn' : null);
+    })));
+  }
+  body.push(el('div', { class: 'card__actions' },
+    el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'Measure again',
+                   onclick: () => { opsState.disk = null; paintOps(); } }),
+    stale.length ? el('button', { type: 'button', class: 'btn btn--ghost', iconEnd: 'fa-arrow-right',
+                                  text: 'Derivatives', disabled: ro,
+                                  onclick: () => { opsState.tab = 'derivatives'; paintOps(); } }) : null));
+  body.push(quiet('Walked in ' + d.took_ms + ' ms. Thumbnails and previews are a cache: ' +
+                  'delete them and the next scan builds them again.'));
+  return card('fa-hard-drive', title, note, ...body);
+}
+
+function archiveCard() {
+  const a = opsState.archive;
+  const note = 'what the dashboard counts';
+  if (!a) return card('fa-chart-simple', 'Archive', note, quiet('Counting…'));
+  if (a.error) return card('fa-chart-simple', 'Archive', note, quiet(a.error));
+  const idx = a.index || {};
+  const onDisk = a.photos_on_disk;
+  const drift = onDisk == null ? null : onDisk - idx.images;
+  const body = [el('dl', { class: 'facts' },
+    fact('span', (a.span.from || '—').slice(0, 10) + ' → ' + (a.span.to || '—').slice(0, 10)),
+    fact('albums', idx.albums + ' with photos · ' + a.album_nodes + ' incl. parents'),
+    fact('featured', idx.featured + ' photo(s) · ' + a.showcase_albums + ' showcase album(s)'),
+    fact('formats', a.formats.slice(0, 6).map(([ext, n]) => ext + ' ' + n).join(' · ') || '—'),
+    fact('heic / heif', a.heic ? 'supported' : 'not supported — pillow-heif is missing', a.heic ? null : 'warn'),
+    fact('index', drift === null ? 'not compared — too many rows for a quick count; run Doctor'
+      : drift === 0 ? 'in sync · ' + onDisk + ' file(s) on disk = ' + idx.images + ' row(s)'
+        : Math.abs(drift) + ' file(s) ' + (drift > 0 ? 'not indexed' : 'indexed but gone') +
+          ' · ' + onDisk + ' on disk / ' + idx.images + ' indexed',
+      drift ? 'warn' : drift === 0 ? 'ok' : null))];
+  if (a.albums.length) {
+    const peak = a.albums[0].n;
+    body.push(sub('largest albums'));
+    body.push(el('div', { class: 'brows' }, a.albums.map((r) => barRow(
+      r.album, r.n, peak, r.n + ' · ' + bytes(r.bytes), null,
+      () => select({ kind: 'album', album: r.album })))));
+  }
+  if (a.months.length) {
+    const peak = Math.max(...a.months.map((r) => r.n));
+    body.push(sub('shots per capture month'));
+    body.push(el('div', { class: 'brows' }, a.months.map((r) => barRow(r.ym, r.n, peak, String(r.n)))));
+  }
+  return card('fa-chart-simple', 'Archive', note, ...body);
+}
+
+/* ----- doctor ----------------------------------------------------------- */
+function paintOpsDoctor(grid, st, ro) {
+  const run = () => opsLoad('doctor', '/api/ops/doctor?' +
+    qs({ album: opsValue('doctor-album'), limit_slow: opsValue('doctor-slow') }));
+  grid.append(wide(card('fa-stethoscope', 'Doctor',
+    'index, files, derivatives and cfg, checked against each other',
+    el('div', { class: 'ops__form' },
+      opsInput('doctor-album', { placeholder: 'whole gallery — or one album path', onkeydown: onEnter(run) }),
+      el('label', { class: 'ops__num' },
+        el('span', { text: 'open up to' }),
+        opsInput('doctor-slow', { type: 'number', min: '0', max: '500', placeholder: '50' }),
+        el('span', { text: 'thumb-less files' }))),
+    el('div', { class: 'card__actions' },
+      el('button', { type: 'button', class: 'btn btn--primary', icon: 'fa-stethoscope',
+                     disabled: !!opsState.loading.doctor,
+                     text: opsState.loading.doctor ? 'Checking…' : 'Run doctor', onclick: run })),
+    quiet('It walks every photo and every generated file, so on a large share it takes a while. ' +
+          'Nothing is written — the fixes below are jobs you start.'))));
+  const pending = opsPending('doctor', 'fa-stethoscope', 'Report');
+  if (pending) { grid.append(pending); return; }
+  const report = opsState.reports.doctor;
+  if (!report) return;
+  grid.append(wide(renderDoctor(report)));
+  if (report.total) grid.append(wide(doctorNext(report, ro)));
 }
 
 function renderDoctor(report) {
@@ -768,17 +1025,756 @@ function renderDoctor(report) {
 
   for (const check of Object.keys(problems).sort()) {
     const items = problems[check];
-    body.push(el('h3', { class: 'card__sub' },
-      el('span', { text: check.replace(/_/g, ' ') }),
-      el('span', { class: 'card__sub-n', text: String(items.length) })));
+    body.push(sub(check.replace(/_/g, ' '), items.length));
+    const photoish = !['config', 'database', 'orphan_derivative'].includes(check);
     body.push(...foldedRows('doctor:' + check, items, 25, (item) => homeRow(
       item.rel_path || item.album || '—',
       item.key || '',
       item.detail || '',
-      item.album ? () => select({ kind: 'album', album: item.album }) : null)));
+      item.album ? () => select({ kind: 'album', album: item.album })
+        : photoish && item.rel_path ? () => opsLookup('photo', item.rel_path) : null)));
   }
   return card('fa-stethoscope', 'Doctor', 'index, files, derivatives and cfg, checked against each other',
               ...body);
+}
+
+/* The CLI's "what now" block, as the buttons that do it. */
+function doctorNext(report, ro) {
+  const p = report.problems || {};
+  const n = (...keys) => keys.reduce((sum, k) => sum + ((p[k] || []).length), 0);
+  const scope = report.scope || null;
+  const steps = [];
+  const derivs = n('missing_thumb', 'stale_thumb', 'missing_preview', 'stale_preview');
+  if (derivs) {
+    steps.push(el('button', { type: 'button', class: 'btn btn--primary', icon: 'fa-hammer', disabled: ro,
+      text: 'Build ' + derivs + ' missing or stale',
+      onclick: () => startJob('rebuild', { album: scope }) }));
+  }
+  if (n('orphan_derivative')) {
+    steps.push(el('button', { type: 'button', class: 'btn', icon: 'fa-trash-can', disabled: ro,
+      text: 'Delete ' + n('orphan_derivative') + ' orphaned file(s)',
+      onclick: () => startJob('prune', {},
+        'Delete ' + n('orphan_derivative') + ' generated file(s) that no photo maps to?') }));
+  }
+  if (n('unindexed', 'missing_file')) {
+    steps.push(el('button', { type: 'button', class: 'btn', icon: 'fa-arrows-rotate', disabled: ro || opsState.busy,
+      text: 'Scan' + (scope ? ' ' + scope : ''), onclick: () => startScan(scope, false) }));
+  }
+  if (n('stale_index')) {
+    steps.push(el('button', { type: 'button', class: 'btn', icon: 'fa-arrows-rotate', disabled: ro || opsState.busy,
+      text: 'Scan with force', onclick: () => startScan(scope, true) }));
+  }
+  if (n('featured_drift')) {
+    steps.push(el('button', { type: 'button', class: 'btn', icon: 'fa-star', disabled: ro,
+      text: 'Recompute featured flags', onclick: () => startJob('featured') }));
+  }
+  const notes = [];
+  if (n('config')) notes.push('cfg findings open their album — fix them there.');
+  if (n('unreadable')) notes.push('An unreadable file stays in the gallery without a thumbnail until it is replaced or removed.');
+  if (n('database')) notes.push('Tags no photo uses any more go away with the next scan.');
+  return card('fa-screwdriver-wrench', 'What now', 'the fixes, as the jobs that do them',
+    steps.length ? el('div', { class: 'card__actions' }, steps) : null,
+    ...notes.map(quiet));
+}
+
+/* ----- derivatives ------------------------------------------------------ */
+function paintOpsDerivatives(grid, st, ro) {
+  const inspect = () => opsLoad('derivatives', '/api/ops/derivatives?' +
+    qs({ album: opsValue('der-album'), all: !!opsState.inputs['der-all'] }));
+  grid.append(wide(card('fa-images', 'Derivatives', 'thumbnails and previews: missing, stale, left over',
+    el('div', { class: 'ops__form' },
+      opsInput('der-album', { placeholder: 'whole gallery — or one album path', onkeydown: onEnter(inspect) }),
+      opsCheck('der-all', 'count every derivative, not only the missing and stale ones')),
+    el('div', { class: 'card__actions' },
+      el('button', { type: 'button', class: 'btn btn--primary', icon: 'fa-magnifying-glass',
+                     disabled: !!opsState.loading.derivatives,
+                     text: opsState.loading.derivatives ? 'Inspecting…' : 'Inspect', onclick: inspect })),
+    quiet('Building and deleting run in the indexer, as jobs — the same work as ' +
+          '`thumbs --rebuild` and `thumbs --prune --apply`.'))));
+  const pending = opsPending('derivatives', 'fa-images', 'Report');
+  if (pending) { grid.append(pending); return; }
+  const r = opsState.reports.derivatives;
+  if (!r) return;
+  const scope = r.scope || null;
+  const missing = (r.pending || []).length;
+  const body = [el('dl', { class: 'facts' },
+    fact('scope', scope || 'whole gallery'),
+    fact('photos', String(r.photos)),
+    fact(r.all ? 'to rebuild' : 'to build', r.to_build + ' derivative(s)', missing ? 'warn' : 'ok'),
+    fact('orphans', r.orphans_checked
+      ? r.orphans.length + ' file(s) · ' + sizeOr0(r.orphan_bytes)
+      : 'not checked — only a whole-gallery look can tell', r.orphans.length ? 'warn' : null))];
+  for (const [key, count] of Object.entries(r.by_state || {})) {
+    body.push(homeRow(key.replace(/_/g, ' '), String(count), ''));
+  }
+  if (missing) {
+    body.push(sub('missing or stale', missing));
+    body.push(...foldedRows('der:pending', r.pending, 12, (i) =>
+      homeRow(i.rel_path, i.kind, i.state, () => opsLookup('photo', i.rel_path))));
+  }
+  if (r.orphans.length) {
+    body.push(sub('no photo maps to these', r.orphans.length));
+    body.push(...foldedRows('der:orphans', r.orphans, 12, (path) => lineRow(path)));
+  }
+  body.push(el('div', { class: 'card__actions' },
+    el('button', { type: 'button', class: 'btn btn--primary', icon: 'fa-hammer',
+      disabled: ro || !missing, text: 'Build the missing and stale',
+      onclick: () => startJob('rebuild', { album: scope }) }),
+    el('button', { type: 'button', class: 'btn', icon: 'fa-hammer', disabled: ro,
+      text: 'Rebuild every one',
+      onclick: () => startJob('rebuild', { album: scope, all: true },
+        'Rebuild every thumbnail and preview in ' + (scope || 'the whole gallery') +
+        '? On a large share this takes a long time.') }),
+    el('button', { type: 'button', class: 'btn', icon: 'fa-trash-can',
+      disabled: ro || !r.orphans_checked || !r.orphans.length,
+      text: 'Delete ' + r.orphans.length + ' orphan(s)',
+      onclick: () => startJob('prune', {},
+        'Delete ' + r.orphans.length + ' generated file(s) (' + sizeOr0(r.orphan_bytes) +
+        ') that no photo maps to?') })));
+  grid.append(wide(card('fa-images', 'Report', r.all ? 'every derivative' : 'what needs doing', ...body)));
+}
+
+/* ----- featured --------------------------------------------------------- */
+function paintOpsFeatured(grid, st, ro) {
+  opsAuto('featured', '/api/ops/featured');
+  const pending = opsPending('featured', 'fa-star', 'Featured');
+  if (pending) { grid.append(pending); return; }
+  const r = opsState.reports.featured;
+  if (!r) return;
+  const flagged = new Set(r.flagged || []);
+  const albums = Object.keys(r.albums || {}).sort();
+  const drift = r.drift.not_flagged.length + r.drift.flagged_without_rule.length;
+  grid.append(wide(card('fa-star', 'Featured', 'which album.cfg entry features which photo',
+    el('dl', { class: 'facts' },
+      fact('featured', r.expected + ' photo(s) from ' + albums.length + ' album.cfg file(s)'),
+      fact('db flag', r.db_flagged + ' row(s) flagged'),
+      fact('showcase', r.showcase_albums.join(', ') || '—'),
+      fact('drift', drift ? drift + ' flag(s) disagree with the cfg files' : 'none', drift ? 'warn' : 'ok'),
+      fact('match nothing', String(r.unresolved.length), r.unresolved.length ? 'warn' : null)),
+    el('div', { class: 'card__actions' },
+      el('button', { type: 'button', class: 'btn btn--primary', icon: 'fa-star', disabled: ro,
+                     text: 'Recompute the flags', onclick: () => startJob('featured') }),
+      el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'Read again',
+                     onclick: () => opsLoad('featured', '/api/ops/featured') })),
+    quiet('Any scan recomputes them too.'))));
+
+  if (r.unresolved.length || drift) {
+    const rows = [
+      ...r.unresolved.map((u) => homeRow(u.album, 'featured = ' + u.entry, u.reason,
+        () => select({ kind: 'album', album: u.album }))),
+      ...r.drift.not_flagged.map((rel) => homeRow(rel, 'drift', 'configured, but the flag is 0',
+        () => opsLookup('photo', rel))),
+      ...r.drift.flagged_without_rule.map((rel) => homeRow(rel, 'drift', 'flag is 1, but nothing features it',
+        () => opsLookup('photo', rel))),
+    ];
+    grid.append(wide(card('fa-triangle-exclamation', 'Needs attention', rows.length + ' finding(s)',
+      ...foldedRows('featured:attention', rows, 10, (row) => row))));
+  }
+
+  if (albums.length) {
+    const body = [];
+    for (const album of albums) {
+      body.push(sub(album));
+      for (const [entry, rels] of Object.entries(r.albums[album]).sort()) {
+        body.push(...foldedRows('featured:' + album + ':' + entry, rels, 6, (rel) =>
+          homeRow(rel, 'featured = ' + entry, flagged.has(rel) ? '' : 'not flagged in the index',
+                  () => opsLookup('photo', rel))));
+      }
+    }
+    grid.append(wide(card('fa-list', 'By album', albums.length + ' album(s)', ...body)));
+  }
+}
+
+/* ----- tags ------------------------------------------------------------- */
+function paintOpsTags(grid, st, ro) {
+  const scopeUrl = () => '/api/ops/tags?' + qs({ album: opsValue('tags-album') });
+  opsAuto('tags', scopeUrl());
+  const findTag = (name) => {
+    if (name !== undefined) opsState.inputs['tags-tag'] = name;
+    const tag = opsValue('tags-tag');
+    if (tag) opsLoad('tag', '/api/ops/tags?' + qs({ tag, album: opsValue('tags-album') }));
+  };
+  grid.append(wide(card('fa-tags', 'Tags', 'the vocabulary, and the sidecars against the index',
+    el('div', { class: 'ops__form' },
+      opsInput('tags-album', { placeholder: 'whole gallery — or one album path',
+                               onkeydown: onEnter(() => opsLoad('tags', scopeUrl())) }),
+      el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'Read',
+                     onclick: () => opsLoad('tags', scopeUrl()) })),
+    el('div', { class: 'ops__form' },
+      opsInput('tags-tag', { placeholder: 'one tag — which photos carry it', onkeydown: onEnter(() => findTag()) }),
+      el('button', { type: 'button', class: 'btn', icon: 'fa-magnifying-glass', text: 'Find',
+                     onclick: () => findTag() })))));
+
+  const tagPending = opsPending('tag', 'fa-tag', 'Tag');
+  const found = opsState.reports.tag;
+  if (tagPending) grid.append(tagPending);
+  else if (found) {
+    grid.append(wide(card('fa-tags', found.found ? found.tag : 'No such tag',
+      found.found ? found.photos.length + ' photo(s)' : 'on no indexed photo',
+      found.found
+        ? foldedRows('tag:' + found.tag, found.photos, 12, (rel) => homeRow(rel, '', '', () => opsLookup('photo', rel)))
+        : quiet('Known tags: ' + (found.known.join(', ') || '—')))));
+  }
+
+  const pending = opsPending('tags', 'fa-tags', 'Vocabulary');
+  if (pending) { grid.append(pending); return; }
+  const r = opsState.reports.tags;
+  if (!r) return;
+  const vocab = Object.entries(r.vocabulary).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const peak = vocab.length ? vocab[0][1] : 1;
+  const drift = r.drift.not_indexed.length + r.drift.indexed_without_sidecar.length + r.orphan_sidecars.length;
+  grid.append(wide(card('fa-tags', 'Vocabulary', r.album || 'whole gallery',
+    el('dl', { class: 'facts' },
+      fact('tags', vocab.length + ' on ' + r.photos_tagged + ' photo(s)'),
+      fact('sidecars', r.sidecars + ' .tags file(s) on disk'),
+      fact('drift', drift ? drift + ' finding(s)' : 'none — the index agrees with the sidecars', drift ? 'warn' : 'ok')),
+    vocab.length
+      ? foldedRows('tags:vocab', vocab, 15, ([tag, count]) =>
+          barRow(tag, count, peak, count + ' photo(s)', null, () => findTag(tag)))
+      : quiet('None yet — tag photos on an album’s Photos tab.'))));
+  if (drift) {
+    const rows = [
+      ...r.drift.not_indexed.map((item) => homeRow(item, 'not indexed', 'on disk — a scan picks it up')),
+      ...r.drift.indexed_without_sidecar.map((item) => homeRow(item, 'no sidecar', 'indexed — scan that album with force')),
+      ...r.orphan_sidecars.map((item) => homeRow(item, 'orphan', 'the photo it belongs to is gone')),
+    ];
+    grid.append(wide(card('fa-triangle-exclamation', 'Drift', rows.length + ' finding(s)',
+      ...foldedRows('tags:drift', rows, 10, (row) => row))));
+  }
+}
+
+/* ----- gps -------------------------------------------------------------- */
+function paintOpsGps(grid, st, ro) {
+  const paths = st.paths || {};
+  const run = () => opsLoad('gps', '/api/ops/gps?' + qs({ album: opsValue('gps-album') }));
+  grid.append(wide(card('fa-location-dot', 'GPS', 'which originals still carry coordinates',
+    el('dl', { class: 'facts' },
+      fact('hide gps', paths.hide_gps ? 'on — coordinates are never served' : 'off', paths.hide_gps ? null : 'warn'),
+      fact('strip gps', paths.strip_gps ? 'on — the scan removes them from the originals' : 'off')),
+    el('div', { class: 'ops__form' },
+      opsInput('gps-album', { placeholder: 'whole gallery — or one album path', onkeydown: onEnter(run) })),
+    el('div', { class: 'card__actions' },
+      el('button', { type: 'button', class: 'btn btn--primary', icon: 'fa-magnifying-glass',
+                     disabled: !!opsState.loading.gps,
+                     text: opsState.loading.gps ? 'Reading EXIF…' : 'Read the originals', onclick: run })),
+    quiet('Opens every original to read its EXIF, so on a large share it takes a while.'))));
+  const pending = opsPending('gps', 'fa-location-dot', 'Report');
+  if (pending) { grid.append(pending); return; }
+  const r = opsState.reports.gps;
+  if (!r) return;
+  const hits = r.with_gps.length;
+  const body = [el('dl', { class: 'facts' },
+    fact('scope', r.album || 'whole gallery'),
+    fact('checked', r.checked + ' original(s)'),
+    fact('with gps', hits + ' photo(s)', hits ? 'warn' : 'ok'),
+    r.unreadable.length ? fact('unreadable', String(r.unreadable.length), 'warn') : null)];
+  if (hits) {
+    body.push(sub('coordinates present', hits));
+    body.push(...foldedRows('gps:hits', r.with_gps, 12, (rel) => homeRow(rel, '', '', () => opsLookup('photo', rel))));
+    body.push(el('div', { class: 'card__actions' },
+      el('button', { type: 'button', class: 'btn', icon: 'fa-location-dot', disabled: ro,
+        text: 'Strip them from ' + hits + ' original(s)',
+        onclick: () => startJob('gps_strip', { album: r.album },
+          'Rewrite ' + hits + ' original photo(s) in place to remove their GPS block?\n\n' +
+          'This changes the originals themselves. A scan of that scope is queued afterwards.') })));
+    body.push(quiet('The strip rewrites the photographs — the one job here that touches an original.'));
+  }
+  if (r.unreadable.length) {
+    body.push(sub('unreadable', r.unreadable.length));
+    body.push(...foldedRows('gps:unreadable', r.unreadable, 8, (line) => lineRow(line)));
+  }
+  grid.append(wide(card('fa-location-dot', 'Report', null, ...body)));
+}
+
+/* ----- front page ------------------------------------------------------- */
+const WELCOME_MODES = {
+  manual: 'the cfg list, in this order',
+  showcase: 'random featured photos — this list changes per load',
+  random: 'random photos — this list changes per load',
+};
+
+function paintOpsFrontpage(grid, st, ro) {
+  opsAuto('welcome', '/api/ops/welcome');
+  opsAuto('trips', '/api/ops/trips');
+  const pending = opsPending('welcome', 'fa-house', 'Welcome');
+  if (pending) grid.append(pending);
+  const w = opsState.reports.welcome;
+  if (w && !w.error) {
+    for (const device of w.devices) {
+      grid.append(card(device.device === 'mobile' ? 'fa-mobile-screen' : 'fa-display',
+        'Welcome · ' + device.device, 'what the hero cycles through',
+        el('dl', { class: 'facts' },
+          fact('key', device.source_key),
+          fact('mode', device.mode + (WELCOME_MODES[device.mode] ? ' — ' + WELCOME_MODES[device.mode] : '')),
+          fact('label', device.label || '—'),
+          fact('shows', device.feed.length + ' photo(s)'),
+          device.skipped.length ? fact('skipped', device.skipped.length + ' entr(ies) not indexed', 'warn') : null),
+        ...foldedRows('welcome:' + device.device, device.feed, 8, (rel) =>
+          homeRow(rel, '', '', () => opsLookup('photo', rel))),
+        device.skipped.length
+          ? el('div', { class: 'hrows' }, device.skipped.map((raw) =>
+              homeRow(raw, 'skipped', 'not indexed — scan, or correct the path in gallery.cfg',
+                      () => select({ kind: 'gallery' }))))
+          : null));
+    }
+  }
+
+  const tripsPending = opsPending('trips', 'fa-route', 'Trips');
+  if (tripsPending) { grid.append(tripsPending); return; }
+  const t = opsState.reports.trips;
+  if (!t) return;
+  const langs = (state.meta && state.meta.langs) || ['en'];
+  const openTrip = (key) => {
+    if (key !== undefined) opsState.inputs['trip-album'] = key;
+    if (opsValue('trip-album')) {
+      opsLoad('trip', '/api/ops/trips?' + qs({ album: opsValue('trip-album'), lang: opsState.inputs['trip-lang'] || langs[0] }));
+    }
+  };
+  const langSelect = el('select', { id: 'ops-trip-lang', 'aria-label': 'language of the date labels' },
+    langs.map((lang) => el('option', { value: lang, text: lang.toUpperCase(),
+                                       selected: (opsState.inputs['trip-lang'] || langs[0]) === lang })));
+  langSelect.addEventListener('change', () => { opsState.inputs['trip-lang'] = langSelect.value; openTrip(); });
+  grid.append(wide(card('fa-route', 'Trips', t.trips.length + ' configured in aperture/trips.py',
+    t.trips.length
+      ? el('div', { class: 'hrows' }, t.trips.map((trip) => homeRow(trip.key, trip.stops + ' stop(s)',
+          (trip.title || '') + (trip.album_exists ? '' : ' — no album with this path'),
+          trip.album_exists ? () => openTrip(trip.key) : null)))
+      : quiet('No trip is configured.'),
+    el('div', { class: 'ops__form' }, langSelect),
+    quiet('A trip attaches to the album whose lower-cased path equals its key.'))));
+
+  const tripPending = opsPending('trip', 'fa-route', 'Trip');
+  if (tripPending) { grid.append(tripPending); return; }
+  const trip = opsState.reports.trip;
+  if (!trip) return;
+  grid.append(wide(card('fa-route', trip.title || trip.key, trip.album,
+    el('dl', { class: 'facts' },
+      fact('trip', (trip.title || '—') + ' (' + trip.key + ')'),
+      fact('depart', String(trip.depart ?? '—'))),
+    el('div', { class: 'hrows' }, (trip.stops || []).map((stop) => homeRow(
+      stop.city || '—', (stop.start || '?') + ' → ' + (stop.end || '?'),
+      (stop.count || 0) + ' photo(s) · link ' + (stop.href || 'none (empty folder)') +
+      ' · icon ' + (stop.icon || 'none')))))));
+}
+
+/* ----- lookup ----------------------------------------------------------- */
+const LOOKUP_URL = {
+  album: (v) => '/api/ops/albums?' + qs({ album: v }),
+  photo: (v) => '/api/ops/photo?' + qs({ path: v }),
+  cfg: (v) => (v ? '/api/ops/cfg?' + qs({ album: v }) : '/api/ops/cfg?gallery=true'),
+  search: (v) => '/api/ops/search?' + qs({ q: v, album: opsValue('lookup-search-album') }),
+};
+
+/* Ask one of the lookups, from any tab: a photo named in a report opens here. */
+function opsLookup(kind, value) {
+  if (value !== undefined) opsState.inputs['lookup-' + kind] = value;
+  const v = opsValue('lookup-' + kind);
+  if (kind === 'photo' && !v) { toast('Name a photo — its path under photos/', 'warn'); return; }
+  if (kind === 'search' && !v) { toast('Nothing to search for', 'warn'); return; }
+  opsState.lookup = { kind, value: v };
+  opsState.tab = 'lookup';
+  opsLoad('lookup', LOOKUP_URL[kind](v));
+  $('#pane').scrollTop = 0;
+}
+
+function paintOpsLookup(grid, st, ro) {
+  const form = (kind, icon, title, note, placeholder, extra) => card(icon, title, note,
+    el('div', { class: 'ops__form' },
+      opsInput('lookup-' + kind, { placeholder, onkeydown: onEnter(() => opsLookup(kind)) }),
+      extra || null,
+      el('button', { type: 'button', class: 'btn', icon: 'fa-magnifying-glass', text: 'Look',
+                     onclick: () => opsLookup(kind) })));
+  grid.append(form('album', 'fa-folder-open', 'Album', 'one in full — blank lists them all', 'album path'));
+  grid.append(form('photo', 'fa-image', 'Photo', 'everything the app knows about one', 'berlin/gate.jpg'));
+  grid.append(form('cfg', 'fa-file-code', 'Config', 'as the app parses it — blank is gallery.cfg', 'album path'));
+  grid.append(form('search', 'fa-magnifying-glass', 'Search', 'the /search grammar: words, camera: lens: iso: f: mm: date:',
+    'camera:x100v date:2026', opsInput('lookup-search-album', { placeholder: 'in album (optional)',
+                                                                onkeydown: onEnter(() => opsLookup('search')) })));
+
+  const pending = opsPending('lookup', 'fa-magnifying-glass', 'Result');
+  if (pending) { grid.append(pending); return; }
+  const r = opsState.reports.lookup;
+  if (!r || !opsState.lookup) return;
+  const kind = opsState.lookup.kind;
+  if (kind === 'album') grid.append(wide(r.albums ? albumListCard(r) : albumCard(r)));
+  else if (kind === 'photo') grid.append(wide(photoCard(r)));
+  else if (kind === 'cfg') grid.append(wide(cfgCard(r)));
+  else if (kind === 'search') grid.append(wide(searchCard(r)));
+}
+
+function albumListCard(r) {
+  return card('fa-folder-open', 'Albums', r.albums.length + ' album(s)',
+    ...foldedRows('lookup:albums', r.albums, 20, (a) => homeRow(a.album, a.photos + ' photo(s)',
+      [a.has_cfg ? 'cfg' : null, a.showcase ? 'showcase' : null, a.collection ? 'collection' : null]
+        .filter(Boolean).join(' · '),
+      () => opsLookup('album', a.album))));
+}
+
+function albumCard(r) {
+  const cfg = r.cfg || {};
+  const body = [el('dl', { class: 'facts' },
+    fact('photos', r.photos + ' · ' + bytes(r.bytes) + (r.undated ? ' · ' + r.undated + ' undated' : '')),
+    r.span ? fact('span', r.span[0].slice(0, 10) + ' → ' + r.span[1].slice(0, 10)) : null,
+    fact('flags', [r.showcase ? 'showcase' : null, r.collection ? 'collection' : null].filter(Boolean).join(', ') || '—'),
+    fact('cover', r.cover || 'auto (newest photo)'),
+    fact('featured', r.featured.length ? r.featured.length + ' photo(s)' : '—'),
+    fact('tags', r.tags.join(', ') || '—'),
+    fact('look', [r.icon ? 'icon=' + r.icon : null, r.font ? 'font=' + r.font : null,
+                  cfg.effect ? 'effect=' + cfg.effect[0] : null].filter(Boolean).join(', ') || '—'),
+    fact('text', r.descriptions.join(', ') || 'no album_*.md'))];
+  if (r.sub_albums.length) {
+    body.push(sub('sub-albums', r.sub_albums.length));
+    body.push(...foldedRows('lookup:subs:' + r.album, r.sub_albums, 10, (name) =>
+      homeRow(name, '', '', () => opsLookup('album', name))));
+  }
+  if (r.issues.length) {
+    body.push(sub('cfg issues', r.issues.length));
+    body.push(el('div', { class: 'hrows' }, r.issues.map((i) => homeRow(i.level, i.key, i.detail))));
+  }
+  body.push(el('div', { class: 'card__actions' },
+    el('button', { type: 'button', class: 'btn btn--primary', iconEnd: 'fa-arrow-right', text: 'Open the album',
+                   onclick: () => select({ kind: 'album', album: r.album }) }),
+    el('button', { type: 'button', class: 'btn', icon: 'fa-file-code', text: 'Its config',
+                   onclick: () => opsLookup('cfg', r.album) })));
+  return card('fa-folder-open', r.album, 'one album in full', ...body);
+}
+
+function photoCard(r) {
+  const drift = r.file_mtime != null && Math.abs(r.file_mtime - r.mtime) >= 1;
+  const stamp = (ts) => (typeof ts === 'number' ? new Date(ts * 1000).toISOString().replace('T', ' ').slice(0, 19) : '—');
+  const body = [
+    el('img', { class: 'ops__photo', src: thumbUrl(r.rel_path), alt: '', loading: 'lazy',
+                onerror: (ev) => { ev.target.remove(); } }),
+    el('dl', { class: 'facts' },
+      fact('album', r.album),
+      fact('file', r.filename + ' · ' + bytes(r.size) + (r.width ? ' · ' + r.width + '×' + r.height : '')),
+      fact('on disk', r.file_exists ? 'yes' : 'no — the row is stale, run a scan', r.file_exists ? null : 'bad'),
+      fact('taken', r.taken_at || '— (no EXIF date; sorted by mtime)'),
+      fact('mtime', stamp(r.mtime) + (drift ? ' — the file says ' + stamp(r.file_mtime) + ' (stale index)' : ''),
+           drift ? 'warn' : null),
+      fact('indexed', r.indexed_at || '—'),
+      fact('featured', (r.is_showcase ? 'yes' : 'no') + ' · ' + (r.featured_by.length
+        ? r.featured_by.map((f) => f.album + ' → featured = ' + f.entry).join(', ')
+        : 'no album.cfg entry features it')),
+      fact('tags', r.tags.join(', ') || '—')),
+    sub('derivatives'),
+    el('div', { class: 'hrows' }, Object.entries(r.derivatives).map(([k, info]) =>
+      homeRow(k, info.state, info.path))),
+    sub('urls'),
+    el('div', { class: 'hrows' }, r.urls.map((url) => lineRow(url))),
+  ];
+  if (r.exif_pretty.length) {
+    body.push(sub('exif', r.exif_pretty.length));
+    body.push(el('dl', { class: 'facts' }, r.exif_pretty.map(([label, value]) => fact(label, value))));
+  }
+  const raw = Object.keys(r.exif || {}).sort();
+  if (raw.length) {
+    body.push(el('details', { class: 'release' },
+      el('summary', { class: 'release__toggle', icon: 'fa-chevron-down', text: raw.length + ' raw EXIF key(s)' }),
+      el('dl', { class: 'facts' }, raw.map((key) => fact(key, String(r.exif[key]))))));
+  }
+  body.push(el('div', { class: 'card__actions' },
+    el('button', { type: 'button', class: 'btn', iconEnd: 'fa-arrow-right', text: 'Open its album',
+                   onclick: () => select({ kind: 'album', album: r.album }) })));
+  return card('fa-image', r.rel_path.split('/').pop(), r.rel_path, ...body);
+}
+
+function cfgCard(r) {
+  const parsed = Object.keys(r.parsed || {}).sort();
+  const body = [el('dl', { class: 'facts' },
+    fact('file', r.file),
+    fact('exists', r.exists ? 'yes' : 'no — the app falls back to defaults', r.exists ? null : 'warn'))];
+  body.push(sub('parsed', parsed.length));
+  body.push(parsed.length
+    ? el('dl', { class: 'facts' }, parsed.map((key) => fact(key, r.parsed[key].join(', '))))
+    : quiet('Nothing — no file, or an empty one.'));
+  const res = r.resolved;
+  if (res) {
+    body.push(sub('resolved'));
+    body.push(el('dl', { class: 'facts' },
+      fact('showcase album', String(res.showcase)),
+      fact('collection', String(res.collection)),
+      fact('cover', res.cover || '— (no photo found)'),
+      fact('reel', res.reel_mode + ' (' + res.reel + ' photo(s))'),
+      fact('tags', res.tags.join(', ') || '—'),
+      fact('descriptions', res.descriptions.join(', ') || '—'),
+      fact('wallpaper', res.wallpaper),
+      fact('wallpaper mobile', res.wallpaper_mobile)));
+  }
+  body.push(sub('issues', r.issues.length));
+  body.push(r.issues.length
+    ? el('div', { class: 'hrows' }, r.issues.map((i) => homeRow(i.level, i.key, i.detail)))
+    : quiet('None.'));
+  body.push(el('div', { class: 'card__actions' },
+    el('button', { type: 'button', class: 'btn', iconEnd: 'fa-arrow-right', text: 'Edit it',
+                   onclick: () => select(r.scope ? { kind: 'album', album: r.scope } : { kind: 'gallery' }) })));
+  return card('fa-file-code', r.scope ? r.scope + '/.album/album.cfg' : 'gallery.cfg',
+              'exactly as the app parses it', ...body);
+}
+
+function searchCard(r) {
+  return card('fa-magnifying-glass', r.query, r.matches + ' match(es)' + (r.album ? ' in ' + r.album : ''),
+    r.ignored.length ? el('dl', { class: 'facts' }, fact('ignored', r.ignored.join(', ') + ' — not understood', 'warn')) : null,
+    r.photos.length
+      ? foldedRows('lookup:search', r.photos, 20, (p) => homeRow(p.rel_path, (p.taken_at || 'undated').slice(0, 10), '',
+          () => opsLookup('photo', p.rel_path)))
+      : quiet('Nothing. Words match album, file name, tag, camera and lens.'),
+    r.matches > r.photos.length ? quiet('Showing the first ' + r.photos.length + '.') : null);
+}
+
+/* ----- translations ----------------------------------------------------- */
+const I18N_ORDER = ['shape', 'empty', 'missing', 'js', 'blank', 'untranslated', 'unused'];
+const I18N_HARD = ['shape', 'empty', 'missing', 'js'];
+
+function paintOpsI18n(grid) {
+  opsAuto('i18n', '/api/ops/i18n');
+  const pending = opsPending('i18n', 'fa-language', 'Translations');
+  if (pending) { grid.append(pending); return; }
+  const r = opsState.reports.i18n;
+  if (!r) return;
+  const hard = I18N_HARD.reduce((n, k) => n + ((r.problems[k] || []).length), 0);
+  const body = [el('dl', { class: 'facts' },
+    fact('table', r.keys + ' key(s) × ' + r.languages.length + ' language(s) in aperture/i18n.py'),
+    fact('app.js', Object.entries(r.js_languages).map(([k, n]) => k + ' ' + n).join(' · ') || '—'),
+    fact('used', r.used + ' referenced in templates and app code'),
+    fact('result', !r.total ? 'no problems found'
+      : hard ? hard + ' problem(s) that affect rendering' : r.total + ' note(s), nothing broken',
+      !r.total ? 'ok' : hard ? 'warn' : null))];
+  for (const kind of I18N_ORDER) {
+    const items = r.problems[kind];
+    if (!items || !items.length) continue;
+    body.push(sub(kind + (I18N_HARD.includes(kind) ? '' : ' — informational'), items.length));
+    body.push(...foldedRows('i18n:' + kind, items, 10, (text) => lineRow(text)));
+  }
+  if (hard) body.push(quiet('New Japanese glyphs need `python tools/build_jp_subset.py`.'));
+  body.push(el('div', { class: 'card__actions' },
+    el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'Check again',
+                   onclick: () => opsLoad('i18n', '/api/ops/i18n') })));
+  grid.append(wide(card('fa-language', 'Translations', 'EN / DE / JP, and the app.js mirror', ...body)));
+}
+
+/* ----- export ----------------------------------------------------------- */
+function paintOpsExport(grid) {
+  opsAuto('export', '/api/ops/export/contents');
+  const pending = opsPending('export', 'fa-box-archive', 'Export');
+  if (pending) { grid.append(pending); return; }
+  const r = opsState.reports.export;
+  if (!r) return;
+  grid.append(wide(card('fa-box-archive', 'Export', 'every hand-written file, as one .tar.gz',
+    el('dl', { class: 'facts' },
+      fact('contents', r.files.length + ' file(s) · ' + sizeOr0(r.bytes)),
+      fact('holds', 'gallery.cfg and .gallery/, every .album/ — config, descriptions, icons, fonts, backdrops'),
+      fact('leaves out', 'the photos: they already are the backup')),
+    el('div', { class: 'card__actions' },
+      el('a', { class: 'btn btn--primary', href: '/api/ops/export', download: '', icon: 'fa-download',
+                text: 'Download the archive' }),
+      el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'List again',
+                     onclick: () => opsLoad('export', '/api/ops/export/contents') })),
+    quiet('Restore with: tar -xzf <archive> -C <photos dir>'),
+    sub('files', r.files.length),
+    ...foldedRows('export:files', r.files, 15, (name) => lineRow(name)))));
+}
+
+/* ----- the password ----------------------------------------------------- */
+function paintOpsAccess(grid, st, ro) {
+  const auth = st.auth || {};
+  const isSet = auth.mode === 'password';
+  grid.append(wide(card('fa-key', isSet ? 'Change the password' : 'Set a password',
+    isSet ? 'the console asks for it wherever it listens' : 'none is set — anyone who reaches this port can use the console',
+    el('dl', { class: 'facts' },
+      fact('door', isSet ? 'password' : 'open', isSet ? 'ok' : 'warn'),
+      fact('listens on', auth.bind || '—'),
+      fact('without one', auth.may_run_open
+        ? 'allowed here — loopback, or CONSOLE_ALLOW_OPEN=1'
+        : 'not allowed — this console would refuse to start')),
+    ro ? quiet('The console is mounted read-only.') : null,
+    el('div', { class: 'ops__form' },
+      isSet ? opsInput('pw-current', { type: 'password', placeholder: 'current password', autocomplete: 'current-password', disabled: ro }) : null,
+      opsInput('pw-new', { type: 'password', placeholder: 'new password — 8 characters or more', autocomplete: 'new-password', disabled: ro }),
+      opsInput('pw-again', { type: 'password', placeholder: 'again', autocomplete: 'new-password', disabled: ro,
+                             onkeydown: onEnter(setPassword) })),
+    el('div', { class: 'card__actions' },
+      el('button', { type: 'button', class: 'btn btn--primary', icon: 'fa-key', disabled: ro,
+                     text: isSet ? 'Change the password' : 'Set the password', onclick: setPassword })),
+    quiet('Stored as an scrypt hash in data/console/credentials. Setting it ends every session, ' +
+          'this one included — you sign in again with the new one.'))));
+
+  if (!isSet) return;
+  grid.append(wide(card('fa-lock-open', 'Remove the password', 'passwd --clear',
+    auth.may_run_open
+      ? [el('div', { class: 'ops__form' },
+           opsInput('pw-clear', { type: 'password', placeholder: 'current password', autocomplete: 'current-password', disabled: ro })),
+         el('div', { class: 'card__actions' },
+           el('button', { type: 'button', class: 'btn', icon: 'fa-lock-open', disabled: ro,
+                          text: 'Remove the password', onclick: clearPassword })),
+         quiet('The console then runs open to anything that can reach ' + auth.bind + '.')]
+      : quiet('This console listens on ' + auth.bind + ', where it may not run without a password — ' +
+              'removing it would leave the door open until the next start, and then keep the console ' +
+              'from starting at all. Change it instead.'))));
+}
+
+async function setPassword() {
+  const inputs = opsState.inputs;
+  const next = inputs['pw-new'] || '';
+  if (next !== (inputs['pw-again'] || '')) { toast('The two entries do not match', 'err'); return; }
+  try {
+    await api('/api/ops/password', { method: 'POST',
+      body: JSON.stringify({ current: inputs['pw-current'] || '', password: next }) });
+  } catch (err) {
+    toast(err.message, 'err');
+    return;
+  } finally {
+    delete inputs['pw-current']; delete inputs['pw-new']; delete inputs['pw-again'];
+  }
+  toLogin('password');
+}
+
+async function clearPassword() {
+  if (!confirm('Remove the console password? Anything that can reach this port can then use the console.')) return;
+  try {
+    await api('/api/ops/password', { method: 'DELETE',
+      body: JSON.stringify({ current: opsState.inputs['pw-clear'] || '' }) });
+  } catch (err) {
+    toast(err.message, 'err');
+    return;
+  } finally {
+    delete opsState.inputs['pw-clear'];
+  }
+  window.location.replace('/');
+}
+
+const OPS_PAINT = {
+  overview: paintOpsOverview,
+  doctor: paintOpsDoctor,
+  derivatives: paintOpsDerivatives,
+  featured: paintOpsFeatured,
+  tags: paintOpsTags,
+  gps: paintOpsGps,
+  frontpage: paintOpsFrontpage,
+  lookup: paintOpsLookup,
+  i18n: paintOpsI18n,
+  export: paintOpsExport,
+  access: paintOpsAccess,
+};
+
+/* ----- jobs ------------------------------------------------------------- */
+/* The writes that are not a scan -- rebuilding and pruning derivatives,
+ * recomputing flags, stripping coordinates -- queue on the control channel
+ * like a scan does, and the indexer runs them. The console follows the one
+ * it queued last: its progress while it runs, its summary when it is done. */
+const JOB_TITLES = {
+  rebuild: 'Rebuilding derivatives',
+  prune: 'Deleting orphaned files',
+  featured: 'Recomputing featured flags',
+  gps_strip: 'Stripping coordinates',
+};
+// which reports a finished job has made stale, to be asked again
+const JOB_STALE = {
+  rebuild: ['derivatives', 'doctor'],
+  prune: ['derivatives', 'doctor'],
+  featured: ['featured', 'doctor'],
+  gps_strip: ['gps'],
+};
+
+function jobSummary(kind, summary) {
+  const r = summary.result || {};
+  const took = summary.seconds != null ? ' in ' + summary.seconds + 's' : '';
+  if (summary.error) return summary.error;
+  if (kind === 'rebuild') return r.built + ' built, ' + r.failed + ' failed of ' + r.to_build + took;
+  if (kind === 'prune') return r.pruned + ' of ' + r.orphans + ' deleted · ' + sizeOr0(r.freed_bytes) + ' freed' + took;
+  if (kind === 'featured') {
+    return r.db_flagged + ' photo(s) flagged' + (r.unresolved ? ' · ' + r.unresolved + ' entr(ies) match nothing' : '') + took;
+  }
+  if (kind === 'gps_strip') {
+    return (r.stripped || []).length + ' of ' + (r.with_gps || []).length + ' rewritten' +
+           (r.scan_requested ? ' · a scan was queued' : '') + took;
+  }
+  return 'done' + took;
+}
+
+function jobCard() {
+  const job = opsState.job;
+  if (!job) return null;
+  const s = job.state || {};
+  const done = s.result;
+  const running = s.running;
+  const tone = done ? (done.error ? 'bad' : 'ok') : running ? 'ok' : 'warn';
+  const word = done ? (done.error ? 'failed' : 'done') : running ? 'running' : 'queued';
+  const live = opsState.status && opsState.status.live;
+  const note = done ? jobSummary(job.kind, done)
+    : running ? (running.label || '')
+      : live ? 'waiting for the indexer to pick it up' : 'no indexer is listening — it runs when one starts';
+  const result = (done && done.result) || {};
+  const problems = [...(result.broken || []), ...(result.errors || [])];
+  return card('fa-screwdriver-wrench', JOB_TITLES[job.kind] || job.kind,
+    ((opsState.status && opsState.status.jobs) || {})[job.kind] || null,
+    el('div', { class: 'lamp' },
+      el('span', { class: 'lamp__dot is-' + tone }),
+      el('span', { class: 'lamp__word is-' + tone, text: word }),
+      el('span', { class: 'lamp__note', text: note })),
+    running && running.total
+      ? el('div', { class: 'job__meter' }, meter(running.done || 0, running.total, 'acc'),
+          el('span', { class: 'brow__v', text: (running.done || 0) + ' / ' + running.total }))
+      : null,
+    problems.length ? foldedRows('job:problems', problems, 6, (line) => lineRow(line)) : null,
+    done ? el('div', { class: 'card__actions' },
+      el('button', { type: 'button', class: 'btn btn--ghost', icon: 'fa-xmark', text: 'Dismiss',
+                     onclick: () => { opsState.job = null; paintOps(); } })) : null);
+}
+
+/* Progress repaints only the job's own card: the rest of the screen may be a
+ * form someone is typing into. */
+function paintJob() {
+  const slot = $('#ops-job');
+  const next = jobCard();
+  if (slot && next) slot.replaceChildren(next);
+  else if (onOps()) paintOps();
+}
+
+async function startJob(kind, params = {}, question = null) {
+  if (question && !confirm(question)) return;
+  let res;
+  try {
+    res = await api('/api/ops/jobs', { method: 'POST', body: JSON.stringify({ kind, ...params }) });
+  } catch (err) {
+    toast(err.message, 'err');
+    return;
+  }
+  opsState.job = { id: res.job.id, kind, state: null };
+  toast(res.note || 'Queued — the indexer picks it up within a couple of seconds', res.note ? 'warn' : 'ok');
+  if (onOps()) {
+    paintOps();
+    $('#pane').scrollTop = 0;
+  }
+  pollJob();
+}
+
+function pollJob() {
+  clearInterval(opsState.jobPoll);
+  const job = opsState.job;
+  opsState.jobPoll = setInterval(async () => {
+    if (opsState.job !== job) { clearInterval(opsState.jobPoll); return; }
+    let body;
+    try {
+      body = await api('/api/ops/jobs/' + encodeURIComponent(job.id));
+    } catch (_) {
+      return;   /* a hiccup is not a reason to stop following a running job */
+    }
+    job.state = body;
+    if (!body.result) {
+      if (onOps()) paintJob();
+      return;
+    }
+    clearInterval(opsState.jobPoll);
+    toast(body.result.error ? 'Job failed: ' + body.result.error : jobSummary(job.kind, body.result),
+          body.result.error ? 'err' : 'ok');
+    opsState.disk = null;
+    await loadOpsStatus();
+    for (const tab of JOB_STALE[job.kind] || []) {
+      if (opsState.reports[tab] && opsState.urls[tab]) opsLoad(tab, opsState.urls[tab], { quiet: true });
+    }
+    if (onOps()) paintOps();
+  }, 1500);
 }
 
 /* A scan is asynchronous by nature: on a large share over SMB a full pass is
@@ -829,6 +1825,8 @@ function pollScan(requestId) {
         : 'Scan finished in ' + body.result.seconds + 's · ' +
           (r.indexed || 0) + ' indexed, ' + (r.thumbnails || 0) + ' thumbnails',
         body.result.error ? 'err' : 'ok');
+      opsState.disk = null;
+      opsState.archive = null;
       await loadOpsStatus();
       repaintOps();
       return;
@@ -849,34 +1847,25 @@ async function doPause(reason) {
     await api('/api/ops/pause', { method: 'POST', body: JSON.stringify({ reason: reason || '' }) });
     toast('Indexing paused');
   } catch (err) { toast(err.message, 'err'); return; }
+  delete opsState.inputs.reason;
   await loadOpsStatus();
   repaintOps();
   renderTree();
 }
 
-async function doResume() {
+async function doResume(scan) {
   try {
-    await api('/api/ops/resume', { method: 'POST' });
-    toast('Indexing resumed');
+    const res = await api('/api/ops/resume', { method: 'POST', body: JSON.stringify({ scan: !!scan }) });
+    toast(res.request ? 'Indexing resumed · scan requested' : 'Indexing resumed');
+    if (res.request) {
+      opsState.busy = true;
+      pollScan(res.request.id);
+    }
   } catch (err) { toast(err.message, 'err'); return; }
+  delete opsState.inputs['resume-scan'];
   await loadOpsStatus();
   repaintOps();
   renderTree();
-}
-
-async function runDoctor(album) {
-  opsState.busy = true;
-  repaintOps();
-  toast('Checking…');
-  try {
-    opsState.doctor = await api('/api/ops/doctor' +
-      (album ? '?album=' + encodeURIComponent(album) : ''));
-  } catch (err) {
-    toast(err.message, 'err');
-  } finally {
-    opsState.busy = false;
-    repaintOps();
-  }
 }
 
 /* ----- home ------------------------------------------------------------- */

@@ -10,7 +10,7 @@ import sys
 from .. import brand, i18n, termui as ui
 from ..ops import UnknownAlbum
 
-from .operate import cmd_doctor, cmd_featured, cmd_passwd, cmd_pause, cmd_resume, cmd_scan, cmd_status, cmd_thumbs
+from .operate import cmd_disk, cmd_doctor, cmd_featured, cmd_passwd, cmd_pause, cmd_resume, cmd_scan, cmd_status, cmd_thumbs
 from .render import fail
 from .reports import cmd_album, cmd_cfg, cmd_export, cmd_gps, cmd_i18n, cmd_photo, cmd_search, cmd_tags, cmd_trip, cmd_welcome
 from .screens import cmd_dash, cmd_help, cmd_home, cmd_menu, cmd_term
@@ -93,6 +93,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--apply", action="store_true", help="with --prune: actually delete them")
     sp.add_argument("--limit", type=int, default=20, help="examples to print (default: 20)")
 
+    add("disk", cmd_disk, "What thumbnails, previews and HEIC conversions cost on disk, "
+                          "against the originals, and how full each volume is.")
+
     sp = add("featured", cmd_featured, "Which album.cfg entry featured which photo, plus DB drift.")
     sp.add_argument("album", nargs="?", help="limit to one album subtree")
     sp.add_argument("--recompute", action="store_true", help="rewrite the is_showcase flags first")
@@ -157,7 +160,7 @@ LOGO_MODES = ("auto", "kitty", "iterm", "blocks", "ascii", "off")
 
 # Commands whose output is wrapped in the shared frame by the dispatcher.
 # The rest draw their own screen (see _screen) or are pure JSON.
-FRAMED_COMMANDS = {"scan", "pause", "resume", "doctor", "thumbs", "featured",
+FRAMED_COMMANDS = {"scan", "pause", "resume", "doctor", "thumbs", "featured", "disk",
                    "passwd",
                    "cfg", "photo", "trip", "i18n",
                    "tags", "welcome", "gps", "album", "search", "export"}

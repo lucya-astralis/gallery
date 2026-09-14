@@ -9,9 +9,8 @@ that entry.py can import this module to build the parser.
 import argparse
 import time
 
-from .. import albums, brand, control, db, ops, scanner, termui as ui
+from .. import brand, control, db, ops, reports, termui as ui
 from ..gallery import api
-from ..runtime import settings
 
 from .render import _render_system, _screen, dump, head, hint, kv
 
@@ -32,58 +31,12 @@ def _dispatch(argv: list[str]) -> int:
 SUBTITLE_FMT = "{title}  ·  CLI v{app}  ·  API v{api}"
 
 
-# Above this many rows the dashboard skips the two directory walks (health +
-# cache size) instead of making you wait for them.
-QUICK_CHECK_MAX_ROWS = 20000
-
-
-def _top_albums(c, limit: int = 6):
-    return c.execute(
-        "SELECT album, COUNT(*) AS n, SUM(size) AS bytes FROM images "
-        "GROUP BY album ORDER BY n DESC, album ASC LIMIT ?", (limit,)).fetchall()
-
-
-def _months(c, limit: int = 12):
-    """Shots per capture month, oldest first — the archive's pulse."""
-    rows = c.execute(
-        "SELECT substr(taken_at, 1, 7) AS ym, COUNT(*) AS n FROM images "
-        "WHERE taken_at IS NOT NULL GROUP BY ym ORDER BY ym DESC LIMIT ?",
-        (limit,)).fetchall()
-    return list(reversed(rows))
-
-
-def _formats(c):
-    counts: dict[str, int] = {}
-    for r in c.execute("SELECT filename FROM images"):
-        ext = r["filename"].rsplit(".", 1)[-1].lower() if "." in r["filename"] else "?"
-        counts[ext] = counts.get(ext, 0) + 1
-    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
-
-
-def _dir_stats(path):
-    files = total = 0
-    if path.is_dir():
-        for f in path.rglob("*"):
-            if f.is_file():
-                files += 1
-                try:
-                    total += f.stat().st_size
-                except OSError:
-                    pass
-    return files, total
-
-
 def cmd_dash(args) -> int:
     if args.json:
-        c = db.conn()
         st, live = ops.server_status()
-        span = c.execute(
-            "SELECT MIN(taken_at) AS a, MAX(taken_at) AS b FROM images "
-            "WHERE taken_at IS NOT NULL").fetchone()
-        dump({"index": ops.index_counts(c), "span": {"from": span["a"], "to": span["b"]},
-              "albums": [dict(r) for r in _top_albums(c, 12)],
-              "months": [dict(r) for r in _months(c)],
-              "formats": _formats(c), "server": st, "live": live,
+        report = reports.archive_report()
+        dump({**{k: report[k] for k in ("index", "span", "albums", "months", "formats")},
+              "server": st, "live": live,
               "paused": control.pause_info() is not None})
         return 0
     if getattr(args, "watch", False):
@@ -129,13 +82,10 @@ def _watch_dash(args) -> int:
 def _dash_body(footer: bool = True) -> None:
     """The dashboard content — drawn inside whatever frame is already open,
     so the menu can lead with it without nesting a second box."""
-    c = db.conn()
     st, live = ops.server_status()
     pause = control.pause_info()
-    counts = ops.index_counts(c)
-    span = c.execute(
-        "SELECT MIN(taken_at) AS a, MAX(taken_at) AS b FROM images "
-        "WHERE taken_at IS NOT NULL").fetchone()
+    report = reports.archive_report()
+    counts, span = report["index"], report["span"]
 
     ui.logo(SUBTITLE_FMT.format(title=brand.PRODUCT.upper(),
                                 app=brand.VERSION, api=api.API_VERSION))
@@ -144,19 +94,15 @@ def _dash_body(footer: bool = True) -> None:
 
     head("archive")
     kv("photos", f"{counts['images']:,}".replace(",", " "))
-    kv("albums", f"{counts['albums']} with photos · "
-                 f"{len(albums.all_album_nodes())} incl. parents")
+    kv("albums", f"{counts['albums']} with photos · {report['album_nodes']} incl. parents")
     kv("featured", f"{counts['featured']} photo(s) · "
-                   f"{sum(1 for a in albums.albums_with_ancestors() if albums.album_is_showcase(a))} showcase album(s)")
+                   f"{report['showcase_albums']} showcase album(s)")
     kv("tags", str(counts["tags"]))
     kv("originals", ops.bytes_h(counts["bytes"]))
-    kv("span", f"{(span['a'] or '—')[:10]} → {(span['b'] or '—')[:10]}")
+    kv("span", f"{(span['from'] or '—')[:10]} → {(span['to'] or '—')[:10]}")
     kv("database", ops.bytes_h(counts["db_bytes"]))
 
-    # NOT `albums`: the lines above read the albums MODULE, and a local of
-    # that name shadows it for the whole function body -- which is how `dash`
-    # came to raise UnboundLocalError before it drew anything at all.
-    largest = _top_albums(c)
+    largest = report["albums"][:6]
     if largest:
         head("largest albums")
         peak = largest[0]["n"]
@@ -168,7 +114,7 @@ def _dash_body(footer: bool = True) -> None:
             print(f"  {name:<{name_w}}  {ui.bar(r['n'], peak, 22)} "
                   f"{ui.C.bold}{r['n']:>5}{ui.C.off} {ui.C.gy}{ops.bytes_h(r['bytes'])}{ui.C.off}")
 
-    months = _months(c)
+    months = report["months"]
     if months:
         head("activity (by capture month)")
         peak = max(r["n"] for r in months)
@@ -176,18 +122,17 @@ def _dash_body(footer: bool = True) -> None:
             print(f"  {r['ym']}   {ui.bar(r['n'], peak, 30, ui.C.mg)} "
                   f"{ui.C.bold}{r['n']:>5}{ui.C.off}")
 
-    formats = _formats(c)
+    formats = report["formats"]
     if formats:
         head("formats")
         kv("types", " · ".join(f"{ext} {n}" for ext, n in formats[:6]))
-    kv("heic/heif", ui.state("supported") if scanner.HEIF_SUPPORTED
+    kv("heic/heif", ui.state("supported") if report["heic"]
        else ui.state("NOT supported — pillow-heif is missing", "warn"))
 
     head("health")
-    if counts["images"] <= QUICK_CHECK_MAX_ROWS:
-        on_disk = len(ops.photo_files())
-        thumbs, thumb_bytes = _dir_stats(settings.thumbs_dir)
-        previews, preview_bytes = _dir_stats(settings.previews_dir)
+    on_disk = report["photos_on_disk"]
+    if on_disk is not None:
+        tiers = {t["key"]: t for t in ops.disk_usage()["tiers"]}
         drift = on_disk - counts["images"]
         if drift == 0:
             kv("index", f"{ui.state('in sync')} · {on_disk} file(s) on disk = {counts['images']} row(s)")
@@ -195,11 +140,11 @@ def _dash_body(footer: bool = True) -> None:
             what = "not indexed" if drift > 0 else "indexed but gone"
             kv("index", f"{ui.state(f'{abs(drift)} file(s) {what}', 'warn')}"
                         f" · {on_disk} on disk / {counts['images']} indexed")
-        kv("cache", f"{thumbs} thumb(s) {ops.bytes_h(thumb_bytes)} · "
-                    f"{previews} preview(s) {ops.bytes_h(preview_bytes)}")
-        hint("  a full check (config, derivatives, drift) is `doctor`")
+        kv("cache", f"{tiers['thumbnails']['files']} thumb(s) {ops.bytes_h(tiers['thumbnails']['bytes'])} · "
+                    f"{tiers['previews']['files']} preview(s) {ops.bytes_h(tiers['previews']['bytes'])}")
+        hint("  a full check (config, derivatives, drift) is `doctor`, the space is `disk`")
     else:
-        hint(f"  skipped — over {QUICK_CHECK_MAX_ROWS} rows; run `doctor` for the full check")
+        hint(f"  skipped — over {reports.QUICK_CHECK_MAX_ROWS} rows; run `doctor` for the full check")
 
     if footer:
         head("commands")
@@ -228,6 +173,7 @@ MENU_ITEMS = [
      [("opt", "--album", "album (blank = whole gallery)"),
       ("flag", "--rebuild", "rebuild missing and stale ones? [y/N]"),
       ("flag", "--prune", "list generated files with no source photo? [y/N]")]),
+    ("disk", "what thumbnails and previews cost on disk", []),
     ("featured", "which album.cfg entry features which photo",
      [("arg", "album", "album (blank = all)")]),
     ("cfg", "album.cfg / gallery.cfg as the app parses it",

@@ -282,6 +282,8 @@ LOGIN_REASONS = {
                % (security.IDLE_TIMEOUT // 60),
     "signout": "Signed out. The console is closed until you sign in again.",
     "expired": "That session reached its twelve-hour limit and ended.",
+    "password": "The console password was changed, which ends every session. "
+                "Sign in with the new one.",
 }
 
 

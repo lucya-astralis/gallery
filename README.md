@@ -67,19 +67,24 @@ to reach a handler that was never mounted on it.
 ### Operations from either front end
 
 `aperture/ops.py` is the operational surface as data — the live state of the
-indexer, what `doctor` checked, what a scan did. Two front ends render it:
-`aperture/cli/` to a terminal, `aperture/console/opsapi.py` over HTTP. There
-is one implementation of each check, and a report that changes changes in both
+indexer, what `doctor` checked, what a scan did, what the generated trees cost
+on disk — and `aperture/reports.py` holds the reports that only look (a cfg, a
+photo, the tags, the welcome feed, the export…). Two front ends render both:
+`aperture/cli/` to a terminal, `aperture/console/opsapi.py` over HTTP, where
+the console's **Operations** place has a tab for every command. There is one
+implementation of each report, and a report that changes changes in both
 places at once.
 
 Actions go through the flag-file control channel in `data/control/`, never
 through a function call — **even in the `all` role, where the console shares a
 process with the indexer.** A scan requested in the browser is the same file
-`python -m aperture.cli scan` writes, picked up by the same control loop. That
-keeps one place where a scan can begin, one place to look when one did not,
-and it means `APERTURE_ROLE=console` in its own container works with no second
-implementation. The request carries `by: console` or `by: cli`, so `status`
-says afterwards which one asked.
+`python -m aperture.cli scan` writes, picked up by the same control loop. So
+is every other write the indexer owns — rebuilding or pruning derivatives,
+recomputing the featured flags, stripping coordinates: the console queues them
+as *jobs* and the indexer runs them. That keeps one writer, one place to look
+when something did not happen, and it means `APERTURE_ROLE=console` in its own
+container works with no second implementation. A request carries
+`by: console` or `by: cli`, so `status` says afterwards which one asked.
 
 Add images:
 
@@ -916,7 +921,8 @@ Inside the package:
 | `aperture/schema.py` + `cfgio.py` | which keys a cfg file may hold, and the grammar that reads and rewrites it |
 | `aperture/checks.py`| what is wrong with a cfg file — one implementation, asked by `doctor`, the CLI and the console |
 | `aperture/scanner.py` + `indexer.py` | the walk that fills the index and writes the derivatives, and the loop that schedules it |
-| `aperture/ops.py`   | the operations surface the CLI and the console's `/api/ops/*` share |
+| `aperture/ops.py`   | the operations surface the CLI and the console's `/api/ops/*` share: live state, `doctor`, disk usage, and everything that ends in a write (scan, pause, jobs) |
+| `aperture/reports.py` | the reports that only look — cfg, photo, album, trips, tags, welcome, search, i18n, archive statistics, the export — for the same two front ends |
 | `aperture/server.py`| the process: which listeners open, and shutdown     |
 | `aperture/runtime.py`| the one place that reads the environment            |
 | `aperture/cli/` + `termui.py` | the operator CLI (`render` how it writes, `operate` the commands that act, `reports` the ones that only look, `screens` the full-screen surfaces, `entry` the parser) and its terminal vocabulary |
@@ -952,13 +958,15 @@ Console only:
 
 ## Operations CLI
 
-Everything operational is one command — or, since 1.0, the **Operations** entry
-at the top of the [console](aperture/console/), which serves the same reports
-from the same functions (`aperture/ops.py`). The console covers what you need
-while the gallery is running: live indexer state, scan now, pause / resume, and
-`doctor`. The CLI covers those plus everything that is about authoring and
-shipping — `cfg`, `photo`, `trip`, `tags`, `welcome`, `gps`, `export`, `i18n` —
-and it is the only one of the two that works with nothing running at all.
+Everything operational is one command — or the **Operations** place at the top
+of the [console](aperture/console/), which serves the same reports from the
+same functions (`aperture/ops.py`, `aperture/reports.py`), one tab each. Since
+1.7.0 the two cover the same ground: everything below except `menu`, `help` and
+`term`, which are about the terminal itself. Two differences remain. The
+console's writes that belong to the indexer (`thumbs --rebuild`,
+`thumbs --prune --apply`, `featured --recompute`, `gps --strip`) are *jobs* the
+running indexer picks up, where the CLI does the work in its own process; and
+the CLI is the one of the two that works with nothing running at all.
 
 Everything operational is one command:
 
@@ -1035,6 +1043,7 @@ docker compose exec gallery python -m aperture.cli status
 | `resume [--scan]` | Lift the pause; `--scan` also requests a scan right away |
 | `doctor [--album X]` | Full integrity check — see below. **Exits 1** when it found something, so it works as a cron/CI check |
 | `thumbs [--rebuild] [--all] [--prune]` | Report, rebuild or prune generated thumbnails and previews. Dry run by default: `--rebuild` builds missing/stale ones (`--all` rebuilds everything), `--prune` lists generated files with no source photo and only deletes them with `--apply` |
+| `disk` | What the generated trees cost: size, file count and size per photo of the thumbnails, previews and HEIC conversions, their share of the originals, files left in a format a tier no longer writes, and how full each volume involved is |
 | `featured [album]` | Which `album.cfg` entry featured which photo, which entries match nothing, and whether the `is_showcase` flags in the DB still agree. `--recompute` rewrites the flags |
 | `cfg <album>` / `cfg --gallery` | An `album.cfg` / `gallery.cfg` exactly as the app parses it, plus what it resolves to (cover, reel, description languages) and everything wrong with it |
 | `photo <rel_path>` | Everything the app knows about one photo: row, mtime drift, tags, why it is (not) featured, derivative state, URLs, prettified EXIF (`--exif` for the raw block) |
@@ -1152,9 +1161,11 @@ through three small files in `data/control/` instead:
 
 | File | Written by | Meaning |
 |------|-----------|---------|
-| `paused.json` | CLI | Indexing is suspended (holds the reason and since when) |
-| `scan.request.json` | CLI | A scan is queued; the server consumes the file when it picks it up |
-| `status.json` | server | The live snapshot `status` reads, re-stamped as a heartbeat |
+| `paused.json` | CLI / console | Indexing is suspended (holds the reason and since when) |
+| `scan.request.json` | CLI / console | A scan is queued; the server consumes the file when it picks it up |
+| `jobs/<id>.json` | console | A job is queued (rebuild, prune, featured, gps_strip); unlike a scan they queue in order |
+| `jobs/<id>.done.json` | server | A finished job's summary; the newest 20 are kept |
+| `status.json` | server | The live snapshot `status` reads, re-stamped as a heartbeat — including a running job's progress |
 
 The server's control loop looks at that directory every 2 seconds, so a
 requested scan starts within ~2s, and `scan` waits for the result by default
@@ -1186,15 +1197,19 @@ requested scan starts within ~2s, and `scan` waits for the result by default
 
 ### What writes what
 
-Nothing in the CLI ever touches `photos/` — the originals stay untouched, as
-everywhere else in this project.
+The originals stay untouched — with one named exception, `gps --strip` (and
+the console's *GPS* job, and a scan with `STRIP_GPS=1`), which rewrites the
+photos that still carry coordinates.
 
-| Writes | Commands |
-|--------|----------|
-| nothing | `status`, `doctor`, `cfg`, `photo`, `trip`, `i18n`, `thumbs` (without flags), `featured` (without `--recompute`) |
-| the SQLite index | `scan`, `featured --recompute` |
-| generated thumbnails/previews | `scan`, `thumbs --rebuild`, `thumbs --prune --apply` (deletes) |
-| the control files | `pause`, `resume`, `scan` |
+| Writes | Commands | In the console |
+|--------|----------|----------------|
+| nothing | `status`, `doctor`, `disk`, `cfg`, `photo`, `album`, `trip`, `welcome`, `tags`, `search`, `i18n`, `export --list`, `thumbs` (without flags), `featured` (without `--recompute`), `gps` (without `--strip`) | every report |
+| the SQLite index | `scan`, `featured --recompute` | a scan, the *featured* job — both run by the indexer |
+| generated thumbnails/previews | `scan`, `thumbs --rebuild`, `thumbs --prune --apply` (deletes) | a scan, the *rebuild* and *prune* jobs |
+| the originals | `gps --strip` | the *gps_strip* job |
+| the control files | `pause`, `resume`, `scan` | every action and job |
+| an archive | `export` | nothing on the server — the archive is a download |
+| `data/console/credentials` | `passwd` | *Password* |
 
 ### Derivatives are written upright
 

@@ -3073,6 +3073,103 @@ img.is-broken { opacity: .2; }
   color: var(--text-dim);
   font-size:var(--fs-text-sm);
 }
+.ops__form input[type="password"],
+.ops__form select { flex: 1 1 200px; }
+.ops__num {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--text-dim);
+  font-size: var(--fs-text-sm);
+}
+.ops__num input[type="number"] { width: 9ch; flex: 0 0 auto; }
+
+
+/* ============================================================
+   THE OPERATIONS TOOLS
+   ------------------------------------------------------------
+   Every report behind the Operations tabs is a .card of .facts and
+   .hrow like any other readout. Three shapes are new here:
+
+     .brow    a figure read against its neighbours — the size of a
+              tier, how full a volume is, the largest albums. The
+              bar is an SVG whose fill width is a geometry
+              attribute: under style-src 'self' an inline width is
+              dropped without a word. Grey, because a size is data,
+              not state; only a running job's bar wears the accent,
+              and only a volume running out of room goes amber/red.
+     .hrow--line  one line of text in the row rhythm (a path, a
+              translation finding) with no where/key columns.
+     .ops__photo  the photo a lookup is about.
+   ============================================================ */
+.meter { display: block; width: 100%; height: var(--s-2); }
+.meter__track { fill: rgba(255, 255, 255, .06); }
+.meter__fill  { fill: rgba(255, 255, 255, .34); }
+.meter.is-acc  .meter__fill { fill: var(--acc); }
+.meter.is-warn .meter__fill { fill: var(--amb); }
+.meter.is-bad  .meter__fill { fill: var(--red); }
+
+/* Eleven tabs do not fit beside the album list on a laptop either, and a
+   strip that scrolls sideways hides the last ones behind an edge with nothing
+   to say they are there. So this strip wraps at every width. */
+.tabs.tabs--many { flex-wrap: wrap; overflow: visible; }
+
+.brows { display: flex; flex-direction: column; }
+.brow {
+  display: grid;
+  grid-template-columns: minmax(90px, 24%) minmax(60px, 1fr) auto;
+  gap: var(--s-4);
+  align-items: center;
+  padding: var(--s-2) 0;
+  font-size: var(--fs-text-sm);
+}
+.brow__k {
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-sm);
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--dur-1) ease;
+}
+.brow__v {
+  color: var(--text-ghost);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+.brow.is-link { cursor: pointer; }
+@media (hover: hover) {
+  .brow.is-link:hover .brow__k { color: var(--acc); }
+}
+
+.hrow.hrow--line { grid-template-columns: minmax(0, 1fr); }
+.hrow--line .hrow__detail { font-family: var(--mono); font-size: var(--fs-chrome-sm); }
+
+.ops__photo {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  margin-bottom: var(--s-5);
+  border: var(--hair) solid var(--line);
+}
+
+.job__meter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s-4);
+  align-items: center;
+  margin-top: var(--s-4);
+}
+
+@media (max-width: 760px) {
+  .brow { grid-template-columns: minmax(70px, 34%) minmax(40px, 1fr) auto; gap: var(--s-3); }
+  .brow__v { font-size: var(--fs-chrome-sm); }
+  /* Operations has eleven tabs. Wrapped like an album's five, but at their
+     own width rather than stretched, so a row holds as many as fit and the
+     strip that stays pinned above a report is three rows, not four. */
+  .tabs--many .tab { flex: 0 1 auto; padding: var(--s-2) var(--s-3); }
+}
 
 
 /* ================================================================

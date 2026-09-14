@@ -18,6 +18,49 @@ notes are never one commit apart.
 
 ---
 
+## 1.7.0 — 2026-09-14
+
+Everything the CLI can do, in the console — and what the thumbnails cost on
+disk.
+
+**New**
+
+* **Operations has a tab for every CLI command.** *Overview*, *Doctor*,
+  *Derivatives*, *Featured*, *Tags*, *GPS*, *Front page* (the welcome feed
+  and the trips), *Lookup* (an album, a photo, a cfg as the app parses it,
+  the search), *Translations*, *Export* and *Password*. Each serves the same
+  function the CLI renders, so the two cannot disagree. Only `menu`, `help`
+  and `term`, which are about the terminal itself, stay in the terminal.
+* **What the generated trees cost.** A *Disk* card on the overview, and
+  `python -m aperture.cli disk`, show the size and file count of the
+  thumbnails, the previews and the HEIC conversions, what that is per photo
+  and as a share of the originals, how full each volume involved is, and how
+  much of a tier is still in a format it no longer writes (the JPEG
+  thumbnails from before WebP, say) — with a way to delete those.
+* **The doctor's fixes are buttons.** Rebuilding missing and stale
+  derivatives, deleting orphaned files, recomputing the featured flags and
+  stripping GPS from the originals are *jobs*: queued on the control channel
+  like a scan, run by the indexer, followed in the console with a progress
+  bar and a summary. After a doctor run, *What now* offers exactly the jobs
+  and scans its findings call for.
+* **The archive's statistics on the overview** — date span, largest albums,
+  shots per capture month, formats, and whether the index and the disk agree
+  — the dashboard `dash` draws, as bars.
+* **The config export is a download**, and *resume* can ask for a scan right
+  away, like `resume --scan`.
+* **The console password can be set and changed in the console.** Changing
+  it asks for the current one and ends every session. Removing it is only
+  offered where the console may run without one (a loopback bind, or
+  `CONSOLE_ALLOW_OPEN=1`) — anywhere else it would stand open until the next
+  start and then refuse to start.
+
+**Fixed**
+
+* **`export` works again.** It looked for the metadata folder names in the
+  wrong module and failed on every run.
+
+---
+
 ## 1.6.1 — 2026-09-14
 
 The folders a NAS keeps for itself stay out of the gallery.

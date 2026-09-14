@@ -31,7 +31,12 @@ _scan_state: dict = {
     "started_at": None,
     "trigger": None,
     "last_scan": None,
+    "job": None,        # the job running right now, with its progress
+    "last_job": None,
 }
+# A running job reports progress many times a second; the status file is
+# rewritten at most this often for it.
+_JOB_PUBLISH_EVERY = 1.0
 _scan_state_lock = threading.Lock()
 
 
@@ -50,6 +55,9 @@ def _publish_status() -> None:
         "scan_trigger": state["trigger"],
         "last_scan": state["last_scan"],
         "pending_request": control.pending_scan_request(),
+        "job": state["job"],
+        "last_job": state["last_job"],
+        "pending_jobs": control.pending_jobs(),
         "watcher": {
             "enabled": settings.enable_watcher,
             "running": watcher.is_running(),
@@ -128,6 +136,52 @@ def run_scan(trigger: str = "periodic", album: str | None = None,
     return summary
 
 
+def run_job(job: dict) -> dict:
+    """One queued job, run by the process that owns the index.
+
+    The caller holds _scan_lock: a rebuild and a scan writing the same
+    derivative at once would only fight over it. What a kind does is
+    ops.run_job's; this is the bookkeeping around it -- progress into
+    status.json while it runs, its summary into the channel when it ends."""
+    from . import ops   # ops reads the index; imported late, like a request
+
+    started = time.time()
+    with _scan_state_lock:
+        _scan_state["job"] = {"id": job.get("id"), "kind": job.get("kind"),
+                              "by": job.get("by"), "started_at": started,
+                              "label": "", "done": None, "total": None}
+    _publish_status()
+    published = [time.monotonic()]
+
+    def progress(label, done=None, total=None):
+        with _scan_state_lock:
+            if _scan_state["job"] is not None:
+                _scan_state["job"].update(label=label, done=done, total=total)
+        if time.monotonic() - published[0] >= _JOB_PUBLISH_EVERY:
+            published[0] = time.monotonic()
+            _publish_status()
+
+    error = result = None
+    try:
+        result = ops.run_job(job.get("kind"), job.get("params") or {}, progress=progress)
+    except Exception as e:
+        error = f"{type(e).__name__}: {e}"
+        log.exception("job %s (%s) failed: %s", job.get("id"), job.get("kind"), e)
+    finished = time.time()
+    summary = {"id": job.get("id"), "kind": job.get("kind"),
+               "params": job.get("params") or {}, "by": job.get("by"),
+               "requested_at": job.get("requested_at"), "started_at": started,
+               "finished_at": finished, "seconds": round(finished - started, 3),
+               "error": error, "result": result}
+    control.finish_job(summary)
+    with _scan_state_lock:
+        _scan_state.update(job=None, last_job=summary)
+    _publish_status()
+    log.info("job %s (%s) finished in %.1fs%s", job.get("id"), job.get("kind"),
+             summary["seconds"], f" with an error: {error}" if error else "")
+    return summary
+
+
 def _control_loop():
     """Heartbeat, control channel and periodic rescan in one thread.
 
@@ -148,6 +202,17 @@ def _control_loop():
                 run_scan(trigger="manual", album=req.get("album"),
                           force=bool(req.get("force")), request_id=req.get("id"))
                 last_periodic = last_beat = time.monotonic()
+                continue
+            # Jobs wait for a scan in flight (the startup scan runs on its own
+            # thread) rather than being taken and then refused.
+            if control.has_pending_jobs() and _scan_lock.acquire(blocking=False):
+                try:
+                    job = control.take_job()
+                    if job is not None:
+                        run_job(job)
+                finally:
+                    _scan_lock.release()
+                last_beat = time.monotonic()
                 continue
             now = time.monotonic()
             if (settings.scan_interval > 0 and not control.is_paused()

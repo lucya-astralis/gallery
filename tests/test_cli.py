@@ -90,9 +90,20 @@ def test_doctor_exits_nonzero_when_it_finds_something(indexed, photos_dir):
 # ----- reports ----------------------------------------------------------
 def test_cfg_resolves_an_album(indexed):
     body = run("cfg", "berlin", "--json")
-    assert set(body) == {"exists", "file", "issues", "parsed"}
+    # `resolved` and `scope` joined in 1.7.0, when the console began serving
+    # the same payload and needed what the terminal only printed.
+    assert set(body) == {"exists", "file", "issues", "parsed", "resolved", "scope"}
     assert body["exists"] is True
     assert body["parsed"]["name"] == ["Berlin"]
+    assert body["resolved"]["cover"] == "berlin/gate.jpg"
+
+
+def test_disk_reports_the_generated_trees(indexed):
+    body = run("disk", "--json")
+    tiers = {t["key"]: t for t in body["tiers"]}
+    assert set(tiers) == {"thumbnails", "previews", "fulls"}
+    assert tiers["thumbnails"]["files"] >= indexed["result"]["indexed"]
+    assert body["derivatives"]["bytes"] == sum(t["bytes"] for t in body["tiers"])
 
 
 def test_photo_resolves_one_file(indexed):
@@ -135,6 +146,14 @@ def test_album_lists_the_tree(indexed):
 def test_search_finds_a_photo(indexed):
     body = run("search", "gate", "--json")
     assert "gate.jpg" in json.dumps(body)
+
+
+def test_export_lists_the_hand_written_files(indexed):
+    """It read the meta-folder names off the wrong module and raised on every
+    run; nothing here ran it until the console began serving it."""
+    body = run("export", "--list", "--json")
+    assert ".gallery/gallery.cfg" in body["files"]
+    assert body["bytes"] > 0
 
 
 def test_thumbs_reports_the_derivatives(indexed):
