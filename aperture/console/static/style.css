@@ -3229,6 +3229,16 @@ img.is-broken { opacity: .2; }
   background: rgba(var(--acc-rgb), .12);
   box-shadow: inset 0 0 0 var(--hair) rgba(var(--acc-rgb), .35);
 }
+/* a release newer than this build: the accent is state, and this is one */
+.place.has-update::after {
+  content: '';
+  display: inline-block;
+  width: var(--s-2);
+  height: var(--s-2);
+  margin-left: var(--s-2);
+  vertical-align: middle;
+  background: var(--acc);
+}
 
 /* ----- the sidebar is one kind of thing now ---------------------------- */
 .sidebar__head {
@@ -3331,6 +3341,18 @@ img.is-broken { opacity: .2; }
 .card__body > .card__quiet + .card__actions,
 .card__body > * + .card__actions { margin-top: var(--s-5); }
 .card__actions { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+
+/* ----- the update notice ---------------------------------------------- */
+.update { display: grid; gap: var(--s-4); }
+.update__versions {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-sm);
+  letter-spacing: .08em;
+  color: var(--text-dim);
+}
+.update__versions strong { color: var(--text); font-weight: inherit; }
+.update__arrow { margin: 0 var(--s-3); }
 
 /* ----- the lamp: one word, and why ------------------------------------- */
 /* The state of the indexer is the first thing on the screen and the only

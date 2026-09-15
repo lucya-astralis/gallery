@@ -156,6 +156,8 @@ os.environ.update(
     STRIP_GPS="1",
     APERTURE_ROLE="all",
     CONSOLE_BIND="127.0.0.1",
+    # the update notice never reaches the network from a test
+    UPDATE_CHECK="0",
 )
 
 # Import order matters — see the module docstring.

@@ -32,7 +32,7 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from .. import brand, checks, scanner
+from .. import brand, checks, scanner, update_check
 from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
@@ -440,6 +440,15 @@ def api_about():
         },
         "releases": _release_notes(text),
     }
+
+
+@app.get("/api/updates")
+def api_updates(fresh: bool = False):
+    """Whether lucya.sh knows a newer aperture (aperture/update_check.py). The
+    server asks, not the page: the console's CSP connects nowhere but here,
+    and one cached answer serves every open tab. `fresh` is the Check again
+    button, honoured at most once a minute."""
+    return update_check.status(fresh=fresh)
 
 
 @app.get("/api/tree")

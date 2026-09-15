@@ -24,6 +24,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass, fields
 from pathlib import Path
 
+from . import brand
+
 # The roles a process can run in. See server.py — this is what decides which
 # listeners open, and it is also what decides whether this process owns the
 # indexer.
@@ -75,6 +77,12 @@ class Settings:
     console_allow_open: bool
     console_backups: int
     console_max_upload: int
+
+    # ----- the maker's update notice -----------------------------------
+    # aperture/update_check.py: the console asks update_url at most twice a day
+    # whether a newer release exists, and shows what it says.
+    update_check: bool
+    update_url: str
 
     # ----- the network in front of both --------------------------------
     # Which peers may set X-Forwarded-For / X-Forwarded-Proto. Only those
@@ -158,6 +166,9 @@ def load() -> Settings:
         console_allow_open=_flag("CONSOLE_ALLOW_OPEN", "0"),
         console_backups=_int("BACKUPS", 20),
         console_max_upload=_int("MAX_UPLOAD_MB", 8) * 1024 * 1024,
+
+        update_check=_flag("UPDATE_CHECK"),
+        update_url=(os.environ.get("UPDATE_URL") or brand.UPDATE_URL).strip(),
 
         # uvicorn's own default, made explicit and configurable. Set it to the
         # reverse proxy's address (or its network, comma-separated) — never

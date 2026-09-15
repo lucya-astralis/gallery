@@ -955,6 +955,8 @@ Console only:
 | `READ_ONLY`       | `0`         | `1` = browse and validate, write nothing            |
 | `BACKUPS`         | `20`        | Versions kept per edited file under `data/console/backups` |
 | `MAX_UPLOAD_MB`   | `8`         | Cap on icon / font / wallpaper uploads              |
+| `UPDATE_CHECK`    | `1`         | Ask lucya.sh (at most twice a day) whether a newer release exists, and say so in the console. `0` = never ask |
+| `UPDATE_URL`      | `https://lucya.sh/aperture/latest.json` | Where that answer is read from |
 
 ## Operations CLI
 
@@ -1505,6 +1507,30 @@ keeps it meaningful, and 1.0 was the last time it happened.
   version. A restyle here is a change in aperture, not in Nebula.
 * **The config grammar** has no version: `aperture/schema.py` is the registry,
   and a key is added or removed in a release entry like anything else.
+
+### Telling running copies
+
+A running console asks `https://lucya.sh/aperture/latest.json` whether there is
+a newer release (`aperture/update_check.py`). The server asks, not the browser, at
+most twice a day, and the request carries nothing but the User-Agent — no
+version, no address, no identifier. When the answer is newer than `VERSION`,
+the Changelog place gets a dot, Home gets a card with a link to the notes, and
+nothing else happens: no download, no install. `UPDATE_CHECK=0` turns it off.
+
+The file is written from this repository, never by hand:
+
+```bash
+python tools/build_update_manifest.py -o latest.json
+```
+
+```json
+{"version": "1.8.0", "date": "2026-09-15",
+ "url": "https://github.com/lucya-astralis/gallery/blob/main/CHANGELOG.md#180--2026-09-15",
+ "notes": "The console says when there is a newer aperture."}
+```
+
+Upload it **after** the release is pushed — a notice for code nobody can pull
+yet sends every operator looking for nothing.
 
 ### Making a release
 

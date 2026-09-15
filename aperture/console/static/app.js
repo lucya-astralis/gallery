@@ -272,6 +272,7 @@ async function boot() {
      * form you land in the middle of. The one exception is coming back
      * through the door after a timeout, which nobody chose. */
     select(takeReturnNote() || { kind: 'home' });
+    loadUpdates();
   } catch (err) {
     $('#pane').innerHTML = '';
     $('#pane').append(el('div', { class: 'pane__empty', text: 'Cannot reach the backend: ' + err.message }));
@@ -1877,6 +1878,74 @@ async function doResume(scan) {
  */
 const home = { issues: null, audit: [], gallery: null };
 
+/* ----- updates -------------------------------------------------------------
+ * Whether lucya.sh knows a newer aperture. The server asks and keeps the
+ * answer (aperture/update_check.py); this only shows it -- a dot on the Changelog
+ * place, a card on Home when there is something to get, the whole state on
+ * the Changelog place. One request per page load serves all three. */
+const updates = { info: null, pending: null };
+
+function loadUpdates(fresh = false) {
+  if (!updates.pending || fresh) {
+    updates.pending = api('/api/updates' + (fresh ? '?fresh=1' : ''))
+      .then((info) => { updates.info = info; syncUpdateMark(); return info; })
+      .catch(() => updates.info);
+  }
+  return updates.pending;
+}
+
+function syncUpdateMark() {
+  const button = $('.place[data-place="changelog"]');
+  if (!button) return;
+  const info = updates.info;
+  const on = !!info && info.state === 'available';
+  button.classList.toggle('has-update', on);
+  if (on) button.title = 'Update available: ' + info.latest.version;
+  else button.removeAttribute('title');
+}
+
+/* The check as a card. Home shows it only when there is a release to get, and
+ * without the button; the Changelog place shows every state. */
+function updateCard(info, withAgain) {
+  const quiet = (text) => el('p', { class: 'card__quiet', text });
+  const again = withAgain ? el('div', { class: 'card__actions' }, el('button', {
+    type: 'button', class: 'btn btn--ghost', icon: 'fa-rotate-right', text: 'Check again',
+    onclick: async (event) => {
+      event.currentTarget.disabled = true;
+      await loadUpdates(true);
+      if (state.sel && state.sel.kind === 'changelog') renderChangelog();
+    },
+  })) : null;
+  if (!info) return card('fa-circle-info', 'Updates', null, quiet('The check did not run.'));
+  const checked = info.checked_at ? 'checked ' + ago(info.checked_at) : null;
+  const latest = info.latest || {};
+  const body = (...rows) => el('div', { class: 'update' }, ...rows);
+  if (info.state === 'available') {
+    const link = latest.url
+      ? el('a', { class: 'btn btn--primary', href: latest.url, target: '_blank', rel: 'noopener',
+                  text: 'Release notes', iconEnd: 'fa-arrow-up-right-from-square' })
+      : null;
+    return card('fa-circle-up', 'Update available', latest.date ? 'released ' + latest.date : checked,
+      body(
+        el('p', { class: 'update__versions' },
+          el('span', { text: info.current }),
+          el('span', { class: 'update__arrow', text: '→' }),
+          el('strong', { text: latest.version })),
+        latest.notes ? quiet(latest.notes) : null,
+        link || again ? el('div', { class: 'card__actions' }, link, again && again.firstChild) : null));
+  }
+  if (info.state === 'current') {
+    return card('fa-circle-check', 'Up to date', checked,
+      body(quiet(info.current + ' is the newest release there is.'), again));
+  }
+  if (info.state === 'unreachable') {
+    const host = (info.source || '').replace(/^https?:\/\//, '').split('/')[0] || 'the update server';
+    return card('fa-circle-exclamation', 'Updates', checked,
+      body(quiet('Could not ask ' + host + ' (' + info.error + '). It is asked again within the hour.'), again));
+  }
+  return card('fa-circle-info', 'Updates', null, quiet('The update check is off (UPDATE_CHECK=0).'));
+}
+
 /* ----- changelog -----------------------------------------------------------
  * The release notes this build ships with, where its code lives and who makes
  * it. The notes arrive as HTML the server rendered from CHANGELOG.md -- this
@@ -1884,6 +1953,7 @@ const home = { issues: null, audit: [], gallery: null };
  * script but its own. The newest release is open, every older one folds. */
 async function renderChangelog() {
   let about = null;
+  const pendingUpdates = loadUpdates();
   try {
     about = await api('/api/about');
   } catch (err) {
@@ -1891,6 +1961,7 @@ async function renderChangelog() {
     $('#pane').append(el('div', { class: 'pane__empty', text: err.message }));
     return;
   }
+  const info = await pendingUpdates;
   if (!state.sel || state.sel.kind !== 'changelog') return;   /* navigated away */
   const pane = $('#pane');
   pane.innerHTML = '';
@@ -1900,10 +1971,14 @@ async function renderChangelog() {
       el('div', { class: 'head__line' },
         el('h1', { class: 'head__title', text: 'Changelog' }),
         el('div', { class: 'head__meta' },
-          el('span', { class: 'pill', icon: 'fa-code-branch', text: about.product + ' ' + about.version }))))));
+          el('span', { class: 'pill', icon: 'fa-code-branch', text: about.product + ' ' + about.version }),
+          info && info.state === 'available'
+            ? el('span', { class: 'pill pill--warn', icon: 'fa-circle-up', text: info.latest.version + ' available' })
+            : null)))));
 
   const grid = el('div', { class: 'home' });
   pane.append(grid);
+  grid.append(el('div', { class: 'home__wide' }, updateCard(info, true)));
 
   const maker = about.maker || {};
   const outward = { target: '_blank', rel: 'noopener' };
@@ -1949,6 +2024,7 @@ async function renderHome() {
     api('/api/validate').catch(() => null),
     api('/api/audit?limit=8').catch(() => null),
     api('/api/gallery').catch(() => null),
+    loadUpdates(),
   ]);
   if (!state.sel || state.sel.kind !== 'home') return;   /* navigated away */
   if (issues) { home.issues = issues; countIssues(issues); renderTree(); }
@@ -2055,6 +2131,11 @@ function paintHome() {
 
   const grid = el('div', { class: 'home' });
   pane.append(grid);
+
+  /* ---- is there a newer release ---- */
+  if (updates.info && updates.info.state === 'available') {
+    grid.append(el('div', { class: 'home__wide' }, updateCard(updates.info, false)));
+  }
 
   /* ---- is the machine working ---- */
   const tone = paused ? 'warn' : live ? 'ok' : 'bad';

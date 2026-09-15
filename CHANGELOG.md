@@ -18,6 +18,26 @@ notes are never one commit apart.
 
 ---
 
+## 1.8.0 — 2026-09-15
+
+The console says when there is a newer aperture.
+
+**New**
+
+* **Update notice.** The console asks lucya.sh, at most twice a day, whether a
+  newer release exists. When one does, the *Changelog* place gets a dot and
+  *Home* a card with the version, its one-line summary and a link to the
+  notes. The *Changelog* place always shows the check — up to date, newer
+  release, could not ask — with a *Check again* button. Nothing is downloaded
+  or installed, and the request carries no version and no identifier. The
+  server asks, not the browser, so the console's CSP is unchanged.
+* **`UPDATE_CHECK` and `UPDATE_URL`.** `UPDATE_CHECK=0` never asks;
+  `UPDATE_URL` reads the answer from somewhere else.
+* **`tools/build_update_manifest.py`** writes the file that is published, from
+  `VERSION` and the newest entry here.
+
+---
+
 ## 1.7.1 — 2026-09-14
 
 The trip timeline shows the trip, not the albums' marks.
