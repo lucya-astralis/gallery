@@ -18,6 +18,32 @@ notes are never one commit apart.
 
 ---
 
+## 1.9.0 — 2026-09-20
+
+The location bar reads as a path again.
+
+**Changed**
+
+* **Every step of the trail carries a mark.** *Home* a house, *Albums* a stack
+  of photos, a folder its folder — open on the one you are standing in — a
+  photo a picture, a search its magnifier. An album with its own emblem
+  (`album.cfg` `icon =`) still shows that instead, so the trail is scanned
+  rather than read.
+* **The trail is grey again.** It used to be accent-purple end to end, which
+  said *state* on a line where nothing had any. The steps above you are dim,
+  the step you are on is bright, and the accent appears exactly once on the
+  row: on the mark of where you are. Tappable is carried by the hairline
+  under each label, which lights up on hover.
+* **The back button follows it.** Quiet grey on a desktop with the accent on
+  the hover border; on a phone it stays a thumb-sized button but is filled
+  with glass rather than an accent tint, and the accent comes back on the
+  press.
+* **One definition for all five pages.** The bar is a macro now
+  (`_pathbar.html`) instead of the same markup copied into the album, photo,
+  index, search and statistics templates.
+
+---
+
 ## 1.8.0 — 2026-09-15
 
 The console says when there is a newer aperture.

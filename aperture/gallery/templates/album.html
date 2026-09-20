@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_pathbar.html" import pathbar with context %}
 {# the album path is the URL; what a reader sees is its display name chain
    (album.cfg `name = …` per level, else the folder name — see
    _album_display_name). Same everywhere the album is named. #}
@@ -58,28 +59,7 @@
      Surfaced as a big, obvious back button on mobile (see .pathbar__back). #}
   {% set up_url = ('/album/' ~ breadcrumbs[-2].path) if breadcrumbs | length > 1 else '/albums' %}
   {% set up_name = breadcrumbs[-2].name if breadcrumbs | length > 1 else t('back.albums') %}
-  <nav class="pathbar" aria-label="Breadcrumb">
-    <a class="pathbar__back" href="{{ up_url }}">
-      <span class="pathbar__back-ico" aria-hidden="true"><i class="fa fa-chevron-left"></i></span>
-      <span class="pathbar__back-lbl">{{ t('back.label') }}</span>
-      <span class="pathbar__back-txt">{{ up_name }}</span>
-    </a>
-    <div class="crumb">
-      <a href="/">{{ t('crumb.home') }}</a>
-      <span class="sep">/</span>
-      <a href="/albums">{{ t('crumb.albums') }}</a>
-      {% for c in breadcrumbs %}
-        <span class="sep">/</span>
-        {# each segment may carry its album's own mark (album.cfg `icon =`),
-           wrapped with its label in one .crumb__seg so the two stay glued
-           together while the trail's gap keeps its distance to the `/`. #}
-        <span class="crumb__seg">
-          {%- if c.icon %}<img class="album-ico crumb__ico" src="{{ c.icon }}" alt="" aria-hidden="true" width="14" height="14">{% endif -%}
-          {%- if loop.last %}<b aria-current="page">{{ c.name }}</b>{% else %}<a href="/album/{{ c.path }}">{{ c.name }}</a>{% endif -%}
-        </span>
-      {% endfor %}
-    </div>
-  </nav>
+  {{ pathbar(up_url, up_name, crumbs=breadcrumbs) }}
 
   {# Album identity overlay (kicker / title / kanji / key facts) — rendered
      onto whichever hero this album has: the reel slideshow when there is

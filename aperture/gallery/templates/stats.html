@@ -5,6 +5,7 @@
    identical without JS. #}
 {% extends "base.html" %}
 {% from "_charts.html" import bars, album_bars, cols, dial, stack, card %}
+{% from "_pathbar.html" import pathbar with context %}
 {% block title %}{{ t('stats.title', brand=brand.title) }}{% endblock %}
 {% block body_class %}page-stats{% endblock %}
 {% block meta %}
@@ -29,18 +30,9 @@
 {% endblock %}
 {% block content %}
 <section>
-  <nav class="pathbar" aria-label="Breadcrumb">
-    <a class="pathbar__back" href="/">
-      <span class="pathbar__back-ico" aria-hidden="true"><i class="fa fa-chevron-left"></i></span>
-      <span class="pathbar__back-lbl">{{ t('back.label') }}</span>
-      <span class="pathbar__back-txt">{{ t('back.home') }}</span>
-    </a>
-    <div class="crumb">
-      <a href="/">{{ t('crumb.home') }}</a>
-      <span class="sep">/</span>
-      <b aria-current="page">{{ t('stats.crumb') }}</b>
-    </div>
-  </nav>
+  {# /stats is a page ABOUT the archive, not a place inside it — no Albums step #}
+  {{ pathbar('/', t('back.home'), albums=False,
+             tail=t('stats.crumb'), tail_icon='fa-chart-simple') }}
 
   {# the page's own facts, in the same quiet line every other page opens with #}
   <p class="section__doc">

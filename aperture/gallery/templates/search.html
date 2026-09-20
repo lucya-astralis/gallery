@@ -1,22 +1,11 @@
 {% extends "base.html" %}
+{% from "_pathbar.html" import pathbar with context %}
 {% block title %}{{ t('search.slug') }}: {{ query }} — {{ brand.title }}{% endblock %}
 {% block body_class %}page-search{% endblock %}
 {% block content %}
 <section>
-  <nav class="pathbar" aria-label="Breadcrumb">
-    <a class="pathbar__back" href="/albums">
-      <span class="pathbar__back-ico" aria-hidden="true"><i class="fa fa-chevron-left"></i></span>
-      <span class="pathbar__back-lbl">{{ t('back.label') }}</span>
-      <span class="pathbar__back-txt">{{ t('back.albums') }}</span>
-    </a>
-    <div class="crumb">
-      <a href="/">{{ t('crumb.home') }}</a>
-      <span class="sep">/</span>
-      <a href="/albums">{{ t('crumb.albums') }}</a>
-      <span class="sep">/</span>
-      <b aria-current="page">{{ t('search.crumb') }} / {{ query }}</b>
-    </div>
-  </nav>
+  {{ pathbar('/albums', t('back.albums'),
+             tail=t('search.crumb') ~ ': ' ~ query, tail_icon='fa-magnifying-glass') }}
 
   <header class="section__head">
     <h1 class="section__slug"><span class="name">{{ t('search.slug') }}</span></h1>

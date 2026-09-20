@@ -1,0 +1,71 @@
+{# The location bar — one route line, one definition, five pages.
+
+   It is two things sitting on one row: the way UP (the back link, the
+   control a phone visitor reaches for on every page) and the way BACK
+   ANYWHERE (the trail, Home / Albums / … / here). Both wear the same
+   face: a hairline, a glass fill, the same height.
+
+   Every segment carries a mark, because the trail is scanned, not read —
+   a house, a stack of photos, a folder, a picture. An album brings its
+   own (album.cfg `icon =`) and that one wins; the rest fall back to the
+   Font Awesome glyph named here. Run tools/build_fa_subset.py after
+   changing any of them.
+
+   Colour follows rule 1: the trail is grey furniture, and the ONLY accent
+   on the row marks state — the mark of the segment you are standing on,
+   and the border of the back link while a real pointer hovers it. The
+   links used to be accent-purple end to end, which said "state" four
+   times on a line where nothing had any.
+
+   Usage (import `with context`, the macro calls t()):
+
+     {% from "_pathbar.html" import pathbar with context %}
+     {{ pathbar('/albums', t('back.albums'), crumbs=breadcrumbs) }}
+
+   back_url/back_name  the way up: parent album, album index, home
+   crumbs              album breadcrumbs ({path, name, icon}), in order
+   tail                a final segment that is not an album (a filename,
+                       a search, /stats) — with `tail` given the last
+                       album crumb links like the rest
+   albums              False for a page that does not sit under /albums
+#}
+
+{% macro pathbar(back_url, back_name, crumbs=None, tail=None, tail_icon=None, albums=True) %}
+  {%- set trail = [{'url': '/', 'name': t('crumb.home'), 'glyph': 'fa-house'}] -%}
+  {%- if albums -%}
+    {%- set _ = trail.append({'url': '/albums', 'name': t('crumb.albums'), 'glyph': 'fa-images'}) -%}
+  {%- endif -%}
+  {%- for c in crumbs or [] -%}
+    {%- set _ = trail.append({'url': '/album/' ~ c.path, 'name': c.name, 'glyph': 'fa-folder', 'mark': c.icon}) -%}
+  {%- endfor -%}
+  {%- if tail -%}
+    {%- set _ = trail.append({'url': None, 'name': tail, 'glyph': tail_icon or 'fa-file'}) -%}
+  {%- endif -%}
+  <nav class="pathbar" aria-label="Breadcrumb">
+    <a class="pathbar__back" href="{{ back_url }}">
+      <span class="pathbar__back-ico" aria-hidden="true"><i class="fa fa-chevron-left"></i></span>
+      <span class="pathbar__back-lbl">{{ t('back.label') }}</span>
+      <span class="pathbar__back-txt">{{ back_name }}</span>
+    </a>
+    <div class="crumb">
+      {%- for seg in trail %}
+        {%- if not loop.first %}<span class="sep" aria-hidden="true">/</span>{% endif -%}
+        {#- the folder you are standing in is open, the ones above it are shut -#}
+        {%- set glyph = 'fa-folder-open' if loop.last and seg.glyph == 'fa-folder' else seg.glyph -%}
+        {#- mark + label are one element, so the mark is part of the target
+            and the two can never wrap apart -#}
+        {%- if loop.last %}
+        <span class="crumb__seg crumb__seg--here" aria-current="page">
+          {%- if seg.mark %}<img class="album-ico crumb__ico" src="{{ seg.mark }}" alt="" aria-hidden="true" width="14" height="14">
+          {%- else %}<i class="fa {{ glyph }} crumb__ico" aria-hidden="true"></i>{% endif -%}
+          <b class="crumb__lbl">{{ seg.name }}</b></span>
+        {%- else %}
+        <a class="crumb__seg" href="{{ seg.url }}">
+          {%- if seg.mark %}<img class="album-ico crumb__ico" src="{{ seg.mark }}" alt="" aria-hidden="true" width="14" height="14">
+          {%- else %}<i class="fa {{ glyph }} crumb__ico" aria-hidden="true"></i>{% endif -%}
+          <span class="crumb__lbl">{{ seg.name }}</span></a>
+        {%- endif -%}
+      {%- endfor %}
+    </div>
+  </nav>
+{% endmacro %}

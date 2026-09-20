@@ -1220,30 +1220,56 @@ section{
 .crumb{
   font-size:var(--fs-text-md);
   color:var(--text-ghost);
+  /* the row's gap is a step WIDER than the gap inside a segment (mark to
+     label), so each step reads as one group with a slash between groups
+     rather than as an even run of marks, words and slashes */
   display:flex; align-items:center; gap:var(--s-3);
   /* wrap to a new line instead of overflowing when the trail is long */
   flex-wrap:wrap;
   margin-bottom:18px;
 }
-/* trail links read as clearly tappable (accent + underline) vs. the current page
-   (plain bright "you are here"); same treatment on every viewport. */
-.crumb a{
-  color:var(--acc);
-  text-decoration:underline;
-  text-decoration-color:rgba(var(--acc-rgb),.45);
-  text-underline-offset:var(--s-1);
+/* One segment = its mark plus its label, in one box: the mark is part of the
+   target, and the two can never wrap apart from each other.
+   The trail used to be accent-purple end to end. Rule 1: the accent marks
+   STATE, and a link that is merely there is not a state — so the trail is
+   grey furniture now (dim for the steps above you, bright for the step you
+   are on) and the accent appears exactly once on the row, on the mark of
+   the segment you are standing in. What tells you a step is tappable is the
+   hairline under its label, which lights up to full contrast on hover. */
+.crumb__seg{
+  display:inline-flex; align-items:center; gap:var(--s-2);
+  min-width:0;
   padding:var(--s-0) 0;
-  transition:color var(--dur-1), text-decoration-color var(--dur-1);
+  color:var(--text-dim);
+  transition:color var(--dur-1);
 }
-.crumb a:hover{ color:var(--acc); text-decoration-color:var(--acc); }
-.crumb b{ color:var(--text); font-weight:500; }
-/* the slashes are what makes the trail read as a path — ghosted they
-   disappeared and the segments ran together */
-.crumb .sep{ color:var(--text); }
+.crumb__lbl{
+  text-decoration:underline;
+  text-decoration-color:var(--line-strong);
+  text-underline-offset:var(--s-1);
+  transition:text-decoration-color var(--dur-1);
+}
+/* the step you are standing on: brightest label, no underline (it goes
+   nowhere), and the row's one accent on its mark */
+.crumb__seg--here{ color:var(--text); }
+.crumb__seg--here .crumb__lbl{ text-decoration:none; font-weight:500; }
+.crumb__seg--here .crumb__ico{ color:var(--acc); }
+/* a colour hover REPAINTS, so it costs a phone the first tap — see the note
+   at .pathbar__back:hover. Gated on a real pointer, like every other one. */
+@media (hover: hover){
+  a.crumb__seg:hover{ color:var(--text); }
+  a.crumb__seg:hover .crumb__lbl{ text-decoration-color:currentColor; }
+  a.crumb__seg:hover .crumb__ico{ color:var(--text-dim); }
+}
+/* the slashes are what makes the trail read as a path. They can sit quieter
+   than they used to now that every segment carries a mark: the marks are
+   what break the line into steps, and full-contrast slashes on top of them
+   made a five-step trail read as punctuation with names in between. */
+.crumb .sep{ color:var(--text-ghost); }
 /* album names and filenames are often single unbreakable tokens (underscores
    aren't break points) — let them break so a long name can't overflow the
    viewport and clip / force horizontal scroll, esp. on mobile. */
-.crumb a, .crumb b{ min-width:0; overflow-wrap:anywhere; }
+.crumb__seg, .crumb__lbl{ min-width:0; overflow-wrap:anywhere; }
 
 /* ---- per-album icon (album.cfg `icon = ...`) ------------------------
    One mark per album, rendered wherever that album is named: the grid
@@ -1261,10 +1287,20 @@ section{
 }
 /* the showcase rail sets its captions bigger; keep the mark in proportion */
 .album-ico--lg{ width:1.15em; height:1.15em; }
-/* mark and label are one flex item (.crumb__seg) so they stay glued
-   together while the trail's own gap keeps its distance to the `/`. */
-.crumb__seg{ display:inline-flex; align-items:center; gap:var(--s-2); min-width:0; }
-.crumb__ico{ flex:0 0 auto; width:1.35em; height:1.35em; margin-right:0; }
+/* The mark slot of one trail segment — ONE box, two possible occupants: the
+   album's own emblem (an <img>, which fills the box) or the generic Font
+   Awesome glyph for that kind of place (an <i>, drawn a step smaller inside
+   it, the way a glyph and a picture have to be to look the same size). Both
+   measure the same, so a trail of mixed segments keeps one rhythm. */
+.crumb__ico{
+  flex:0 0 auto;
+  display:inline-flex; align-items:center; justify-content:center;
+  width:1.2em; height:1.2em;
+  font-size:.82em; line-height:1;
+  margin-right:0;
+  color:var(--text-ghost);
+  transition:color var(--dur-1);
+}
 
 /* ---- route line: back link, then the trail beside it. It used to be a
    filled accent chip in monospace caps followed by a decorative rule fading
@@ -1300,7 +1336,9 @@ section{
   max-width:100%;
   min-height:40px;
   padding:var(--s-3) 0;
-  color:var(--acc);
+  /* the way up is grey furniture like the trail beside it; the accent is
+     kept for the hover, which IS a state (see the .crumb rules above) */
+  color:var(--text-dim);
   font-size:var(--fs-text-md);
   font-weight:500;
   line-height:1;
@@ -1375,6 +1413,12 @@ section{
   text-overflow:ellipsis;
   white-space:nowrap;
   font-weight:600;
+  color:var(--text);
+}
+/* the chevron is furniture, at the same weight as the trail's marks */
+.pathbar__back-ico{ color:var(--text-ghost); transition:color var(--dur-1); }
+@media (hover: hover){
+  .pathbar__back:hover .pathbar__back-ico{ color:var(--acc); }
 }
 
 /* ================================================================
@@ -3252,15 +3296,17 @@ details[open] > summary::before{ content:"▾ "; }
   .section__doc .doc-min-hide{ display:none; }
   /* On a phone this is THE way up — the trail underneath it is 12px text with
      tap targets to match — so it reads as a button and is sized like one:
-     filled, bordered, 44px of thumb. */
+     filled, bordered, 44px of thumb. It used to be filled with an accent
+     TINT, which is the one thing rule 1 forbids the accent to do; a lifted
+     glass face and a strong hairline read as a button just as plainly, and
+     the accent comes back where it belongs — on the press. */
   .pathbar__back{
     display:inline-flex;
     min-height:36px;
     padding:0 14px;
     gap:var(--s-3);
-    border:var(--hair) solid rgba(var(--acc-rgb),.38);
-    background:linear-gradient(180deg, rgba(var(--acc-rgb),.20), rgba(var(--acc-rgb),.08));
-    /* the accent is carried by the fill and the border; the label is --text */
+    border:var(--hair) solid var(--line-strong);
+    background:var(--glass-hi);
     color:var(--text);
     font-weight:600;
     transition:background var(--dur-1), border-color var(--dur-1), box-shadow var(--dur-1);
@@ -3269,13 +3315,12 @@ details[open] > summary::before{ content:"▾ "; }
      gated, because on a phone the "hover" IS the first tap (see the note at
      the base .pathbar__back:hover rule). */
   .pathbar__back:active{
-    background:linear-gradient(180deg, rgba(var(--acc-rgb),.30), rgba(var(--acc-rgb),.14));
     border-color:var(--acc);
     color:var(--text);
   }
+  .pathbar__back:active .pathbar__back-ico{ color:var(--acc); }
   @media (hover: hover){
     .pathbar__back:hover{
-      background:linear-gradient(180deg, rgba(var(--acc-rgb),.30), rgba(var(--acc-rgb),.14));
       border-color:var(--acc);
       color:var(--text);
     }

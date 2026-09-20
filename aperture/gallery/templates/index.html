@@ -1,20 +1,10 @@
 {% extends "base.html" %}
+{% from "_pathbar.html" import pathbar with context %}
 {% block title %}{{ t('index.slug') }} — {{ brand.title }}{% endblock %}
 {% block body_class %}page-albums{% endblock %}
 {% block content %}
 <section>
-  <nav class="pathbar" aria-label="Breadcrumb">
-    <a class="pathbar__back" href="/">
-      <span class="pathbar__back-ico" aria-hidden="true"><i class="fa fa-chevron-left"></i></span>
-      <span class="pathbar__back-lbl">{{ t('back.label') }}</span>
-      <span class="pathbar__back-txt">{{ t('back.home') }}</span>
-    </a>
-    <div class="crumb">
-      <a href="/">{{ t('crumb.home') }}</a>
-      <span class="sep">/</span>
-      <b aria-current="page">{{ t('crumb.albums') }}</b>
-    </div>
-  </nav>
+  {{ pathbar('/', t('back.home')) }}
 
   <header class="section__head">
     <h1 class="section__slug"><span class="name">{{ t('index.slug') }}</span></h1>
