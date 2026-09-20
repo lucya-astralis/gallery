@@ -1239,9 +1239,9 @@ section{
    target, and the two can never wrap apart from each other.
    The trail used to be accent-purple end to end. Rule 1: the accent marks
    STATE, and a link that is merely there is not a state — so the trail is
-   grey furniture now, dim for the steps above you, and the accent appears
-   exactly once on the row, as the chip on the step you are standing on
-   (.crumb__seg--here, below). What tells you a step is tappable is the
+   grey furniture now (dim for the steps above you, bright for the step you
+   are on) and the accent appears exactly once on the row, on the mark of
+   the segment you are standing in. What tells you a step is tappable is the
    hairline under its label, which lights up to full contrast on hover. */
 .crumb__seg{
   display:inline-flex; align-items:center; gap:var(--s-2);
@@ -1255,21 +1255,14 @@ section{
   text-underline-offset:var(--s-1);
   transition:text-decoration-color var(--dur-1);
 }
-/* The step you are standing on is marked the way every other "you are here"
-   in this sheet is marked — see .nav__lang-opt.is-active: a faint accent
-   face, an accent ring, and the label at --text. That is where the accent
-   belongs on this row, and it works whatever the mark is (an accent GLYPH
-   only works until an album brings its own emblem). Accent ON an accent
-   tint is the one thing the accent may not do, so the mark goes bright
-   here rather than purple. */
-.crumb__seg--here{
-  color:var(--text);
-  padding:var(--s-1) var(--s-3);
-  background:rgba(var(--acc-rgb),.12);
-  box-shadow:inset 0 0 0 var(--hair) rgba(var(--acc-rgb),.35);
-}
+/* The step you are standing on: brightest label, no underline (it goes
+   nowhere), and the row's one accent on its mark. It wore a chip for a
+   while — the faint accent face and ring that marks the selected language
+   in the header — and the chip was a box too many on a line that is
+   already two boxes. */
+.crumb__seg--here{ color:var(--text); }
 .crumb__seg--here .crumb__lbl{ text-decoration:none; font-weight:500; }
-.crumb__seg--here .crumb__ico{ color:var(--text); }
+.crumb__seg--here .crumb__ico{ color:var(--acc); }
 /* a colour hover REPAINTS, so it costs a phone the first tap — see the note
    at .pathbar__back:hover. Gated on a real pointer, like every other one. */
 @media (hover: hover){
@@ -3353,9 +3346,7 @@ details[open] > summary::before{ content:"▾ "; }
   }
   /* a button label does not underline on press */
   .pathbar__back:hover .pathbar__back-txt{ text-decoration:none; }
-  /* the marks carry the row once the labels are gone, so the whole bar's
-     icon box steps up together — one size, still (see .crumb__ico) */
-  .pathbar__back-ico{ width:1.45em; height:1.45em; }
+
   .section__head{ margin-bottom:var(--s-5); }
 
   /* pathbar on phones: the button takes the first row on its own, the trail
@@ -3393,39 +3384,21 @@ details[open] > summary::before{ content:"▾ "; }
   .kv dt{ font-size:var(--fs-text-sm); }
   .kv dd{ font-size:var(--fs-text-sm); }
   .raw-exif{ font-size:var(--fs-chrome-sm); max-height:240px; padding:var(--s-3) 10px; }
-  /* On a phone the trail keeps the END of the path in words — where you are
-     and the step directly above it — and everything further up comes down to
-     its mark. With every step labelled the trail wrapped onto two and three
-     lines and the bar stood 107px tall before the album even started; this
-     is one line, and it turns each shortcut from a 12px word into a square
-     tap target. No name is lost: every step carries its own aria-label. */
-  /* The spacing was upside down here: with the slashes gone the steps sat
-     4px apart while a mark sat 6px from its own label, so the row grouped
-     into the wrong things. A step is one step away from the next (--s-2)
-     and its mark sits half that from its label (--s-1) — the same
-     relationship the desktop gets from a wider gap with a slash inside it. */
-  .crumb{ font-size:var(--fs-text-md); gap:var(--s-2); flex-wrap:wrap; }
-  .crumb__seg{ gap:var(--s-1); }
-  .crumb__seg:not(.crumb__seg--here):not(.crumb__seg--near) .crumb__lbl{
-    display:none;
-  }
-  /* a mark standing alone is still a target: --s-6 wide, and as tall as the
-     pane's inner box (the segments stretch), so the size comes from the bar
-     rather than from a number typed here */
-  .crumb__seg:not(.crumb__seg--here):not(.crumb__seg--near){
-    justify-content:center;
-    min-width:var(--s-6);
-  }
-  .crumb__ico{ width:1.45em; height:1.45em; }
-  /* the marks are discrete boxes already — slashes between them only added
-     width to a line that has to fit a phone */
-  .crumb .sep{ display:none; }
+  /* The trail keeps every step in words here too. It was tried the other
+     way — marks only above the step you are on, which fits a deep path on
+     one line and halves the height — and a row of bare marks is too little
+     to navigate by with any confidence. The path is the one thing on the
+     page that has to be unambiguous, so it is allowed to wrap.
+     Breadcrumb link styling is shared with the base; on small screens just
+     shrink the gaps. */
+  .crumb{ font-size:var(--fs-text-md); gap:var(--s-2) var(--s-3); flex-wrap:wrap; }
   /* The trail and the button above it are the same object in two rows, so
-     they are one height and carry the same side padding. Both read --bar-h;
-     neither owns it. */
+     they hold the same floor height and the same side padding. Both read
+     --bar-h; neither owns it. A trail long enough to wrap grows past it —
+     that is the point of a floor. */
   .pathbar .crumb{
     min-height:var(--bar-h);
-    align-items:stretch;
+    align-content:center;
     padding:var(--s-1) var(--s-4);
   }
 }
