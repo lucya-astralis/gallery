@@ -46,6 +46,16 @@ The location bar reads as a path again.
   a 12px word, and the bar is a quarter shorter before the album starts. The
   back button and the trail are the same 38px, the way they already were on a
   desktop. No name is lost — every step carries its own `aria-label`.
+* **Every measure in the bar comes off a scale.** The route line had picked
+  up a hand-typed 14px gap, an 18px and a 20px margin, a 38px and a 40px
+  height and two different icon sizes — the exact drift the design language's
+  fifth rule exists to stop. It now reads two named measures (the gap, and
+  the thumb target both panes share), and the marks sit in one icon box: an
+  album's own emblem and a generic glyph measured 12.8px and 14.3px in the
+  same slot before, which is what happens when a size has no name.
+* **`--fs-ico`.** That icon step is now a token, in all three copies of the
+  sheet. It was the value `.92em`, spelled out once in the gallery and once
+  in the console — two apps, one number, no way to keep them together.
 * **One definition for all five pages.** The bar is a macro now
   (`_pathbar.html`) instead of the same markup copied into the album, photo,
   index, search and statistics templates.

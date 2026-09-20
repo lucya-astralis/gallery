@@ -218,6 +218,12 @@
   --fs-chrome-lg: 14px;
   --fs-chrome-xl: 20px;
 
+  /* Icons are not type, but they are sized like it: one step under the cap
+     height of whatever label they lead. `.fa` reads this, and so does any
+     BOX built to hold an icon — that is what keeps a glyph and an <img>
+     emblem the same size in the same slot. */
+  --fs-ico:       .92em;
+
   --fs-text-sm:   12px;
   --fs-text-md:   13px;
   --fs-text-lg:   15px;
@@ -3583,7 +3589,7 @@ img.is-broken { opacity: .2; }
    gallery sheet's over there. Every glyph is decorative -- it travels with
    a label, a title or an aria-label and carries aria-hidden -- and sized
    in em, so it follows the mono type it sits in. */
-.fa { font-size: .92em; }
+.fa { font-size: var(--fs-ico); }
 
 /* leading: a marker before the word, with the air tracked-out caps need */
 .btn > .fa,

@@ -482,6 +482,14 @@
   --fs-chrome-lg: 14px;    /* a measured value with its own line */
   --fs-chrome-xl: 20px;    /* a headline number: a stat tile, a count */
 
+  /* Icons are not type, but they are sized like it: one step under the cap
+     height of whatever label they lead, everywhere on the site. `.fa` reads
+     this and so does any BOX built to hold an icon (the route line's mark
+     slot), which is what keeps a glyph and an <img> album emblem the same
+     size in the same slot — they were 14.3px and 12.8px before it had a
+     name and the two places could each pick their own. */
+  --fs-ico:       .92em;
+
   --fs-text-sm:   12px;    /* help text, footer, key/value */
   --fs-text-md:   13px;    /* inputs, panel body */
   --fs-text-lg:   15px;    /* base body size, leads */
@@ -1226,20 +1234,18 @@ section{
   display:flex; align-items:center; gap:var(--s-3);
   /* wrap to a new line instead of overflowing when the trail is long */
   flex-wrap:wrap;
-  margin-bottom:18px;
 }
 /* One segment = its mark plus its label, in one box: the mark is part of the
    target, and the two can never wrap apart from each other.
    The trail used to be accent-purple end to end. Rule 1: the accent marks
    STATE, and a link that is merely there is not a state — so the trail is
-   grey furniture now (dim for the steps above you, bright for the step you
-   are on) and the accent appears exactly once on the row, on the mark of
-   the segment you are standing in. What tells you a step is tappable is the
+   grey furniture now, dim for the steps above you, and the accent appears
+   exactly once on the row, as the chip on the step you are standing on
+   (.crumb__seg--here, below). What tells you a step is tappable is the
    hairline under its label, which lights up to full contrast on hover. */
 .crumb__seg{
   display:inline-flex; align-items:center; gap:var(--s-2);
   min-width:0;
-  padding:var(--s-0) 0;
   color:var(--text-dim);
   transition:color var(--dur-1);
 }
@@ -1297,20 +1303,31 @@ section{
 }
 /* the showcase rail sets its captions bigger; keep the mark in proportion */
 .album-ico--lg{ width:1.15em; height:1.15em; }
-/* The mark slot of one trail segment — ONE box, two possible occupants: the
-   album's own emblem (an <img>, which fills the box) or the generic Font
-   Awesome glyph for that kind of place (an <i>, drawn a step smaller inside
-   it, the way a glyph and a picture have to be to look the same size). Both
-   measure the same, so a trail of mixed segments keeps one rhythm. */
-.crumb__ico{
+/* THE BAR HAS ONE ICON SIZE. This box is the mark slot of a trail segment
+   AND the back link's chevron — the two used to be sized separately (1.2em
+   against a raw 13px) and read as two different scales on one row.
+   Two possible occupants: an album's own emblem (an <img>, which fills the
+   box) or a Font Awesome glyph (an <i>, drawn a step smaller inside it, the
+   way a glyph and a picture have to be to look the same size). Both measure
+   the same, so a row of mixed segments keeps one rhythm, and the box is in
+   em so it tracks the type it sits in rather than needing a rule per place. */
+.crumb__ico,
+.pathbar__back-ico{
   flex:0 0 auto;
   display:inline-flex; align-items:center; justify-content:center;
+  /* the box is 1.2em of the ICON step, not of the label's — an <img> would
+     otherwise measure the label's em while an <i class="fa"> measured the
+     icon's, and the same slot would come out two different sizes */
+  font-size:var(--fs-ico);
   width:1.2em; height:1.2em;
-  font-size:.82em; line-height:1;
+  line-height:1;
   margin-right:0;
   color:var(--text-ghost);
   transition:color var(--dur-1);
 }
+/* the chevron sits in a WRAPPER — the glyph is a child of the box, not the
+   box itself — so without this it would take the icon step twice */
+.pathbar__back-ico > .fa{ font-size:1em; }
 
 /* ---- route line: back link, then the trail beside it. It used to be a
    filled accent chip in monospace caps followed by a decorative rule fading
@@ -1319,15 +1336,27 @@ section{
    40px hit area so it stays thumb-sized on a phone without needing to look
    like a button to do it. */
 .pathbar{
+  /* The bar's own two measures, named once and read by both panes — rule 5
+     holds inside a component too, and these were three hand-typed pixel
+     values (a 14px gap, a 20px margin, a 40px height) that could only drift
+     apart the next time one of them was touched.
+     --bar-h is the one measure the space scale cannot supply: it is not a
+     distance, it is the thumb target the way-up link has to keep. */
+  --bar-gap:var(--s-3);
+  --bar-h:40px;
   display:flex; flex-flow:row wrap; align-items:center;
-  gap:var(--s-2) 14px; margin-bottom:20px; min-width:0;
+  /* one gap, both axes: the two panes are one object, side by side on a
+     desktop and stacked on a phone, and an object does not change how far
+     apart it holds itself just because it wrapped */
+  gap:var(--bar-gap);
+  margin-bottom:var(--s-6);
+  min-width:0;
 }
 /* the trail's own pane. `fit-content` (not `100%`) is what makes it hug the
    path: the row is a flex line, so once the trail wraps onto a line of its
    own the pane would otherwise stretch the full width and float a two-word
    breadcrumb inside an empty bar. */
 .pathbar .crumb{
-  margin-bottom:0;
   flex:0 1 auto;
   width:fit-content;
   max-width:100%;
@@ -1341,10 +1370,12 @@ section{
 .pathbar__back{
   display:inline-flex;
   align-items:center;
-  gap:var(--s-3);
+  /* a mark and its label, the same relationship the trail's segments have
+     and therefore the same gap — see .crumb__seg */
+  gap:var(--s-2);
   flex:0 0 auto;
   max-width:100%;
-  min-height:40px;
+  min-height:var(--bar-h);
   padding:var(--s-3) 0;
   /* the way up is grey furniture like the trail beside it; the accent is
      kept for the hover, which IS a state (see the .crumb rules above) */
@@ -1386,7 +1417,6 @@ section{
     align-self:stretch;
     min-height:0;
     padding:var(--s-2) var(--s-4);
-    gap:var(--s-3);
     font-size:var(--fs-text-md);
     line-height:1.5;
     border:var(--hair) solid var(--line);
@@ -1403,18 +1433,6 @@ section{
 @media (hover: hover){
   .pathbar__back:hover .pathbar__back-txt{ text-decoration:underline; text-underline-offset:var(--s-1); }
 }
-/* a square flex box, so the chevron is centred by layout rather than by the
-   glyph's bearing inside its em box — that left it visibly high on phones,
-   where the button is tall enough for a pixel or two to show */
-.pathbar__back-ico{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width:1.15em; height:1.15em;
-  font-size:13px;
-  line-height:1;
-  flex:0 0 auto;
-}
 /* "Back to" is scaffolding for the album name that follows it; the name is
    the part worth reading, so only the name gets full contrast */
 .pathbar__back-lbl{ color:inherit; opacity:.75; }
@@ -1425,8 +1443,6 @@ section{
   font-weight:600;
   color:var(--text);
 }
-/* the chevron is furniture, at the same weight as the trail's marks */
-.pathbar__back-ico{ color:var(--text-ghost); transition:color var(--dur-1); }
 @media (hover: hover){
   .pathbar__back:hover .pathbar__back-ico{ color:var(--acc); }
 }
@@ -3312,10 +3328,9 @@ details[open] > summary::before{ content:"▾ "; }
      the accent comes back where it belongs — on the press. */
   .pathbar__back{
     display:inline-flex;
-    /* the same height as the trail pane under it — see .pathbar .crumb below */
-    min-height:38px;
-    padding:0 14px;
-    gap:var(--s-3);
+    /* the same height and the same side padding as the trail pane under it */
+    min-height:var(--bar-h);
+    padding:0 var(--s-4);
     border:var(--hair) solid var(--line-strong);
     background:var(--glass-hi);
     color:var(--text);
@@ -3338,7 +3353,9 @@ details[open] > summary::before{ content:"▾ "; }
   }
   /* a button label does not underline on press */
   .pathbar__back:hover .pathbar__back-txt{ text-decoration:none; }
-  .pathbar__back-ico{ font-size:14px; }
+  /* the marks carry the row once the labels are gone, so the whole bar's
+     icon box steps up together — one size, still (see .crumb__ico) */
+  .pathbar__back-ico{ width:1.45em; height:1.45em; }
   .section__head{ margin-bottom:var(--s-5); }
 
   /* pathbar on phones: the button takes the first row on its own, the trail
@@ -3382,23 +3399,35 @@ details[open] > summary::before{ content:"▾ "; }
      lines and the bar stood 107px tall before the album even started; this
      is one line, and it turns each shortcut from a 12px word into a square
      tap target. No name is lost: every step carries its own aria-label. */
-  .crumb{ font-size:var(--fs-text-md); gap:var(--s-1); flex-wrap:wrap; }
+  /* The spacing was upside down here: with the slashes gone the steps sat
+     4px apart while a mark sat 6px from its own label, so the row grouped
+     into the wrong things. A step is one step away from the next (--s-2)
+     and its mark sits half that from its label (--s-1) — the same
+     relationship the desktop gets from a wider gap with a slash inside it. */
+  .crumb{ font-size:var(--fs-text-md); gap:var(--s-2); flex-wrap:wrap; }
+  .crumb__seg{ gap:var(--s-1); }
   .crumb__seg:not(.crumb__seg--here):not(.crumb__seg--near) .crumb__lbl{
     display:none;
   }
+  /* a mark standing alone is still a target: --s-6 wide, and as tall as the
+     pane's inner box (the segments stretch), so the size comes from the bar
+     rather than from a number typed here */
   .crumb__seg:not(.crumb__seg--here):not(.crumb__seg--near){
     justify-content:center;
-    min-width:26px;
-    padding:0;
+    min-width:var(--s-6);
   }
-  .crumb__seg{ min-height:26px; }
   .crumb__ico{ width:1.45em; height:1.45em; }
   /* the marks are discrete boxes already — slashes between them only added
      width to a line that has to fit a phone */
   .crumb .sep{ display:none; }
-  /* the trail and the button above it are the same object in two rows, so
-     they are the same height: one 38px bar, then another. */
-  .pathbar .crumb{ min-height:38px; align-content:center; padding:var(--s-1) var(--s-3); }
+  /* The trail and the button above it are the same object in two rows, so
+     they are one height and carry the same side padding. Both read --bar-h;
+     neither owns it. */
+  .pathbar .crumb{
+    min-height:var(--bar-h);
+    align-items:stretch;
+    padding:var(--s-1) var(--s-4);
+  }
 }
 @media (max-width:480px){
   .nav__brand .brand-text{ display:none; }
@@ -6033,9 +6062,11 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease
 /* ---- micro-interactions (CSS-only, so gated on the OS preference
    rather than the JS fx-anim class) ---- */
 @media (prefers-reduced-motion: no-preference){
-  /* back button: chevron leans into "back" */
-  .pathbar__back-ico{ transition:transform var(--dur-1) ease; }
-  .pathbar__back:hover .pathbar__back-ico{ transform:translateX(-3px); }
+  /* back button: chevron leans into "back". The independent `translate`,
+     not `transform` — the box is a flex child that may carry a transform of
+     its own, and 3px was off the space scale besides. */
+  .pathbar__back-ico{ transition:translate var(--dur-1) ease, color var(--dur-1); }
+  .pathbar__back:hover .pathbar__back-ico{ translate:calc(-1 * var(--s-0)); }
 
   /* stage arrows lean into their direction */
   .nav-arrow.prev:hover{ transform:translateY(-50%) translateX(-2px); }
@@ -6355,7 +6386,7 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
   .btn-link:hover{ transform:none; }
   .nav-arrow.prev:hover,
   .nav-arrow.next:hover{ transform:translateY(-50%); }
-  .pathbar__back:hover .pathbar__back-ico{ transform:none; }
+  .pathbar__back:hover .pathbar__back-ico{ translate:none; }
 
   /* --- the last two ancestor-restyles-a-descendant hovers on the site.
      They only change a colour, so they were easy to miss when this block
@@ -6381,7 +6412,7 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
 
 /* leading icon: sized a touch under the cap height of the label so it
    reads as a marker, not a second word */
-.fa{ font-size:.92em; }
+.fa{ font-size:var(--fs-ico); }
 
 /* --- generic label pairings -------------------------------------------- */
 .btn-link > .fa,
@@ -6423,8 +6454,9 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
 
 /* --- chevrons that replaced ‹ › ---------------------------------------- */
 /* these buttons were sized around a 13-22px punctuation glyph; a chevron
-   at the same px reads much heavier, so it is dialled back per control */
-.pathbar__back-ico > .fa{ font-size:11px; }
+   at the same px reads much heavier, so it is dialled back per control.
+   The route line is not in this list: its chevron is sized by the bar's own
+   icon box, the same one the trail's marks sit in (see .crumb__ico). */
 .nav-arrow > .fa{ font-size:15px; }
 .lightbox__nav > .fa{ font-size:20px; }
 .lightbox__close > .fa{ font-size:17px; }
