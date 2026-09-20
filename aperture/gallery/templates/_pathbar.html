@@ -60,9 +60,11 @@
           {%- else %}<i class="fa {{ glyph }} crumb__ico" aria-hidden="true"></i>{% endif -%}
           <b class="crumb__lbl">{{ seg.name }}</b></span>
         {%- else %}
-        {#- the label is hidden on a phone (the mark stands alone there), so the
-            name is carried by aria-label too, not by the text node only -#}
-        <a class="crumb__seg" href="{{ seg.url }}" aria-label="{{ seg.name }}">
+        {#- --near is the step DIRECTLY above you: on a phone it keeps its name
+            when the ones further up are down to their mark alone. Those hide
+            their label in CSS, so every step carries its name in aria-label
+            as well and not in the text node only. -#}
+        <a class="crumb__seg{% if loop.revindex == 2 %} crumb__seg--near{% endif %}" href="{{ seg.url }}" aria-label="{{ seg.name }}">
           {%- if seg.mark %}<img class="album-ico crumb__ico" src="{{ seg.mark }}" alt="" aria-hidden="true" width="14" height="14">
           {%- else %}<i class="fa {{ glyph }} crumb__ico" aria-hidden="true"></i>{% endif -%}
           <span class="crumb__lbl">{{ seg.name }}</span></a>

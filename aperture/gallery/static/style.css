@@ -1249,11 +1249,21 @@ section{
   text-underline-offset:var(--s-1);
   transition:text-decoration-color var(--dur-1);
 }
-/* the step you are standing on: brightest label, no underline (it goes
-   nowhere), and the row's one accent on its mark */
-.crumb__seg--here{ color:var(--text); }
+/* The step you are standing on is marked the way every other "you are here"
+   in this sheet is marked — see .nav__lang-opt.is-active: a faint accent
+   face, an accent ring, and the label at --text. That is where the accent
+   belongs on this row, and it works whatever the mark is (an accent GLYPH
+   only works until an album brings its own emblem). Accent ON an accent
+   tint is the one thing the accent may not do, so the mark goes bright
+   here rather than purple. */
+.crumb__seg--here{
+  color:var(--text);
+  padding:var(--s-1) var(--s-3);
+  background:rgba(var(--acc-rgb),.12);
+  box-shadow:inset 0 0 0 var(--hair) rgba(var(--acc-rgb),.35);
+}
 .crumb__seg--here .crumb__lbl{ text-decoration:none; font-weight:500; }
-.crumb__seg--here .crumb__ico{ color:var(--acc); }
+.crumb__seg--here .crumb__ico{ color:var(--text); }
 /* a colour hover REPAINTS, so it costs a phone the first tap — see the note
    at .pathbar__back:hover. Gated on a real pointer, like every other one. */
 @media (hover: hover){
@@ -3302,7 +3312,8 @@ details[open] > summary::before{ content:"▾ "; }
      the accent comes back where it belongs — on the press. */
   .pathbar__back{
     display:inline-flex;
-    min-height:36px;
+    /* the same height as the trail pane under it — see .pathbar .crumb below */
+    min-height:38px;
     padding:0 14px;
     gap:var(--s-3);
     border:var(--hair) solid var(--line-strong);
@@ -3365,26 +3376,29 @@ details[open] > summary::before{ content:"▾ "; }
   .kv dt{ font-size:var(--fs-text-sm); }
   .kv dd{ font-size:var(--fs-text-sm); }
   .raw-exif{ font-size:var(--fs-chrome-sm); max-height:240px; padding:var(--s-3) 10px; }
-  /* On a phone the trail says WHERE YOU ARE, not what everything above you is
-     called: the button over it already names the parent in full, and the steps
-     further up are shortcuts you take by their mark. So they drop their labels
-     and keep only the mark — and the step you are standing on keeps its name.
-     That is the height fix: with labels the trail wrapped onto two and three
-     lines and the bar stood 107px tall before the album even started. It also
-     turns each shortcut from a 12px word into a square tap target.
-     The names are not lost — each link carries its own aria-label. */
-  .crumb{ font-size:var(--fs-text-md); gap:var(--s-2); flex-wrap:wrap; }
-  .crumb__seg:not(.crumb__seg--here) .crumb__lbl{ display:none; }
-  .crumb__seg:not(.crumb__seg--here){
-    justify-content:center;
-    min-width:30px; min-height:30px;
-    padding:0 var(--s-1);
+  /* On a phone the trail keeps the END of the path in words — where you are
+     and the step directly above it — and everything further up comes down to
+     its mark. With every step labelled the trail wrapped onto two and three
+     lines and the bar stood 107px tall before the album even started; this
+     is one line, and it turns each shortcut from a 12px word into a square
+     tap target. No name is lost: every step carries its own aria-label. */
+  .crumb{ font-size:var(--fs-text-md); gap:var(--s-1); flex-wrap:wrap; }
+  .crumb__seg:not(.crumb__seg--here):not(.crumb__seg--near) .crumb__lbl{
+    display:none;
   }
-  .crumb__ico{ width:1.5em; height:1.5em; }
+  .crumb__seg:not(.crumb__seg--here):not(.crumb__seg--near){
+    justify-content:center;
+    min-width:26px;
+    padding:0;
+  }
+  .crumb__seg{ min-height:26px; }
+  .crumb__ico{ width:1.45em; height:1.45em; }
   /* the marks are discrete boxes already — slashes between them only added
      width to a line that has to fit a phone */
   .crumb .sep{ display:none; }
-  .pathbar .crumb{ padding:var(--s-1) var(--s-3); }
+  /* the trail and the button above it are the same object in two rows, so
+     they are the same height: one 38px bar, then another. */
+  .pathbar .crumb{ min-height:38px; align-content:center; padding:var(--s-1) var(--s-3); }
 }
 @media (max-width:480px){
   .nav__brand .brand-text{ display:none; }

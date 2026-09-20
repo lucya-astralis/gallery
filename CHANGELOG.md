@@ -29,21 +29,23 @@ The location bar reads as a path again.
   photo a picture, a search its magnifier. An album with its own emblem
   (`album.cfg` `icon =`) still shows that instead, so the trail is scanned
   rather than read.
-* **The trail is grey again.** It used to be accent-purple end to end, which
-  said *state* on a line where nothing had any. The steps above you are dim,
-  the step you are on is bright, and the accent appears exactly once on the
-  row: on the mark of where you are. Tappable is carried by the hairline
-  under each label, which lights up on hover.
+* **The trail is grey again, and the accent marks one thing.** It used to be
+  accent-purple end to end, which said *state* on a line where nothing had
+  any. The steps above you are dim, tappable by the hairline under each label
+  that lights up on hover — and the step you are standing on is an accent
+  chip, the same faint face and accent ring that marks the selected language
+  up in the header. It reads as *here* whatever the step's mark is.
 * **The back button follows it.** Quiet grey on a desktop with the accent on
   the hover border; on a phone it stays a thumb-sized button but is filled
   with glass rather than an accent tint, and the accent comes back on the
   press.
-* **On a phone it is one line.** The button above the trail already names the
-  parent in full, so up there the steps keep only their mark and the step you
-  are standing on keeps its name. A path that wrapped onto two and three lines
-  now fits on one, each shortcut is a square tap target instead of a 12px
-  word, and the bar is a quarter shorter before the album starts. The names
-  are not lost — every step carries its own `aria-label`.
+* **On a phone it is one line, and both rows are one height.** The end of the
+  path stays in words — where you are and the step directly above it — and
+  everything further up comes down to its mark. A path that wrapped onto two
+  and three lines now fits on one, each mark is a square tap target instead of
+  a 12px word, and the bar is a quarter shorter before the album starts. The
+  back button and the trail are the same 38px, the way they already were on a
+  desktop. No name is lost — every step carries its own `aria-label`.
 * **One definition for all five pages.** The bar is a macro now
   (`_pathbar.html`) instead of the same markup copied into the album, photo,
   index, search and statistics templates.
