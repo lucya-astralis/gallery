@@ -3365,9 +3365,26 @@ details[open] > summary::before{ content:"▾ "; }
   .kv dt{ font-size:var(--fs-text-sm); }
   .kv dd{ font-size:var(--fs-text-sm); }
   .raw-exif{ font-size:var(--fs-chrome-sm); max-height:240px; padding:var(--s-3) 10px; }
-  /* breadcrumb link styling is shared with the base now; on small screens just
-     shrink the type and tighten the gaps. */
-  .crumb{ font-size:var(--fs-text-md); gap:var(--s-2) var(--s-3); flex-wrap:wrap; }
+  /* On a phone the trail says WHERE YOU ARE, not what everything above you is
+     called: the button over it already names the parent in full, and the steps
+     further up are shortcuts you take by their mark. So they drop their labels
+     and keep only the mark — and the step you are standing on keeps its name.
+     That is the height fix: with labels the trail wrapped onto two and three
+     lines and the bar stood 107px tall before the album even started. It also
+     turns each shortcut from a 12px word into a square tap target.
+     The names are not lost — each link carries its own aria-label. */
+  .crumb{ font-size:var(--fs-text-md); gap:var(--s-2); flex-wrap:wrap; }
+  .crumb__seg:not(.crumb__seg--here) .crumb__lbl{ display:none; }
+  .crumb__seg:not(.crumb__seg--here){
+    justify-content:center;
+    min-width:30px; min-height:30px;
+    padding:0 var(--s-1);
+  }
+  .crumb__ico{ width:1.5em; height:1.5em; }
+  /* the marks are discrete boxes already — slashes between them only added
+     width to a line that has to fit a phone */
+  .crumb .sep{ display:none; }
+  .pathbar .crumb{ padding:var(--s-1) var(--s-3); }
 }
 @media (max-width:480px){
   .nav__brand .brand-text{ display:none; }

@@ -60,7 +60,9 @@
           {%- else %}<i class="fa {{ glyph }} crumb__ico" aria-hidden="true"></i>{% endif -%}
           <b class="crumb__lbl">{{ seg.name }}</b></span>
         {%- else %}
-        <a class="crumb__seg" href="{{ seg.url }}">
+        {#- the label is hidden on a phone (the mark stands alone there), so the
+            name is carried by aria-label too, not by the text node only -#}
+        <a class="crumb__seg" href="{{ seg.url }}" aria-label="{{ seg.name }}">
           {%- if seg.mark %}<img class="album-ico crumb__ico" src="{{ seg.mark }}" alt="" aria-hidden="true" width="14" height="14">
           {%- else %}<i class="fa {{ glyph }} crumb__ico" aria-hidden="true"></i>{% endif -%}
           <span class="crumb__lbl">{{ seg.name }}</span></a>

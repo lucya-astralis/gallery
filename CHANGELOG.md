@@ -38,6 +38,12 @@ The location bar reads as a path again.
   the hover border; on a phone it stays a thumb-sized button but is filled
   with glass rather than an accent tint, and the accent comes back on the
   press.
+* **On a phone it is one line.** The button above the trail already names the
+  parent in full, so up there the steps keep only their mark and the step you
+  are standing on keeps its name. A path that wrapped onto two and three lines
+  now fits on one, each shortcut is a square tap target instead of a 12px
+  word, and the bar is a quarter shorter before the album starts. The names
+  are not lost — every step carries its own `aria-label`.
 * **One definition for all five pages.** The bar is a macro now
   (`_pathbar.html`) instead of the same markup copied into the album, photo,
   index, search and statistics templates.
