@@ -18,6 +18,24 @@ notes are never one commit apart.
 
 ---
 
+## 1.11.3 — 2026-09-23
+
+Both surfaces caught up with the rules Nebula wrote down since 1.11.2.
+
+**Fixed**
+
+* **`hidden` always hides.** One base rule in each sheet now beats every
+  component's own `display`, instead of a `[hidden]` line per component —
+  anything a script hides is gone from the screen and the tab order, not
+  only the handful that had remembered their line.
+* **The console's toast reports; it no longer wears the accent.** Its edge
+  is grey, a warning finally shows amber instead of falling back to the
+  accent, and every toast carries a glyph as well as its colour.
+* **The touch target and the door's width are tokens** (`--tap`,
+  `--door-w`), and the sign-in button is 44px tall on a desktop too.
+
+---
+
 ## 1.11.2 — 2026-09-23
 
 The console's door, held to the Nebula rules written down for it.

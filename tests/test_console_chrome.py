@@ -39,10 +39,10 @@ def test_the_boot_screen_is_hidden_until_a_script_shows_it(console):
     assert re.search(r'<div class="boot" id="boot" hidden>', page)
 
     sheet = console.get("/static/style.css").text
-    assert ".boot[hidden] { display: none; }" in sheet
-    # every other overlay in this sheet earns the same line
-    for cls in (".modal", ".toast", ".scrim"):
-        assert cls + "[hidden] { display: none; }" in sheet
+    # NEBULA's "hidden wins": one base rule, strong enough to beat every
+    # component's own display -- the boot screen, the modal, the toast and
+    # the scrim all ride it rather than a line each.
+    assert "[hidden] { display: none !important; }" in sheet
 
 
 def test_nothing_of_the_tool_shows_behind_the_boot_screen(console):

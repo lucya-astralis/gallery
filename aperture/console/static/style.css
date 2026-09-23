@@ -367,6 +367,10 @@
   /* The one breakpoint the language owns. This sheet has others of its own
      (the album tree collapses at 900px); it may not disagree about this one. */
   --bp-narrow:   760px;
+  /* The one touch target, and the sign-in card's one readable column. A
+     submit button on the door is 44px on a desktop too. */
+  --tap:         44px;
+  --door-w:      420px;
 
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -455,6 +459,14 @@ html.fx-lite {
 }
 
 * { box-sizing: border-box; }
+
+/* `hidden` is a statement about the DOM and it has to WIN (NEBULA rule 1,
+   "hidden wins"). Every component here sets its own display, and each of
+   them beats the bare attribute on specificity -- which is how a boot screen
+   that ignores `hidden` ends up on top of the console on every load after
+   the first. The one !important in the sheet, and it is what the attribute
+   already means, so no component needs its own `X[hidden]` line. */
+[hidden] { display: none !important; }
 
 html, body { height: 100%; margin: 0; padding: 0; }
 
@@ -716,13 +728,6 @@ html.is-booting .openbar { opacity: 0; }
   /* the hand-off, and the only thing about this screen that transitions */
   transition: opacity var(--boot-fade) var(--ease);
 }
-/* The house rule, and this screen is the one that cannot do without it: a
-   class that sets `display` beats the browser's own [hidden] rule, and a
-   boot screen that ignores `hidden` is a boot screen that is on top of the
-   console on every load AFTER the first one -- once per session is the
-   whole point, and the second load is when the script returns early and
-   leaves nothing to take it away again. */
-.boot[hidden] { display: none; }
 .boot.is-done { opacity: 0; pointer-events: none; }
 @keyframes bootScan {
   from { background-position: 0 0, 0 0, center; }
@@ -1035,7 +1040,6 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   -webkit-backdrop-filter: var(--scrim-blur);
 }
 
-.scrim[hidden] { display: none; }
 
 .pane {
   min-height: 0;
@@ -1364,7 +1368,6 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 }
 
 .tabpanel { padding-top: 20px; padding-bottom: 36px; }
-.tabpanel[hidden] { display: none; }
 
 /* ----- fields ---------------------------------------------------------- */
 /* Every key used to be a full-width row with its label in a 210px column, so
@@ -2061,7 +2064,6 @@ select option { background: var(--surface); color: var(--text); }
 
 /* ----- modal ----------------------------------------------------------- */
 .modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; }
-.modal[hidden] { display: none; }
 
 .modal__backdrop { position: absolute; inset: 0; background-color: var(--scrim-hi); backdrop-filter: var(--scrim-blur); -webkit-backdrop-filter: var(--scrim-blur); }
 
@@ -2123,7 +2125,10 @@ select option { background: var(--surface); color: var(--text); }
   letter-spacing: .08em;
 }
 
-/* ----- toast ----------------------------------------------------------- */
+/* ----- toast -----------------------------------------------------------
+   A toast REPORTS; it does not mark a state (NEBULA, "the controls the sheet
+   now owns"). So its edge is --chrome, not the accent, and the kinds are
+   statuses -- each with a glyph as well as its colour, set by toast(). */
 .toast {
   position: fixed;
   bottom: 26px;
@@ -2134,7 +2139,7 @@ select option { background: var(--surface); color: var(--text); }
   border-radius: var(--radius);
   background: var(--surface-2);
   border: var(--hair) solid var(--line-strong);
-  border-left: 2px solid var(--acc);
+  border-left: 2px solid var(--chrome);
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
   letter-spacing:var(--tr-chrome-lg);
@@ -2143,9 +2148,10 @@ select option { background: var(--surface); color: var(--text); }
   box-shadow: 0 14px 40px -12px rgba(0, 0, 0, .85);
 }
 
-.toast[hidden] { display: none; }
-.toast.is-ok  { border-left-color: var(--ok);  color: var(--ok); }
-.toast.is-err { border-left-color: var(--red); color: var(--red); }
+.toast.is-ok   { border-left-color: var(--ok);  color: var(--ok); }
+.toast.is-warn { border-left-color: var(--amb); color: var(--amb); }
+.toast.is-err  { border-left-color: var(--red); color: var(--red); }
+.toast > .fa   { margin-right: var(--s-2); }
 
 /* ----- footer ---------------------------------------------------------- */
 /* The gallery's footer, kept as a bar because this is an app shell rather
@@ -2877,7 +2883,7 @@ img.is-broken { opacity: .2; }
   padding: var(--s-5);
 }
 
-.login { width: 100%; max-width: 420px; }
+.login { width: 100%; max-width: var(--door-w); }
 
 .login__card {
   display: flex;
@@ -2932,7 +2938,7 @@ img.is-broken { opacity: .2; }
 }
 .login__error > .fa { flex: none; }
 
-.login__submit { margin-top: var(--s-3); }
+.login__submit { margin-top: var(--s-3); min-height: var(--tap); }
 
 .login__foot {
   color: var(--text-ghost);
@@ -2998,8 +3004,6 @@ img.is-broken { opacity: .2; }
   letter-spacing: .1em;
   text-transform: uppercase;
 }
-.login__caps[hidden] { display: none; }
-.login__error[hidden] { display: none; }
 
 /* The way out. Signing in is a full page load — the console is a different
    document — and a hard navigation flashes. So the card leaves under its own

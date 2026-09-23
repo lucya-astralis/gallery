@@ -673,6 +673,9 @@
      column, the bar sheds its middle and touch targets grow. The sheet may
      add its own; it may not disagree about this one. */
   --bp-narrow:  760px;
+  /* The one touch target: 44px, on a desktop too -- a control a thumb has to
+     find is that big wherever it is. */
+  --tap:        44px;
 }
 
 /* ==================================================================
@@ -887,6 +890,14 @@ html.fx-anim.is-live-loading [data-live]{
   .is-live-loading [data-live]{ transition:none; }
   html.fx-anim.is-live-loading [data-live]{ transition:none; }
 }
+
+/* `hidden` is a statement about the DOM and it has to WIN (NEBULA rule 1,
+   "hidden wins"). Every component here sets its own display, and each of
+   them beats the bare attribute on specificity, which leaves an element the
+   markup calls hidden on screen with its controls still in the tab order.
+   The one !important in the sheet, and it is what the attribute already
+   means -- so no component needs its own `X[hidden]` line. */
+[hidden]{ display:none !important; }
 
 a{ color:inherit; text-decoration:none; }
 a:hover{ color:var(--acc); }
@@ -2045,7 +2056,6 @@ section{
   backdrop-filter:var(--overlay-blur);
   -webkit-backdrop-filter:var(--overlay-blur);
 }
-.sort__menu[hidden]{ display:none; }
 .sort__head{
   padding:var(--s-3) 14px var(--s-2);
   font-family:var(--mono);
@@ -3068,7 +3078,7 @@ section{
   position:absolute;
   top:50%;
   transform:translateY(-50%);
-  width:44px; height:64px;
+  width:var(--tap); height:64px;
   display:flex; align-items:center; justify-content:center;
   font-family:inherit;
   font-size:22px;
@@ -3550,7 +3560,6 @@ html.fx-anim .stage.is-spa-loading.is-leaving-prev img{ transform:translate3d(18
   touch-action:manipulation;
   overscroll-behavior:contain;
 }
-.lightbox[hidden]{ display:none; }
 body.lightbox-open{ overflow:hidden; }
 
 .lightbox__stage{
@@ -5382,9 +5391,8 @@ body.page-welcome{ --page-max: 2400px; }
 /* live weather: a small readout with its own left rule — glyph,
    temperature, then the condition underneath. Entirely grey: the sky over
    Sapporo is not a state of the itinerary, and a second palette here was
-   what made the panel unreadable. The [hidden] no-JS / no-data state must
-   beat the display below. */
-.trip__stop-wx[hidden]{ display:none; }
+   what made the panel unreadable. Its [hidden] no-JS / no-data state
+   is the base rule's. */
 .trip__stop-wx{
   display:flex; flex-direction:column; gap:var(--s-1); min-width:0;
   padding-left:var(--s-3);
@@ -5408,7 +5416,6 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__stop-wx[data-wx-kind="snow"]  .trip__stop-wx-ico{ color:var(--trip-cool); }
 .trip__stop-wx[data-wx-kind="storm"] .trip__stop-wx-ico{ color:var(--trip-warm); }
 /* today's envelope trails the current reading, one step quieter */
-.trip__stop-wx-range[hidden]{ display:none; }
 .trip__stop-wx-range{
   flex:0 0 auto;
   font-size:.62em; font-weight:400; letter-spacing:var(--tr-chrome-xl);

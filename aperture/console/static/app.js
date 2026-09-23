@@ -106,9 +106,14 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+/* A status is a glyph as well as a colour -- hue alone never says anything. */
+const TOAST_GLYPH = {
+  ok: 'fa-circle-check', warn: 'fa-triangle-exclamation', err: 'fa-circle-exclamation',
+};
+
 function toast(message, kind = 'ok') {
   const box = $('#toast');
-  box.textContent = message;
+  box.replaceChildren(ico(TOAST_GLYPH[kind] || 'fa-circle-info'), message);
   box.className = 'toast is-' + kind;
   box.hidden = false;
   clearTimeout(toast._t);
