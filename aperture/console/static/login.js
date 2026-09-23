@@ -18,11 +18,13 @@
   const submit = document.getElementById('login-submit');
   const card = document.querySelector('.login__card');
   if (!form || !field) return;
+  // the words, not the line: the line also holds the glyph
+  const errorText = error.querySelector('.login__error-text') || error;
 
   const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function fail(message) {
-    error.textContent = message;
+    errorText.textContent = message;
     error.hidden = false;
     field.select();
     field.focus();
@@ -83,7 +85,7 @@
     field.disabled = true;
     const paint = () => {
       submitLabel.textContent = 'Locked — ' + left + 's';
-      error.textContent = 'Too many attempts. The door is shut for a moment.';
+      errorText.textContent = 'Too many attempts. The door is shut for a moment.';
       error.hidden = false;
     };
     paint();
@@ -113,6 +115,27 @@
     }
   });
 
+  /* ----- the way out -----------------------------------------------------
+   * The navigation waits for the card's own fade to END. It used to fire on a
+   * hand-typed 300 ms while the fade ran for --boot-fade (.45s), so the card
+   * was cut off two thirds of the way out. transitionend is the signal; the
+   * token's own duration plus a margin is the net for a browser that never
+   * sends one (a hidden tab does not run transitions at all). */
+  function leave() {
+    let gone = false;
+    const go = () => {
+      if (gone) return;
+      gone = true;
+      window.location.replace('/');
+    };
+    card.addEventListener('transitionend', (event) => {
+      if (event.target === card && event.propertyName === 'opacity') go();
+    });
+    const fade = parseFloat(getComputedStyle(card).transitionDuration) || 0;
+    setTimeout(go, fade * 1000 + 150);
+    card.classList.add('is-out');
+  }
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (ticking) return;                 // shut is shut
@@ -130,8 +153,7 @@
          * document swap. replace(), not assign(): the login page has no
          * business in the history stack that Back walks through. */
         if (card && !REDUCED) {
-          card.classList.add('is-out');
-          setTimeout(() => window.location.replace('/'), 300);
+          leave();
         } else {
           window.location.replace('/');
         }

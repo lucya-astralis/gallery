@@ -215,8 +215,27 @@ def test_the_door_hands_over_to_the_boot_screen(console):
     first, so the hand-off is a fade and not a document swap's white flash."""
     js = console.get("/static/login.js").text
     assert "card.classList.add('is-out')" in js
+    # and the page is replaced when the fade has ENDED, not on a hand-typed
+    # number that disagrees with --boot-fade
+    assert "transitionend" in js
+    assert "setTimeout(() => window.location.replace('/'), 300)" not in js
     sheet = console.get("/static/style.css").text
     assert ".login__card.is-out" in sheet
+
+
+def test_the_door_refuses_with_a_glyph_not_only_red(console):
+    """Nebula rule 6: never state by hue alone. The refusal carries a glyph,
+    and the script writes into the text span so the glyph survives."""
+    from aperture.console import security
+    security.set_password("a-test-password")
+    try:
+        page = console.get("/login").text
+    finally:
+        security.clear_password()
+        security.reset()
+    assert 'id="login-error" role="alert" hidden><i class="fa fa-circle-exclamation"' in page
+    js = console.get("/static/login.js").text
+    assert "error.textContent" not in js
 
 
 def test_the_door_wears_the_mark_but_does_not_build_it(console):

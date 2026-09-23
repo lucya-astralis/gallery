@@ -2920,12 +2920,17 @@ img.is-broken { opacity: .2; }
 }
 
 /* The one place in the tool where a message is --red: a refused
-   sign-in is a state the operator has to act on, not a note. */
+   sign-in is a state the operator has to act on, not a note. The glyph in
+   front of it is what still says so without the red. */
 .login__error {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
   color: var(--red);
   font-size:var(--fs-text-sm);
   margin: 0;
 }
+.login__error > .fa { flex: none; }
 
 .login__submit { margin-top: var(--s-3); }
 

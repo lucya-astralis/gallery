@@ -18,6 +18,19 @@ notes are never one commit apart.
 
 ---
 
+## 1.11.2 — 2026-09-23
+
+The console's door, held to the Nebula rules written down for it.
+
+**Fixed**
+
+* **A refused sign-in says so without the red.** The error line carries a
+  warning glyph in front of the words, so it still reads as a refusal in
+  forced colours or to anyone who cannot tell red from grey.
+* **Signing in no longer cuts the card off mid-fade.** The page used to move
+  on after a fixed 300 ms while the card's fade ran for 450; it now waits for
+  the fade to finish, with the fade's own duration as the fallback.
+
 ## 1.11.1 — 2026-09-23
 
 The viewer's bar fits a phone.

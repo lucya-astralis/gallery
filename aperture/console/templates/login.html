@@ -78,7 +78,10 @@
         Caps Lock is on.
       </p>
 
-      <p class="login__error" id="login-error" role="alert" hidden></p>
+      {# Red AND a glyph: a refusal is never told by hue alone (Nebula rule 6).
+         The script writes the words into the span, never into the <p>, or the
+         glyph goes with them. #}
+      <p class="login__error" id="login-error" role="alert" hidden><i class="fa fa-circle-exclamation" aria-hidden="true"></i><span class="login__error-text"></span></p>
 
       <button type="submit" class="btn btn--primary login__submit" id="login-submit">
         <i class="fa fa-right-to-bracket" aria-hidden="true"></i><span class="login__submit-label">Sign in</span>
