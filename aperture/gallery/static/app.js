@@ -1984,6 +1984,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeBtn = document.getElementById('lb-close');
   const fullBtn = document.getElementById('lb-full');
   const dlBtn = document.getElementById('lb-dl');
+  // the label, not the button: textContent on the button would drop its icon
+  const fullTxt = document.getElementById('lb-full-txt');
   const bar = lb.querySelector('.lightbox__bar');
 
   // mutable state — refreshed whenever the underlying #album-data changes
@@ -2105,7 +2107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     countEl.textContent = String(index + 1).padStart(2, '0') + ' / ' + String(total).padStart(2, '0');
     dlBtn.href = relToFull(rel);
     dlBtn.setAttribute('download', filename);
-    fullBtn.textContent = TXT.loadOriginal;
+    fullTxt.textContent = TXT.loadOriginal;
     bar.classList.remove('is-loading-full', 'is-full');
     showingFull = false;
 
@@ -2272,7 +2274,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const rel = rels[index];
     const fullUrl = relToFull(rel);
     bar.classList.add('is-loading-full');
-    fullBtn.textContent = TXT.loading;
+    fullTxt.textContent = TXT.loading;
     const full = new Image();
     full.onload = () => {
       imgEl.src = fullUrl;
@@ -2282,7 +2284,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     full.onerror = () => {
       bar.classList.remove('is-loading-full');
-      fullBtn.textContent = TXT.errRetry;
+      fullTxt.textContent = TXT.errRetry;
     };
     full.src = fullUrl;
   });

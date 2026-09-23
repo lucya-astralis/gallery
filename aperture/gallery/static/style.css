@@ -3732,26 +3732,31 @@ body.lightbox-open{ overflow:hidden; }
   .lightbox__nav--prev{ left:var(--s-2); }
   .lightbox__nav--next{ right:var(--s-2); }
   .lightbox__close{ width:36px; height:36px; font-size:14px; top:var(--s-3); right:var(--s-3); }
+  /* phones: the bar spans the screen instead of floating as a narrow box,
+     and it is a grid, not a wrapping flex row — the file name gets the top
+     row to itself (order:-1 lifts it above the counter), the counter and the
+     two buttons share ONE row below, so Download never drops to a third row
+     and no row ends in a dead cell. */
   .lightbox__bar{
-    bottom:var(--s-3);
-    flex-wrap:wrap;
-    font-size:var(--fs-text-sm);
-    letter-spacing:var(--tr-text);
-    max-width: calc(100% - 16px);
+    left:var(--s-2); right:var(--s-2);
+    bottom:max(var(--s-3), env(safe-area-inset-bottom, 0px));
+    transform:none;
+    display:grid;
+    grid-template-columns:auto 1fr 1fr;
+    max-width:none;
   }
-  /* phones: the bar wraps into two rows — the file name gets the top one to
-     itself (order:-1 lifts it above the counter), the counter and the two
-     buttons share the row below. Beats a 62vw sliver fighting the buttons. */
   .lightbox__title{
     order:-1;
-    flex:1 1 100%;
+    grid-column:1 / -1;
     max-width:none;
-    padding:var(--s-3) 10px;
+    padding:var(--s-3) 12px;
     border-right:0;
     border-bottom:var(--hair) solid var(--line);
   }
-  .lightbox__count{ padding:var(--s-3) 10px; }
-  .lightbox__btn{ padding:var(--s-3) 10px; }
+  .lightbox__count{ padding:var(--s-3) 12px; }
+  .lightbox__btn{ padding:var(--s-3) 10px; justify-content:center; }
+  /* once the original is in, its button leaves and Download takes both cells */
+  .lightbox__bar.is-full #lb-dl{ grid-column:2 / -1; }
 }
 
 /* trigger affordance on stage image */

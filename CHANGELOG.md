@@ -18,6 +18,23 @@ notes are never one commit apart.
 
 ---
 
+## 1.11.1 — 2026-09-23
+
+The viewer's bar fits a phone.
+
+**Fixed**
+
+* **The lightbox bar on a phone.** It floated as a narrow box in the middle
+  of the screen and wrapped into three rows, with Download alone on the last
+  one and a dead cell beside the counter. It now spans the screen in two
+  rows: the file name on top, the counter, Load original and Download
+  side by side below — and once the original is in, Download takes the
+  whole row. It also clears the home indicator.
+* **Load original keeps its icon.** Opening a photo in the viewer replaced
+  the button's whole content with its label and dropped the icon.
+
+---
+
 ## 1.11.0 — 2026-09-23
 
 Every gallery says which aperture it runs, and the update check asks
