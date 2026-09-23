@@ -53,11 +53,12 @@ REPO_URL = "https://github.com/lucya-astralis/gallery"
 MAKER_NAME = "lucya.sh"
 MAKER_URL = "https://lucya.sh"
 
-# Where a running aperture asks whether there is a newer one: a small JSON file
-# the maker publishes (tools/build_update_manifest.py writes it). The console
-# shows the answer and aperture/update_check.py is the whole of it; UPDATE_CHECK=0
-# turns it off and UPDATE_URL points it elsewhere.
-UPDATE_URL = f"{MAKER_URL}/aperture/latest.json"
+# Where a running aperture asks whether there is a newer one: the maker's own
+# gallery, which always runs the newest release and says so at /api/version
+# like every gallery does. The console shows the answer and
+# aperture/update_check.py is the whole of it; UPDATE_CHECK=0 turns it off and
+# UPDATE_URL points it elsewhere.
+UPDATE_URL = "https://images.lucya.sh/api/version"
 
 # Aperture's own release version — THE one place it is written. The nav, the
 # footer, /humans.txt, X-Powered-By, <meta name="generator">, the EXIF
@@ -75,7 +76,7 @@ UPDATE_URL = f"{MAKER_URL}/aperture/latest.json"
 # the configurator were two programs, this is one, and a version is a promise
 # about a thing. Distinct from API_VERSION (gallery/api.py), which versions the
 # JSON API contract and did NOT reset — the endpoints kept their shape.
-VERSION = "1.10.0"
+VERSION = "1.11.0"
 
 # One-line form, shared by <meta name="generator">, the X-Powered-By header
 # and the EXIF `Software` tag so all three can never drift apart.

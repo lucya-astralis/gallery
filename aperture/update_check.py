@@ -1,14 +1,16 @@
 """Is there a newer aperture than this one?
 
-The maker publishes one small JSON file next to their site (brand.UPDATE_URL):
+Every gallery says which aperture it runs, publicly, at /api/version:
 
     {"version": "1.8.0", "date": "2026-09-15",
-     "url": "https://github.com/lucya-astralis/gallery/blob/main/CHANGELOG.md",
+     "url": "https://github.com/lucya-astralis/gallery/blob/main/CHANGELOG.md#...",
      "notes": "One sentence on what the release is."}
 
-`python tools/build_update_manifest.py` writes it from VERSION and the newest
-CHANGELOG.md entry, so publishing a release is copying that file up. Only
-`version` is required; the rest is shown when it is there.
+`manifest()` builds it from VERSION and the newest CHANGELOG.md entry. The
+maker's own gallery (brand.UPDATE_URL, images.lucya.sh) always runs the newest
+release, so its answer IS the latest one -- there is no file to publish and
+nothing to forget after a push. Only `version` is required of an answer; the
+rest is shown when it is there.
 
 The SERVER asks, never the browser. The console's CSP connects nowhere but
 itself and stays that way, one answer serves every open tab, and the request
@@ -24,11 +26,13 @@ else. UPDATE_CHECK=0 turns it off; UPDATE_URL points it somewhere else.
 
 from __future__ import annotations
 
+import functools
 import json
 import re
 import threading
 import time
 import urllib.request
+from pathlib import Path
 
 from . import brand
 from .runtime import settings
@@ -45,6 +49,11 @@ MAX_NOTES = 280
 
 _VERSION = re.compile(r"\d+\.\d+\.\d+")
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+# The release notes this build ships with; the Dockerfile copies them next to
+# the package. The console's Changelog place renders the same file.
+CHANGELOG_PATH = Path(__file__).resolve().parent.parent / "CHANGELOG.md"
+_HEADING = re.compile(r"^## (\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})\s*$", re.M)
 
 _lock = threading.Lock()
 _last: dict | None = None
@@ -82,6 +91,36 @@ def read_manifest(payload) -> dict:
         "url": url if isinstance(url, str) and url.startswith("https://") else None,
         "notes": notes,
     }
+
+
+def _anchor(heading: str) -> str:
+    """GitHub's anchor for a heading: lowercase, punctuation out, spaces to
+    hyphens -- `1.8.0 — 2026-09-15` -> `180--2026-09-15`."""
+    return re.sub(r"[^\w\- ]", "", heading.lower()).replace(" ", "-")
+
+
+@functools.cache
+def manifest() -> dict:
+    """What this copy runs, in the shape read_manifest() reads: VERSION, and
+    the date, link and one-line summary of its CHANGELOG.md entry (the test
+    net holds the two to each other). Without the file -- or with an entry for
+    another version -- it is the version alone."""
+    out = {"version": brand.VERSION, "date": None, "url": None, "notes": None}
+    try:
+        text = CHANGELOG_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return out
+    match = _HEADING.search(text)
+    if not match or match.group(1) != brand.VERSION:
+        return out
+    summary = text[match.end():].lstrip("\n").split("\n\n", 1)[0]
+    heading = match.group(0)[3:].strip()
+    out.update(
+        date=match.group(2),
+        url="%s/blob/main/CHANGELOG.md#%s" % (brand.REPO_URL, _anchor(heading)),
+        notes=" ".join(summary.split())[:MAX_NOTES] or None,
+    )
+    return out
 
 
 def _fetch(url: str):

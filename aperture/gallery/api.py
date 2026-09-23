@@ -9,7 +9,8 @@ import time
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from .. import albums, brand, branding, cfgio, config, db, i18n, photos, schema, theme, trips
+from .. import (albums, brand, branding, cfgio, config, db, i18n, photos, schema, theme,
+               trips, update_check)
 from ..runtime import settings
 from . import context, media
 
@@ -78,6 +79,7 @@ def api_trip_weather(trip: str):
 #   GET /api/showcase          featured photos (the original endpoint)
 #   GET /api/shuffle           random photos
 #   GET /api/trip-weather      trip stop conditions (see the trip section)
+#   GET /api/version           which aperture this is (other galleries' update check)
 API_VERSION = 2
 API_MAX_LIMIT = 200
 API_VARY = "Accept-Language, Cookie"
@@ -162,8 +164,20 @@ def api_index(request: Request):
             }},
             {"path": "/api/trip-weather", "about": "current conditions per trip stop",
              "params": {"trip": "trip key (see an album's `trip`)"}},
+            {"path": "/api/version", "about": "the aperture release this gallery runs",
+             "params": {}},
         ],
     })
+
+
+@router.get("/api/version")
+def api_version():
+    """The release this copy runs, with its changelog line. Other galleries'
+    consoles read the maker's answer to learn there is a newer aperture
+    (aperture/update_check.py), so the shape is the one read_manifest() reads
+    and it does not follow API_VERSION."""
+    return context.json_cors({"product": brand.PRODUCT, **update_check.manifest()},
+                             max_age=3600)
 
 
 @router.get("/api/stats")

@@ -395,7 +395,6 @@ def api_meta():
 # lives and who makes it. CHANGELOG.md sits next to the package -- the image
 # copies it there (see the Dockerfile) -- and is rendered here rather than in
 # the browser, which under this app's CSP runs no script but its own.
-CHANGELOG_PATH = BASE_DIR.parents[1] / "CHANGELOG.md"
 _HEADING = re.compile(r"^## (.+?)\s*$", re.MULTILINE)
 _RELEASE = re.compile(r"(\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})")
 _RELATIVE_HREF = re.compile(r'href="(?!https?:|#|mailto:)([^"]+)"')
@@ -426,7 +425,7 @@ def _release_notes(text: str) -> list[dict]:
 def api_about():
     """What the Changelog place shows. Behind the door like every route here."""
     try:
-        text = CHANGELOG_PATH.read_text(encoding="utf-8")
+        text = update_check.CHANGELOG_PATH.read_text(encoding="utf-8")
     except OSError:
         text = ""
     return {
@@ -444,7 +443,7 @@ def api_about():
 
 @app.get("/api/updates")
 def api_updates(fresh: bool = False):
-    """Whether lucya.sh knows a newer aperture (aperture/update_check.py). The
+    """Whether images.lucya.sh runs a newer aperture (aperture/update_check.py). The
     server asks, not the page: the console's CSP connects nowhere but here,
     and one cached answer serves every open tab. `fresh` is the Check again
     button, honoured at most once a minute."""

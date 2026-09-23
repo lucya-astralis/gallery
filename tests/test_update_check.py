@@ -1,4 +1,5 @@
-"""The update notice: what lucya.sh publishes, and what the console makes of it.
+"""The update notice: what every gallery says about itself, and what the
+console makes of the maker's answer.
 
 Nothing here reaches the network. The fixture environment sets UPDATE_CHECK=0,
 and every test that turns it on replaces the one function that would ask.
@@ -116,3 +117,20 @@ def test_the_route_stays_behind_the_door(indexed):
     finally:
         security.clear_password()
         security.reset()
+
+
+def test_every_gallery_says_which_aperture_it_runs(client):
+    r = client.get("/api/version")
+    assert r.status_code == 200
+    assert r.headers["access-control-allow-origin"] == "*"
+    body = r.json()
+    assert body["version"] == brand.VERSION and body["product"] == brand.PRODUCT
+    # the answer one gallery gives is exactly what another one's check reads
+    got = update_check.read_manifest(body)
+    assert got["version"] == brand.VERSION and got["date"] and got["notes"]
+    assert got["url"].startswith(brand.REPO_URL + "/blob/main/CHANGELOG.md#")
+    assert any(e["path"] == "/api/version" for e in client.get("/api").json()["endpoints"])
+
+
+def test_the_maker_gallery_is_the_default_source():
+    assert brand.UPDATE_URL == "https://images.lucya.sh/api/version"

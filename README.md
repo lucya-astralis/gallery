@@ -659,6 +659,7 @@ A read-only JSON view of everything the pages render — albums, photos, EXIF, t
 | `GET /api/tags`             | Photo tags with counts                                                  |
 | `GET /api/showcase`         | Featured photos (the original embed endpoint)                           |
 | `GET /api/shuffle`          | Random photos (bare array — the welcome hero reads it)                  |
+| `GET /api/version`          | The aperture release this gallery runs (other galleries' update check)  |
 
 Three rules hold everywhere:
 
@@ -955,8 +956,8 @@ Console only:
 | `READ_ONLY`       | `0`         | `1` = browse and validate, write nothing            |
 | `BACKUPS`         | `20`        | Versions kept per edited file under `data/console/backups` |
 | `MAX_UPLOAD_MB`   | `8`         | Cap on icon / font / wallpaper uploads              |
-| `UPDATE_CHECK`    | `1`         | Ask lucya.sh (at most twice a day) whether a newer release exists, and say so in the console. `0` = never ask |
-| `UPDATE_URL`      | `https://lucya.sh/aperture/latest.json` | Where that answer is read from |
+| `UPDATE_CHECK`    | `1`         | Ask images.lucya.sh (at most twice a day) whether a newer release exists, and say so in the console. `0` = never ask |
+| `UPDATE_URL`      | `https://images.lucya.sh/api/version` | Where that answer is read from — any aperture's `/api/version` |
 
 ## Operations CLI
 
@@ -1497,6 +1498,7 @@ All GET, all public:
 - `GET /lang/{en|de|jp}?next=…` — set the language cookie, 303 back to `next` (relative paths only)
 - `GET /api` + `/api/stats` + `/api/albums` + `/api/album/{album}` + `/api/photos` + `/api/photo/{rel_path}` + `/api/tags` + `/api/showcase` + `/api/shuffle` — the JSON API, CORS-enabled (see [API](#api))
 - `GET /api/trip-weather?trip=…` — current conditions per trip stop plus today's high/low, served as a same-origin proxy to [Open-Meteo](https://open-meteo.com/) (weather data CC BY 4.0). Server-side cache (15 min); the visitor's browser never contacts a third party, so no cookies and no consent banner are involved.
+- `GET /api/version` — the aperture release this gallery runs, with its changelog line; what other galleries' update check reads (see [Telling running copies](#telling-running-copies))
 
 ## Versions
 
@@ -1534,27 +1536,24 @@ keeps it meaningful, and 1.0 was the last time it happened.
 
 ### Telling running copies
 
-A running console asks `https://lucya.sh/aperture/latest.json` whether there is
-a newer release (`aperture/update_check.py`). The server asks, not the browser, at
-most twice a day, and the request carries nothing but the User-Agent — no
-version, no address, no identifier. When the answer is newer than `VERSION`,
-the Changelog place gets a dot, Home gets a card with a link to the notes, and
-nothing else happens: no download, no install. `UPDATE_CHECK=0` turns it off.
-
-The file is written from this repository, never by hand:
-
-```bash
-python tools/build_update_manifest.py -o latest.json
-```
+Every gallery says which release it runs at `/api/version` — public, CORS-open,
+built from `VERSION` and the newest entry in `CHANGELOG.md`:
 
 ```json
-{"version": "1.8.0", "date": "2026-09-15",
- "url": "https://github.com/lucya-astralis/gallery/blob/main/CHANGELOG.md#180--2026-09-15",
- "notes": "The console says when there is a newer aperture."}
+{"product": "lucya.systems aperture", "version": "1.11.0", "date": "2026-09-23",
+ "url": "https://github.com/lucya-astralis/gallery/blob/main/CHANGELOG.md#1110--2026-09-23",
+ "notes": "Every gallery says which aperture it runs, and the update check asks images.lucya.sh."}
 ```
 
-Upload it **after** the release is pushed — a notice for code nobody can pull
-yet sends every operator looking for nothing.
+A running console asks `https://images.lucya.sh/api/version` whether there is
+a newer release (`aperture/update_check.py`). That gallery is the maker's own and
+always runs the newest release, so its answer is the latest one — there is no
+file to publish after a push. The server asks, not the browser, at most twice a
+day, and the request carries nothing but the User-Agent — no version, no
+address, no identifier. When the answer is newer than `VERSION`, the Changelog
+place gets a dot, Home gets a card with a link to the notes, and nothing else
+happens: no download, no install. `UPDATE_CHECK=0` turns it off; `UPDATE_URL`
+asks another aperture instead.
 
 ### Making a release
 

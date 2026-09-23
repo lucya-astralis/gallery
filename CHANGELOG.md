@@ -18,6 +18,29 @@ notes are never one commit apart.
 
 ---
 
+## 1.11.0 — 2026-09-23
+
+Every gallery says which aperture it runs, and the update check asks
+images.lucya.sh.
+
+**Added**
+
+* **`GET /api/version`.** The version this gallery runs, with the date, link
+  and one-line summary of its changelog entry — public and CORS-open like the
+  rest of the API, and listed in `/api`.
+
+**Changed**
+
+* **The update check asks a gallery, not a file.** The console now reads
+  `https://images.lucya.sh/api/version`: the maker's own gallery always runs
+  the newest release, so its answer is the latest one. `UPDATE_URL` can point
+  at any other aperture's `/api/version` instead.
+
+**Removed**
+
+* **`tools/build_update_manifest.py`** and the uploaded `latest.json` it wrote
+  — there is nothing to publish by hand after a release any more.
+
 ## 1.10.0 — 2026-09-23
 
 A photo replaced under the same name is picked up as a new picture.
