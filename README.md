@@ -1230,6 +1230,30 @@ python -m aperture.cli scan --force        # re-read the dimensions
 python -m aperture.cli thumbs --rebuild --all   # rewrite the files
 ```
 
+### A replaced photo is noticed by its bytes
+
+Every photo in the index carries the SHA-256 of its file. Edit a photo and
+upload it again under the same name, and the next scan (or the watcher, the
+moment it lands) sees a different hash: the old thumbnail, preview and full
+JPEG are deleted and built again from the new file. That holds even when the
+upload kept the old timestamp, which many copy tools and NAS clients do — as
+long as the size changed, and an edited photo practically always does. The
+reverse is spared too: the *same* file copied over again only gets its new
+mtime written down, and nothing is re-encoded.
+
+A file is only read for its hash when its mtime or size moved, so a scan of an
+unchanged gallery stays a walk of `stat` calls. The one exception is the first
+scan after upgrading to 1.10, which hashes every photo once. `scan --force`
+re-reads everything regardless, for the case where neither mtime nor size
+changed.
+
+The hash is also the photo's **version stamp**: the pages ask for
+`/thumb/…`, `/preview/…` and `/full/…` with `?v=<first 12 hex digits>`, and
+only such a URL is cached for a year. A replaced photo therefore has a new
+address, and no browser or proxy keeps showing the old picture. A plain URL
+without the stamp (an old bookmark, an embed built before 1.10) still works
+and is cached for an hour.
+
 ### Examples
 
 ```bash

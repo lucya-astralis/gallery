@@ -111,6 +111,12 @@ def migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE images ADD COLUMN is_showcase INTEGER NOT NULL DEFAULT 0")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_images_showcase ON images(is_showcase)")
 
+    if "content_hash" not in existing_cols:
+        # SHA-256 of the photo's bytes (scanner.content_hash). Left NULL here:
+        # the next scan hashes each photo once, and reading every original
+        # is the scan's job, not a startup's.
+        conn.execute("ALTER TABLE images ADD COLUMN content_hash TEXT")
+
     added = [col for col, kind in CAPTURE_COLUMNS if col not in existing_cols]
     for col, kind in CAPTURE_COLUMNS:
         if col in added:

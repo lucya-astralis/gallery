@@ -246,7 +246,7 @@ DERIVATIVE_MIME = {".jpg": "image/jpeg", ".webp": "image/webp"}
 
 
 def _serve_derivative(album: str, filename: str, out_dir: Path, size: int, kind: str,
-                      ext: str = scanner.PREVIEW_EXT):
+                      ext: str = scanner.PREVIEW_EXT, v: str | None = None):
     """A downscaled copy of the photo at album/filename, built on demand.
 
     The two sizes the gallery serves — the grid thumbnail and the stage
@@ -265,23 +265,23 @@ def _serve_derivative(album: str, filename: str, out_dir: Path, size: int, kind:
         if not built:
             raise HTTPException(500, f"{kind} generation failed")
         dst = built
-    return FileResponse(str(dst), media_type=DERIVATIVE_MIME[ext], headers=context.IMMUTABLE)
+    return FileResponse(str(dst), media_type=DERIVATIVE_MIME[ext], headers=context.photo_cache(v))
 
 
 @router.get("/thumb/{album}/{filename:path}")
-def serve_thumb(album: str, filename: str):
+def serve_thumb(album: str, filename: str, v: str | None = None):
     return _serve_derivative(album, filename, settings.thumbs_dir, settings.thumb_size, "thumb",
-                             scanner.THUMB_EXT)
+                             scanner.THUMB_EXT, v)
 
 
 @router.get("/preview/{album}/{filename:path}")
-def serve_preview(album: str, filename: str):
+def serve_preview(album: str, filename: str, v: str | None = None):
     return _serve_derivative(album, filename, settings.previews_dir, settings.preview_size, "preview",
-                             scanner.PREVIEW_EXT)
+                             scanner.PREVIEW_EXT, v)
 
 
 @router.get("/full/{album}/{filename:path}")
-def serve_full(album: str, filename: str):
+def serve_full(album: str, filename: str, v: str | None = None):
     rel = safe_rel(album, filename).as_posix()
     src = settings.photos_dir / rel
     if not src.exists():
@@ -290,5 +290,5 @@ def serve_full(album: str, filename: str):
         dst = scanner.ensure_full_jpeg(settings.photos_dir, settings.fulls_dir, rel)
         if not dst:
             raise HTTPException(500, "full conversion failed")
-        return FileResponse(str(dst), media_type="image/jpeg", headers=context.IMMUTABLE)
-    return FileResponse(str(src), headers=context.IMMUTABLE)
+        return FileResponse(str(dst), media_type="image/jpeg", headers=context.photo_cache(v))
+    return FileResponse(str(src), headers=context.photo_cache(v))

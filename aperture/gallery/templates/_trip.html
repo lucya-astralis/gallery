@@ -24,7 +24,7 @@
    — stays hidden without JS or data) opposite the day counter. #}
 {% macro stop_inner(s) %}
   <span class="trip__stop-media" aria-hidden="true">
-    {% if s.cover %}<img src="/thumb/{{ s.cover }}" alt="" loading="lazy">{% endif %}
+    {% if s.cover %}<img src="{{ media_url('thumb', s.cover) }}" alt="" loading="lazy">{% endif %}
   </span>
   <span class="trip__stop-shade" aria-hidden="true"></span>
   <span class="trip__stop-body">

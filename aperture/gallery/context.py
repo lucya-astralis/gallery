@@ -11,18 +11,31 @@ from functools import partial
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from .. import brand, branding, i18n, templating, theme
+from .. import brand, branding, i18n, scanner, templating, theme
 from ..runtime import settings
 
 
 # Every route that hands out a derived or configured FILE (thumbs, previews,
 # originals, album fonts and icons, wallpapers, brand assets, the generated
 # theme sheets) sends this. A year is safe because none of those URLs is
-# ambiguous: a photo route is keyed on the photo's own path, and the generated
-# ones carry a `?v=` stamp derived from the source file's mtime, so a change
-# produces a different URL rather than a stale hit. HTML is the exception and
+# ambiguous: a photo URL carries the photo's content stamp (see PLAIN_PHOTO
+# below), and the generated ones carry a `?v=` stamp derived from the source
+# file's mtime, so a change produces a different URL rather than a stale hit. HTML is the exception and
 # gets no-store — see the security_headers middleware in gallery/app.py.
 IMMUTABLE = {"Cache-Control": "public, max-age=31536000"}
+
+# The photo routes are the exception to "keyed on the photo's own path": a
+# photo replaced under the same name keeps its path. So the pages ask for
+# them with the photo's version stamp (`?v=`, scanner.media_url), and only
+# those URLs are immutable. A plain one — an old bookmark, an embed built
+# before stamps, a photo not hashed yet — is kept an hour at most, so a
+# replaced photo shows through it the same day.
+PLAIN_PHOTO = {"Cache-Control": "public, max-age=3600"}
+
+
+def photo_cache(v: str | None) -> dict:
+    """The Cache-Control a /thumb/, /preview/ or /full/ answer gets."""
+    return IMMUTABLE if v else PLAIN_PHOTO
 
 
 # ----- language (EN / DE / JP) -------------------------------------------
@@ -111,3 +124,5 @@ templates.env.globals["public_base_url"] = public_base_url
 templates.env.globals["site_font"] = theme.site_font
 templates.env.globals["site_bg"] = theme.site_bg
 templates.env.globals["theme_css_url"] = theme.theme_css_url
+# /thumb/, /preview/ and /full/ addresses with the photo's version stamp
+templates.env.globals["media_url"] = scanner.media_url

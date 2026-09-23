@@ -9,6 +9,8 @@ chain behind them actually ran.
 """
 
 import pytest
+
+from aperture import scanner
 from fastapi.testclient import TestClient
 
 # Routes that render a page or hand out a file, with the content type they
@@ -74,7 +76,9 @@ def test_pages_render(client, path, ctype):
 
 @pytest.mark.parametrize("path,ctypes", MEDIA)
 def test_media_served(client, path, ctypes):
-    r = client.get(path)
+    # as the pages ask for it: with the photo's version stamp, which is what
+    # earns the year (a plain URL is test_content_hash's business)
+    r = client.get(path + "?v=" + scanner.photo_stamp(path.split("/", 2)[2]))
     assert r.status_code == 200, path
     assert r.headers["content-type"] in ctypes, r.headers["content-type"]
     assert r.headers["cache-control"] == "public, max-age=31536000"

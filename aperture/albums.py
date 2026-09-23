@@ -12,7 +12,7 @@ import threading
 import time
 from collections import Counter
 
-from . import cfgio, config, db, i18n, photos, schema, stats, theme
+from . import cfgio, config, db, i18n, photos, scanner, schema, stats, theme
 from .runtime import settings
 
 
@@ -627,10 +627,10 @@ def serialize_album(card: dict, base: str) -> dict:
         "cover": {
             "rel_path": cover,
             "urls": {
-                "thumb": f"/thumb/{cover}",
-                "preview": f"/preview/{cover}",
-                "thumb_abs": f"{base}/thumb/{cover}",
-                "preview_abs": f"{base}/preview/{cover}",
+                "thumb": scanner.media_url("thumb", cover),
+                "preview": scanner.media_url("preview", cover),
+                "thumb_abs": scanner.media_url("thumb", cover, base),
+                "preview_abs": scanner.media_url("preview", cover, base),
             },
         } if cover else None,
         # album.cfg `icon = …` — the album's own mark, null when it sets none

@@ -171,7 +171,7 @@
     {% include "_featured.html" %}
   {% elif album_cover %}
     <header class="album-hero">
-      <img class="album-hero__media" src="/preview/{{ album_cover }}" alt="{{ hero_title }}" fetchpriority="high">
+      <img class="album-hero__media" src="{{ media_url('preview', album_cover) }}" alt="{{ hero_title }}" fetchpriority="high">
       <span class="album-hero__shade" aria-hidden="true"></span>
       <div class="album-hero__body">{{ hero_info() }}</div>
     </header>
@@ -215,7 +215,7 @@
             <a href="/album/{{ a.album }}">
               <div class="album-card__img">
                 {% if a.cover %}
-                  <img src="/thumb/{{ a.cover }}" alt="{{ a.name }}" loading="lazy">
+                  <img src="{{ media_url('thumb', a.cover) }}" alt="{{ a.name }}" loading="lazy">
                 {% else %}
                   <div class="album-card__cover-empty">{{ t('card.no_cover') }}</div>
                 {% endif %}
@@ -290,7 +290,7 @@
         {% for img in items %}
           <li class="image-tile{% if img.is_showcase %} image-tile--showcase{% endif %}">
             <a href="/image/{{ img.rel_path }}{{ img_qs }}">
-              <img src="/thumb/{{ img.rel_path }}" alt="{{ img.filename }}" loading="lazy">
+              <img src="{{ media_url('thumb', img) }}" alt="{{ img.filename }}" loading="lazy">
               {% if img.is_showcase %}<span class="image-tile__star" aria-label="Featured"><i class="fa fa-star"></i></span>{% endif %}
               <div class="image-tile__overlay"><span>OPEN<i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i></span></div>
             </a>

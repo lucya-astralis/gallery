@@ -77,10 +77,10 @@
              all read as on-screen, so lazy never deferred any of them. First
              frame only; app.js hydrates the rest one ahead of the crossfade. #}
           {% if loop.first %}
-            <img src="/preview/{{ img.rel_path }}" alt="{{ img.filename }}"
+            <img src="{{ media_url('preview', img) }}" alt="{{ img.filename }}"
                  loading="eager" fetchpriority="high" decoding="async">
           {% else %}
-            <img data-src="/preview/{{ img.rel_path }}" alt="{{ img.filename }}"
+            <img data-src="{{ media_url('preview', img) }}" alt="{{ img.filename }}"
                  loading="lazy" decoding="async">
           {% endif %}
         </a>

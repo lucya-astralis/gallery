@@ -34,10 +34,10 @@
              the crossfade. Without JS only the first slide is ever shown, so
              nothing is lost there either. #}
           {% if loop.first %}
-            <img src="/preview/{{ img.rel_path }}" alt="{{ feat_label(img) }}"
+            <img src="{{ media_url('preview', img) }}" alt="{{ feat_label(img) }}"
                  loading="eager" fetchpriority="high" decoding="async">
           {% else %}
-            <img data-src="/preview/{{ img.rel_path }}" alt="{{ feat_label(img) }}"
+            <img data-src="{{ media_url('preview', img) }}" alt="{{ feat_label(img) }}"
                  loading="lazy" decoding="async">
           {% endif %}
         </a>

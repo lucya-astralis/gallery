@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from .. import (
-    albums, brand, branding, cfgio, config, db, i18n, photos, schema, search, stats, theme,
+    albums, brand, branding, cfgio, config, db, i18n, photos, scanner, schema, search, stats, theme,
     trips, welcome,
 )
 from ..runtime import settings
@@ -395,10 +395,15 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
         days=photos.scope_day_count(where_scope, scope_params) > 1)
     order_sql = photos.SORT_IMAGE_SQL[base_sort]
     neighbours = c.execute(
-        f"SELECT rel_path FROM images WHERE {where_scope} ORDER BY {order_sql}",
+        f"SELECT rel_path, content_hash FROM images WHERE {where_scope} ORDER BY {order_sql}",
         scope_params,
     ).fetchall()
     rel_list = [r["rel_path"] for r in neighbours]
+    # the version stamp of every photo the lightbox and the prefetch may ask
+    # for, so the URLs they build match the ones the pages render
+    # (scanner.media_url)
+    stamps = {r["rel_path"]: r["content_hash"][:scanner.STAMP_LEN]
+              for r in neighbours if r["content_hash"]}
     if current_sort == photos.SORT_CURATED:
         pos = {r: i for i, r in enumerate(curated_order)}
         rel_list.sort(key=lambda r: pos.get(r, len(pos)))
@@ -422,6 +427,7 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
             "next_rel": next_rel,
             "description": description,
             "album_rels": rel_list,
+            "album_stamps": stamps,
             "collection_root": col_root or None,
             "current_index": idx,
             "current_sort": current_sort,

@@ -18,6 +18,30 @@ notes are never one commit apart.
 
 ---
 
+## 1.10.0 — 2026-09-23
+
+A photo replaced under the same name is picked up as a new picture.
+
+**Added**
+
+* **Every photo is hashed.** The index keeps the SHA-256 of each file. When a
+  photo is edited and uploaded again under its old name, the scan (or the
+  watcher) sees different bytes, deletes the old thumbnail, preview and full
+  JPEG, and builds them again from the new file — also when the upload kept
+  the old timestamp, which used to leave the old picture in the gallery for
+  good. The same file copied over again is recognised as unchanged and
+  nothing is re-encoded.
+* **Photo URLs carry a version stamp.** `/thumb/`, `/preview/` and `/full/`
+  are asked for with `?v=` plus the start of the hash, on every page, in the
+  lightbox and in the API's `urls`. Only a stamped URL is cached for a year,
+  so a replaced photo gets a new address and no browser keeps the old one. A
+  plain URL still answers, cached for an hour.
+
+**Worth knowing:** nothing to do, but the first scan after the upgrade reads
+every photo once to hash it — on a large share over SMB that scan takes as
+long as reading the whole library. Later scans only read files whose mtime
+or size changed.
+
 ## 1.9.0 — 2026-09-20
 
 The location bar reads as a path again.

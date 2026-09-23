@@ -11,6 +11,8 @@ counts, the scope block), because that is where a moved helper would show up.
 
 import pytest
 
+from aperture import scanner
+
 # route -> the exact top-level key set it answers with
 SHAPES = {
     "/api": {"base_url", "endpoints", "languages", "limits", "name", "product",
@@ -64,9 +66,11 @@ def test_photo_items_have_one_shape(client):
 def test_photo_urls_point_at_the_serving_routes(client):
     item = client.get("/api/photos?album=berlin&sort=name_asc").json()["items"][0]
     rel = item["rel_path"]
-    assert item["urls"]["thumb"] == "/thumb/" + rel
-    assert item["urls"]["preview"] == "/preview/" + rel
-    assert item["urls"]["full"] == "/full/" + rel
+    # the file URLs carry the photo's version stamp (scanner.media_url)
+    stamp = "?v=" + scanner.photo_stamp(rel)
+    assert item["urls"]["thumb"] == "/thumb/" + rel + stamp
+    assert item["urls"]["preview"] == "/preview/" + rel + stamp
+    assert item["urls"]["full"] == "/full/" + rel + stamp
     assert item["urls"]["page"] == "/image/" + rel
     for key in ("thumb", "preview", "full", "page", "api"):
         assert item["urls"][key + "_abs"].endswith(item["urls"][key])

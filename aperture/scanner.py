@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import os
@@ -513,6 +514,99 @@ def prune_tags() -> int:
         return cur.rowcount or 0
 
 
+# ----- content hash -----------------------------------------------------
+# The index used to know a photo only by its mtime, and the derivatives were
+# rebuilt only when their source was NEWER than them. A photo edited and
+# uploaded again under the same name is exactly the case that slipped
+# through: plenty of copy tools and NAS clients keep the original timestamp,
+# so the gallery went on serving the thumbnail and preview of the old
+# picture. Every photo now carries the SHA-256 of its bytes, and a different
+# hash under the same name drops the old derivatives so they are built from
+# the new file.
+HASH_CHUNK = 1 << 20
+
+# How much of the hash rides photo URLs as `?v=` (see photos.media_url): the
+# derivative routes are cached for a year, so a replaced photo needs a new
+# address, not just new files on disk.
+STAMP_LEN = 12
+
+
+def content_hash(path: Path) -> str:
+    """SHA-256 of the file's bytes, read in chunks so a 100 MB original never
+    sits in memory whole."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while chunk := f.read(HASH_CHUNK):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def photo_stamp(rel: str) -> str | None:
+    """The version stamp of one indexed photo, or None when it has no hash
+    yet (indexed before hashing, not scanned since) or is not indexed."""
+    row = db.conn().execute("SELECT content_hash FROM images WHERE rel_path = ?",
+                            (rel,)).fetchone()
+    return row["content_hash"][:STAMP_LEN] if row and row["content_hash"] else None
+
+
+def media_url(kind: str, photo, base: str = "") -> str:
+    """The address of one photo's `thumb`, `preview` or `full`, carrying
+    `?v=<stamp>` so a photo replaced under the same name gets a new URL and
+    the year-long cache (gallery/context.IMMUTABLE) never serves the old
+    picture. `photo` is an index row (a dict with rel_path + content_hash —
+    no query) or a bare rel_path (looked up: album covers, trip stops).
+    Without a hash yet the URL is plain, and the route caches it briefly."""
+    if isinstance(photo, str):
+        rel, stamp = photo, photo_stamp(photo)
+    else:
+        rel = photo["rel_path"]
+        # a dict or a sqlite3.Row; a row selected without the column is
+        # just a photo without a stamp
+        digest = photo["content_hash"] if "content_hash" in photo.keys() else None
+        stamp = digest[:STAMP_LEN] if digest else None
+    url = f"{base}/{kind}/{rel}"
+    return f"{url}?v={stamp}" if stamp else url
+
+
+def derivative_paths(rel: str) -> list[Path]:
+    """Every generated file one photo may have on disk: each tier, in every
+    format that tier has ever been written in (DERIVATIVE_EXTS) — a gallery
+    that served JPEG thumbs before the WebP switch still has those."""
+    out = []
+    for d in (settings.thumbs_dir, settings.previews_dir, settings.fulls_dir):
+        if d is None:
+            continue
+        out.extend((d / rel).with_suffix(ext) for ext in DERIVATIVE_EXTS)
+    return out
+
+
+def drop_derivatives(rel: str) -> int:
+    """Delete one photo's derivatives; returns how many files went. Whoever
+    asks next (the scan, the watcher, a visitor) builds them fresh."""
+    dropped = 0
+    for f in derivative_paths(rel):
+        try:
+            if f.exists():
+                f.unlink()
+                dropped += 1
+        except OSError:
+            pass
+    return dropped
+
+
+def _keep_derivatives(rel: str) -> None:
+    """The bytes are the same but the file's mtime moved (a re-copy, a
+    `touch`, the same export uploaded twice): bring the derivatives' mtimes
+    along, so needs_rebuild() does not rebuild files that would come out
+    identical."""
+    for f in derivative_paths(rel):
+        try:
+            if f.exists():
+                os.utime(f)
+        except OSError:
+            pass
+
+
 def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
     relp = file.relative_to(photos_dir)
     rel = relp.as_posix()
@@ -534,18 +628,47 @@ def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
     effective_mtime = max(mtime, sidecar_mtime)
 
     c = db.conn()
-    with db.lock():
-        row = c.execute("SELECT id, mtime FROM images WHERE rel_path = ?", (rel,)).fetchone()
-        # `force` re-reads a file whose mtime says "unchanged" — the escape
-        # hatch for a row that went bad (bogus EXIF, a restored backup that
-        # kept its old timestamps). See aperture/cli.py `scan --force`.
-        if not force and row and abs(row["mtime"] - effective_mtime) < 1.0:
-            return False
+    row = c.execute("SELECT id, mtime, size, content_hash FROM images WHERE rel_path = ?",
+                    (rel,)).fetchone()
+    # Same mtime AND same size: unchanged, without reading a byte. The size
+    # is what catches most edits uploaded with their old timestamp kept; the
+    # hash below settles everything that gets past this line.
+    # `force` re-reads a file whose stamp says "unchanged" — the escape
+    # hatch for a row that went bad (bogus EXIF, a restored backup that
+    # kept its old timestamps). See `scan --force`.
+    if not force and row and abs(row["mtime"] - effective_mtime) < 1.0 \
+            and row["size"] == stat.st_size:
+        if row["content_hash"] is None:
+            # indexed before hashing existed: hashed once, on the first scan
+            # after the upgrade, so its URLs can carry a version stamp too
+            digest = content_hash(file)
+            with db.lock():
+                c.execute("UPDATE images SET content_hash = ? WHERE id = ?", (digest, row["id"]))
+                c.commit()
+        return False
 
     if settings.strip_gps and strip_gps_inplace(file):
         stat = file.stat()
         mtime = stat.st_mtime
         effective_mtime = max(mtime, sidecar_mtime)
+
+    # After the GPS strip, so the stored hash is of the file as it now lies.
+    digest = content_hash(file)
+    if row and row["content_hash"] == digest and not force:
+        # Only the timestamps moved (or the .tags sidecar did): the EXIF and
+        # the derivatives would come out the same, so neither is redone.
+        _keep_derivatives(rel)
+        with db.lock():
+            c.execute("UPDATE images SET mtime = ?, size = ? WHERE id = ?",
+                      (effective_mtime, stat.st_size, row["id"]))
+            c.commit()
+        _sync_tags(row["id"], _read_sidecar_tags(file))
+        return True
+    if row and row["content_hash"] != digest:
+        # A different picture under the same name: its old thumbnail, preview
+        # and full JPEG go, and are rebuilt from the new bytes.
+        if drop_derivatives(rel):
+            log.info("%s changed on disk -> derivatives dropped", rel)
 
     width = height = None
     exif: dict = {}
@@ -575,16 +698,17 @@ def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
     with db.lock():
         c.execute(
             """INSERT INTO images (album, filename, rel_path, mtime, size, width, height, exif_json, taken_at,
-                                   camera, lens, focal, aperture, iso)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                   camera, lens, focal, aperture, iso, content_hash)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(rel_path) DO UPDATE SET
                  album=excluded.album, filename=excluded.filename, mtime=excluded.mtime,
                  size=excluded.size, width=excluded.width, height=excluded.height,
                  exif_json=excluded.exif_json, taken_at=excluded.taken_at,
                  camera=excluded.camera, lens=excluded.lens, focal=excluded.focal,
-                 aperture=excluded.aperture, iso=excluded.iso""",
+                 aperture=excluded.aperture, iso=excluded.iso,
+                 content_hash=excluded.content_hash""",
             (album, filename, rel, effective_mtime, stat.st_size, width, height, json.dumps(exif), taken,
-             fact["camera"], fact["lens"], fact["focal"], fact["aperture"], fact["iso"]),
+             fact["camera"], fact["lens"], fact["focal"], fact["aperture"], fact["iso"], digest),
         )
         image_id = c.execute("SELECT id FROM images WHERE rel_path = ?", (rel,)).fetchone()["id"]
         c.commit()

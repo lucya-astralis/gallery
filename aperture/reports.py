@@ -106,7 +106,9 @@ def photo_report(rel_path: str) -> dict:
             "file_mtime": ops.effective_mtime(rel),
             "derivatives": {k: {"path": str(p), "state": states.get(k)}
                             for k, p in ops.derivatives(rel).items()},
-            "urls": [f"/{name}/{rel}" for name in PHOTO_URLS]}
+            # the file URLs as the pages hand them out, version stamp and all
+            "urls": [scanner.media_url(name, rel) if name in ("thumb", "preview", "full")
+                     else f"/{name}/{rel}" for name in PHOTO_URLS]}
 
 
 # ----- trips ------------------------------------------------------------

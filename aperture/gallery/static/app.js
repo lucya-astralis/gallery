@@ -412,6 +412,15 @@ function warmAllSlidesOnIntent(root, slides) {
     root.addEventListener(ev, all, { once: true, passive: true }));
 }
 
+// A photo's /thumb/, /preview/ or /full/ address with its version stamp,
+// the same one scanner.media_url puts on the rendered pages. A URL built here
+// has to match that one exactly: the files are cached for a year, so a plain
+// URL is a second download of a file the page already has — or, after the
+// photo was replaced under the same name, the old picture.
+function mediaUrl(kind, rel, v) {
+  return '/' + kind + '/' + rel + (v ? '?v=' + encodeURIComponent(v) : '');
+}
+
 function readAlbumData() {
   const el = document.getElementById('album-data');
   if (!el) return null;
@@ -676,10 +685,10 @@ document.addEventListener('DOMContentLoaded', () => {
             img.alt = item.filename;
             if (i === 0) {
               img.removeAttribute('data-src');
-              img.src = '/preview/' + item.rel_path;
+              img.src = item.urls.preview;
             } else {
               img.removeAttribute('src');
-              img.dataset.src = '/preview/' + item.rel_path;
+              img.dataset.src = item.urls.preview;
             }
           }
         });
@@ -1582,8 +1591,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const m = (a.getAttribute('href') || '').split('?')[0].match(/^\/image\/(.+)$/);
     if (!m || warmed.has(m[1])) return;
     warmed.add(m[1]);
+    // the tile's own thumb carries the photo's stamp; the preview shares it
+    const tile = a.querySelector('img');
+    let v = null;
+    try { if (tile) v = new URL(tile.currentSrc || tile.src, location.href).searchParams.get('v'); }
+    catch (e) {}
     const img = new Image();
-    img.src = '/preview/' + m[1];
+    img.src = mediaUrl('preview', m[1], v);
   };
   // On a thin or distant link hovering is not enough of a promise: a guess
   // that misses costs ~320 KB the grid still needs. Pressing is not a guess,
@@ -1761,7 +1775,12 @@ function initImagePage() {
     try {
       const u = new URL(a.href, location.href);
       const m = u.pathname.match(/^\/image\/(.+)$/);
-      if (m) { const p = new Image(); p.src = '/preview/' + m[1]; }
+      if (m) {
+        const data = readAlbumData();
+        const stamps = (data && data.stamps) || {};
+        const p = new Image();
+        p.src = mediaUrl('preview', m[1], stamps[decodeURIComponent(m[1])]);
+      }
     } catch (e) {}
   });
 
@@ -1970,6 +1989,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // mutable state — refreshed whenever the underlying #album-data changes
   // (initial page load + after every SPA swap).
   let rels = [];
+  let stamps = {};
   let total = 0;
   let index = 0;
   let initialIndex = 0;
@@ -1979,10 +1999,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function reload() {
     const data = readAlbumData();
     if (!data || !Array.isArray(data.rels) || data.rels.length === 0) {
-      rels = []; total = 0; index = 0; initialIndex = 0;
+      rels = []; stamps = {}; total = 0; index = 0; initialIndex = 0;
       return;
     }
     rels = data.rels;
+    stamps = data.stamps || {};
     total = rels.length;
     index = Math.max(0, Math.min(data.current | 0, total - 1));
     initialIndex = index;
@@ -2007,8 +2028,8 @@ document.addEventListener('DOMContentLoaded', () => {
     lb.classList.remove('is-idle');
   }
 
-  function relToPreview(rel){ return '/preview/' + rel; }
-  function relToFull(rel){ return '/full/' + rel; }
+  function relToPreview(rel){ return mediaUrl('preview', rel, stamps[rel]); }
+  function relToFull(rel){ return mediaUrl('full', rel, stamps[rel]); }
   function relToFilename(rel){
     const parts = rel.split('/');
     return parts[parts.length - 1];

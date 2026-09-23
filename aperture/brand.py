@@ -75,7 +75,7 @@ UPDATE_URL = f"{MAKER_URL}/aperture/latest.json"
 # the configurator were two programs, this is one, and a version is a promise
 # about a thing. Distinct from API_VERSION (gallery/api.py), which versions the
 # JSON API contract and did NOT reset — the endpoints kept their shape.
-VERSION = "1.9.0"
+VERSION = "1.10.0"
 
 # One-line form, shared by <meta name="generator">, the X-Powered-By header
 # and the EXIF `Software` tag so all three can never drift apart.

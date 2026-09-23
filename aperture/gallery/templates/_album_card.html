@@ -6,7 +6,7 @@
   <a href="/album/{{ a.album }}">
     <div class="album-card__img">
       {% if a.cover %}
-        <img src="/thumb/{{ a.cover }}" alt="{{ a.name }}" loading="lazy" decoding="async">
+        <img src="{{ media_url('thumb', a.cover) }}" alt="{{ a.name }}" loading="lazy" decoding="async">
       {% else %}
         <div class="album-card__cover-empty">{{ t('card.no_cover') }}</div>
       {% endif %}
