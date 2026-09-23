@@ -830,18 +830,18 @@ function paintOpsOverview(grid, st, ro) {
         : live ? '' : 'no heartbeat in the control file' })),
     el('dl', { class: 'facts' },
       paused && st.pause
-        ? fact('paused', ago(st.pause.since) +
+        ? fact('Paused', ago(st.pause.since) +
                (st.pause.reason ? ' — ' + st.pause.reason : ''), 'warn')
         : null,
-      fact('last scan', scan
+      fact('Last scan', scan
         ? ago(scan.finished_at) + ' · ' + (scan.trigger || '?') +
           (scan.seconds != null ? ' · ' + scan.seconds + 's' : '')
         : 'never'),
-      fact('it did', scan ? scanSummary(res) : '—', res.failed || res.held ? 'warn' : null),
-      scan && scan.error ? fact('last error', scan.error, 'bad') : null,
-      pending.length ? fact('jobs queued', String(pending.length), 'warn') : null,
-      fact('every', paths.scan_interval ? paths.scan_interval + 's' : 'manual only'),
-      fact('watcher', paths.watcher ? 'on' : 'off'))));
+      fact('It did', scan ? scanSummary(res) : '—', res.failed || res.held ? 'warn' : null),
+      scan && scan.error ? fact('Last error', scan.error, 'bad') : null,
+      pending.length ? fact('Jobs queued', String(pending.length), 'warn') : null,
+      fact('Every', paths.scan_interval ? paths.scan_interval + 's' : 'manual only'),
+      fact('Watcher', paths.watcher ? 'on' : 'off'))));
 
   /* ----- what it has built ----- */
   grid.append(card('fa-database', 'Index', 'what the scan has put in the database',
@@ -885,19 +885,19 @@ function paintOpsOverview(grid, st, ro) {
   /* ----- where things are ----- */
   grid.append(card('fa-folder-tree', 'Paths', 'read once at startup — aperture/runtime.py',
     el('dl', { class: 'facts' },
-      fact('photos', paths.photos || '—'),
-      fact('thumbnails', paths.thumbs || '—'),
-      fact('previews', paths.previews || '—'),
-      fact('data', paths.data || '—'),
-      fact('control', st.control_dir || '—'))));
+      fact('Photos', paths.photos || '—'),
+      fact('Thumbnails', paths.thumbs || '—'),
+      fact('Previews', paths.previews || '—'),
+      fact('Data', paths.data || '—'),
+      fact('Control', st.control_dir || '—'))));
 
   /* ----- what it does to a photo ----- */
   grid.append(card('fa-shield-halved', 'Derivatives and privacy', 'what the scan makes, and drops',
     el('dl', { class: 'facts' },
-      fact('thumbnail', (paths.thumb_size || '—') + ' px'),
-      fact('preview', (paths.preview_size || '—') + ' px'),
-      fact('hide gps', paths.hide_gps ? 'yes — never served in the API' : 'no'),
-      fact('strip gps', paths.strip_gps
+      fact('Thumbnail', (paths.thumb_size || '—') + ' px'),
+      fact('Preview', (paths.preview_size || '—') + ' px'),
+      fact('Hide GPS', paths.hide_gps ? 'yes — never served in the API' : 'no'),
+      fact('Strip GPS', paths.strip_gps
         ? 'yes — removed from the originals on scan' : 'no'))));
 
   grid.append(wide(archiveCard()));
@@ -969,12 +969,12 @@ function archiveCard() {
   const onDisk = a.photos_on_disk;
   const drift = onDisk == null ? null : onDisk - idx.images;
   const body = [el('dl', { class: 'facts' },
-    fact('span', (a.span.from || '—').slice(0, 10) + ' → ' + (a.span.to || '—').slice(0, 10)),
-    fact('albums', idx.albums + ' with photos · ' + a.album_nodes + ' incl. parents'),
-    fact('featured', idx.featured + ' photo(s) · ' + a.showcase_albums + ' showcase album(s)'),
-    fact('formats', a.formats.slice(0, 6).map(([ext, n]) => ext + ' ' + n).join(' · ') || '—'),
-    fact('heic / heif', a.heic ? 'supported' : 'not supported — pillow-heif is missing', a.heic ? null : 'warn'),
-    fact('index', drift === null ? 'not compared — too many rows for a quick count; run Doctor'
+    fact('Span', (a.span.from || '—').slice(0, 10) + ' → ' + (a.span.to || '—').slice(0, 10)),
+    fact('Albums', idx.albums + ' with photos · ' + a.album_nodes + ' incl. parents'),
+    fact('Featured', idx.featured + ' photo(s) · ' + a.showcase_albums + ' showcase album(s)'),
+    fact('Formats', a.formats.slice(0, 6).map(([ext, n]) => ext + ' ' + n).join(' · ') || '—'),
+    fact('HEIC / HEIF', a.heic ? 'supported' : 'not supported — pillow-heif is missing', a.heic ? null : 'warn'),
+    fact('Index', drift === null ? 'not compared — too many rows for a quick count; run Doctor'
       : drift === 0 ? 'in sync · ' + onDisk + ' file(s) on disk = ' + idx.images + ' row(s)'
         : Math.abs(drift) + ' file(s) ' + (drift > 0 ? 'not indexed' : 'indexed but gone') +
           ' · ' + onDisk + ' on disk / ' + idx.images + ' indexed',
@@ -1023,10 +1023,10 @@ function paintOpsDoctor(grid, st, ro) {
 function renderDoctor(report) {
   const problems = report.problems || {};
   const body = [el('dl', { class: 'facts' },
-    fact('scope', report.scope || 'whole gallery'),
-    fact('checked', report.photos_on_disk + ' file(s) on disk · ' +
+    fact('Scope', report.scope || 'whole gallery'),
+    fact('Checked', report.photos_on_disk + ' file(s) on disk · ' +
                     report.rows + ' row(s) indexed'),
-    fact('result', report.total ? report.total + ' problem(s) found' : 'no problems found',
+    fact('Result', report.total ? report.total + ' problem(s) found' : 'no problems found',
          report.total ? 'warn' : 'ok'))];
 
   for (const check of Object.keys(problems).sort()) {
@@ -1104,10 +1104,10 @@ function paintOpsDerivatives(grid, st, ro) {
   const scope = r.scope || null;
   const missing = (r.pending || []).length;
   const body = [el('dl', { class: 'facts' },
-    fact('scope', scope || 'whole gallery'),
-    fact('photos', String(r.photos)),
+    fact('Scope', scope || 'whole gallery'),
+    fact('Photos', String(r.photos)),
     fact(r.all ? 'to rebuild' : 'to build', r.to_build + ' derivative(s)', missing ? 'warn' : 'ok'),
-    fact('orphans', r.orphans_checked
+    fact('Orphans', r.orphans_checked
       ? r.orphans.length + ' file(s) · ' + sizeOr0(r.orphan_bytes)
       : 'not checked — only a whole-gallery look can tell', r.orphans.length ? 'warn' : null))];
   for (const [key, count] of Object.entries(r.by_state || {})) {
@@ -1152,11 +1152,11 @@ function paintOpsFeatured(grid, st, ro) {
   const drift = r.drift.not_flagged.length + r.drift.flagged_without_rule.length;
   grid.append(wide(card('fa-star', 'Featured', 'which album.cfg entry features which photo',
     el('dl', { class: 'facts' },
-      fact('featured', r.expected + ' photo(s) from ' + albums.length + ' album.cfg file(s)'),
-      fact('db flag', r.db_flagged + ' row(s) flagged'),
-      fact('showcase', r.showcase_albums.join(', ') || '—'),
-      fact('drift', drift ? drift + ' flag(s) disagree with the cfg files' : 'none', drift ? 'warn' : 'ok'),
-      fact('match nothing', String(r.unresolved.length), r.unresolved.length ? 'warn' : null)),
+      fact('Featured', r.expected + ' photo(s) from ' + albums.length + ' album.cfg file(s)'),
+      fact('DB flag', r.db_flagged + ' row(s) flagged'),
+      fact('Showcase', r.showcase_albums.join(', ') || '—'),
+      fact('Drift', drift ? drift + ' flag(s) disagree with the cfg files' : 'none', drift ? 'warn' : 'ok'),
+      fact('Match nothing', String(r.unresolved.length), r.unresolved.length ? 'warn' : null)),
     el('div', { class: 'card__actions' },
       el('button', { type: 'button', class: 'btn btn--primary', icon: 'fa-star', disabled: ro,
                      text: 'Recompute the flags', onclick: () => startJob('featured') }),
@@ -1231,9 +1231,9 @@ function paintOpsTags(grid, st, ro) {
   const drift = r.drift.not_indexed.length + r.drift.indexed_without_sidecar.length + r.orphan_sidecars.length;
   grid.append(wide(card('fa-tags', 'Vocabulary', r.album || 'whole gallery',
     el('dl', { class: 'facts' },
-      fact('tags', vocab.length + ' on ' + r.photos_tagged + ' photo(s)'),
-      fact('sidecars', r.sidecars + ' .tags file(s) on disk'),
-      fact('drift', drift ? drift + ' finding(s)' : 'none — the index agrees with the sidecars', drift ? 'warn' : 'ok')),
+      fact('Tags', vocab.length + ' on ' + r.photos_tagged + ' photo(s)'),
+      fact('Sidecars', r.sidecars + ' .tags file(s) on disk'),
+      fact('Drift', drift ? drift + ' finding(s)' : 'none — the index agrees with the sidecars', drift ? 'warn' : 'ok')),
     vocab.length
       ? foldedRows('tags:vocab', vocab, 15, ([tag, count]) =>
           barRow(tag, count, peak, count + ' photo(s)', null, () => findTag(tag)))
@@ -1255,8 +1255,8 @@ function paintOpsGps(grid, st, ro) {
   const run = () => opsLoad('gps', '/api/ops/gps?' + qs({ album: opsValue('gps-album') }));
   grid.append(wide(card('fa-location-dot', 'GPS', 'which originals still carry coordinates',
     el('dl', { class: 'facts' },
-      fact('hide gps', paths.hide_gps ? 'on — coordinates are never served' : 'off', paths.hide_gps ? null : 'warn'),
-      fact('strip gps', paths.strip_gps ? 'on — the scan removes them from the originals' : 'off')),
+      fact('Hide GPS', paths.hide_gps ? 'on — coordinates are never served' : 'off', paths.hide_gps ? null : 'warn'),
+      fact('Strip GPS', paths.strip_gps ? 'on — the scan removes them from the originals' : 'off')),
     el('div', { class: 'ops__form' },
       opsInput('gps-album', { placeholder: 'whole gallery — or one album path', onkeydown: onEnter(run) })),
     el('div', { class: 'card__actions' },
@@ -1270,10 +1270,10 @@ function paintOpsGps(grid, st, ro) {
   if (!r) return;
   const hits = r.with_gps.length;
   const body = [el('dl', { class: 'facts' },
-    fact('scope', r.album || 'whole gallery'),
-    fact('checked', r.checked + ' original(s)'),
-    fact('with gps', hits + ' photo(s)', hits ? 'warn' : 'ok'),
-    r.unreadable.length ? fact('unreadable', String(r.unreadable.length), 'warn') : null)];
+    fact('Scope', r.album || 'whole gallery'),
+    fact('Checked', r.checked + ' original(s)'),
+    fact('With GPS', hits + ' photo(s)', hits ? 'warn' : 'ok'),
+    r.unreadable.length ? fact('Unreadable', String(r.unreadable.length), 'warn') : null)];
   if (hits) {
     body.push(sub('coordinates present', hits));
     body.push(...foldedRows('gps:hits', r.with_gps, 12, (rel) => homeRow(rel, '', '', () => opsLookup('photo', rel))));
@@ -1310,11 +1310,11 @@ function paintOpsFrontpage(grid, st, ro) {
       grid.append(card(device.device === 'mobile' ? 'fa-mobile-screen' : 'fa-display',
         'Welcome · ' + device.device, 'what the hero cycles through',
         el('dl', { class: 'facts' },
-          fact('key', device.source_key),
-          fact('mode', device.mode + (WELCOME_MODES[device.mode] ? ' — ' + WELCOME_MODES[device.mode] : '')),
-          fact('label', device.label || '—'),
-          fact('shows', device.feed.length + ' photo(s)'),
-          device.skipped.length ? fact('skipped', device.skipped.length + ' entr(ies) not indexed', 'warn') : null),
+          fact('Key', device.source_key),
+          fact('Mode', device.mode + (WELCOME_MODES[device.mode] ? ' — ' + WELCOME_MODES[device.mode] : '')),
+          fact('Label', device.label || '—'),
+          fact('Shows', device.feed.length + ' photo(s)'),
+          device.skipped.length ? fact('Skipped', device.skipped.length + ' entr(ies) not indexed', 'warn') : null),
         ...foldedRows('welcome:' + device.device, device.feed, 8, (rel) =>
           homeRow(rel, '', '', () => opsLookup('photo', rel))),
         device.skipped.length
@@ -1355,8 +1355,8 @@ function paintOpsFrontpage(grid, st, ro) {
   if (!trip) return;
   grid.append(wide(card('fa-route', trip.title || trip.key, trip.album,
     el('dl', { class: 'facts' },
-      fact('trip', (trip.title || '—') + ' (' + trip.key + ')'),
-      fact('depart', String(trip.depart ?? '—'))),
+      fact('Trip', (trip.title || '—') + ' (' + trip.key + ')'),
+      fact('Depart', String(trip.depart ?? '—'))),
     el('div', { class: 'hrows' }, (trip.stops || []).map((stop) => homeRow(
       stop.city || '—', (stop.start || '?') + ' → ' + (stop.end || '?'),
       (stop.count || 0) + ' photo(s) · link ' + (stop.href || 'none (empty folder)') +
@@ -1419,15 +1419,15 @@ function albumListCard(r) {
 function albumCard(r) {
   const cfg = r.cfg || {};
   const body = [el('dl', { class: 'facts' },
-    fact('photos', r.photos + ' · ' + bytes(r.bytes) + (r.undated ? ' · ' + r.undated + ' undated' : '')),
-    r.span ? fact('span', r.span[0].slice(0, 10) + ' → ' + r.span[1].slice(0, 10)) : null,
-    fact('flags', [r.showcase ? 'showcase' : null, r.collection ? 'collection' : null].filter(Boolean).join(', ') || '—'),
-    fact('cover', r.cover || 'auto (newest photo)'),
-    fact('featured', r.featured.length ? r.featured.length + ' photo(s)' : '—'),
-    fact('tags', r.tags.join(', ') || '—'),
-    fact('look', [r.icon ? 'icon=' + r.icon : null, r.font ? 'font=' + r.font : null,
+    fact('Photos', r.photos + ' · ' + bytes(r.bytes) + (r.undated ? ' · ' + r.undated + ' undated' : '')),
+    r.span ? fact('Span', r.span[0].slice(0, 10) + ' → ' + r.span[1].slice(0, 10)) : null,
+    fact('Flags', [r.showcase ? 'showcase' : null, r.collection ? 'collection' : null].filter(Boolean).join(', ') || '—'),
+    fact('Cover', r.cover || 'auto (newest photo)'),
+    fact('Featured', r.featured.length ? r.featured.length + ' photo(s)' : '—'),
+    fact('Tags', r.tags.join(', ') || '—'),
+    fact('Look', [r.icon ? 'icon=' + r.icon : null, r.font ? 'font=' + r.font : null,
                   cfg.effect ? 'effect=' + cfg.effect[0] : null].filter(Boolean).join(', ') || '—'),
-    fact('text', r.descriptions.join(', ') || 'no album_*.md'))];
+    fact('Text', r.descriptions.join(', ') || 'no album_*.md'))];
   if (r.sub_albums.length) {
     body.push(sub('sub-albums', r.sub_albums.length));
     body.push(...foldedRows('lookup:subs:' + r.album, r.sub_albums, 10, (name) =>
@@ -1452,17 +1452,17 @@ function photoCard(r) {
     el('img', { class: 'ops__photo', src: thumbUrl(r.rel_path), alt: '', loading: 'lazy',
                 onerror: (ev) => { ev.target.remove(); } }),
     el('dl', { class: 'facts' },
-      fact('album', r.album),
-      fact('file', r.filename + ' · ' + bytes(r.size) + (r.width ? ' · ' + r.width + '×' + r.height : '')),
-      fact('on disk', r.file_exists ? 'yes' : 'no — the row is stale, run a scan', r.file_exists ? null : 'bad'),
-      fact('taken', r.taken_at || '— (no EXIF date; sorted by mtime)'),
+      fact('Album', r.album),
+      fact('File', r.filename + ' · ' + bytes(r.size) + (r.width ? ' · ' + r.width + '×' + r.height : '')),
+      fact('On disk', r.file_exists ? 'yes' : 'no — the row is stale, run a scan', r.file_exists ? null : 'bad'),
+      fact('Taken', r.taken_at || '— (no EXIF date; sorted by mtime)'),
       fact('mtime', stamp(r.mtime) + (drift ? ' — the file says ' + stamp(r.file_mtime) + ' (stale index)' : ''),
            drift ? 'warn' : null),
-      fact('indexed', r.indexed_at || '—'),
-      fact('featured', (r.is_showcase ? 'yes' : 'no') + ' · ' + (r.featured_by.length
+      fact('Indexed', r.indexed_at || '—'),
+      fact('Featured', (r.is_showcase ? 'yes' : 'no') + ' · ' + (r.featured_by.length
         ? r.featured_by.map((f) => f.album + ' → featured = ' + f.entry).join(', ')
         : 'no album.cfg entry features it')),
-      fact('tags', r.tags.join(', ') || '—')),
+      fact('Tags', r.tags.join(', ') || '—')),
     sub('derivatives'),
     el('div', { class: 'hrows' }, Object.entries(r.derivatives).map(([k, info]) =>
       homeRow(k, info.state, info.path))),
@@ -1488,8 +1488,8 @@ function photoCard(r) {
 function cfgCard(r) {
   const parsed = Object.keys(r.parsed || {}).sort();
   const body = [el('dl', { class: 'facts' },
-    fact('file', r.file),
-    fact('exists', r.exists ? 'yes' : 'no — the app falls back to defaults', r.exists ? null : 'warn'))];
+    fact('File', r.file),
+    fact('Exists', r.exists ? 'yes' : 'no — the app falls back to defaults', r.exists ? null : 'warn'))];
   body.push(sub('parsed', parsed.length));
   body.push(parsed.length
     ? el('dl', { class: 'facts' }, parsed.map((key) => fact(key, r.parsed[key].join(', '))))
@@ -1498,14 +1498,14 @@ function cfgCard(r) {
   if (res) {
     body.push(sub('resolved'));
     body.push(el('dl', { class: 'facts' },
-      fact('showcase album', String(res.showcase)),
-      fact('collection', String(res.collection)),
-      fact('cover', res.cover || '— (no photo found)'),
-      fact('reel', res.reel_mode + ' (' + res.reel + ' photo(s))'),
-      fact('tags', res.tags.join(', ') || '—'),
-      fact('descriptions', res.descriptions.join(', ') || '—'),
-      fact('wallpaper', res.wallpaper),
-      fact('wallpaper mobile', res.wallpaper_mobile)));
+      fact('Showcase album', String(res.showcase)),
+      fact('Collection', String(res.collection)),
+      fact('Cover', res.cover || '— (no photo found)'),
+      fact('Reel', res.reel_mode + ' (' + res.reel + ' photo(s))'),
+      fact('Tags', res.tags.join(', ') || '—'),
+      fact('Descriptions', res.descriptions.join(', ') || '—'),
+      fact('Wallpaper', res.wallpaper),
+      fact('Wallpaper mobile', res.wallpaper_mobile)));
   }
   body.push(sub('issues', r.issues.length));
   body.push(r.issues.length
@@ -1520,7 +1520,7 @@ function cfgCard(r) {
 
 function searchCard(r) {
   return card('fa-magnifying-glass', r.query, r.matches + ' match(es)' + (r.album ? ' in ' + r.album : ''),
-    r.ignored.length ? el('dl', { class: 'facts' }, fact('ignored', r.ignored.join(', ') + ' — not understood', 'warn')) : null,
+    r.ignored.length ? el('dl', { class: 'facts' }, fact('Ignored', r.ignored.join(', ') + ' — not understood', 'warn')) : null,
     r.photos.length
       ? foldedRows('lookup:search', r.photos, 20, (p) => homeRow(p.rel_path, (p.taken_at || 'undated').slice(0, 10), '',
           () => opsLookup('photo', p.rel_path)))
@@ -1540,10 +1540,10 @@ function paintOpsI18n(grid) {
   if (!r) return;
   const hard = I18N_HARD.reduce((n, k) => n + ((r.problems[k] || []).length), 0);
   const body = [el('dl', { class: 'facts' },
-    fact('table', r.keys + ' key(s) × ' + r.languages.length + ' language(s) in aperture/i18n.py'),
+    fact('Table', r.keys + ' key(s) × ' + r.languages.length + ' language(s) in aperture/i18n.py'),
     fact('app.js', Object.entries(r.js_languages).map(([k, n]) => k + ' ' + n).join(' · ') || '—'),
-    fact('used', r.used + ' referenced in templates and app code'),
-    fact('result', !r.total ? 'no problems found'
+    fact('Used', r.used + ' referenced in templates and app code'),
+    fact('Result', !r.total ? 'no problems found'
       : hard ? hard + ' problem(s) that affect rendering' : r.total + ' note(s), nothing broken',
       !r.total ? 'ok' : hard ? 'warn' : null))];
   for (const kind of I18N_ORDER) {
@@ -1568,9 +1568,9 @@ function paintOpsExport(grid) {
   if (!r) return;
   grid.append(wide(card('fa-box-archive', 'Export', 'every hand-written file, as one .tar.gz',
     el('dl', { class: 'facts' },
-      fact('contents', r.files.length + ' file(s) · ' + sizeOr0(r.bytes)),
-      fact('holds', 'gallery.cfg and .gallery/, every .album/ — config, descriptions, icons, fonts, backdrops'),
-      fact('leaves out', 'the photos: they already are the backup')),
+      fact('Contents', r.files.length + ' file(s) · ' + sizeOr0(r.bytes)),
+      fact('Holds', 'gallery.cfg and .gallery/, every .album/ — config, descriptions, icons, fonts, backdrops'),
+      fact('Leaves out', 'the photos: they already are the backup')),
     el('div', { class: 'card__actions' },
       el('a', { class: 'btn btn--primary', href: '/api/ops/export', download: '', icon: 'fa-download',
                 text: 'Download the archive' }),
@@ -1588,9 +1588,9 @@ function paintOpsAccess(grid, st, ro) {
   grid.append(wide(card('fa-key', isSet ? 'Change the password' : 'Set a password',
     isSet ? 'the console asks for it wherever it listens' : 'none is set — anyone who reaches this port can use the console',
     el('dl', { class: 'facts' },
-      fact('door', isSet ? 'password' : 'open', isSet ? 'ok' : 'warn'),
-      fact('listens on', auth.bind || '—'),
-      fact('without one', auth.may_run_open
+      fact('Door', isSet ? 'password' : 'open', isSet ? 'ok' : 'warn'),
+      fact('Listens on', auth.bind || '—'),
+      fact('Without one', auth.may_run_open
         ? 'allowed here — loopback, or CONSOLE_ALLOW_OPEN=1'
         : 'not allowed — this console would refuse to start')),
     ro ? quiet('The console is mounted read-only.') : null,
@@ -2154,14 +2154,14 @@ function paintHome() {
           (st.pause.reason ? ' — ' + st.pause.reason : '')
         : live ? '' : 'no heartbeat — start the gallery to index' })),
     el('dl', { class: 'facts' },
-      fact('last scan', scan
+      fact('Last scan', scan
         ? ago(scan.finished_at) + ' · ' + (scan.trigger || '?') +
           (scan.seconds != null ? ' · ' + scan.seconds + 's' : '')
         : 'never'),
-      fact('it did', scan ? scanSummary(res) : '—'),
-      fact('every', paths.scan_interval ? paths.scan_interval + 's' : 'manual only'),
-      fact('watcher', paths.watcher ? 'on' : 'off'),
-      fact('role', st.role || '—')),
+      fact('It did', scan ? scanSummary(res) : '—'),
+      fact('Every', paths.scan_interval ? paths.scan_interval + 's' : 'manual only'),
+      fact('Watcher', paths.watcher ? 'on' : 'off'),
+      fact('Role', st.role || '—')),
     el('div', { class: 'card__actions' },
       el('button', {
         type: 'button', class: 'btn btn--primary', icon: 'fa-arrows-rotate', text: 'Scan now',
@@ -3112,8 +3112,8 @@ function renderSaveBar() {
 
   if (!changed.length) {
     bar.append(el('span', { class: 'savebar__note', text: READ_ONLY
-      ? 'readonly mount · saving disabled'
-      : 'idle · comments and untouched keys survive every save' }));
+      ? 'Read-only mount — saving is off'
+      : 'Nothing to save. Comments and untouched keys survive every save.' }));
   } else {
     bar.append(el('span', { class: 'savebar__note',
       text: changed.length + ' unsaved' }));
@@ -3184,7 +3184,7 @@ function renderRaw() {
     area,
     el('div', { class: 'savebar' },
       el('span', { class: 'savebar__note',
-        text: READ_ONLY ? 'readonly mount · saving disabled' : 'whole-file write' }),
+        text: READ_ONLY ? 'Read-only mount — saving is off' : 'Saving writes the whole file.' }),
       el('button', {
         class: 'btn', type: 'button', icon: 'fa-rotate-left', text: 'Revert',
         onclick: () => { area.value = state.data.raw || ''; },

@@ -832,7 +832,7 @@ html.is-booting .openbar { opacity: 0; }
 .boot__sub {
   font-family: var(--mono);
   font-size: var(--fs-chrome-md);
-  letter-spacing: .3em;
+  letter-spacing: var(--tr-chrome-md);
   text-transform: uppercase;
   color: color-mix(in srgb, var(--acc-soft) 30%, var(--acc));
   /* the wordmark glitches in; the line under it just arrives, a beat
@@ -845,7 +845,7 @@ html.is-booting .openbar { opacity: 0; }
 @media (max-width: 620px) {
   .boot__stage { gap: var(--s-6); }
   .boot__name { font-size: var(--fs-chrome-lg); letter-spacing: var(--tr-chrome-sm); }
-  .boot__sub { font-size: var(--fs-chrome-xs); letter-spacing: .22em; }
+  .boot__sub { font-size: var(--fs-chrome-xs); letter-spacing: var(--tr-chrome-xs); }
 }
 
 /* splash.js never shows this screen under a reduced-motion request, so this
@@ -974,7 +974,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .brand-sub {
   font-family: var(--mono);
   font-size:var(--fs-chrome-xs);
-  letter-spacing: .28em;
+  letter-spacing: var(--tr-chrome-xs);
   text-transform: uppercase;
   color: color-mix(in srgb, var(--acc-soft) 30%, var(--acc));
 }
@@ -1064,13 +1064,10 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .pane > .issues { padding-bottom: 36px; }
 
 .pane__empty {
-  color: var(--text-ghost);
-  padding: 56px var(--s-3);
+  color: var(--text-dim);
+  padding: var(--s-9) var(--s-3);
   text-align: center;
-  font-family: var(--mono);
-  font-size:var(--fs-chrome-md);
-  letter-spacing: .12em;
-  text-transform: uppercase;
+  font-size: var(--fs-text-md);
 }
 
 /* ----- tree ------------------------------------------------------------ */
@@ -1085,10 +1082,9 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .tree ul { list-style: none; margin: 0; padding: 0; }
 
 .tree__empty {
-  padding: 14px;
-  color: var(--text-ghost);
-  font-family: var(--mono);
-  font-size:var(--fs-chrome-sm);
+  padding: var(--s-4);
+  color: var(--text-dim);
+  font-size: var(--fs-text-sm);
 }
 
 .tree__row {
@@ -1302,7 +1298,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .pill {
   font-family: var(--mono);
   font-size:var(--fs-chrome-xs);
-  letter-spacing: .2em;
+  letter-spacing: var(--tr-chrome-xs);
   text-transform: uppercase;
   padding: var(--s-1) var(--s-3);
   border-radius: var(--radius);
@@ -1347,7 +1343,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   color: var(--text-ghost);
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
-  letter-spacing: .12em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
   padding: var(--s-2) var(--s-4);
   cursor: pointer;
@@ -1379,45 +1375,46 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
      collapses the empty tracks and stretches that single tile across the
      whole pane — a toggle 1100px wide. */
   grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-  gap: var(--s-3);
+  /* NEBULA's .stack, in two directions: the tiles share their hairlines
+     instead of each floating in its own box. A one-hair gap with every
+     tile ringed in --line lays two rings on the same pixel, so a seam is
+     one line, and an empty track at the end of a row draws nothing. */
+  gap: var(--hair);
   margin-top: var(--s-4);
-  align-items: start;
+  align-items: stretch;
 }
 
 .field {
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
-  padding:var(--s-4) var(--s-4);
-  border: var(--hair) solid var(--line);
-  border-left: 2px solid var(--acc-soft);
+  padding: var(--s-4) var(--s-5);
+  box-shadow: 0 0 0 var(--hair) var(--line);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--glass);
   min-width: 0;
 }
 
 .field--wide { grid-column: 1 / -1; }
 
 /* An unset key is still listed — it is part of the vocabulary — but it
-   recedes: no fill, no accent edge. */
-.field.is-unset {
-  background: transparent;
-  border-left-color: var(--line);
-}
+   recedes: no fill. (Set keys used to carry an accent edge too; a key
+   being written in the file is not a state the accent marks.) */
+.field.is-unset { background: transparent; }
 
 /* Staged but not written. Amber is the file-is-out-of-date colour here (the
    save bar's dirty note uses it), so an edit is findable by eye without
    reading the bar's chip list. */
 .field.is-edited {
-  border-left-color: var(--amb);
-  background: linear-gradient(180deg, rgba(var(--amb-rgb), .06), transparent 60%), var(--surface);
+  box-shadow: 0 0 0 var(--hair) var(--line), inset 2px 0 0 var(--amb);
+  background: linear-gradient(180deg, rgba(var(--amb-rgb), .06), transparent 60%), var(--glass);
 }
 
 .field__flag {
   flex: 0 0 auto;
   font-family: var(--mono);
   font-size:var(--fs-chrome-xs);
-  letter-spacing: .16em;
+  letter-spacing: var(--tr-chrome-xs);
   text-transform: uppercase;
   color: var(--amb);
 }
@@ -1432,20 +1429,22 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 
 .field__top { display: flex; align-items: center; gap: var(--s-3); }
 
+/* The key exactly as it is written in the file: mono, because it is an
+   identifier, and never cased (NEBULA rule 4) -- wallpaper_mobile is what
+   the operator types, not WALLPAPER_MOBILE. */
 .field__label {
   flex: 1 1 auto;
   font-family: var(--mono);
-  font-size:var(--fs-chrome-sm);
-  font-weight: 400;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-  color: var(--label);
+  font-size: var(--fs-chrome-md);
+  font-weight: 500;
+  letter-spacing: var(--tr-num);
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.field.is-unset .field__label { color: var(--text-ghost); font-weight: 400; }
+.field.is-unset .field__label { color: var(--text-dim); font-weight: 400; }
 
 .field__unset {
   appearance: none;
@@ -1462,7 +1461,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 .field__unset:hover { color: var(--red); }
 
 .field__help {
-  color: var(--text-ghost);
+  color: var(--text-dim);
   font-size:var(--fs-text-sm);
   line-height: 1.45;
 }
@@ -1527,7 +1526,7 @@ input:focus, select:focus, textarea:focus {
   -webkit-backdrop-filter: var(--glass-blur);
   font-family: var(--mono);
   font-size:var(--fs-chrome-md);
-  letter-spacing: .08em;
+  letter-spacing: var(--tr-chrome-md);
   padding: var(--s-3) var(--s-4);
 }
 
@@ -1555,7 +1554,7 @@ select option { background: var(--surface); color: var(--text); }
   color: var(--text-dim);
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
-  letter-spacing: .16em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
   padding:var(--s-3) var(--s-4);
   cursor: pointer;
@@ -1635,7 +1634,7 @@ select option { background: var(--surface); color: var(--text); }
   color: var(--text-ghost);
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
-  letter-spacing: .12em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
   padding: var(--s-2) var(--s-4);
   cursor: pointer;
@@ -1717,7 +1716,7 @@ select option { background: var(--surface); color: var(--text); }
   flex: 0 0 auto;
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
-  letter-spacing: .12em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
   color: var(--red);
 }
@@ -1890,11 +1889,11 @@ select option { background: var(--surface); color: var(--text); }
 .issue--error { border-left: 2px solid var(--red); }
 .issue--warn  { border-left: 2px solid var(--amb); }
 
+/* A cfg key, so it is written as the file writes it -- never cased. */
 .issue__key {
   font-family: var(--mono);
-  font-size:var(--fs-chrome-sm);
-  letter-spacing: .12em;
-  text-transform: uppercase;
+  font-size: var(--fs-chrome-md);
+  letter-spacing: var(--tr-num);
   color: var(--text);
   flex: 0 0 auto;
 }
@@ -1912,11 +1911,9 @@ select option { background: var(--surface); color: var(--text); }
 .issue__detail { color: var(--text-dim); }
 
 .empty-note {
-  color: var(--text-ghost);
-  padding: 18px 0;
-  font-family: var(--mono);
-  font-size:var(--fs-chrome-sm);
-  letter-spacing:var(--tr-chrome-lg);
+  color: var(--text-dim);
+  padding: var(--s-5) 0;
+  font-size: var(--fs-text-md);
 }
 
 /* ----- sticky save bar -------------------------------------------------- */
@@ -1949,10 +1946,8 @@ select option { background: var(--surface); color: var(--text); }
 }
 
 .savebar__note {
-  color: var(--text-ghost);
-  font-family: var(--mono);
-  font-size:var(--fs-chrome-sm);
-  letter-spacing: .08em;
+  color: var(--text-dim);
+  font-size: var(--fs-text-sm);
   flex: 1 1 auto;
   white-space: nowrap;
 }
@@ -2026,18 +2021,16 @@ select option { background: var(--surface); color: var(--text); }
   color: var(--text-ghost);
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
-  letter-spacing: .08em;
+  letter-spacing: var(--tr-chrome-sm);
 }
 
 .dropzone {
   border: var(--hair) dashed var(--line-strong);
   border-radius: var(--radius);
-  padding: 22px;
+  padding: var(--s-6);
   text-align: center;
   color: var(--text-ghost);
-  font-family: var(--mono);
-  font-size:var(--fs-chrome-sm);
-  letter-spacing:var(--tr-num);
+  font-size: var(--fs-text-md);
   cursor: pointer;
   transition: border-color var(--dur-1) ease, color var(--dur-1) ease;
 }
@@ -2092,14 +2085,13 @@ select option { background: var(--surface); color: var(--text); }
   border-bottom: var(--hair) solid var(--line);
 }
 
+/* A dialog asks a question, and a question is read (NEBULA .dlg). */
 .modal__head h2 {
   margin: 0;
-  font-family: var(--mono);
-  font-size:var(--fs-chrome-sm);
+  font-size: var(--fs-text-lg);
   font-weight: 600;
-  letter-spacing: .2em;
-  text-transform: uppercase;
-  color: var(--text);
+  letter-spacing: var(--tr-head);
+  color: var(--text-head);
   white-space: nowrap;
 }
 
@@ -2122,7 +2114,7 @@ select option { background: var(--surface); color: var(--text); }
   color: var(--text-ghost);
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
-  letter-spacing: .08em;
+  letter-spacing: var(--tr-chrome-sm);
 }
 
 /* ----- toast -----------------------------------------------------------
@@ -2131,27 +2123,37 @@ select option { background: var(--surface); color: var(--text); }
    statuses -- each with a glyph as well as its colour, set by toast(). */
 .toast {
   position: fixed;
-  bottom: 26px;
+  /* clear of the footer AND a save bar under it: a report that covers the
+     line saying whether there is anything to save has hidden a fact. */
+  bottom: var(--s-10);
   left: 50%;
-  transform: translateX(-50%);
+  translate: -50% 0;
   z-index: 300;
-  padding:var(--s-4) 20px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  max-width: min(calc(100vw - 2 * var(--page-pad)), var(--door-w));
+  padding: var(--s-3) var(--s-4);
   border-radius: var(--radius);
-  background: var(--surface-2);
+  /* NEBULA's toast: a menu's surface, because it has to read over whatever
+     the pane happens to have under it -- and a sentence, so it is sans. */
+  background-color: var(--overlay);
+  backdrop-filter: var(--overlay-blur);
+  -webkit-backdrop-filter: var(--overlay-blur);
   border: var(--hair) solid var(--line-strong);
   border-left: 2px solid var(--chrome);
-  font-family: var(--mono);
-  font-size:var(--fs-chrome-sm);
-  letter-spacing:var(--tr-chrome-lg);
-  text-transform: uppercase;
+  box-shadow: var(--shadow-2);
+  font-size: var(--fs-text-md);
   color: var(--text);
-  box-shadow: 0 14px 40px -12px rgba(0, 0, 0, .85);
 }
 
-.toast.is-ok   { border-left-color: var(--ok);  color: var(--ok); }
-.toast.is-warn { border-left-color: var(--amb); color: var(--amb); }
-.toast.is-err  { border-left-color: var(--red); color: var(--red); }
-.toast > .fa   { margin-right: var(--s-2); }
+.toast.is-ok   { border-left-color: var(--ok); }
+.toast.is-warn { border-left-color: var(--amb); }
+.toast.is-err  { border-left-color: var(--red); }
+.toast > .fa   { flex: 0 0 auto; color: var(--label); }
+.toast.is-ok   > .fa { color: var(--ok); }
+.toast.is-warn > .fa { color: var(--amb); }
+.toast.is-err  > .fa { color: var(--red); }
 
 /* ----- footer ---------------------------------------------------------- */
 /* The gallery's footer, kept as a bar because this is an app shell rather
@@ -2310,22 +2312,20 @@ select option { background: var(--surface); color: var(--text); }
 .group.is-folded .group__blurb { display: none; }
 .group.is-folded { margin-bottom: 10px; }
 
-/* The gallery's .search-group__label — the eyebrow over a group of results
-   is the same object as the eyebrow over a group of keys. */
+/* A group of keys is headed like a card: sans, sentence case, with its
+   line of prose under it. */
 .group__title {
   margin: 0;
-  font-family: var(--mono);
-  font-size:var(--fs-chrome-sm);
-  font-weight: 400;
-  letter-spacing:var(--tr-chrome-xs);
-  text-transform: uppercase;
-  color: var(--label);
+  font-size: var(--fs-text-lg);
+  font-weight: 600;
+  letter-spacing: var(--tr-head);
+  color: var(--text-head);
 }
 
 .group__blurb {
   margin: var(--s-1) 0 0;
   font-size:var(--fs-text-sm);
-  color: var(--text-ghost);
+  color: var(--text-dim);
   max-width: 88ch;
 }
 
@@ -2439,7 +2439,7 @@ select option { background: var(--surface); color: var(--text); }
   flex: 1 1 auto;
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
-  letter-spacing: .12em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
   color: var(--text-ghost);
 }
@@ -2492,7 +2492,7 @@ select option { background: var(--surface); color: var(--text); }
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
   font-weight: 600;
-  letter-spacing: .2em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
   color: var(--text-ghost);
 }
@@ -2506,16 +2506,16 @@ select option { background: var(--surface); color: var(--text); }
   font-size:var(--fs-text-sm);
 }
 
+/* The gallery's .kv dt: the name of a fact is read, so it is sans and
+   keeps its own case -- some of them are a cfg key or an EXIF tag, and
+   casing those is restyling data. */
 .facts dt {
-  font-family: var(--mono);
-  font-size:var(--fs-chrome-sm);
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--text-ghost);
-  padding-top: var(--s-0);
+  font-size: var(--fs-text-sm);
+  letter-spacing: var(--tr-text);
+  color: var(--text-dim);
 }
 
-.facts dd { margin: 0; color: var(--text-dim); }
+.facts dd { margin: 0; color: var(--text); }
 
 /* ----- tag chips -------------------------------------------------------- */
 .chips { display: flex; flex-wrap: wrap; gap:var(--s-2); }
@@ -2533,7 +2533,7 @@ select option { background: var(--surface); color: var(--text); }
   color: var(--text-dim);
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
-  letter-spacing: .12em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
 }
 
@@ -2556,7 +2556,7 @@ select option { background: var(--surface); color: var(--text); }
   font-family: var(--mono);
   font-size:var(--fs-chrome-xs);
   font-weight: 700;
-  letter-spacing: .02em;
+  letter-spacing: var(--tr-chrome-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2794,7 +2794,7 @@ img.is-broken { opacity: .2; }
   /* The save bar is the one thing that must never need horizontal hunting on
      a phone: label and chips take the first line, the buttons the second. */
   .savebar { gap: var(--s-3); padding: 10px var(--pane-x) var(--s-4); }
-  .savebar__note { flex: 1 1 100%; white-space: normal; font-size: 10px; }
+  .savebar__note { flex: 1 1 100%; white-space: normal; }
   /* Idle, the settings bar has nothing to say that is worth two lines at the
      bottom of a phone — the Save button alone is the state. It speaks up
      again the moment there is something staged. */
@@ -2846,7 +2846,7 @@ img.is-broken { opacity: .2; }
   .foot__bit:not(.foot__bit--keep) { display: none; }
   /* the separator belongs to a sibling that is no longer there */
   .foot__bit + .foot__bit--keep::before { content: none; }
-  .toast { left: var(--s-4); right: var(--s-4); bottom: 14px; transform: none; text-align: center; }
+  .toast { left: var(--s-4); right: var(--s-4); translate: none; max-width: none; }
 }
 
 /* The tree, the folder tiles and the list rows all repaint on :hover. On a
@@ -2920,7 +2920,7 @@ img.is-broken { opacity: .2; }
 .login__label {
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
-  letter-spacing: .16em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
   color: var(--label);
 }
@@ -3001,7 +3001,7 @@ img.is-broken { opacity: .2; }
   color: var(--amb);
   font-family: var(--mono);
   font-size: var(--fs-chrome-sm);
-  letter-spacing: .1em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
 }
 
@@ -3053,7 +3053,7 @@ img.is-broken { opacity: .2; }
   color: var(--text);
   font-family: var(--mono);
   font-size:var(--fs-chrome-sm);
-  letter-spacing: .12em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
 }
 .openbar > span:first-child { white-space: nowrap; }
@@ -3231,7 +3231,7 @@ img.is-broken { opacity: .2; }
   color: var(--text-ghost);
   font-family: var(--mono);
   font-size: var(--fs-chrome-sm);
-  letter-spacing: .12em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
   padding: var(--s-2) var(--s-4);
   cursor: pointer;
@@ -3266,7 +3266,7 @@ img.is-broken { opacity: .2; }
 .sidebar__title {
   font-family: var(--mono);
   font-size: var(--fs-chrome-sm);
-  letter-spacing: .18em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
   color: var(--label);
 }
@@ -3313,24 +3313,30 @@ img.is-broken { opacity: .2; }
   padding: var(--s-4) var(--s-5);
   border-bottom: var(--hair) solid var(--line);
 }
+/* The gallery's .panel h2: a panel's heading is read, so it is sans and
+   sentence case. The mono eyebrow it used to be is what made every card on
+   a screen shout the same small caps at once. */
 .card__title {
   margin: 0;
-  font-family: var(--mono);
-  font-size: var(--fs-chrome-sm);
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  color: var(--label);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  font-size: var(--fs-text-lg);
+  font-weight: 600;
+  letter-spacing: var(--tr-head);
+  color: var(--text-head);
 }
+.card__title > .fa { color: var(--label); font-size: var(--icon-md); }
 .card__note {
   font-size: var(--fs-text-sm);
-  color: var(--text-ghost);
+  color: var(--text-dim);
   text-align: right;
 }
 .card__body { padding: var(--s-5); }
 .card__quiet {
   margin: 0;
   font-size: var(--fs-text-sm);
-  color: var(--text-ghost);
+  color: var(--text-dim);
 }
 
 /* A heading inside a card — one group of a long report. */
@@ -3342,7 +3348,7 @@ img.is-broken { opacity: .2; }
   margin: var(--s-6) 0 var(--s-2);
   font-family: var(--mono);
   font-size: var(--fs-chrome-sm);
-  letter-spacing: .14em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
   color: var(--label);
   border-bottom: var(--hair) solid var(--line);
@@ -3363,7 +3369,7 @@ img.is-broken { opacity: .2; }
   margin: 0;
   font-family: var(--mono);
   font-size: var(--fs-chrome-sm);
-  letter-spacing: .08em;
+  letter-spacing: var(--tr-chrome-sm);
   color: var(--text-dim);
 }
 .update__versions strong { color: var(--text); font-weight: inherit; }
@@ -3391,15 +3397,15 @@ img.is-broken { opacity: .2; }
 .lamp__dot.is-bad  { background: var(--red); box-shadow: 0 0 10px rgba(var(--red-rgb), .5); }
 .lamp__word {
   font-family: var(--mono);
-  font-size: var(--fs-text-lg);
-  letter-spacing: .1em;
+  font-size: var(--fs-chrome-lg);
+  letter-spacing: var(--tr-chrome-lg);
   text-transform: uppercase;
   color: var(--text);
 }
 .lamp__word.is-ok   { color: var(--ok); }
 .lamp__word.is-warn { color: var(--amb); }
 .lamp__word.is-bad  { color: var(--red); }
-.lamp__note { font-size: var(--fs-text-sm); color: var(--text-ghost); }
+.lamp__note { font-size: var(--fs-text-sm); color: var(--text-dim); }
 
 /* ----- a short list of facts ------------------------------------------- */
 /* `.facts` is the sheet's own definition list (a photo's metadata uses it);
@@ -3435,7 +3441,7 @@ img.is-broken { opacity: .2; }
 .tile__k {
   font-family: var(--mono);
   font-size: var(--fs-chrome-xs);
-  letter-spacing: .16em;
+  letter-spacing: var(--tr-chrome-xs);
   text-transform: uppercase;
   color: var(--text-ghost);
 }
@@ -3464,11 +3470,11 @@ img.is-broken { opacity: .2; }
 .hrow__key {
   font-family: var(--mono);
   font-size: var(--fs-chrome-sm);
-  letter-spacing: .1em;
+  letter-spacing: var(--tr-chrome-sm);
   color: var(--label);
   overflow-wrap: anywhere;
 }
-.hrow__detail { color: var(--text-ghost); overflow-wrap: anywhere; }
+.hrow__detail { color: var(--text-dim); overflow-wrap: anywhere; }
 
 /* ----- pretty links ---------------------------------------------------- */
 /* The Links screen: one form and one list, both inside the .card every other
@@ -3495,7 +3501,7 @@ img.is-broken { opacity: .2; }
 .links__label {
   font-family: var(--mono);
   font-size: var(--fs-chrome-xs);
-  letter-spacing: .16em;
+  letter-spacing: var(--tr-chrome-xs);
   text-transform: uppercase;
   color: var(--label);
 }
@@ -3518,8 +3524,7 @@ img.is-broken { opacity: .2; }
 }
 .links__hint {
   margin: var(--s-4) 0 0;
-  font-family: var(--mono);
-  font-size: var(--fs-chrome-sm);
+  font-size: var(--fs-text-sm);
   color: var(--text-dim);
   overflow-wrap: anywhere;
 }
@@ -3559,7 +3564,7 @@ img.is-broken { opacity: .2; }
   flex: 0 0 auto;
   font-family: var(--mono);
   font-size: var(--fs-chrome-xs);
-  letter-spacing: .14em;
+  letter-spacing: var(--tr-chrome-xs);
   text-transform: uppercase;
   color: var(--label);
 }
@@ -3708,7 +3713,7 @@ img.is-broken { opacity: .2; }
   list-style: none;
   font-family: var(--mono);
   font-size: var(--fs-chrome-sm);
-  letter-spacing: .14em;
+  letter-spacing: var(--tr-chrome-sm);
   text-transform: uppercase;
   color: var(--text-ghost);
 }

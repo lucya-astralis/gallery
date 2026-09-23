@@ -34,6 +34,25 @@ Both surfaces caught up with the rules Nebula wrote down since 1.11.2.
 * **The touch target and the door's width are tokens** (`--tap`,
   `--door-w`), and the sign-in button is 44px tall on a desktop too.
 
+**Changed**
+
+* **The console reads less like a terminal.** It now speaks Nebula's two
+  voices the way the gallery does: card, group and dialog headings, the
+  names in a list of facts, empty states, hints, the save bar's line and
+  the toast are sans and sentence case. Mono stays on what is chrome or an
+  identifier.
+* **Settings are one sheet, not a pile of boxes.** The keys share their
+  hairlines, a set key no longer wears an accent edge (being written in the
+  file is not a state), and a key is shown as the file writes it:
+  `wallpaper_mobile`, never `WALLPAPER_MOBILE`. The same goes for the key
+  in a config warning.
+* **Reading copy is `--text-dim` at the faintest**, as Nebula's first rule
+  asks. Help text, notes and empty states were a step fainter.
+* **The toast is Nebula's**: the menu surface, a sentence, a coloured glyph,
+  and it sits clear of the save bar.
+* Every tracked label takes the tracking paired with its size
+  (`--tr-chrome-*`), so there are no hand-typed `em` values left.
+
 ---
 
 ## 1.11.2 — 2026-09-23
