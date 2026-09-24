@@ -658,10 +658,10 @@
      the three statuses), and only ever on a glyph -- never text, never a
      fill, never a border. Validated as a set on this ground, every pair,
      under protan/deutan/tritan (dataviz validate_palette.js, --pairs all). */
-  --glyph-album:   #9F6DAB; /* albums, folders, photos, the site */
-  --glyph-tag:   #AE2C5E; /* tags */
-  --glyph-time:    #1F98ED; /* time: dates, history, activity */
-  --glyph-machine: #295AB9; /* the machine and the camera */
+  --glyph-album:   #C867C6; /* albums, folders, photos, the site */
+  --glyph-tag:   #C31773; /* tags */
+  --glyph-time:    #009BF0; /* time: dates, history, activity */
+  --glyph-machine: #8443D3; /* the machine and the camera */
   --nav-h:      60px;
   /* The mono face, spelled once. Every label, readout and HUD string on the
      site reads this, and it is character-for-character the configurator's

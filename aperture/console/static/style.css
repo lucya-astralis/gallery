@@ -375,19 +375,19 @@
      the three statuses), and only ever on a glyph -- never text, never a
      fill, never a border. Validated as a set on this ground, every pair,
      under protan/deutan/tritan (dataviz validate_palette.js, --pairs all). */
-  --glyph-album:   #9F6DAB;   /* albums, folders, photos, the site */
-  --glyph-tag:   #AE2C5E;   /* tags */
-  --glyph-time:    #1F98ED;   /* time: dates, history, activity */
-  --glyph-machine: #295AB9;   /* the machine and the camera */
+  --glyph-album:   #C867C6;   /* albums, folders, photos, the site */
+  --glyph-tag:   #C31773;   /* tags */
+  --glyph-time:    #009BF0;   /* time: dates, history, activity */
+  --glyph-machine: #8443D3;   /* the machine and the camera */
   /* CHART RAMPS. Each glyph hue as four steps, light to dark, for a chart
      whose parts are RANKED (a ring's slices, largest first): one family
      per chart, never a hue per slice. Everything past the fourth is one
      neutral "other". Validated per ramp on this ground as ordinal: one hue,
      monotone lightness, visible gaps, the dark end clear of the surface. */
-  --ramp-album-1:   #E1BBEA; --ramp-album-2:   #C28ECF; --ramp-album-3:   #9C6AA8; --ramp-album-4:   #784883;
-  --ramp-tag-1:   #FFA9C4; --ramp-tag-2:   #F8719C; --ramp-tag-3:   #CD4A78; --ramp-tag-4:   #A42156;
-  --ramp-time-1:    #8CD2FF; --ramp-time-2:    #3BACFF; --ramp-time-3:    #0085D9; --ramp-time-4:    #0060B1;
-  --ramp-machine-1: #A2CBFF; --ramp-machine-2: #6BA2FF; --ramp-machine-3: #487CDE; --ramp-machine-4: #2657B6;
+  --ramp-album-1:   #F5AFF2; --ramp-album-2:   #DC7ADA; --ramp-album-3:   #B454B3; --ramp-album-4:   #8D2F8D;
+  --ramp-tag-1:   #FFA0CE; --ramp-tag-2:   #FF5FA9; --ramp-tag-3:   #D83385; --ramp-tag-4:   #AE0062;
+  --ramp-time-1:    #87D3FF; --ramp-time-2:    #2BADFF; --ramp-time-3:    #0087DA; --ramp-time-4:    #0061B2;
+  --ramp-machine-1: #D9B3FF; --ramp-machine-2: #BB7EFF; --ramp-machine-3: #9657E8; --ramp-machine-4: #732EBF;
   --ramp-other:    #4A4A55;
   --tap:         44px;
   --door-w:      420px;
