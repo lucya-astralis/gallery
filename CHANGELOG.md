@@ -18,10 +18,18 @@ notes are never one commit apart.
 
 ---
 
-## 1.12.0 — 2026-09-24
+## 2.0.0 — 2026-09-24
 
-The console, rebuilt around what you came to do. This is the first step of a
-larger rework: the frame is new, and the screens inside it follow.
+The console, rebuilt around what you came to do: a different shape, the same
+files. It is now a set of places with addresses, a Library over every photo
+with a real selection, and a tag manager.
+
+**Before you upgrade:** nothing to do. No cfg key, file name, sidecar format
+or database column changed, and the gallery itself is untouched — pull,
+rebuild, restart. What changes is where things are in the console: albums
+are the **Albums** place (no sidecar tree any more), photos and tagging are
+the **Library**, and Operations is **System**. Old bookmarks to the console's
+root still land on the Overview.
 
 **New**
 
