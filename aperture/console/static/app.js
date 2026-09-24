@@ -316,15 +316,16 @@ async function select(sel, keepTab = false, how = 'push') {
   state.data = null;
   if (!keepTab) { state.tab = 'settings'; state.query = ''; }
   if (sel.kind === 'ops') opsState.tab = sel.tab || 'overview';
-  if (sel.kind === 'tags') opsState.tab = 'tags';
   if (how !== 'none') setAddress(sel, how === 'replace');
   syncRail();
   syncDirtyMark();
   $('#pane').scrollTop = 0;
+  $('#pane').classList.remove('pane--library');
   $('#pane').innerHTML = '';
   $('#pane').append(el('div', { class: 'pane__empty', text: 'Loading…' }));
   if (sel.kind === 'home') { await renderHome(); return true; }
-  if (sel.kind === 'ops' || sel.kind === 'tags') { await renderOps(); return true; }
+  if (sel.kind === 'ops') { await renderOps(); return true; }
+  if (sel.kind === 'tags') { await renderTagsPlace(); return true; }
   if (sel.kind === 'links') { await renderLinks(sel.draft); return true; }
   if (sel.kind === 'changelog') { await renderChangelog(); return true; }
   if (sel.kind === 'albums') { renderAlbums(); return true; }
@@ -428,16 +429,6 @@ const GALLERY_GROUPS = [
 let paneScroll = 0;
 let paneScrollLanded = 0;
 
-/* Markup that arrives after renderPane() has already returned (the photo grid
- * of a folder that still has to be fetched) calls this once it has height, so
- * the clamped scroll position can be restored. Left alone if the pane moved
- * in the meantime — that movement is the user scrolling. */
-function keepPaneScroll() {
-  const pane = $('#pane');
-  if (!pane || pane.scrollTop !== paneScrollLanded) return;
-  pane.scrollTop = paneScroll;
-  paneScrollLanded = pane.scrollTop;
-}
 
 /* ============================================================
    OPERATIONS
@@ -565,7 +556,7 @@ const onEnter = (fn) => (ev) => { if (ev.key === 'Enter') { ev.preventDefault();
 const wide = (node) => el('div', { class: 'home__wide' }, node);
 const quiet = (text) => el('p', { class: 'card__quiet', text });
 const sizeOr0 = (n) => (n ? bytes(n) : '0 B');
-const onOps = () => !!state.sel && (state.sel.kind === 'ops' || state.sel.kind === 'tags');
+const onOps = () => !!state.sel && state.sel.kind === 'ops';
 
 /* A field whose value outlives a repaint: a job finishing repaints the whole
  * screen, and a half-typed album path should still be there afterwards. */
@@ -668,7 +659,6 @@ function paintOps() {
   const st = opsState.status || {};
   const ro = !!st.read_only || READ_ONLY;
   const scroll = pane.scrollTop;
-  const tagsPlace = state.sel.kind === 'tags';
   pane.innerHTML = '';
 
   const fill = (grid) => {
@@ -681,24 +671,11 @@ function paintOps() {
     (OPS_PAINT[opsState.tab] || paintOpsOverview)(grid, st, ro);
   };
 
-  if (tagsPlace) {
-    pane.append(el('div', { class: 'pane__top' },
-      el('div', { class: 'head' },
-        el('div', { class: 'head__crumb', text: 'every .tags sidecar under ' + state.meta.photos_dir }),
-        el('div', { class: 'head__line' },
-          el('h1', { class: 'head__title', text: 'Tags' }),
-          el('div', { class: 'head__meta' },
-            el('span', { class: 'pill', icon: 'fa-tags', text: (state.vocab || []).length + ' in use' }))))));
-    const grid = el('div', { class: 'home' });
-    pane.append(grid);
-    fill(grid);
-  } else {
-    const label = (SYSTEM_TABS.find(([id]) => id === opsState.tab) || SYSTEM_TABS[0])[1];
-    systemFrame(pane, label, st.control_dir || '', [
-      el('span', { class: 'pill', icon: 'fa-server', text: 'role ' + (st.role || '—') }),
-      ro ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null,
-    ], fill);
-  }
+  const label = (SYSTEM_TABS.find(([id]) => id === opsState.tab) || SYSTEM_TABS[0])[1];
+  systemFrame(pane, label, st.control_dir || '', [
+    el('span', { class: 'pill', icon: 'fa-server', text: 'role ' + (st.role || '—') }),
+    ro ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null,
+  ], fill);
   pane.scrollTop = scroll;
 }
 
@@ -3134,17 +3111,6 @@ async function loadFolder(path, withTags = false) {
   return payload;
 }
 
-/* The same lookup without the await: renderPhotosTab() needs to know whether
- * it can fill the grid in this tick or has to wait for the network. */
-function cachedFolder(path, withTags = false) {
-  return photoCache.get((path || '::root') + (withTags ? '|t' : '')) || null;
-}
-
-function invalidateFolder(path) {
-  photoCache.delete((path || '::root') + '|t');
-  photoCache.delete(path || '::root');
-}
-
 /* Breadcrumb from the browse root down to the current folder. */
 function crumbs(root, current, onGo) {
   const rootLabel = root ? (root.split('/').pop() || root) : 'photos';
@@ -3178,381 +3144,6 @@ function folderTile(folder, onOpen) {
       el('span', { class: 'foldertile__name', text: folder.name }),
       el('span', { class: 'foldertile__count',
                    text: folder.count + (folder.count === 1 ? ' photo' : ' photos') })));
-}
-
-/* ----- the Library ------------------------------------------------------
- * Every photo in the archive, browsed from the root down. An album is a
- * place in it, and the address follows the folder you are in, so Back
- * climbs back out. */
-function renderLibrary() {
-  const pane = $('#pane');
-  paneScroll = pane.scrollTop;
-  const b = state.browse;
-  if (b && b.path !== (state.sel.album || '')) {
-    state.sel = { kind: 'library', album: b.path };
-    setAddress(state.sel);
-    paneScroll = 0;
-  }
-  pane.innerHTML = '';
-  const album = state.sel.album || '';
-  const node = album ? treeNode(album) : null;
-  const idx = (opsState.status && opsState.status.index) || {};
-  pane.append(el('div', { class: 'pane__top' },
-    el('div', { class: 'head' },
-      el('div', { class: 'head__crumb', text: state.meta.photos_dir + (album ? '/' + album : '') }),
-      el('div', { class: 'head__line' },
-        el('h1', { class: 'head__title', text: node ? node.name : 'Library' }),
-        el('div', { class: 'head__meta' },
-          el('span', { class: 'pill', icon: 'fa-image', text: (node ? node.total_photos : idx.images ?? '—') + ' photos' }),
-          node ? el('a', { class: 'btn', href: pathFor({ kind: 'album', album }), 'data-go': true,
-                           icon: 'fa-sliders', text: 'Album settings' }) : null)))));
-  pane.append(renderPhotosTab());
-  pane.scrollTop = paneScroll;
-  paneScrollLanded = pane.scrollTop;
-}
-
-/* ----- Photos & tags tab ------------------------------------------------ */
-/* Where a photo browser starts: the Library from the photo root, so its
- * breadcrumb climbs all the way up; anything else from its own album. */
-const browseRoot = () => (state.sel.kind === 'library' ? '' : state.sel.album || '');
-
-function renderPhotosTab() {
-  const album = browseRoot();
-  if (!state.browse) state.browse = { path: state.sel.album || '', selected: new Set(), detail: null };
-  const b = state.browse;
-
-  const panel = el('div', { class: 'tabpanel' });
-  panel.append(el('div', { class: 'field__help tabnote u-mb' },
-    'Browse folder by folder. Click a photo to select it and see its metadata; ' +
-    'use its corner tick — or ctrl-click — to add more, shift-click for a run. ' +
-    'Photo files are never modified: tags go into a .tags sidecar next to each ' +
-    'photo, which is what the gallery reads.'));
-
-  /* The grid and the detail panel are laid out side by side, never stacked.
-   * The detail used to be a sticky sheet over the bottom of the grid, which
-   * covered most of the photos the moment one was selected — so picking a
-   * second one was impossible without scrolling it out of the way. */
-  const main = el('div', { class: 'photos__main' });
-  const aside = el('div', { class: 'photos__aside' });
-  panel.append(el('div', { class: 'photos' }, main, aside));
-
-  main.append(crumbs(album, b.path, (path) => {
-    b.path = path; b.detail = null; renderPane();
-  }));
-
-  const body = el('div', { class: 'browser' });
-  main.append(body);
-
-  /* A folder already in the cache is drawn in this same tick rather than a
-   * microtask later: renderPane() puts the pane's scroll position back the
-   * moment it returns, and against a body still holding nothing but
-   * "Loading…" that position does not exist yet — the scrollport is too
-   * short for it, the browser clamps it, and every click on a photo threw
-   * the page back towards the top. */
-  const cached = cachedFolder(b.path, true);
-  if (cached) {
-    fillBrowser(body, b, cached);
-  } else {
-    body.append(el('div', { class: 'empty-note', text: 'Loading…' }));
-    loadFolder(b.path, true).then((payload) => {
-      if (!state.browse || state.browse.path !== b.path) return;
-      fillBrowser(body, b, payload);
-      keepPaneScroll();
-    }).catch((err) => {
-      body.innerHTML = '';
-      body.append(el('div', { class: 'empty-note', text: err.message }));
-    });
-  }
-
-  if (b.selected.size) aside.append(renderTagBar(b));
-  if (b.detail) aside.append(renderDetail(b.detail));
-  if (!b.selected.size && !b.detail) {
-    aside.append(el('div', { class: 'aside-empty' },
-      'Click a photo to see its metadata. Tick its corner — or ctrl-click — ' +
-      'to add it to a selection you can tag all at once.'));
-  }
-  return panel;
-}
-
-/* Draw one folder into the browser column: its sub-folders, the bar above
- * the grid, then the tiles. Split out of renderPhotosTab so a folder that
- * is already cached can be drawn without waiting for a microtask. */
-function fillBrowser(body, b, payload) {
-  const album = browseRoot();
-  body.innerHTML = '';
-
-
-  if (payload.folders.length) {
-    body.append(el('div', { class: 'folders' },
-      payload.folders.map((f) => folderTile(f, (path) => {
-        b.path = path; b.detail = null; renderPane();
-      }))));
-  }
-
-  if (!payload.photos.length) {
-    if (!payload.folders.length) {
-      body.append(el('div', { class: 'empty-note', text: 'Nothing in this folder.' }));
-    }
-    return;
-  }
-
-  const rels = payload.photos.map((p) => p.rel);
-  const allPicked = rels.every((r) => b.selected.has(r));
-  body.append(el('div', { class: 'browser__bar' },
-    el('span', { class: 'browser__count',
-                 text: payload.photos.length + ' photo' +
-                       (payload.photos.length === 1 ? '' : 's') + ' here' }),
-    READ_ONLY ? null : el('button', {
-      class: 'btn btn--sm', type: 'button',
-      icon: 'fa-check-double',
-      text: allPicked ? 'Deselect all here' : 'Select all here',
-      onclick: () => {
-        if (allPicked) rels.forEach((r) => b.selected.delete(r));
-        else rels.forEach((r) => b.selected.add(r));
-        renderPane();
-      },
-    })));
-
-  const cover = value('cover');
-  const featured = (value('featured') || []).map(strip);
-  const order = (value('order') || []).map(strip);
-  const subOf = (rel) => album ? rel.slice(album.length + 1) : rel;
-
-  const toggle = (rel) => {
-    if (b.selected.has(rel)) b.selected.delete(rel);
-    else b.selected.add(rel);
-  };
-
-  const grid = el('div', { class: 'grid' });
-  payload.photos.forEach((photo, index) => {
-    const roles = [];
-    const sub = subOf(photo.rel);
-    if (cover && strip(cover) === sub) roles.push('cover');
-    if (featured.includes(sub)) roles.push('featured');
-    if (order.includes(sub)) roles.push('#' + (order.indexOf(sub) + 1));
-    const picked = b.selected.has(photo.rel);
-
-    grid.append(el('div', {
-      class: 'cell' + (picked ? ' is-picked' : '') +
-             (b.detail === photo.rel ? ' is-detail' : ''),
-      title: photo.rel,
-      onclick: (ev) => {
-        if (ev.shiftKey && b.lastIndex !== undefined) {
-          const [from, to] = [Math.min(b.lastIndex, index), Math.max(b.lastIndex, index)];
-          for (let i = from; i <= to; i++) b.selected.add(payload.photos[i].rel);
-        } else if (ev.ctrlKey || ev.metaKey) {
-          toggle(photo.rel);
-        } else {
-          b.selected.clear();
-          b.selected.add(photo.rel);
-        }
-        b.lastIndex = index;
-        b.detail = photo.rel;
-        renderPane();
-      },
-    },
-      el('img', { src: thumbUrl(photo.rel), alt: '', loading: 'lazy' }),
-      // A plain-click way to extend the selection: not everyone reaches for
-      // a modifier, and on some setups ctrl-click never arrives at all.
-      el('button', {
-        class: 'cell__pick' + (picked ? ' is-on' : ''),
-        type: 'button',
-        text: picked ? '✓' : '',
-        title: picked ? 'remove from the selection' : 'add to the selection',
-        onclick: (ev) => {
-          ev.stopPropagation();
-          toggle(photo.rel);
-          b.lastIndex = index;
-          renderPane();
-        },
-      }),
-      // Everything written over a tile has to survive being narrow: the roles
-      // are separate chips along the top, and the tags share the footer with
-      // the file name — one line each, ellipsised, with the whole text on the
-      // tooltip. As two wide badges they wrapped across the photo, and the
-      // tags landed on top of the roles.
-      roles.length
-        ? el('span', { class: 'cell__roles', title: roles.join(', ') },
-            roles.map((r) => el('span', { class: 'cell__role', text: r })))
-        : null,
-      el('span', { class: 'cell__foot' },
-        (photo.tags || []).length
-          ? el('span', { class: 'cell__tags', text: photo.tags.join(' · '),
-                         title: photo.tags.join(', ') })
-          : null,
-        el('span', { class: 'cell__name', text: photo.name }))));
-  });
-  body.append(grid);
-}
-
-/* Read-only EXIF for the photo last clicked, plus its own tags. */
-function renderDetail(rel) {
-  const box = el('aside', { class: 'detail' });
-  box.append(el('div', { class: 'detail__head' },
-    el('span', { class: 'detail__name', text: splitPath(rel)[1] }),
-    el('button', {
-      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', icon: 'fa-xmark', title: 'close',
-      onclick: () => { state.browse.detail = null; renderPane(); },
-    })));
-  const body = el('div', { class: 'detail__body' },
-    el('div', { class: 'empty-note', text: 'Reading metadata…' }));
-  box.append(body);
-
-  api('/api/image?path=' + encodeURIComponent(rel)).then((info) => {
-    if (!state.browse || state.browse.detail !== rel) return;
-    body.innerHTML = '';
-    const m = info.meta;
-
-    body.append(el('img', { class: 'detail__thumb', src: thumbUrl(rel), alt: '' }));
-
-    const facts = [
-      ['Dimensions', m.width ? m.width + ' × ' + m.height : '—'],
-      ['File', (m.format || '?') + ' · ' + bytes(m.size)],
-    ].concat((m.fields || []).map((f) => [f.label, f.value]));
-    if (m.gps) facts.push(['GPS', 'present in the file']);
-    if (m.error) facts.push(['Unreadable', m.error]);
-
-    body.append(el('dl', { class: 'facts' }, facts.map(([k, v]) => [
-      el('dt', { text: k }), el('dd', { text: v }),
-    ])));
-    body.append(el('p', { class: 'field__help field__hint', text:
-      'Read-only — the console never rewrites a photo file.' }));
-    if (!READ_ONLY) body.append(el('div', { class: 'row' }, linkButton(rel, 'Pretty link…')));
-
-    body.append(el('h3', { class: 'detail__sub', icon: 'fa-tags', text: 'Tags' }));
-    body.append(tagChips(info.tags, READ_ONLY ? null : (next) =>
-      applyTags({ photos: [rel], set: next })));
-    if (!READ_ONLY) {
-      body.append(tagInput('Add a tag…', (tag) => applyTags({ photos: [rel], add: [tag] })));
-    }
-  }).catch((err) => {
-    body.innerHTML = '';
-    body.append(el('div', { class: 'empty-note', text: err.message }));
-  });
-
-  return box;
-}
-
-/* The bulk panel: whatever is selected gets tagged together. It lives in the
- * side column rather than as a bar across the bottom — a sticky bar covered
- * the photos it existed to tag. */
-function renderTagBar(b) {
-  const count = b.selected.size;
-  const picked = [...b.selected];
-  const box = el('aside', { class: 'detail bulk' });
-  box.append(el('div', { class: 'detail__head' },
-    el('span', { class: 'detail__name',
-                 text: count + ' photo' + (count === 1 ? '' : 's') + ' selected' }),
-    el('button', {
-      class: 'btn btn--sm btn--ghost btn--icon', type: 'button', icon: 'fa-xmark',
-      title: 'deselect all',
-      onclick: () => { b.selected.clear(); renderPane(); },
-    })));
-
-  const body = el('div', { class: 'detail__body' });
-  box.append(body);
-
-  // What the selection already carries, so removing a tag is a click and not
-  // a guess typed into a prompt.
-  const common = new Map();
-  for (const rel of picked) {
-    for (const tag of (tagsOf(rel) || [])) {
-      common.set(tag, (common.get(tag) || 0) + 1);
-    }
-  }
-  if (common.size) {
-    body.append(el('h3', { class: 'detail__sub', icon: 'fa-tags', text: 'Tags in the selection' }));
-    body.append(el('div', { class: 'chips' }, [...common.entries()]
-      .sort((a, c) => c[1] - a[1] || a[0].localeCompare(c[0]))
-      .map(([tag, n]) => el('span', { class: 'chip' },
-        tag + (n < count ? ' (' + n + '/' + count + ')' : ''),
-        READ_ONLY ? null : el('button', {
-          class: 'chip__x', type: 'button', icon: 'fa-xmark',
-          title: 'remove from all ' + count,
-          onclick: () => applyTags({ photos: picked, remove: [tag] }),
-        })))));
-  }
-
-  if (!READ_ONLY) {
-    body.append(el('h3', { class: 'detail__sub', icon: 'fa-plus', text: 'Add to all' }));
-    body.append(tagInput('Type a tag, press ↵', (tag) =>
-      applyTags({ photos: picked, add: [tag] })));
-    body.append(el('button', {
-      class: 'btn btn--sm btn--ghost btn--danger', type: 'button', icon: 'fa-eraser', text: 'Clear every tag',
-      onclick: () => {
-        if (confirm('Remove every tag from the ' + count + ' selected photos?')) {
-          applyTags({ photos: picked, set: [] });
-        }
-      },
-    }));
-  }
-  return box;
-}
-
-/* Tags of one photo out of the folder payload already in the cache — the
- * bulk panel needs them without a request per selected photo. */
-function tagsOf(rel) {
-  const payload = photoCache.get((state.browse.path || '::root') + '|t');
-  if (!payload) return [];
-  const photo = payload.photos.find((p) => p.rel === rel);
-  return photo ? (photo.tags || []) : [];
-}
-
-async function applyTags(payload) {
-  try {
-    const res = await api('/api/tags', { method: 'PUT', body: JSON.stringify(payload) });
-    // The response carries each photo's new tag list, so the cached folder is
-    // patched in place rather than thrown away: a refetch would land after the
-    // re-render, leaving the panel briefly showing no tags at all.
-    const cached = photoCache.get((state.browse.path || '::root') + '|t');
-    if (cached) {
-      for (const photo of cached.photos) {
-        if (photo.rel in res.tags) photo.tags = res.tags[photo.rel];
-      }
-    }
-    invalidateFolder(state.browse ? state.browse.path : '');
-    if (cached) photoCache.set((state.browse.path || '::root') + '|t', cached);
-    await loadVocab();
-    renderPane();
-    toast('Tags updated on ' + res.changed + ' photo' + (res.changed === 1 ? '' : 's'));
-  } catch (err) {
-    toast('Tagging failed: ' + err.message, 'err');
-  }
-}
-
-function tagChips(tags, onChange) {
-  if (!tags.length) return el('div', { class: 'empty-note', text: 'No tags yet.' });
-  return el('div', { class: 'chips' }, tags.map((tag) =>
-    el('span', { class: 'chip' }, tag,
-      onChange ? el('button', {
-        class: 'chip__x', type: 'button', icon: 'fa-xmark', title: 'remove',
-        onclick: () => onChange(tags.filter((t) => t !== tag)),
-      }) : null)));
-}
-
-/* A tag field backed by the gallery-wide vocabulary, so the same idea does
- * not end up spelled three ways across an album. */
-function tagInput(placeholder, onSubmit, extraClass) {
-  const listId = 'tagvocab';
-  if (!$('#' + listId)) {
-    document.body.append(el('datalist', { id: listId }));
-  }
-  const datalist = $('#' + listId);
-  datalist.innerHTML = '';
-  for (const t of state.vocab) {
-    datalist.append(el('option', { value: t.name, label: t.name + ' (' + t.count + ')' }));
-  }
-  return el('input', {
-    class: extraClass || '', type: 'text', placeholder, list: listId, autocomplete: 'off',
-    onkeydown: (ev) => {
-      if (ev.key !== 'Enter') return;
-      ev.preventDefault();
-      const tag = ev.target.value.trim();
-      if (!tag) return;
-      ev.target.value = '';
-      onSubmit(tag);
-    },
-  });
 }
 
 /* ----- description tab -------------------------------------------------- */

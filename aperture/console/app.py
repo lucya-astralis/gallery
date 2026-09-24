@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import re
 import shutil
+import sqlite3
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,7 +33,7 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from .. import brand, checks, scanner, update_check
+from .. import brand, checks, db, scanner, search, update_check
 from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
@@ -765,6 +766,146 @@ async def api_tags_write(request: Request):
         _writes(request, "tags", sidecar, before)
 
     return {"ok": True, "changed": len(results), "tags": results}
+
+
+def _retag(request: Request, change) -> dict:
+    """Run `change(tags) -> tags` over every sidecar in the tree and write
+    back the ones it changed. The tag manager's one write path: each file
+    still goes through sidecar_target, gets a backup and an audit line, so a
+    rename across four hundred photos is four hundred ordinary tag writes."""
+    _guard_write()
+    changed: list[str] = []
+    for rel, _path in list(lib.sidecars()):
+        try:
+            sidecar = sidecar_target(settings.photos_dir, rel, is_image=schema.is_image)
+        except PathRefused:
+            continue   # an orphan sidecar: its photo is gone, nothing to retag
+        have = lib.read_tags(rel)
+        want = change(have)
+        if want == have:
+            continue
+        before = security.sha256_of(sidecar)
+        _backup(sidecar, "tags")
+        lib.write_tags(rel, want)
+        _writes(request, "tags", sidecar, before)
+        changed.append(rel)
+    return {"ok": True, "changed": len(changed), "photos": changed}
+
+
+def _tag_name(body: dict, field: str) -> str:
+    raw = body.get(field)
+    name = str(raw).strip() if isinstance(raw, str) else ""
+    if not name:
+        raise HTTPException(400, "expected a tag in `%s`" % field)
+    if "," in name or "\n" in name:
+        raise HTTPException(400, "a tag cannot contain a comma or a line break")
+    return name
+
+
+@app.post("/api/tags/rename")
+async def api_tags_rename(request: Request):
+    """Rename a tag on every photo that carries it. Renaming onto a tag that
+    already exists is a merge: a photo with both keeps one."""
+    body = await _json_body(request)
+    old, new = _tag_name(body, "from"), _tag_name(body, "to")
+
+    def change(tags: list[str]) -> list[str]:
+        if not any(t.lower() == old.lower() for t in tags):
+            return tags
+        out: list[str] = []
+        for tag in tags:
+            tag = new if tag.lower() == old.lower() else tag
+            if tag.lower() not in {t.lower() for t in out}:
+                out.append(tag)
+        return out
+
+    return _retag(request, change)
+
+
+@app.post("/api/tags/delete")
+async def api_tags_delete(request: Request):
+    """Take a tag off every photo. A sidecar left with nothing in it is
+    removed, as lib.write_tags always does."""
+    body = await _json_body(request)
+    name = _tag_name(body, "tag")
+    return _retag(request, lambda tags: [t for t in tags if t.lower() != name.lower()])
+
+
+# ----- the Library ------------------------------------------------------
+@app.get("/api/library")
+def api_library():
+    """Every photo, with what the index knows about it and what its sidecar
+    says right now.
+
+    The FILES and the TAGS come off disk in one walk (lib.catalog), because
+    the index is a scan behind and a tag written a second ago has to show. The
+    capture facts come from the index, read-only -- they are what a scan
+    extracted, and extracting them again here would be a second indexer. A
+    photo the index has not seen yet is listed with `indexed: false`."""
+    photos, tags = lib.catalog()
+    facts: dict[str, dict] = {}
+    try:
+        for row in db.conn().execute(
+                "SELECT rel_path, width, height, taken_at, camera, lens, iso, aperture, "
+                "focal, is_showcase FROM images"):
+            facts[row["rel_path"]] = dict(row)
+    except sqlite3.Error:
+        facts = {}
+    out = []
+    for photo in photos:
+        fact = facts.get(photo["rel"])
+        out.append({
+            **photo,
+            "tags": tags.get(photo["rel"], []),
+            "indexed": fact is not None,
+            "w": fact and fact["width"], "h": fact and fact["height"],
+            "taken": fact and fact["taken_at"],
+            "camera": fact and fact["camera"], "lens": fact and fact["lens"],
+            "iso": fact and fact["iso"], "f": fact and fact["aperture"],
+            "mm": fact and fact["focal"],
+            "featured": bool(fact and fact["is_showcase"]),
+        })
+    return {"photos": out, "total": len(out), "indexed": len(facts)}
+
+
+@app.get("/api/library/search")
+def api_library_search(q: str = ""):
+    """Which photos the gallery's own search grammar finds -- the same parser
+    /search, /api/photos?q= and the CLI use (aperture/search.py), over the
+    index. The Library filters its own list by the answer; the filters that
+    are the console's alone (a tag in a sidecar, an album, a state) it applies
+    itself."""
+    query = search.parse(q)
+    cond, params = search.condition(query, "i")
+    try:
+        rows = db.conn().execute(f"SELECT i.rel_path FROM images i WHERE {cond}", params).fetchall()
+    except sqlite3.Error as exc:
+        raise HTTPException(503, "the index cannot be read: %s" % exc)
+    return {
+        "matches": [row["rel_path"] for row in rows],
+        "words": query.text,
+        "filters": [{"label": f.label, "ok": f.ok} for f in query.filters],
+    }
+
+
+@app.get("/api/preview")
+def api_preview(path: str):
+    """The gallery's large preview of one photo -- what the Library's loupe
+    shows. Built first when missing, into the same tree the gallery serves
+    it from; never the original."""
+    try:
+        source = lib.safe(path)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    rel = relative_to_photos(settings.photos_dir, source)
+    if not source.is_file() or not schema.is_image(source.name) or scanner.is_meta_path(Path(rel)):
+        raise HTTPException(404, "no such photo")
+    preview = scanner.ensure_thumb(settings.photos_dir, settings.previews_dir, rel,
+                                   settings.preview_size, ext=scanner.PREVIEW_EXT)
+    if preview is None:
+        raise HTTPException(415, "cannot decode %s" % source.name)
+    return FileResponse(preview, media_type=schema.MIME[scanner.PREVIEW_EXT],
+                        headers={"Cache-Control": "private, max-age=86400"})
 
 
 # ----- .album assets ----------------------------------------------------

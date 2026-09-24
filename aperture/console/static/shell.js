@@ -126,7 +126,7 @@ function renderRail() {
 function railCounts() {
   const idx = (opsState.status && opsState.status.index) || {};
   return {
-    library: idx.images ?? null,
+    library: L.photos ? L.photos.length : idx.images ?? null,
     albums: state.tree ? countAlbums(state.tree) : null,
     tags: state.vocab ? state.vocab.length : null,
   };
@@ -525,16 +525,9 @@ async function openSetting(sel, key) {
   if (input) input.focus();
 }
 
-/* A tag, wherever tags are looked at. For now that is the Tags place and the
- * list of photos that carry it. */
-async function openTag(tag) {
-  opsState.inputs['tags-tag'] = tag;
-  await select({ kind: 'tags' });
-  opsLoad('tag', '/api/ops/tags?' + qs({ tag }));
-}
-
 async function reloadAll() {
   photoCache.clear();
+  L.photos = null;
   await Promise.all([loadTree(), loadVocab(), loadOpsStatus()]);
   syncLamp();
   renderRail();

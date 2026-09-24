@@ -20,6 +20,21 @@ _SKIP_DIRS = {schema.ALBUM_META_DIR, schema.GALLERY_META_DIR, "__pycache__"}
 _SKIP_FILES = {".DS_Store", "Thumbs.db", "desktop.ini"}
 
 
+def parse_tags(raw: str) -> list[str]:
+    """A sidecar's text as tags, exactly as the gallery's scanner reads it:
+    commas and newlines both separate, blanks drop, and a repeat that only
+    differs in case is dropped as a duplicate."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for chunk in raw.replace("\n", ",").split(","):
+        tag = chunk.strip()
+        if not tag or tag.lower() in seen:
+            continue
+        seen.add(tag.lower())
+        out.append(tag)
+    return out
+
+
 def asset_kinds(name: str) -> list[str]:
     """Every role a file in an album's .album/ folder could fill.
 
@@ -309,22 +324,64 @@ class Library:
         return photo.with_suffix(photo.suffix + ".tags")
 
     def read_tags(self, rel: str) -> list[str]:
-        """Tags on one photo, parsed exactly as the gallery's scanner does:
-        commas and newlines both separate, blanks drop, and a repeat that only
-        differs in case is dropped as a duplicate."""
+        """Tags on one photo, parsed exactly as the gallery's scanner does."""
         try:
             raw = self.tags_path(rel).read_text(encoding="utf-8", errors="replace")
         except OSError:
             return []
-        out: list[str] = []
-        seen: set[str] = set()
-        for chunk in raw.replace("\n", ",").split(","):
-            tag = chunk.strip()
-            if not tag or tag.lower() in seen:
-                continue
-            seen.add(tag.lower())
-            out.append(tag)
-        return out
+        return parse_tags(raw)
+
+    def catalog(self) -> tuple[list[dict], dict[str, list[str]]]:
+        """Every photo in the tree and every photo's tags, in ONE walk.
+
+        The Library's source of truth for what is on disk: the index lags a
+        scan behind, and a tag written a second ago has to be there when the
+        page asks again. Photos as {rel, album, name, size, mtime}; tags as
+        photo rel -> list, read from the sidecars the way the scanner reads
+        them."""
+        photos: list[dict] = []
+        tags: dict[str, list[str]] = {}
+        for folder, dirnames, filenames in os.walk(self.root):
+            dirnames[:] = sorted((d for d in dirnames if _visible_dir(d)), key=str.lower)
+            here = Path(folder)
+            album = here.relative_to(self.root).as_posix()
+            album = "" if album == "." else album
+            prefix = album + "/" if album else ""
+            for filename in sorted(filenames, key=str.lower):
+                if filename.endswith(".tags"):
+                    photo = filename[:-len(".tags")]
+                    if not schema.is_image(photo):
+                        continue
+                    try:
+                        raw = (here / filename).read_text(encoding="utf-8", errors="replace")
+                    except OSError:
+                        continue
+                    parsed = parse_tags(raw)
+                    if parsed:
+                        tags[prefix + photo] = parsed
+                    continue
+                if filename in _SKIP_FILES or not schema.is_image(filename):
+                    continue
+                try:
+                    st = (here / filename).stat()
+                except OSError:
+                    continue
+                photos.append({"rel": prefix + filename, "album": album, "name": filename,
+                               "size": st.st_size, "mtime": int(st.st_mtime)})
+        return photos, tags
+
+    def sidecars(self):
+        """(photo rel, sidecar path) for every .tags file named after a
+        photograph. Whether that photo still exists is the caller's question
+        -- the write path proves it through paths.sidecar_target."""
+        for folder, dirnames, filenames in os.walk(self.root):
+            dirnames[:] = [d for d in dirnames if _visible_dir(d)]
+            here = Path(folder)
+            album = here.relative_to(self.root).as_posix()
+            prefix = "" if album == "." else album + "/"
+            for filename in filenames:
+                if filename.endswith(".tags") and schema.is_image(filename[:-len(".tags")]):
+                    yield prefix + filename[:-len(".tags")], here / filename
 
     def write_tags(self, rel: str, tags: list[str]) -> list[str]:
         """Replace a photo's tags. An empty list removes the sidecar entirely

@@ -52,7 +52,6 @@
 .fa-camera{ --fa:"\f030"; }
 .fa-chart-simple{ --fa:"\e473"; }
 .fa-check{ --fa:"\f00c"; }
-.fa-check-double{ --fa:"\f560"; }
 .fa-chevron-down{ --fa:"\f078"; }
 .fa-chevron-left{ --fa:"\f053"; }
 .fa-chevron-right{ --fa:"\f054"; }
@@ -64,6 +63,7 @@
 .fa-circle-up{ --fa:"\f35b"; }
 .fa-clock-rotate-left{ --fa:"\f1da"; }
 .fa-code-branch{ --fa:"\f126"; }
+.fa-code-merge{ --fa:"\f387"; }
 .fa-copy{ --fa:"\f0c5"; }
 .fa-database{ --fa:"\f1c0"; }
 .fa-display{ --fa:"\e163"; }

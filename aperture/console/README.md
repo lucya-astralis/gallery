@@ -151,47 +151,89 @@ edge to amber, and the save bar lists one chip per staged key: the name jumps
 to that field — through a filter, through a fold — and the ✕ undoes that one
 change rather than all of them.
 
-### Photos & tags
+### The Library
 
-The **Photos & tags** tab is a folder browser, not a flat wall: sub-folders
-come up as tiles with a cover and a count, and only the photos actually in the
-folder you are looking at are listed. A 391-photo trip is browsed the way it is
-stored. The same browser backs every photo picker, so choosing a cover out of
-`japan_2026/kansai/osaka` is a matter of clicking down to it. Typing in the
-picker's filter switches to searching the whole subtree below where you stand.
+The **Library** is every photo in the archive in one grid, in three columns:
+the **filters** on the left, the **grid**, and the **inspector** on the right,
+each scrolling on its own so the tag field stays where your hand is while the
+grid runs on under it.
+
+**What it lists.** `/api/library` walks the tree once for the files and their
+`.tags` sidecars, and joins the capture facts (date, camera, lens, exposure,
+featured) out of the index read-only. Tags come off disk rather than out of
+the index, so a tag written a second ago is there on the next read; a photo no
+scan has seen yet is listed and marked *not indexed yet*.
+
+**Narrowing it down.**
+
+| | |
+| --- | --- |
+| Albums | the folder you are in and the folders under it; the address follows (`/library/japan_2026/kansai`) |
+| Tags | any of the ticked ones, plus **Untagged** |
+| Year, Camera | what a scan read from the EXIF |
+| Status | Featured, Not indexed yet |
+| Search | the gallery's own grammar (`camera:`, `lens:`, `iso:`, `f:`, `mm:`, `date:` and words), answered by `/api/library/search` through `aperture/search.py` — plus the console's `tag:`, `album:` and `is:featured / is:untagged / is:new`, which it applies itself |
+
+Every facet counts what you would get by ticking it, and every active filter
+is a chip above the grid that one click removes.
+
+**Selecting.** Click picks one. Ctrl-click or the corner tick adds or takes
+one away, Shift-click takes a run, and dragging across the gaps draws a
+**lasso** (Shift or Ctrl adds to what was picked). `Ctrl A` takes everything
+that matches — not only the tiles drawn so far — and `Ctrl I` inverts. The
+arrow keys move, Shift-arrows extend, `Esc` lets go. A filter that hides a
+picked photo also unpicks it, so nothing is ever tagged behind your back.
+
+**Tagging.** The inspector lists the tags in the selection, each with how
+many of the picked photos carry it: a full chip is on all of them, a dashed
+one on some — click it to put it on the rest. `T` jumps to the field, which
+autocompletes against every tag in use and takes several at once with commas;
+the tags you used this session sit under it as one-click chips.
+
+**Undo.** Every tag change can be taken back with `Ctrl Z` (and put back with
+`Ctrl Shift Z`): each photo gets its own earlier list back, photos that shared
+one in a single request.
+
+**Looking closer.** `Space`, `Enter` or a double click opens the **loupe** on
+the gallery's large preview — never the original. `←`/`→` step through what
+matches, `X` picks or drops the photo you are looking at.
+
+**Acting on the selection.** Feature or unfeature (the `featured` list of each
+photo's own album), make a photo its album's cover, give it a pretty link, copy
+the paths. Each is an ordinary `album.cfg` save, with the same backup and audit
+line as any other.
+
+Tags are written to a `<photo>.tags` sidecar, which is exactly what the
+gallery's scanner already reads; because it folds the sidecar's mtime into the
+photo's, the next scan picks the change up on its own. The console never
+rewrites a photo file — this library is almost entirely PNG and BMP, where
+there is no dependable metadata container to write into.
+
+### Tags
+
+The **Tags** place is the vocabulary: every tag with how many photos carry it
+and where, a click from the Library narrowed to it. **Rename** rewrites the
+tag in every sidecar; renaming onto a tag that exists **merges** the two (a
+photo with both keeps one). **Delete** takes it off every photo. Both go
+through `/api/tags/rename` and `/api/tags/delete`, which write each sidecar
+the way a single tag write does — through `paths.sidecar_target`, with a
+backup and an audit line each.
+
+Above the list, **Probably the same tag** pairs tags that are one typo apart
+or differ only in case, spaces, hyphens or underscores (`tokio` / `tokyo`,
+`Night` / `night`), with a Merge button. Below it, **Sidecars and the index**
+lists where the two disagree until the next scan.
+
+### Pickers and ordered lists
+
+The photo pickers (a cover, the featured list, the welcome reels) are a folder
+browser, not a flat wall: sub-folders come up as tiles with a cover and a
+count. Typing in the picker's filter searches the whole subtree below where
+you stand.
 
 Every ordered list — `featured`, `order`, `album_order`, the welcome reels —
 is drag-to-reorder, since file order *is* display order for all of them. Each
 row also has ↑/↓ buttons, so reordering never requires a mouse.
-
-Click a photo to select it and open its metadata. To build a selection there
-is a tick in each tile's corner — no modifier needed — plus ctrl-click to
-toggle, shift-click to take a run, and **Select all here** for the whole
-folder.
-
-The selection panel and the metadata panel sit in a **column beside the grid**,
-never on top of it. That is deliberate: as a sticky bar across the bottom, the
-tagging controls covered most of the photos they existed to tag, which made
-picking a second photo impossible without scrolling them out of the way. On a
-phone there is no second column, so they move **above** the grid rather than
-below it — stacked underneath, tagging forty photos meant scrolling past all
-forty to reach the panel that tags them.
-
-Whatever is selected can be tagged in one go. The panel lists the tags already
-in the selection — with a `4/6` count when only some of them carry it — so
-removing one is a click rather than a guess. The add field autocompletes
-against every tag used anywhere in the gallery, so the same idea does not end
-up spelled three ways.
-
-Tags are written to a `<photo>.tags` sidecar, which is exactly what the
-gallery's scanner already reads; because it folds the sidecar's mtime into the
-photo's, the next scan picks the change up on its own.
-
-Clicking a photo also opens its metadata panel: dimensions, file size, camera,
-lens, exposure, aperture, ISO, focal length, capture date. That panel is
-**read-only** — the console never rewrites a photo file. This library is
-almost entirely PNG and BMP, where there is no dependable metadata container
-to write into, so tags in a sidecar are the honest way to attach anything.
 
 ### Custom attributes
 
@@ -388,7 +430,8 @@ aperture/console/
   imagemeta.py  read-only EXIF for the metadata panel
   static/       style.css, shell.js, app.js, bg/, logo/ (the fonts are the gallery's)
                 shell.js is the frame: the places, the addresses, the palette,
-                the keys and the Albums table; app.js draws what is in a place
+                the keys and the Albums table; library.js the Library and the
+                Tags place; app.js draws what is in the other places
   templates/    index.html
 ```
 

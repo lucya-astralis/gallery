@@ -37,8 +37,26 @@ larger rework: the frame is new, and the screens inside it follow.
 * **Keyboard**: `?` lists the keys, `g` and a letter jumps to a place.
 * **Albums is a table**: cover, photos, config and text state per album,
   with a filter, "unwritten" and "with issues" views and three sort orders.
-* **The Library** browses every photo from the root down, with the same
-  selection and bulk tagging an album's Photos tab had.
+* **The Library** is every photo in one grid, with filters for album, tag
+  (and "untagged"), year, camera and status, and the gallery's own search
+  grammar (`camera:`, `lens:`, `date:` …) plus `tag:`, `album:` and `is:`.
+  Every facet counts what ticking it would give.
+* **Selection like a photo tool**: click, Ctrl-click, Shift-click, a lasso
+  across the gaps, `Ctrl A` for everything that matches, `Ctrl I` to invert,
+  arrow keys with Shift to extend.
+* **Tags in one go**: the inspector shows each tag in the selection as
+  "on all" or "on 2 of 6" — click the second to put it on the rest. `T`
+  jumps to the field; commas add several; recently used tags are one click.
+* **Undo for tags**: `Ctrl Z` gives every photo its own earlier tags back,
+  `Ctrl Shift Z` redoes.
+* **The loupe**: `Space` shows the photo large (the gallery's preview, never
+  the original), `←`/`→` step through, `X` picks it.
+* **Acting on a selection**: feature or unfeature, make a cover, give a photo
+  a pretty link, copy the paths.
+* **The Tags place manages the vocabulary**: rename a tag everywhere, merge
+  two by renaming one onto the other, delete one from every photo — each
+  sidecar backed up and audited. It also points out tags that are probably
+  the same one (`tokio` / `tokyo`) with a Merge button.
 * The bar shows the **indexer's lamp** on every screen, and an amber mark
   while the page has unsaved edits.
 
