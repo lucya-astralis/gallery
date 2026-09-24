@@ -2,8 +2,8 @@
  *
  * Plain HTML, no library: every chart here shows ONE series, so it takes one
  * neutral ink (--label, --chrome under the pointer) and no categorical
- * palette -- the glyph hue of the kind of thing it counts (time orange,
- * albums teal, tags rose, cameras violet), the same hue its card's icon
+ * palette -- the glyph hue of the kind of thing it counts (time sky,
+ * albums sage, tags rose, cameras violet), the same hue its card's icon
  * wears. The accent is state in Nebula, not data, so no chart wears it --
  * only a progress fill does (the tag coverage meter). Sizes ride custom
  * properties through the CSSOM, because the console's CSP drops a style
@@ -109,7 +109,7 @@ function photosOverTime(photos, onBucket) {
     m += quarterly ? 3 : 1;
     if (m > 12) { m -= 12; y++; }
   }
-  return { node: columnChart(buckets, { hue: 'orange' }), quarterly, buckets };
+  return { node: columnChart(buckets, { hue: 'sky', height: 's' }), quarterly, buckets };
 }
 
 /* A ranked list of bars: the top `limit` rows, the rest folded into one
@@ -130,7 +130,7 @@ function rankedBars(rows, { limit = 8, unit = 'photos', onRow, hue = null } = {}
  * take the four steps of ONE hue family -- light to dark, largest first, so
  * the order reads in the colour -- and everything else is one grey "Other".
  * Never a hue per slice: that is the rainbow a ring invites. `parts` is
- * [{label, value}], `hue` a glyph family (teal, rose, orange, violet). The
+ * [{label, value}], `hue` a glyph family (sage, rose, sky, violet). The
  * legend beside it carries the names and figures, so identity is never the
  * colour alone; hovering a slice or a row lights both and puts that part in
  * the middle. */

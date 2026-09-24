@@ -98,8 +98,9 @@ edits.
 | **Needs attention** | what the config check found, each line a click from the key — and most with a Fix |
 | **Recent changes** | the audit log — every write this console has made |
 
-Every chart takes the colour of the kind of thing it counts — time orange,
-albums and formats teal, tags rose, cameras violet — a single family, never a
+The cards form a **bento**: one pane, shared hairlines, no gaps. Every chart
+takes the colour of the kind of thing it counts — time sky, albums and formats
+sage, tags rose, cameras violet — a single family, never a
 hue per part; the accent stays for state. They are plain HTML (`static/charts.js`),
 sized through the CSSOM because the CSP drops a style attribute.
 

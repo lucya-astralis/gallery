@@ -375,19 +375,19 @@
      the three statuses), and only ever on a glyph -- never text, never a
      fill, never a border. Validated as a set on this ground, every pair,
      under protan/deutan/tritan (dataviz validate_palette.js, --pairs all). */
-  --glyph-teal:   #27A6B2;   /* albums, folders, photos, the site */
-  --glyph-rose:   #B04C80;   /* tags */
-  --glyph-orange: #C87F3D;   /* time: dates, history, activity */
-  --glyph-violet: #8E6FE0;   /* the machine and the camera */
+  --glyph-sage:   #47AA84;   /* albums, folders, photos, the site */
+  --glyph-rose:   #BC4A7C;   /* tags */
+  --glyph-sky:    #2F9CEA;   /* time: dates, history, activity */
+  --glyph-violet: #6B4CAE;   /* the machine and the camera */
   /* CHART RAMPS. Each glyph hue as four steps, light to dark, for a chart
      whose parts are RANKED (a ring's slices, largest first): one family
      per chart, never a hue per slice. Everything past the fourth is one
      neutral "other". Validated per ramp on this ground as ordinal: one hue,
      monotone lightness, visible gaps, the dark end clear of the surface. */
-  --ramp-teal-1:   #8ADAE3; --ramp-teal-2:   #40B7C3; --ramp-teal-3:   #00929E; --ramp-teal-4:   #006D79;
-  --ramp-rose-1:   #FFAED4; --ramp-rose-2:   #E67CB1; --ramp-rose-3:   #BD588C; --ramp-rose-4:   #953368;
-  --ramp-orange-1: #F7BD8E; --ramp-orange-2: #DC9150; --ramp-orange-3: #B46D28; --ramp-orange-4: #8D4900;
-  --ramp-violet-1: #CEBBFF; --ramp-violet-2: #AB8DFF; --ramp-violet-3: #8768D8; --ramp-violet-4: #6543B0;
+  --ramp-sage-1:   #9BDBBE; --ramp-sage-2:   #59BA93; --ramp-sage-3:   #2E9570; --ramp-sage-4:   #00704E;
+  --ramp-rose-1:   #FFADCD; --ramp-rose-2:   #EE77A8; --ramp-rose-3:   #C55283; --ramp-rose-4:   #9C2C61;
+  --ramp-sky-1:    #8FD2FF; --ramp-sky-2:    #43ACFB; --ramp-sky-3:    #0586D3; --ramp-sky-4:    #0061AB;
+  --ramp-violet-1: #CFBDFF; --ramp-violet-2: #AC8FF8; --ramp-violet-3: #886ACF; --ramp-violet-4: #6646A8;
   --ramp-other:    #4A4A55;
   --tap:         44px;
   --door-w:      420px;
@@ -3830,7 +3830,7 @@ button.colchart__col { cursor: pointer; }
   opacity: .72;
   transition: opacity var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
 }
-.colchart--orange .colchart__bar { background: var(--glyph-orange); }
+.colchart--sky .colchart__bar { background: var(--glyph-sky); }
 .colchart__col.is-zero .colchart__bar { opacity: .18; }
 .colchart__col.is-on .colchart__bar,
 .colchart__col:focus-visible .colchart__bar { background: var(--chrome); opacity: 1; }
@@ -3934,18 +3934,18 @@ button.donut__row { cursor: pointer; }
 .donut__sw { width: var(--s-3); height: var(--s-3); }
 .donut__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .donut__v { font-family: var(--mono); font-size: var(--fs-chrome-sm); color: var(--label); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.donut--teal .donut__seg--1 { stroke: var(--ramp-teal-1); } .donut--teal .donut__sw--1 { background: var(--ramp-teal-1); }
-.donut--teal .donut__seg--2 { stroke: var(--ramp-teal-2); } .donut--teal .donut__sw--2 { background: var(--ramp-teal-2); }
-.donut--teal .donut__seg--3 { stroke: var(--ramp-teal-3); } .donut--teal .donut__sw--3 { background: var(--ramp-teal-3); }
-.donut--teal .donut__seg--4 { stroke: var(--ramp-teal-4); } .donut--teal .donut__sw--4 { background: var(--ramp-teal-4); }
+.donut--sage .donut__seg--1 { stroke: var(--ramp-sage-1); } .donut--sage .donut__sw--1 { background: var(--ramp-sage-1); }
+.donut--sage .donut__seg--2 { stroke: var(--ramp-sage-2); } .donut--sage .donut__sw--2 { background: var(--ramp-sage-2); }
+.donut--sage .donut__seg--3 { stroke: var(--ramp-sage-3); } .donut--sage .donut__sw--3 { background: var(--ramp-sage-3); }
+.donut--sage .donut__seg--4 { stroke: var(--ramp-sage-4); } .donut--sage .donut__sw--4 { background: var(--ramp-sage-4); }
 .donut--rose .donut__seg--1 { stroke: var(--ramp-rose-1); } .donut--rose .donut__sw--1 { background: var(--ramp-rose-1); }
 .donut--rose .donut__seg--2 { stroke: var(--ramp-rose-2); } .donut--rose .donut__sw--2 { background: var(--ramp-rose-2); }
 .donut--rose .donut__seg--3 { stroke: var(--ramp-rose-3); } .donut--rose .donut__sw--3 { background: var(--ramp-rose-3); }
 .donut--rose .donut__seg--4 { stroke: var(--ramp-rose-4); } .donut--rose .donut__sw--4 { background: var(--ramp-rose-4); }
-.donut--orange .donut__seg--1 { stroke: var(--ramp-orange-1); } .donut--orange .donut__sw--1 { background: var(--ramp-orange-1); }
-.donut--orange .donut__seg--2 { stroke: var(--ramp-orange-2); } .donut--orange .donut__sw--2 { background: var(--ramp-orange-2); }
-.donut--orange .donut__seg--3 { stroke: var(--ramp-orange-3); } .donut--orange .donut__sw--3 { background: var(--ramp-orange-3); }
-.donut--orange .donut__seg--4 { stroke: var(--ramp-orange-4); } .donut--orange .donut__sw--4 { background: var(--ramp-orange-4); }
+.donut--sky .donut__seg--1 { stroke: var(--ramp-sky-1); } .donut--sky .donut__sw--1 { background: var(--ramp-sky-1); }
+.donut--sky .donut__seg--2 { stroke: var(--ramp-sky-2); } .donut--sky .donut__sw--2 { background: var(--ramp-sky-2); }
+.donut--sky .donut__seg--3 { stroke: var(--ramp-sky-3); } .donut--sky .donut__sw--3 { background: var(--ramp-sky-3); }
+.donut--sky .donut__seg--4 { stroke: var(--ramp-sky-4); } .donut--sky .donut__sw--4 { background: var(--ramp-sky-4); }
 .donut--violet .donut__seg--1 { stroke: var(--ramp-violet-1); } .donut--violet .donut__sw--1 { background: var(--ramp-violet-1); }
 .donut--violet .donut__seg--2 { stroke: var(--ramp-violet-2); } .donut--violet .donut__sw--2 { background: var(--ramp-violet-2); }
 .donut--violet .donut__seg--3 { stroke: var(--ramp-violet-3); } .donut--violet .donut__sw--3 { background: var(--ramp-violet-3); }
@@ -3956,6 +3956,53 @@ button.donut__row { cursor: pointer; }
   .donut { grid-template-columns: 104px minmax(0, 1fr); gap: var(--s-4); }
   .donut__ring { width: 104px; height: 104px; }
   .donut__center { font-size: var(--fs-chrome-lg); }
+}
+
+/* ----- the bento ------------------------------------------------------ */
+/* The Overview's cards as ONE pane of glass: a six-column grid, no gaps,
+   each cell drawing its right and bottom hairline so neighbours share one
+   line (the container draws the top and left). Not a gap over a --line
+   fill -- over glass that lights the whole grid (rule 3). A cell spans 2,
+   4 or 6 columns; the order is a class, not the order of the code. */
+.bento {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: var(--s-6) 0 var(--s-9);
+  border-top: var(--hair) solid var(--line);
+  border-left: var(--hair) solid var(--line);
+  background-color: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+.bento__cell {
+  display: flex;
+  min-width: 0;
+  border-right: var(--hair) solid var(--line);
+  border-bottom: var(--hair) solid var(--line);
+}
+.bento__cell > .card {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.bento .span-2 { grid-column: span 2; }
+.bento .span-4 { grid-column: span 4; }
+.bento .span-6 { grid-column: 1 / -1; }
+.o-0 { order: 0; } .o-1 { order: 1; } .o-2 { order: 2; } .o-3 { order: 3; } .o-4 { order: 4; }
+.o-5 { order: 5; } .o-6 { order: 6; } .o-7 { order: 7; } .o-8 { order: 8; } .o-9 { order: 9; }
+/* inside a bento the to-do strip is already inside the pane's lines */
+.bento .todo { border: 0; border-top: var(--hair) solid var(--line); margin: 0 calc(var(--s-5) * -1) calc(var(--s-5) * -1); }
+@media (max-width: 1100px) {
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bento .span-2 { grid-column: span 1; }
+  .bento .span-4 { grid-column: 1 / -1; }
+}
+@media (max-width: 620px) {
+  .bento { grid-template-columns: minmax(0, 1fr); }
+  .bento .span-2, .bento .span-4 { grid-column: 1 / -1; }
 }
 
 /* ----- to do ------------------------------------------------------------ */
@@ -4009,9 +4056,9 @@ button.donut__row { cursor: pointer; }
    not named here stays grey furniture; state keeps the accent and the
    statuses keep theirs.
    ================================================================ */
-:is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-folder, .fa-folder-tree, .fa-folder-open, .fa-images, .fa-image, .fa-globe, .fa-link, .fa-id-card, .fa-house) { color: var(--glyph-teal); }
+:is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-folder, .fa-folder-tree, .fa-folder-open, .fa-images, .fa-image, .fa-globe, .fa-link, .fa-id-card, .fa-house) { color: var(--glyph-sage); }
 :is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-tag, .fa-tags) { color: var(--glyph-rose); }
-:is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-calendar-day, .fa-clock-rotate-left, .fa-chart-simple, .fa-scroll) { color: var(--glyph-orange); }
+:is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-calendar-day, .fa-clock-rotate-left, .fa-chart-simple, .fa-scroll) { color: var(--glyph-sky); }
 :is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-camera, .fa-microchip, .fa-server, .fa-hard-drive, .fa-stethoscope, .fa-gauge, .fa-location-dot, .fa-key, .fa-box-archive, .fa-palette) { color: var(--glyph-violet); }
 /* on a filled face -- the tab you are on -- the glyph takes the face's ink;
    a done to-do goes quiet */
@@ -4276,9 +4323,9 @@ button.donut__row { cursor: pointer; }
 .meter__fill  { fill: rgba(255, 255, 255, .34); }
 .meter.is-acc  .meter__fill { fill: var(--acc); }
 /* a chart about one kind of thing wears that kind's glyph hue */
-.meter.is-teal   .meter__fill { fill: var(--glyph-teal); }
+.meter.is-sage   .meter__fill { fill: var(--glyph-sage); }
 .meter.is-rose   .meter__fill { fill: var(--glyph-rose); }
-.meter.is-orange .meter__fill { fill: var(--glyph-orange); }
+.meter.is-sky .meter__fill { fill: var(--glyph-sky); }
 .meter.is-violet .meter__fill { fill: var(--glyph-violet); }
 .meter.is-warn .meter__fill { fill: var(--amb); }
 .meter.is-bad  .meter__fill { fill: var(--red); }

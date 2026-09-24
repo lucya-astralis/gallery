@@ -658,10 +658,10 @@
      the three statuses), and only ever on a glyph -- never text, never a
      fill, never a border. Validated as a set on this ground, every pair,
      under protan/deutan/tritan (dataviz validate_palette.js, --pairs all). */
-  --glyph-teal:   #27A6B2;/* albums, folders, photos, the site */
-  --glyph-rose:   #B04C80;/* tags */
-  --glyph-orange: #C87F3D;/* time: dates, history, activity */
-  --glyph-violet: #8E6FE0;/* the machine and the camera */
+  --glyph-sage:   #47AA84; /* albums, folders, photos, the site */
+  --glyph-rose:   #BC4A7C; /* tags */
+  --glyph-sky:    #2F9CEA; /* time: dates, history, activity */
+  --glyph-violet: #6B4CAE; /* the machine and the camera */
   --nav-h:      60px;
   /* The mono face, spelled once. Every label, readout and HUD string on the
      site reads this, and it is character-for-character the configurator's
@@ -1253,9 +1253,9 @@ section{
 .facet-group__label .fa{ font-size:var(--fs-chrome-sm); }
 /* GLYPH HUES: which kind of thing a heading is about, keyed on the glyph --
    the console's table, the same four hues. Never text, fill or state. */
-:is(.facet-group__label, .search-group__label) > :is(.fa-folder, .fa-image){ color:var(--glyph-teal); }
+:is(.facet-group__label, .search-group__label) > :is(.fa-folder, .fa-image){ color:var(--glyph-sage); }
 :is(.facet-group__label, .search-group__label) > .fa-tag{ color:var(--glyph-rose); }
-:is(.facet-group__label, .search-group__label) > .fa-calendar-day{ color:var(--glyph-orange); }
+:is(.facet-group__label, .search-group__label) > .fa-calendar-day{ color:var(--glyph-sky); }
 :is(.facet-group__label, .search-group__label) > .fa-camera{ color:var(--glyph-violet); }
 .facet-list{ list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:var(--s-2); }
 .facet{

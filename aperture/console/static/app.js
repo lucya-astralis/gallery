@@ -1592,16 +1592,21 @@ function paintHome() {
     ro ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null,
   ], { tip: paths.photos || state.meta.photos_dir })));
 
-  const grid = el('div', { class: 'home' });
+  /* A bento: the cards share their hairlines, no gaps between them, and
+   * each takes a span of a six-column grid. The order is set here, not by
+   * the order the cards are built in. */
+  const grid = el('div', { class: 'bento' });
   pane.append(grid);
+  const put = (span, order, node, id) => grid.append(
+    el('div', { class: 'bento__cell span-' + span + ' o-' + order, id: id || null }, node));
 
   /* ---- is there a newer release ---- */
   if (updates.info && updates.info.state === 'available') {
-    grid.append(el('div', { class: 'home__wide' }, updateCard(updates.info, false)));
+    put(6, 0, updateCard(updates.info, false));
   }
 
   /* ---- what is waiting for you ---- */
-  grid.append(wide(todoCard()));
+  put(6, 1, todoCard());
 
   /* ---- what the archive is made of ---- */
   const photos = L.photos || [];
@@ -1612,10 +1617,10 @@ function paintHome() {
     }));
     const undated = photos.filter((p) => !p.taken).length;
     if (over) {
-      grid.append(wide(card('fa-chart-simple', 'Photos over time',
+      put(6, 2, card('fa-chart-simple', 'Photos over time',
         (over.quarterly ? 'per quarter' : 'per month') + ' they were taken' + (undated ? ' · ' + undated + ' undated' : ''),
         over.node,
-        quiet('Click a ' + (over.quarterly ? 'quarter' : 'month') + ' to see its photos in the Library.'))));
+        quiet('Click a ' + (over.quarterly ? 'quarter' : 'month') + ' to see its photos in the Library.')));
     }
 
     const byAlbum = new Map();
@@ -1623,13 +1628,13 @@ function paintHome() {
       const top = p.album.split('/')[0] || 'photos';
       byAlbum.set(top, (byAlbum.get(top) || 0) + 1);
     }
-    grid.append(card('fa-folder-tree', 'Albums', 'photos per album, sub-albums included',
+    put(2, 3, card('fa-folder-tree', 'Albums', 'photos per album, sub-albums included',
       ...rankedBars([...byAlbum].map(([label, value]) => ({ label, value }))
-        .sort((x, y) => y.value - x.value), { hue: 'teal', onRow: (r) => go({ kind: 'library', album: r.label === 'photos' ? '' : r.label }) })));
+        .sort((x, y) => y.value - x.value), { hue: 'sage', onRow: (r) => go({ kind: 'library', album: r.label === 'photos' ? '' : r.label }) })));
 
     const tagged = photos.filter((p) => p.tags.length).length;
     const tagRows = (state.vocab || []).map((t) => ({ label: t.name, value: t.count }));
-    grid.append(card('fa-tags', 'Tags', tagged + ' of ' + photos.length + ' photos tagged',
+    put(2, 4, card('fa-tags', 'Tags', tagged + ' of ' + photos.length + ' photos tagged',
       donutChart([
         { label: 'tagged', value: tagged },
         { label: 'untagged', value: photos.length - tagged, other: true },
@@ -1644,7 +1649,7 @@ function paintHome() {
 
     const cams = new Map();
     for (const p of photos) cams.set(p.camera || 'Unknown', (cams.get(p.camera || 'Unknown') || 0) + 1);
-    grid.append(card('fa-camera', 'Cameras', cams.size + (cams.size === 1 ? ' camera' : ' cameras'),
+    put(2, 5, card('fa-camera', 'Cameras', cams.size + (cams.size === 1 ? ' camera' : ' cameras'),
       donutChart([...cams].map(([label, value]) => ({ label, value })),
         { hue: 'violet', center: String(cams.size), sub: cams.size === 1 ? 'camera' : 'cameras',
           onPart: (part) => libraryWith({ cameras: [part.label] }) })));
@@ -1659,9 +1664,9 @@ function paintHome() {
       sizes.set(ext, (sizes.get(ext) || 0) + (p.size || 0));
     }
     const totalBytes = [...sizes.values()].reduce((a, b) => a + b, 0);
-    grid.append(card('fa-images', 'Formats', bytes(totalBytes) + ' of originals',
+    put(2, 8, card('fa-images', 'Formats', bytes(totalBytes) + ' of originals',
       donutChart([...formats].map(([label, value]) => ({ label, value })),
-        { hue: 'teal', center: String(photos.length), sub: 'photos',
+        { hue: 'sage', center: String(photos.length), sub: 'photos',
           onPart: (part) => libraryWith({ q: '.' + part.label.toLowerCase() }) }),
       el('dl', { class: 'facts formats__bytes' }, [...sizes].sort((a, b) => b[1] - a[1]).slice(0, 4)
         .map(([ext, n]) => fact(ext, bytes(n) + ' · ' + bytes(n / formats.get(ext)) + ' a photo')))));
@@ -1670,7 +1675,7 @@ function paintHome() {
   /* ---- is the machine working ---- */
   const tone = paused ? 'warn' : live ? 'ok' : 'bad';
   const word = paused ? 'paused' : scanning ? 'scanning' : live ? 'running' : 'not running';
-  grid.append(card('fa-microchip', 'Indexer', st.control_dir ? 'via the control channel' : null,
+  put(2, 6, card('fa-microchip', 'Indexer', st.control_dir ? 'via the control channel' : null,
     el('div', { class: 'lamp' },
       el('span', { class: 'lamp__dot is-' + tone }),
       el('span', { class: 'lamp__word is-' + tone, text: word }),
@@ -1706,7 +1711,7 @@ function paintHome() {
   /* ---- is anything broken ---- */
   const issues = home.issues;
   const list = (issues && issues.issues) || [];
-  grid.append(el('div', { class: 'home__wide', id: 'needs' }, card('fa-triangle-exclamation', 'Needs attention',
+  put(4, 7, card('fa-triangle-exclamation', 'Needs attention',
     issues ? issues.errors + ' error(s) · ' + issues.warnings + ' warning(s)' : null,
     !issues
       ? el('p', { class: 'card__quiet', text: 'The check did not run.' })
@@ -1735,10 +1740,10 @@ function paintHome() {
             return row;
           }),
     el('div', { class: 'card__actions' },
-      el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'Check again', onclick: checkAll })))));
+      el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'Check again', onclick: checkAll }))), 'needs');
 
   /* ---- what happened here ---- */
-  grid.append(card('fa-clock-rotate-left', 'Recent changes', 'this console, not the gallery',
+  put(4, 9, card('fa-clock-rotate-left', 'Recent changes', 'this console, not the gallery',
     !home.audit.length
       ? el('p', { class: 'card__quiet', text: 'Nothing has been saved here yet.' })
       : el('div', { class: 'hrows' }, home.audit.map((entry) => {
