@@ -11,6 +11,8 @@ means the same thing wherever it is typed:
     f:2.8      f:1.4-2        f/2.8   ƒ2.8   (the way the EXIF panel prints it)
     mm:35      mm:24-70
     date:2026  date:2026-08   date:2026-08-15   date:2026-08-01..2026-08-20
+    tag:night                 a tag the photo carries (exactly, any case)
+    album:japan_2026          that album and every album under it
 
 The words match any of their fields; every filter narrows what they found. A
 filter whose value cannot be read is handed back marked as such and ignored,
@@ -36,6 +38,8 @@ KEYS = {
     "f": "aperture", "aperture": "aperture",
     "mm": "focal", "focal": "focal",
     "date": "date",
+    "tag": "tag",
+    "album": "album",
 }
 
 # key:value (value optionally quoted) | "a phrase" | a word
@@ -50,7 +54,7 @@ _F_SLACK = 0.05
 
 @dataclass
 class Filter:
-    fact: str          # camera, lens, iso, aperture, focal or date
+    fact: str          # camera, lens, iso, aperture, focal, date, tag or album
     key: str           # the key as it was typed, lower-cased
     value: str         # the value without its quotes
     pos: int           # which token of the query it was
@@ -111,6 +115,18 @@ def _number(s: str) -> float:
 def _compile(f: Filter) -> None:
     v = f.value.lower().replace(" ", "")
     if not v:
+        return
+    # A tag is matched whole: "night" is not "midnight". A folder path is
+    # the album and everything under it, as the album pages count it.
+    if f.fact == "tag":
+        f.sql = ("EXISTS (SELECT 1 FROM image_tags ft JOIN tags fg ON fg.id = ft.tag_id "
+                 "WHERE ft.image_id = {a}.id AND lower(fg.name) = ?)")
+        f.params = [f.value.strip().lower()]
+        return
+    if f.fact == "album":
+        path = f.value.strip().strip("/").lower()
+        f.sql = "(lower({a}.album) = ? OR substr(lower({a}.album), 1, ?) = ?)"
+        f.params = [path, len(path) + 1, path + "/"]
         return
     col = "{a}." + f.fact
     if f.fact in ("camera", "lens"):

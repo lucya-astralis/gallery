@@ -128,3 +128,36 @@ def test_stats_bars_link_to_their_search(client, indexed):
     body = client.get("/stats").text
     assert 'href="/search?q=camera%3A%22Fixture%20Cam%22"' in body
     assert 'href="/search?q=iso%3A201-400"' in body
+
+
+# ----- tag: and album:, and the facets ----------------------------------
+def test_tag_and_album_are_part_of_the_grammar(client, indexed):
+    # desk.jpg carries workspace + keyboard in the fixture's sidecar
+    assert _found(client, "tag:workspace") == {"tech/desk.jpg"}
+    assert _found(client, "tag:WORK") == set()                 # a tag is matched whole
+    assert _found(client, "album:berlin") == {
+        "berlin/gate.jpg", "berlin/wall.jpg", "berlin/tv-tower.jpg",
+        "berlin/mitte/dome.jpg", "berlin/mitte/river.jpg"}      # the album and under it
+    assert _found(client, "album:berlin/mitte") == {"berlin/mitte/dome.jpg", "berlin/mitte/river.jpg"}
+    assert _found(client, "album:ber") == set()                # a path, not a substring
+
+
+def test_an_empty_search_browses_everything_by_facet(client, everything):
+    res = client.get("/search")
+    assert res.status_code == 200
+    body = res.text
+    assert "search-facets" in body
+    # the facets link to the search with the filter added
+    assert 'href="/search?q=album%3Aberlin"' in body
+    assert 'href="/search?q=date%3A2026"' in body
+    assert 'href="/search?q=tag%3Aworkspace"' in body
+
+
+def test_a_facet_that_is_on_takes_itself_away(client, indexed):
+    body = client.get("/search", params={"q": "album:berlin"}).text
+    # the albums facet has drilled into berlin: its child, and a way back up
+    assert 'href="/search?q=album%3Aberlin%20album%3Aberlin%2Fmitte"' in body
+    assert 'class="facet facet--up" href="/search"' in body
+    # the chip for the filter drops it
+    import re
+    assert re.search(r'class="tag search-filter"\s+href="/search"', body)

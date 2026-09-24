@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from functools import partial
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -491,15 +492,98 @@ def _matches(needle: str, haystack: str | None) -> bool:
     return bool(haystack) and needle.casefold() in haystack.casefold()
 
 
+# How many rows a facet lists before the rest stay out of sight: a visitor
+# narrows by the common values, not by the long tail.
+FACET_LIMIT = 10
+
+
+def _search_href(q: str, sort_q: str = "") -> str:
+    """/search for a query, keeping the sort the visitor picked."""
+    # %20, not "+": the same spelling Jinja's urlencode writes in the chips
+    parts = (["q=" + quote(q, safe="")] if q else []) + ([sort_q] if sort_q else [])
+    return "/search" + ("?" + "&".join(parts) if parts else "")
+
+
+def _facet_link(q: str, query, key: str, value: str, sort_q: str = "") -> tuple[str, bool]:
+    """(the search with this facet toggled, whether it is on). On: the same
+    search without that filter. Off: the search with it added."""
+    for f in query.filters:
+        if f.fact == search.KEYS.get(key) and f.value.strip().lower() == value.strip().lower():
+            return _search_href(query.without(f), sort_q), True
+    return _search_href((q + " " + search.term(key, value)).strip(), sort_q), False
+
+
+def _search_facets(c, where: str, params: list, q: str, query, lang: str, sort_q: str = "") -> dict:
+    """The facets of what a search found -- album, tag, year, camera -- each
+    row counting the photos it would leave (filters AND, so that is the
+    count within the current results) and linking to the search with it
+    added or taken away. The console's Library, for a visitor."""
+    listed, listed_params = albums.unlisted_clause("i.album")
+    base = f"FROM images i WHERE ({where}) AND {listed}"
+    args = [*params, *listed_params]
+
+    def rows(key, sql, label=lambda v: v):
+        out = []
+        for row in c.execute(sql, args).fetchall():
+            value, n = row[0], row[1]
+            if value in (None, ""):
+                continue
+            href, on = _facet_link(q, query, key, value, sort_q)
+            out.append({"label": label(value), "value": value, "n": n, "href": href, "on": on})
+        return out
+
+    # Albums drill down: with one album filter on, the rows are its children.
+    album_on = [f.value.strip().strip("/") for f in query.filters if f.fact == "album" and f.ok]
+    depth = album_on[0].count("/") + 1 if len(album_on) == 1 else 0
+    album_rows = []
+    counts: Counter = Counter()
+    for row in c.execute(f"SELECT i.album AS album, COUNT(*) AS n {base} GROUP BY i.album", args).fetchall():
+        parts = row["album"].split("/")
+        if depth and not row["album"].lower().startswith(album_on[0].lower()):
+            continue
+        if len(parts) <= depth:
+            continue      # the photos of the album itself, not of a child
+        counts["/".join(parts[:depth + 1])] += row["n"]
+    for path, n in counts.most_common(FACET_LIMIT):
+        href, on = _facet_link(q, query, "album", path, sort_q)
+        album_rows.append({"label": config.album_display_name(path) or path.rsplit("/", 1)[-1],
+                           "value": path, "n": n, "href": href, "on": on})
+
+    # One step back up the album tree: the same search with the album filter
+    # moved to the parent, or dropped at the top.
+    up = None
+    if len(album_on) == 1:
+        f = next(f for f in query.filters if f.fact == "album" and f.ok)
+        rest = query.without(f)
+        parent = album_on[0].rsplit("/", 1)[0] if "/" in album_on[0] else ""
+        target = (rest + " " + search.term("album", parent)).strip() if parent else rest
+        up = {"href": _search_href(target, sort_q),
+              "label": (config.album_display_name(parent) or parent) if parent else None}
+    return {
+        "albums": album_rows,
+        "album_up": up,
+        "tags": rows("tag",
+            f"SELECT t.name, COUNT(*) {base.replace('FROM images i', 'FROM images i JOIN image_tags it ON it.image_id = i.id JOIN tags t ON t.id = it.tag_id', 1)} "
+            f"GROUP BY lower(t.name) ORDER BY 2 DESC, 1 LIMIT {FACET_LIMIT}"),
+        "years": rows("date",
+            f"SELECT substr(i.taken_at, 1, 4) AS y, COUNT(*) {base} AND i.taken_at IS NOT NULL "
+            f"GROUP BY y ORDER BY y DESC LIMIT {FACET_LIMIT}"),
+        "cameras": rows("camera",
+            f"SELECT i.camera, COUNT(*) {base} AND i.camera IS NOT NULL AND i.camera != '' "
+            f"GROUP BY i.camera ORDER BY 2 DESC LIMIT {FACET_LIMIT}"),
+    }
+
+
 @router.get("/search", response_class=HTMLResponse)
 def search_page(request: Request, q: str = "", sort: str | None = None):
+    """The search, and -- with nothing typed -- a way to browse every photo
+    by the same facets. It used to send an empty search to /albums."""
     q = q.strip()
     c = db.conn()
-    if not q:
-        return RedirectResponse("/albums")
     lang = context.request_lang(request)
     current_sort = photos.pick_sort(sort, photos.SORT_IMAGE_SQL, photos.SORT_IMAGE_DEFAULT)
     qualified_sql = photos.qualify_sort(photos.SORT_IMAGE_SQL[current_sort])
+    sort_q = "" if current_sort == photos.SORT_IMAGE_DEFAULT else "sort=" + current_sort
 
     # Albums the query names. The `album` column is the FOLDER path, so on its
     # own it could not find "Japan 2026" — the name the album is called
@@ -527,22 +611,28 @@ def search_page(request: Request, q: str = "", sort: str | None = None):
 
     # The words match album, file, tag, camera and lens; an album found by its
     # display name adds everything inside it. Filters narrow what that found.
-    also = (("i.album IN (%s)" % ",".join("?" * len(scope_albums)), scope_albums)
-            if scope_albums else None)
-    where, params = search.condition(query, "i", also)
+    # Nothing typed at all is every photo.
+    if q:
+        also = (("i.album IN (%s)" % ",".join("?" * len(scope_albums)), scope_albums)
+                if scope_albums else None)
+        where, params = search.condition(query, "i", also)
+    else:
+        where, params = "1", []
     listed, listed_params = albums.unlisted_clause("i.album")
+    total = c.execute(f"SELECT COUNT(*) FROM images i WHERE ({where}) AND {listed}",
+                      (*params, *listed_params)).fetchone()[0]
     rows = c.execute(
         f"""SELECT i.* FROM images i
            WHERE ({where}) AND {listed}
            ORDER BY {qualified_sql}
            LIMIT ?""",
-        (*params, *listed_params, SEARCH_PHOTO_LIMIT + 1),
+        (*params, *listed_params, SEARCH_PHOTO_LIMIT),
     ).fetchall()
-    # One row over the limit is fetched purely to tell "exactly this many" from
-    # "this many and more" — a broad query used to render every matching row,
-    # and a one-letter search meant a 340 KB page of 600 thumbnails.
-    capped = len(rows) > SEARCH_PHOTO_LIMIT
-    images = [dict(r) for r in rows[:SEARCH_PHOTO_LIMIT]]
+    # A broad query used to render every matching row, and a one-letter
+    # search meant a 340 KB page of 600 thumbnails: the grid stops at the
+    # cap, and the total says how many there are.
+    capped = total > SEARCH_PHOTO_LIMIT
+    images = [dict(r) for r in rows]
 
     album_cards = albums.sorted_album_cards(
         [albums.album_card(a) for a in matched_albums[:SEARCH_ALBUM_LIMIT]], "name_asc")
@@ -552,8 +642,12 @@ def search_page(request: Request, q: str = "", sort: str | None = None):
         {
             "query": q,
             # one chip per filter; each links to the same search without it
-            "filters": [{"label": f.label, "ok": f.ok, "rest": query.without(f)}
+            "filters": [{"label": f.label, "ok": f.ok, "href": _search_href(query.without(f), sort_q)}
                         for f in query.filters],
+            "words": text,
+            "facets": _search_facets(c, where, params, q, query, lang, sort_q),
+            "sort_q": sort_q,
+            "total": total,
             "albums": album_cards,
             "images": images,
             "capped": capped,

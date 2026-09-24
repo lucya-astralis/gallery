@@ -652,6 +652,16 @@
      round (status dot, lightbox buttons) have to opt out on purpose. */
   --radius:     0;
   --hair:       1px;      /* the one border width in the system */
+  /* GLYPH HUES. Four hues for the icon that says what KIND of thing a
+     heading, a row or a place is about: albums and photos, tags, time,
+     the machine and the camera. Identity, never state (that is --acc and
+     the three statuses), and only ever on a glyph -- never text, never a
+     fill, never a border. Validated as a set on this ground, every pair,
+     under protan/deutan/tritan (dataviz validate_palette.js, --pairs all). */
+  --glyph-teal:   #27A6B2;/* albums, folders, photos, the site */
+  --glyph-rose:   #B04C80;/* tags */
+  --glyph-orange: #C87F3D;/* time: dates, history, activity */
+  --glyph-violet: #8E6FE0;/* the machine and the camera */
   --nav-h:      60px;
   /* The mono face, spelled once. Every label, readout and HUD string on the
      site reads this, and it is character-for-character the configurator's
@@ -1214,6 +1224,71 @@ section{
 }
 .search-filter .fa{ margin-left:var(--s-2); }
 .search-filter.is-bad{ color:var(--text-dim); text-decoration:line-through; }
+.search-filters__clear{
+  display:inline-flex; align-items:center; height:100%;
+  padding:var(--s-2) var(--s-2);
+  font-family:var(--mono); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs);
+  text-transform:uppercase; color:var(--text-dim);
+}
+@media (hover:hover){ .search-filters__clear:hover{ color:var(--text); } }
+
+/* ---- the facets beside the results ----
+   The console Library's filter column, for a visitor: album, tag, year and
+   camera, each row counting the photos it would leave and linking to the
+   search with it added -- plain links, no script needed to narrow. On a
+   phone the rows become one wrapped line of chips per group above the
+   results, so narrowing never means scrolling past the grid. */
+.search-layout{ display:grid; grid-template-columns:minmax(0,1fr); gap:var(--s-6); }
+.search-results{ min-width:0; }
+.search-facets{ display:flex; flex-direction:column; gap:var(--s-5); min-width:0; }
+.search-facets__head{
+  margin:0; font-family:var(--mono); font-size:var(--fs-chrome-xs); font-weight:400;
+  letter-spacing:var(--tr-chrome-xs); text-transform:uppercase; color:var(--text-ghost);
+}
+.facet-group__label{
+  display:flex; align-items:center; gap:var(--s-2);
+  margin:0 0 var(--s-2); font-family:var(--mono); font-size:var(--fs-chrome-sm); font-weight:400;
+  letter-spacing:var(--tr-chrome-sm); text-transform:uppercase; color:var(--label);
+}
+.facet-group__label .fa{ font-size:var(--fs-chrome-sm); }
+/* GLYPH HUES: which kind of thing a heading is about, keyed on the glyph --
+   the console's table, the same four hues. Never text, fill or state. */
+:is(.facet-group__label, .search-group__label) > :is(.fa-folder, .fa-image){ color:var(--glyph-teal); }
+:is(.facet-group__label, .search-group__label) > .fa-tag{ color:var(--glyph-rose); }
+:is(.facet-group__label, .search-group__label) > .fa-calendar-day{ color:var(--glyph-orange); }
+:is(.facet-group__label, .search-group__label) > .fa-camera{ color:var(--glyph-violet); }
+.facet-list{ list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:var(--s-2); }
+.facet{
+  display:inline-flex; align-items:center; gap:var(--s-2);
+  padding:var(--s-2) var(--s-3);
+  border:var(--hair) solid var(--line);
+  background-color:var(--glass);
+  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  color:var(--text-dim); font-size:var(--fs-text-sm);
+  transition:color var(--dur-1), border-color var(--dur-1);
+}
+.facet__box{ display:none; }
+.facet__label{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.facet__n{ font-family:var(--mono); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-num); color:var(--text-ghost); font-variant-numeric:tabular-nums; }
+@media (hover:hover){ .facet:hover{ color:var(--text); border-color:var(--line-strong); } }
+.facet.is-on{ color:var(--text); border-color:var(--acc); box-shadow:inset 0 0 0 var(--hair) var(--acc); }
+.facet.is-on .facet__n{ color:var(--text-dim); }
+.facet--up{ color:var(--label); }
+.facet--up .fa{ font-size:var(--fs-chrome-sm); }
+/* A column beside the results where there is room for one: rows, not chips,
+   each with a box that fills with the accent when it is on. */
+@media (min-width:1000px){
+  .search-layout{ grid-template-columns:220px minmax(0,1fr); gap:var(--s-7); align-items:start; }
+  .search-facets{ position:sticky; top:calc(var(--nav-h) + var(--s-5)); max-height:calc(100vh - var(--nav-h) - var(--s-7)); overflow-y:auto; }
+  .facet-list{ flex-direction:column; gap:0; }
+  .facet{ display:flex; width:100%; border:0; background:none; backdrop-filter:none; -webkit-backdrop-filter:none; padding:var(--s-1) var(--s-2); }
+  .facet__box{ display:block; flex:0 0 auto; width:var(--s-4); height:var(--s-4); border:var(--hair) solid var(--line-strong); }
+  .facet__label{ flex:1 1 auto; }
+  .facet.is-on{ box-shadow:none; }
+  .facet.is-on .facet__box{ background:var(--acc); border-color:var(--acc); }
+  @media (hover:hover){ .facet:hover{ background:rgba(255,255,255,.04); } }
+}
+
 /* parent-album link before the title (e.g. "↑ japan / tokyo"). Hidden on every
    viewport now that the pathbar "‹ Back to <parent>" button is always shown —
    the inline link would just duplicate it. */

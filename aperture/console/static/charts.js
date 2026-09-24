@@ -2,7 +2,9 @@
  *
  * Plain HTML, no library: every chart here shows ONE series, so it takes one
  * neutral ink (--label, --chrome under the pointer) and no categorical
- * palette. The accent is state in Nebula, not data, so no chart wears it --
+ * palette -- the glyph hue of the kind of thing it counts (time orange,
+ * albums teal, tags rose, cameras violet), the same hue its card's icon
+ * wears. The accent is state in Nebula, not data, so no chart wears it --
  * only a progress fill does (the tag coverage meter). Sizes ride custom
  * properties through the CSSOM, because the console's CSP drops a style
  * attribute.
@@ -15,7 +17,7 @@
  * the time axis is honest, a hover/focus tooltip with the exact figure,
  * the axis labelled only where a new year starts. `buckets` is
  * [{key, label, value, axis?, onclick?}]. */
-function columnChart(buckets, { unit = 'photos', height = 'm' } = {}) {
+function columnChart(buckets, { unit = 'photos', height = 'm', hue = null } = {}) {
   const max = Math.max(1, ...buckets.map((b) => b.value));
   const tip = el('div', { class: 'colchart__tip', role: 'status', hidden: true });
   const cols = el('div', { class: 'colchart__cols' });
@@ -55,7 +57,7 @@ function columnChart(buckets, { unit = 'photos', height = 'm' } = {}) {
     axis.append(el('span', { class: 'colchart__tick', text: b.axis || '' }));
   });
 
-  return el('div', { class: 'colchart colchart--' + height },
+  return el('div', { class: 'colchart colchart--' + height + (hue ? ' colchart--' + hue : '') },
     el('div', { class: 'colchart__plot' },
       el('div', { class: 'colchart__grid', 'aria-hidden': 'true' },
         el('span', { class: 'colchart__gl', 'data-v': String(max) }),
@@ -107,16 +109,16 @@ function photosOverTime(photos, onBucket) {
     m += quarterly ? 3 : 1;
     if (m > 12) { m -= 12; y++; }
   }
-  return { node: columnChart(buckets), quarterly, buckets };
+  return { node: columnChart(buckets, { hue: 'orange' }), quarterly, buckets };
 }
 
 /* A ranked list of bars: the top `limit` rows, the rest folded into one
  * "and N more" line rather than generated into ever-thinner bars. */
-function rankedBars(rows, { limit = 8, unit = 'photos', onRow } = {}) {
+function rankedBars(rows, { limit = 8, unit = 'photos', onRow, hue = null } = {}) {
   const top = rows.slice(0, limit);
   const peak = Math.max(1, ...top.map((r) => r.value));
   const out = [el('div', { class: 'brows' }, top.map((r) => barRow(
-    r.label, r.value, peak, r.value + ' ' + unit, null, onRow ? () => onRow(r) : null)))];
+    r.label, r.value, peak, r.value + ' ' + unit, hue, onRow ? () => onRow(r) : null)))];
   if (rows.length > limit) {
     const rest = rows.slice(limit).reduce((n, r) => n + r.value, 0);
     out.push(quiet('and ' + (rows.length - limit) + ' more · ' + rest + ' ' + unit));

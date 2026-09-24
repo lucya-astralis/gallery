@@ -369,6 +369,16 @@
   --bp-narrow:   760px;
   /* The one touch target, and the sign-in card's one readable column. A
      submit button on the door is 44px on a desktop too. */
+  /* GLYPH HUES. Four hues for the icon that says what KIND of thing a
+     heading, a row or a place is about: albums and photos, tags, time,
+     the machine and the camera. Identity, never state (that is --acc and
+     the three statuses), and only ever on a glyph -- never text, never a
+     fill, never a border. Validated as a set on this ground, every pair,
+     under protan/deutan/tritan (dataviz validate_palette.js, --pairs all). */
+  --glyph-teal:   #27A6B2;   /* albums, folders, photos, the site */
+  --glyph-rose:   #B04C80;   /* tags */
+  --glyph-orange: #C87F3D;   /* time: dates, history, activity */
+  --glyph-violet: #8E6FE0;   /* the machine and the camera */
   --tap:         44px;
   --door-w:      420px;
   /* The rail: wide enough for "Overview" and a count beside it. */
@@ -3810,6 +3820,7 @@ button.colchart__col { cursor: pointer; }
   opacity: .72;
   transition: opacity var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
 }
+.colchart--orange .colchart__bar { background: var(--glyph-orange); }
 .colchart__col.is-zero .colchart__bar { opacity: .18; }
 .colchart__col.is-on .colchart__bar,
 .colchart__col:focus-visible .colchart__bar { background: var(--chrome); opacity: 1; }
@@ -3890,6 +3901,23 @@ button.colchart__col { cursor: pointer; }
   .todo__item { border-bottom: var(--hair) solid var(--line); }
 }
 
+
+/* ================================================================
+   GLYPH HUES  —  which kind of thing, at a glance
+   ------------------------------------------------------------------
+   One table, keyed on the glyph itself, so an icon wears the same hue
+   in a card title, on the rail, in the palette and on a tab. Everything
+   not named here stays grey furniture; state keeps the accent and the
+   statuses keep theirs.
+   ================================================================ */
+:is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-folder, .fa-folder-tree, .fa-folder-open, .fa-images, .fa-image, .fa-globe, .fa-link, .fa-id-card, .fa-house) { color: var(--glyph-teal); }
+:is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-tag, .fa-tags) { color: var(--glyph-rose); }
+:is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-calendar-day, .fa-clock-rotate-left, .fa-chart-simple, .fa-scroll) { color: var(--glyph-orange); }
+:is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-camera, .fa-microchip, .fa-server, .fa-hard-drive, .fa-stethoscope, .fa-gauge, .fa-location-dot, .fa-key, .fa-box-archive, .fa-palette) { color: var(--glyph-violet); }
+/* on a filled face -- the tab you are on -- the glyph takes the face's ink;
+   a done to-do goes quiet */
+.tab.is-active > .fa { color: inherit; }
+.todo__item.is-done .todo__what > .fa { color: var(--text-ghost); }
 
 /* ============================================================
    THE DOOR
@@ -4148,6 +4176,11 @@ button.colchart__col { cursor: pointer; }
 .meter__track { fill: rgba(255, 255, 255, .06); }
 .meter__fill  { fill: rgba(255, 255, 255, .34); }
 .meter.is-acc  .meter__fill { fill: var(--acc); }
+/* a chart about one kind of thing wears that kind's glyph hue */
+.meter.is-teal   .meter__fill { fill: var(--glyph-teal); }
+.meter.is-rose   .meter__fill { fill: var(--glyph-rose); }
+.meter.is-orange .meter__fill { fill: var(--glyph-orange); }
+.meter.is-violet .meter__fill { fill: var(--glyph-violet); }
 .meter.is-warn .meter__fill { fill: var(--amb); }
 .meter.is-bad  .meter__fill { fill: var(--red); }
 
@@ -4281,7 +4314,7 @@ button.colchart__col { cursor: pointer; }
   letter-spacing: var(--tr-head);
   color: var(--text-head);
 }
-.card__title > .fa { color: var(--label); font-size: var(--icon-md); }
+.card__title > .fa { font-size: var(--icon-md); }
 .card__note {
   font-size: var(--fs-text-sm);
   color: var(--text-dim);
@@ -4572,7 +4605,8 @@ button.colchart__col { cursor: pointer; }
 /* headings: grey furniture, as the gallery's panel headings are. The
    accent is state, and a card title is not one. */
 .card__title > .fa,
-.detail__sub > .fa { margin-right: .75em; color: var(--text-dim); }
+.detail__sub > .fa { margin-right: .75em; }
+.detail__sub > .fa { color: var(--text-dim); }
 
 /* trailing: "further on" or "leaves this page" -- a size down, so it reads
    as punctuation rather than a second word */

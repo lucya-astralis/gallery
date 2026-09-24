@@ -1,42 +1,84 @@
 {% extends "base.html" %}
 {% from "_pathbar.html" import pathbar with context %}
-{% block title %}{{ t('search.slug') }}: {{ query }} — {{ brand.title }}{% endblock %}
+{% block title %}{{ t('search.slug') }}{% if query %}: {{ query }}{% endif %} — {{ brand.title }}{% endblock %}
 {% block body_class %}page-search{% endblock %}
 {% block content %}
 <section>
   {{ pathbar('/albums', t('back.albums'),
-             tail=t('search.crumb') ~ ': ' ~ query, tail_icon='fa-magnifying-glass') }}
+             tail=(t('search.crumb') ~ ': ' ~ query) if query else t('search.browse'), tail_icon='fa-magnifying-glass') }}
 
   <header class="section__head">
     <h1 class="section__slug"><span class="name">{{ t('search.slug') }}</span></h1>
-    {% set hits = (albums | length) + (images | length) %}
     <p class="section__stat" data-live="doc">
-      <b>{{ hits }}{% if capped %}+{% endif %}</b>
-      {{ t('search.hits_one') if hits == 1 and not capped else t('search.hits_many') }}
-      <span class="section__stat-sep" aria-hidden="true">·</span>
-      <span class="section__stat-q">{{ query }}</span>
+      <b>{{ total }}</b>
+      {% if query %}
+        {{ t('search.hits_one') if total == 1 else t('search.hits_many') }}
+        <span class="section__stat-sep" aria-hidden="true">·</span>
+        <span class="section__stat-q">{{ query }}</span>
+      {% else %}
+        {{ t('search.photos_head') }}
+      {% endif %}
     </p>
-    {# the filters the search was narrowed by; each chip is the same search
-       without it, and one the grammar could not read is marked, not hidden #}
+    {# the filters the search was narrowed by -- typed or picked beside the
+       results. Each chip is the same search without it, and one the grammar
+       could not read is marked, not hidden. #}
     {% if filters %}
       <ul class="search-filters" aria-label="{{ t('search.filters') }}">
         {% for f in filters %}
           <li><a class="tag search-filter{% if not f.ok %} is-bad{% endif %}"
-                 href="{% if f.rest %}/search?q={{ f.rest | urlencode }}{% else %}/albums{% endif %}"
+                 href="{{ f.href }}"
                  {% if not f.ok %}title="{{ t('search.filter_bad') }}"{% endif %}
                  aria-label="{{ t('search.filter_remove', f=f.label) }}">{{ f.label }}<i class="fa fa-xmark" aria-hidden="true"></i></a></li>
         {% endfor %}
+        {% if filters | length > 1 or words %}
+          <li><a class="search-filters__clear" href="/search">{{ t('search.clear') }}</a></li>
+        {% endif %}
       </ul>
     {% endif %}
   </header>
 
-  {% if not images and not albums %}
-    <div class="empty">
-      <p>{{ t('search.no_match_prefix') }}<code>{{ query }}</code>{{ t('search.no_match_suffix') }}</p>
-      <p class="note">{{ t('search.hint') }}</p>
-    </div>
-  {% else %}
-    <div data-live="body">
+  <div class="search-layout">
+    {# The facets: what the results are made of, each row counting what it
+       would leave and linking to the search with it added (or, when it is
+       on, taken away). Plain links, so the page needs no script to narrow. #}
+    {% set groups = [
+      ('albums', t('search.albums_head'), 'fa-folder', facets.albums),
+      ('tags', t('search.facet_tags'), 'fa-tag', facets.tags),
+      ('years', t('search.facet_years'), 'fa-calendar-day', facets.years),
+      ('cameras', t('search.facet_cameras'), 'fa-camera', facets.cameras),
+    ] %}
+    {% if facets.albums or facets.tags or facets.years or facets.cameras %}
+    <aside class="search-facets" aria-label="{{ t('search.narrow') }}">
+      <h2 class="search-facets__head">{{ t('search.narrow') }}</h2>
+      {% for key, label, icon, rows in groups %}
+        {% if rows or (key == 'albums' and facets.album_up) %}
+        <div class="facet-group">
+          <h3 class="facet-group__label"><i class="fa {{ icon }}" aria-hidden="true"></i>{{ label }}</h3>
+          <ul class="facet-list">
+            {% if key == 'albums' and facets.album_up %}
+              <li><a class="facet facet--up" href="{{ facets.album_up.href }}"><i class="fa fa-arrow-turn-up" aria-hidden="true"></i><span class="facet__label">{{ facets.album_up.label or t('search.all_albums') }}</span></a></li>
+            {% endif %}
+            {% for r in rows %}
+              <li><a class="facet{% if r.on %} is-on{% endif %}" href="{{ r.href }}"
+                     {% if r.on %}aria-current="true" title="{{ t('search.filter_remove', f=r.label) }}"{% endif %}>
+                <span class="facet__box" aria-hidden="true"></span>
+                <span class="facet__label">{{ r.label }}</span>
+                <span class="facet__n">{{ r.n }}</span></a></li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </aside>
+    {% endif %}
+
+    <div class="search-results" data-live="body">
+    {% if not images and not albums %}
+      <div class="empty">
+        {% if query %}<p>{{ t('search.no_match_prefix') }}<code>{{ query }}</code>{{ t('search.no_match_suffix') }}</p>{% endif %}
+        <p class="note">{{ t('search.hint') }}</p>
+      </div>
+    {% else %}
 
     {# Albums the query named, above the photos. Searching "hokkaido" used to
        answer with 181 thumbnails and no way to tell you the album exists. #}
@@ -54,7 +96,7 @@
 
     {% if images %}
     <section class="search-group">
-      <h2 class="search-group__label"><i class="fa fa-image" aria-hidden="true"></i>{{ t('search.photos_head') }}<span class="search-group__n">{{ images | length }}{% if capped %}+{% endif %}</span></h2>
+      <h2 class="search-group__label"><i class="fa fa-image" aria-hidden="true"></i>{{ t('search.photos_head') }}<span class="search-group__n">{{ total }}</span></h2>
       <div class="toolbar">
         <span class="toolbar__spacer"></span>
         <div class="sort" data-sort>
@@ -69,7 +111,7 @@
             {% for opt in sort_options %}
               <a class="sort__option{% if opt.active %} is-active{% endif %}"
                  role="menuitem"
-                 href="/search?q={{ query | urlencode }}&sort={{ opt.key }}">
+                 href="/search?{% if query %}q={{ query | urlencode }}&{% endif %}sort={{ opt.key }}">
                 {{ opt.label }}
               </a>
             {% endfor %}
@@ -90,7 +132,8 @@
       {% if capped %}<p class="note search-group__capped">{{ t('search.capped', n=limit) }}</p>{% endif %}
     </section>
     {% endif %}
+    {% endif %}
     </div>
-  {% endif %}
+  </div>
 </section>
 {% endblock %}

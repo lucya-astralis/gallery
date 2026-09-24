@@ -96,6 +96,20 @@ root still land on the Overview.
   unsaved files — each a click from where it is done), photos over time as
   a column per month, and ranked bars for albums, tags (with how much is
   tagged) and cameras, every row a click into the Library filtered to it.
+* **The gallery's search, like the Library**: `/search` puts a column of
+  facets beside the results — album (drilling into sub-albums), tag, year,
+  camera — each counting the photos it would leave and linking to the
+  search with it added or, when it is on, taken away. With nothing typed it
+  browses every photo instead of sending you to /albums. Plain links, so it
+  needs no script; on a phone the facets are chips above the results.
+* **`tag:` and `album:` in the search grammar** — on /search, `/api/photos?q=`
+  and the CLI alike. A tag is matched whole; an album is that folder and
+  everything under it.
+* **Colour that means something**: four glyph hues — teal for albums and
+  photos, rose for tags, orange for time, violet for the machine and the
+  camera — on the rail, card titles, facts, tabs and the gallery's facets,
+  and on the charts that count that kind of thing. Nebula's rule 1 names
+  them; the accent stays for state.
 * The bar shows the **indexer's lamp** on every screen.
 
 **Changed**

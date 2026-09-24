@@ -142,7 +142,9 @@ function passing(skip) {
     for (const { key, value } of local) {
       if (!value) continue;
       if (key === 'tag' && !p.tags.some((t) => t.toLowerCase() === value)) return false;
-      if (key === 'album' && !p.album.toLowerCase().includes(value)) return false;
+      // the album and everything under it -- the gallery's search means the same
+      if (key === 'album' && !(p.album.toLowerCase() === value.replace(/\/+$/, '') ||
+                               p.album.toLowerCase().startsWith(value.replace(/\/+$/, '') + '/'))) return false;
       if (key === 'is') {
         if (value === 'featured' && !p.featured) return false;
         if (value === 'untagged' && p.tags.length) return false;

@@ -1625,7 +1625,7 @@ function paintHome() {
     }
     grid.append(card('fa-folder-tree', 'Albums', 'photos per album, sub-albums included',
       ...rankedBars([...byAlbum].map(([label, value]) => ({ label, value }))
-        .sort((x, y) => y.value - x.value), { onRow: (r) => go({ kind: 'library', album: r.label === 'photos' ? '' : r.label }) })));
+        .sort((x, y) => y.value - x.value), { hue: 'teal', onRow: (r) => go({ kind: 'library', album: r.label === 'photos' ? '' : r.label }) })));
 
     const tagged = photos.filter((p) => p.tags.length).length;
     const tagRows = (state.vocab || []).map((t) => ({ label: t.name, value: t.count }));
@@ -1634,7 +1634,7 @@ function paintHome() {
         meter(tagged, photos.length, 'acc'),
         el('span', { class: 'coverage__v', text: Math.round(tagged / photos.length * 100) + '%' })),
       tagRows.length
-        ? rankedBars(tagRows, { limit: 6, onRow: (r) => openTag(r.label) })
+        ? rankedBars(tagRows, { limit: 6, hue: 'rose', onRow: (r) => openTag(r.label) })
         : quiet('No photo carries a tag yet.'),
       el('div', { class: 'card__actions' },
         el('button', { type: 'button', class: 'btn', icon: 'fa-tag', text: 'Tag the untagged',
@@ -1645,7 +1645,7 @@ function paintHome() {
     for (const p of photos) cams.set(p.camera || 'Unknown', (cams.get(p.camera || 'Unknown') || 0) + 1);
     grid.append(card('fa-camera', 'Cameras', cams.size + (cams.size === 1 ? ' camera' : ' cameras'),
       ...rankedBars([...cams].map(([label, value]) => ({ label, value })).sort((x, y) => y.value - x.value),
-        { limit: 5, onRow: (r) => libraryWith({ cameras: [r.label] }) })));
+        { limit: 5, hue: 'violet', onRow: (r) => libraryWith({ cameras: [r.label] }) })));
   }
 
   /* ---- is the machine working ---- */

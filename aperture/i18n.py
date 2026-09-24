@@ -286,10 +286,18 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "search.hits_one": ("match", "Treffer", "件"),
     "search.hits_many": ("matches", "Treffer", "件"),
     "search.hint": (
-        "Searches album names, filenames, tags, cameras and lenses. Narrow it with camera:, lens:, iso:, f:, mm: or date: — for example iso:1600- or date:2026-08.",
-        "Durchsucht Albumnamen, Dateinamen, Tags, Kameras und Objektive. Eingrenzen mit camera:, lens:, iso:, f:, mm: oder date: — zum Beispiel iso:1600- oder date:2026-08.",
-        "アルバム名・ファイル名・タグ・カメラ・レンズを検索します。camera: lens: iso: f: mm: date: で絞り込めます（例：iso:1600- や date:2026-08）。",
+        "Searches album names, filenames, tags, cameras and lenses. Narrow it with the filters beside the results, or type camera:, lens:, iso:, f:, mm:, date:, tag: or album: — for example tag:night date:2026-08.",
+        "Durchsucht Albumnamen, Dateinamen, Tags, Kameras und Objektive. Eingrenzen mit den Filtern neben den Ergebnissen oder mit camera:, lens:, iso:, f:, mm:, date:, tag: oder album: — zum Beispiel tag:night date:2026-08.",
+        "アルバム名・ファイル名・タグ・カメラ・レンズを検索します。結果の横のフィルター、または camera: lens: iso: f: mm: date: tag: album: で絞り込めます（例：tag:night date:2026-08）。",
     ),
+    # the facets beside the results -- the console Library's, for a visitor
+    "search.narrow": ("Narrow it down", "Eingrenzen", "絞り込み"),
+    "search.facet_tags": ("Tags", "Tags", "タグ"),
+    "search.facet_years": ("Year", "Jahr", "年"),
+    "search.facet_cameras": ("Camera", "Kamera", "カメラ"),
+    "search.all_albums": ("All albums", "Alle Alben", "すべてのアルバム"),
+    "search.clear": ("Clear all", "Alle entfernen", "すべて解除"),
+    "search.browse": ("All photos", "Alle Fotos", "すべての写真"),
     # results are grouped: the albums a query names first, its photos below
     "search.albums_head": ("Albums", "Alben", "アルバム"),
     "search.photos_head": ("Photos", "Fotos", "写真"),
