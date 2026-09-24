@@ -100,7 +100,7 @@ edits.
 
 The cards form a **bento**: one pane, shared hairlines, no gaps. Every chart
 takes the colour of the kind of thing it counts — time sky, albums and formats
-sage, tags rose, cameras violet — a single family, never a
+mauve, tags plum, cameras deep blue — a single family, never a
 hue per part; the accent stays for state. They are plain HTML (`static/charts.js`),
 sized through the CSSOM because the CSP drops a style attribute.
 

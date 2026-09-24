@@ -1630,7 +1630,7 @@ function paintHome() {
     }
     put(2, 3, card('fa-folder-tree', 'Albums', 'photos per album, sub-albums included',
       ...rankedBars([...byAlbum].map(([label, value]) => ({ label, value }))
-        .sort((x, y) => y.value - x.value), { hue: 'sage', onRow: (r) => go({ kind: 'library', album: r.label === 'photos' ? '' : r.label }) })));
+        .sort((x, y) => y.value - x.value), { hue: 'album', onRow: (r) => go({ kind: 'library', album: r.label === 'photos' ? '' : r.label }) })));
 
     const tagged = photos.filter((p) => p.tags.length).length;
     const tagRows = (state.vocab || []).map((t) => ({ label: t.name, value: t.count }));
@@ -1638,9 +1638,9 @@ function paintHome() {
       donutChart([
         { label: 'tagged', value: tagged },
         { label: 'untagged', value: photos.length - tagged, other: true },
-      ], { hue: 'rose', ranked: false, center: Math.round(tagged / photos.length * 100) + '%', sub: 'tagged' }),
+      ], { hue: 'tag', ranked: false, center: Math.round(tagged / photos.length * 100) + '%', sub: 'tagged' }),
       tagRows.length
-        ? rankedBars(tagRows, { limit: 6, hue: 'rose', onRow: (r) => openTag(r.label) })
+        ? rankedBars(tagRows, { limit: 6, hue: 'tag', onRow: (r) => openTag(r.label) })
         : quiet('No photo carries a tag yet.'),
       el('div', { class: 'card__actions' },
         el('button', { type: 'button', class: 'btn', icon: 'fa-tag', text: 'Tag the untagged',
@@ -1651,7 +1651,7 @@ function paintHome() {
     for (const p of photos) cams.set(p.camera || 'Unknown', (cams.get(p.camera || 'Unknown') || 0) + 1);
     put(2, 5, card('fa-camera', 'Cameras', cams.size + (cams.size === 1 ? ' camera' : ' cameras'),
       donutChart([...cams].map(([label, value]) => ({ label, value })),
-        { hue: 'violet', center: String(cams.size), sub: cams.size === 1 ? 'camera' : 'cameras',
+        { hue: 'machine', center: String(cams.size), sub: cams.size === 1 ? 'camera' : 'cameras',
           onPart: (part) => libraryWith({ cameras: [part.label] }) })));
 
     /* What the originals are: a PNG archive is ten times the disk a JPEG
@@ -1666,7 +1666,7 @@ function paintHome() {
     const totalBytes = [...sizes.values()].reduce((a, b) => a + b, 0);
     put(2, 8, card('fa-images', 'Formats', bytes(totalBytes) + ' of originals',
       donutChart([...formats].map(([label, value]) => ({ label, value })),
-        { hue: 'sage', center: String(photos.length), sub: 'photos',
+        { hue: 'album', center: String(photos.length), sub: 'photos',
           onPart: (part) => libraryWith({ q: '.' + part.label.toLowerCase() }) }),
       el('dl', { class: 'facts formats__bytes' }, [...sizes].sort((a, b) => b[1] - a[1]).slice(0, 4)
         .map(([ext, n]) => fact(ext, bytes(n) + ' · ' + bytes(n / formats.get(ext)) + ' a photo')))));

@@ -105,9 +105,9 @@ root still land on the Overview.
 * **`tag:` and `album:` in the search grammar** — on /search, `/api/photos?q=`
   and the CLI alike. A tag is matched whole; an album is that folder and
   everything under it.
-* **Colour that means something**: four glyph hues — sage for albums and
-  photos, rose for tags, sky for time, violet for the machine and the
-  camera — on the rail, card titles, facts, tabs and the gallery's facets,
+* **Colour that means something**: four glyph hues from Nebula's lilac
+  family — mauve for albums and photos, plum for tags, sky for time, deep
+  blue for the machine and the camera — on the rail, card titles, facts, tabs and the gallery's facets,
   and on the charts that count that kind of thing. Nebula's rule 1 names
   them; the accent stays for state.
 * **The Overview is a bento**: one pane of glass, the cards sharing their

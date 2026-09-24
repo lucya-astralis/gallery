@@ -658,10 +658,10 @@
      the three statuses), and only ever on a glyph -- never text, never a
      fill, never a border. Validated as a set on this ground, every pair,
      under protan/deutan/tritan (dataviz validate_palette.js, --pairs all). */
-  --glyph-sage:   #47AA84; /* albums, folders, photos, the site */
-  --glyph-rose:   #BC4A7C; /* tags */
-  --glyph-sky:    #2F9CEA; /* time: dates, history, activity */
-  --glyph-violet: #6B4CAE; /* the machine and the camera */
+  --glyph-album:   #9F6DAB; /* albums, folders, photos, the site */
+  --glyph-tag:   #AE2C5E; /* tags */
+  --glyph-time:    #1F98ED; /* time: dates, history, activity */
+  --glyph-machine: #295AB9; /* the machine and the camera */
   --nav-h:      60px;
   /* The mono face, spelled once. Every label, readout and HUD string on the
      site reads this, and it is character-for-character the configurator's
@@ -1253,10 +1253,10 @@ section{
 .facet-group__label .fa{ font-size:var(--fs-chrome-sm); }
 /* GLYPH HUES: which kind of thing a heading is about, keyed on the glyph --
    the console's table, the same four hues. Never text, fill or state. */
-:is(.facet-group__label, .search-group__label) > :is(.fa-folder, .fa-image){ color:var(--glyph-sage); }
-:is(.facet-group__label, .search-group__label) > .fa-tag{ color:var(--glyph-rose); }
-:is(.facet-group__label, .search-group__label) > .fa-calendar-day{ color:var(--glyph-sky); }
-:is(.facet-group__label, .search-group__label) > .fa-camera{ color:var(--glyph-violet); }
+:is(.facet-group__label, .search-group__label) > :is(.fa-folder, .fa-image){ color:var(--glyph-album); }
+:is(.facet-group__label, .search-group__label) > .fa-tag{ color:var(--glyph-tag); }
+:is(.facet-group__label, .search-group__label) > .fa-calendar-day{ color:var(--glyph-time); }
+:is(.facet-group__label, .search-group__label) > .fa-camera{ color:var(--glyph-machine); }
 .facet-list{ list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:var(--s-2); }
 .facet{
   display:inline-flex; align-items:center; gap:var(--s-2);
