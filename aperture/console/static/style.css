@@ -3487,6 +3487,169 @@ kbd + kbd { margin-left: var(--s-1); }
 }
 
 
+/* ================================================================
+   THE EDITOR  —  a file as one page of sections
+   ------------------------------------------------------------------
+   An album or the site's gallery.cfg: its settings groups, its text and
+   its files, down one page with a table of contents beside it. A setting
+   is NEBULA's .set row -- the name and a line of prose, then the control
+   -- in a hairline stack, not a pile of boxes. Nothing is written until
+   it has been read as a diff (the review dialog below).
+   ================================================================ */
+.editor {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: var(--s-7);
+  align-items: start;
+}
+.editor__body { min-width: 0; }
+.editor__body > .savebar { margin-left: 0; }
+
+.edtoc {
+  position: sticky;
+  top: var(--s-6);
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--s-6);
+}
+.edtoc__title {
+  margin-bottom: var(--s-3);
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: var(--tr-chrome-xs);
+  text-transform: uppercase;
+  color: var(--text-ghost);
+}
+.edtoc__link {
+  padding: var(--s-2) var(--s-3);
+  border-left: var(--hair) solid var(--line);
+  color: var(--text-dim);
+  font-size: var(--fs-text-md);
+  text-decoration: none;
+}
+@media (hover: hover) {
+  .edtoc__link:hover { color: var(--text); }
+}
+.edtoc__link.is-on {
+  color: var(--text);
+  border-left: 2px solid var(--acc);
+  padding-left: calc(var(--s-3) - 1px);
+}
+
+.edsec { margin-top: var(--s-8); scroll-margin-top: var(--s-6); }
+.edsec__title {
+  margin: 0 0 var(--s-4);
+  padding-bottom: var(--s-3);
+  border-bottom: var(--hair) solid var(--line);
+  font-size: var(--fs-text-lg);
+  font-weight: 600;
+  letter-spacing: var(--tr-head);
+  color: var(--text-head);
+}
+.edsec > .tabpanel { padding-top: 0; padding-bottom: 0; }
+.group { scroll-margin-top: var(--s-6); }
+
+/* ----- a setting is a row ---------------------------------------------- */
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hair);
+  background: var(--line);
+  border: var(--hair) solid var(--line);
+}
+.field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: var(--s-3) var(--s-6);
+  align-items: start;
+  padding: var(--s-4) var(--s-5);
+  box-shadow: none;
+  background: var(--glass);
+}
+.field.is-unset { background: var(--glass); }
+.field.is-unset .field__name { color: var(--text-dim); }
+.field.is-edited { box-shadow: inset 2px 0 0 var(--amb); }
+/* a list is a thing of its own width: its control goes under the prose */
+.field--wide { grid-template-columns: minmax(0, 1fr); }
+.field__text { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
+.field__top { flex-wrap: wrap; gap: var(--s-2) var(--s-3); }
+.field__name {
+  font-size: var(--fs-text-lg);
+  font-weight: 600;
+  letter-spacing: var(--tr-head);
+  color: var(--text);
+}
+.field__top > .field__label {
+  flex: 0 1 auto;
+  font-size: var(--fs-chrome-sm);
+  font-weight: 400;
+  color: var(--text-ghost);
+}
+.field__top > .field__unset { margin-left: auto; }
+.field__help { max-width: 62ch; }
+
+/* ----- what the check says, and the fix beside it ---------------------- */
+.issue { align-items: center; flex-wrap: wrap; }
+.issue > .btn { margin-left: auto; }
+.hrow:has(.hrow__fix) { grid-template-columns: minmax(90px, 22%) minmax(70px, 16%) 1fr auto; align-items: center; }
+
+/* ----- the review ------------------------------------------------------ */
+.review { max-width: min(calc(100vw - 2 * var(--page-pad)), 760px); }
+.review__file { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2) var(--s-4); margin: 0 0 var(--s-4); }
+.review__file code { font-family: var(--mono); font-size: var(--fs-chrome-md); color: var(--text); }
+.review__count { font-size: var(--fs-text-sm); color: var(--text-dim); }
+.review__after { margin-top: var(--s-5); }
+.review__issues { margin: 0; padding-left: var(--s-5); color: var(--text-dim); font-size: var(--fs-text-sm); }
+.review__issues code { font-family: var(--mono); color: var(--amb); }
+.dlg__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-top: var(--hair) solid var(--line);
+}
+
+.diff {
+  border: var(--hair) solid var(--line);
+  background: var(--bg-2);
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-md);
+  line-height: 1.6;
+  overflow-x: auto;
+  max-height: 52vh;
+}
+.diff__line { display: flex; min-width: max-content; }
+.diff__op { flex: 0 0 var(--s-6); text-align: center; color: var(--text-ghost); user-select: none; }
+.diff__text { white-space: pre; padding-right: var(--s-5); color: var(--text-ghost); }
+.diff__line--del { background: rgba(var(--red-rgb), .1); }
+.diff__line--del .diff__text, .diff__line--del .diff__op { color: #f0a3a1; }
+.diff__line--add { background: rgba(var(--ok-rgb), .08); }
+.diff__line--add .diff__text, .diff__line--add .diff__op { color: #9ff5c3; }
+.diff__skip {
+  padding: var(--s-1) var(--s-6);
+  color: var(--text-ghost);
+  font-family: var(--sans);
+  font-size: var(--fs-text-sm);
+  border-top: var(--hair) solid var(--line);
+  border-bottom: var(--hair) solid var(--line);
+}
+
+/* ----- the tray -------------------------------------------------------- */
+.tray { display: flex; flex-direction: column; gap: var(--hair); background: var(--line); border: var(--hair) solid var(--line); margin-top: var(--s-4); }
+.tray__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-5); padding: var(--s-4); background: var(--overlay); }
+.tray__text { flex: 1 1 260px; display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
+.tray__file { font-family: var(--mono); font-size: var(--fs-chrome-md); color: var(--text); overflow-wrap: anywhere; }
+.tray__keys { font-family: var(--mono); font-size: var(--fs-chrome-sm); color: var(--amb); overflow-wrap: anywhere; }
+.tray__acts { display: flex; gap: var(--s-2); }
+
+@media (max-width: 900px) {
+  .editor { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .edtoc { display: none; }
+  .field { grid-template-columns: minmax(0, 1fr); }
+  .hrow:has(.hrow__fix) { grid-template-columns: minmax(0, 1fr); }
+}
+
+
 /* ============================================================
    THE DOOR
    ------------------------------------------------------------

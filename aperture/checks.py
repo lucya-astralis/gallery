@@ -35,6 +35,27 @@ from . import albums, branding, cfgio, config, db, links, schema, theme, welcome
 _EXTENSION_HINTS = {"wallpaper_mobile": "stills only: a phone never loads a backdrop video"}
 
 
+# ----- fixes ---------------------------------------------------------------
+# An issue may carry the one edit that makes it go away: which key, and the
+# value it should have (None removes the key). The console stages it as an
+# ordinary unsaved change -- reviewed in its diff and saved like any other
+# edit -- so a fix is never a write of its own. `doctor` ignores it.
+def _issue(entry: dict, fix: dict | None) -> dict:
+    if fix:
+        entry["fix"] = fix
+    return entry
+
+
+def _drop(key: str, label: str = "Remove the line") -> dict:
+    return {"label": label, "key": key, "value": None}
+
+
+def _without(cfg: dict, key: str, item: str) -> dict:
+    """The list with one entry taken out -- the key gone if that was the last."""
+    rest = [i for i in cfg.get(key, []) if i.strip() != item.strip()]
+    return {"label": f"Remove {item.strip()!r}", "key": key, "value": rest or None}
+
+
 def album(name: str, cfg: dict[str, list[str]] | None = None) -> list[dict]:
     """Everything wrong with one album.cfg. Empty when the file is fine or absent.
 
@@ -47,18 +68,20 @@ def album(name: str, cfg: dict[str, list[str]] | None = None) -> list[dict]:
         return []
     out: list[dict] = []
 
-    def add(level: str, key: str, detail: str) -> None:
-        out.append({"scope": "album", "album": name, "level": level, "key": key, "detail": detail})
+    def add(level: str, key: str, detail: str, fix: dict | None = None) -> None:
+        out.append(_issue({"scope": "album", "album": name, "level": level, "key": key,
+                           "detail": detail}, fix))
 
     for key in cfg:
         if key not in schema.ALBUM_KEYS:
             add("error", key, "unknown key — ignored by the gallery (known: %s)"
-                % ", ".join(sorted(schema.ALBUM_KEYS)))
+                % ", ".join(sorted(schema.ALBUM_KEYS)), _drop(key))
 
     if "cover" in cfg:
         raw = cfgio.first(cfg, "cover")
         if raw and not albums.config_cover_rel(name, raw):
-            add("error", "cover", f"{raw!r} does not resolve to an indexed photo")
+            add("error", "cover", f"{raw!r} does not resolve to an indexed photo",
+                _drop("cover", "Pick automatically again"))
 
     featured = [i.strip() for i in cfg.get("featured", []) if i.strip()]
     if any(i.lower() in ("*", "all") for i in featured):
@@ -69,25 +92,29 @@ def album(name: str, cfg: dict[str, list[str]] | None = None) -> list[dict]:
     else:
         for item in featured:
             if not albums.resolve_photo_refs(name, [item]):
-                add("error", "featured", f"{item!r} matches no indexed photo")
+                add("error", "featured", f"{item!r} matches no indexed photo",
+                    _without(cfg, "featured", item))
     for item in cfg.get("order", []):
         item = item.strip()
         if item and not albums.resolve_photo_refs(name, [item]):
-            add("warn", "order", f"{item!r} matches no indexed photo")
+            add("warn", "order", f"{item!r} matches no indexed photo",
+                _without(cfg, "order", item))
 
     reel = (cfgio.first(cfg, "reel") or "").strip().lower()
     if reel and reel not in schema.REEL_ACCEPTED:
-        add("error", "reel", f"{reel!r} is not featured, random or off")
+        add("error", "reel", f"{reel!r} is not featured, random or off", _drop("reel", "Use the default"))
 
     sort = (cfgio.first(cfg, "sort") or "").strip().lower()
     if sort and sort not in schema.PHOTO_SORTS:
-        add("error", "sort", f"{sort!r} is not one of {', '.join(sorted(schema.PHOTO_SORTS))}")
+        add("error", "sort", f"{sort!r} is not one of {', '.join(sorted(schema.PHOTO_SORTS))}",
+            _drop("sort", "Use the default"))
     elif sort == "curated" and "order" not in cfg:
         add("warn", "sort", "curated preset without an `order` list — the gallery falls back to date_desc")
 
     effect = (cfgio.first(cfg, "effect") or "").strip().lower()
     if effect and effect not in schema.EFFECTS:
-        add("error", "effect", f"{effect!r} is not whitelisted ({', '.join(sorted(schema.EFFECTS))})")
+        add("error", "effect", f"{effect!r} is not whitelisted ({', '.join(sorted(schema.EFFECTS))})",
+            _drop("effect", "Use no effect"))
 
     _files(cfg, schema.ALBUM_ASSET_KEYS, config.album_meta_dir(name), schema.ALBUM_META_DIR + "/", add)
     _theme(cfg, add)
@@ -97,12 +124,15 @@ def album(name: str, cfg: dict[str, list[str]] | None = None) -> list[dict]:
     for item in cfg.get("stat", []):
         _label, sep, value = item.partition(":")
         if not sep:
-            add("warn", "stat", f"{item!r} has no `Label: Value` colon — the line is dropped")
+            add("warn", "stat", f"{item!r} has no `Label: Value` colon — the line is dropped",
+                _without(cfg, "stat", item))
         elif not value.strip():
-            add("warn", "stat", f"{item!r} has an empty value — the line is dropped")
+            add("warn", "stat", f"{item!r} has an empty value — the line is dropped",
+                _without(cfg, "stat", item))
     stats = (cfgio.first(cfg, "stats") or "").strip().lower()
     if stats and stats not in cfgio.FALSE:
-        add("warn", "stats", f"{stats!r} does nothing — only an off/false/no value hides the block")
+        add("warn", "stats", f"{stats!r} does nothing — only an off/false/no value hides the block",
+            _drop("stats"))
     return out
 
 
@@ -114,13 +144,14 @@ def gallery(cfg: dict[str, list[str]] | None = None) -> list[dict]:
         return []
     out: list[dict] = []
 
-    def add(level: str, key: str, detail: str) -> None:
-        out.append({"scope": "gallery", "album": None, "level": level, "key": key, "detail": detail})
+    def add(level: str, key: str, detail: str, fix: dict | None = None) -> None:
+        out.append(_issue({"scope": "gallery", "album": None, "level": level, "key": key,
+                           "detail": detail}, fix))
 
     for key in cfg:
         if key not in schema.GALLERY_KEYS:
             add("error", key, "unknown key — ignored by the gallery (known: %s)"
-                % ", ".join(sorted(schema.GALLERY_KEYS)))
+                % ", ".join(sorted(schema.GALLERY_KEYS)), _drop(key))
 
     for key in ("welcome", "welcome_desktop", "welcome_mobile"):
         spec = cfg.get(key, [])
@@ -128,7 +159,8 @@ def gallery(cfg: dict[str, list[str]] | None = None) -> list[dict]:
             continue
         for raw in spec:
             if not welcome.lookup_welcome_image(raw):
-                add("error", key, f"{raw!r} does not resolve to an indexed photo — the entry is skipped")
+                add("error", key, f"{raw!r} does not resolve to an indexed photo — the entry is skipped",
+                    _without(cfg, key, raw))
 
     if "album_order" in cfg:
         known = {albums.album_order_key(n) for n in albums.all_album_nodes()}
@@ -136,12 +168,14 @@ def gallery(cfg: dict[str, list[str]] | None = None) -> list[dict]:
             if item.startswith("#"):
                 continue          # a group label, not an album
             if albums.album_order_key(item) not in known:
-                add("warn", "album_order", f"{item!r} matches no album")
+                add("warn", "album_order", f"{item!r} matches no album",
+                    _without(cfg, "album_order", item))
 
     album_sort = (cfgio.first(cfg, "album_sort") or "").strip().lower()
     if album_sort and album_sort not in schema.GALLERY_ALBUM_SORTS:
         add("error", "album_sort", "%r is not one of %s"
-            % (album_sort, ", ".join(sorted(schema.GALLERY_ALBUM_SORTS))))
+            % (album_sort, ", ".join(sorted(schema.GALLERY_ALBUM_SORTS))),
+            _drop("album_sort", "Use the default"))
     elif album_sort == "curated" and "album_order" not in cfg:
         add("warn", "album_sort", "curated preset without an `album_order` list")
 
@@ -154,12 +188,14 @@ def gallery(cfg: dict[str, list[str]] | None = None) -> list[dict]:
     for key in schema.URL_KEYS:
         raw = cfgio.joined(cfg, key)
         if raw and branding.brand_link(cfg, key) is None:
-            add("error", key, f"{raw!r} is not an http(s) or site-relative URL — the link is dropped")
+            add("error", key, f"{raw!r} is not an http(s) or site-relative URL — the link is dropped",
+                _drop(key))
     badges = cfg.get("badges", [])
     for badge in badges[:schema.BADGE_MAX]:
         file = badge.partition("|")[0].strip()
         if file and branding.brand_file(file) is None:
-            add("error", "badges", f"{file!r} is not an image in {schema.GALLERY_META_DIR}/ — the badge is skipped")
+            add("error", "badges", f"{file!r} is not an image in {schema.GALLERY_META_DIR}/ — the badge is skipped",
+                _without(cfg, "badges", badge))
     if len(badges) > schema.BADGE_MAX:
         add("warn", "badges", f"only the first {schema.BADGE_MAX} are shown")
     return out
@@ -212,15 +248,15 @@ def _files(cfg: dict, keys: dict, folder: Path | None, where: str, add) -> None:
         if not raw:
             continue
         if Path(raw).name != raw:
-            add("error", key, f"{raw!r} must be a bare file name inside {where}")
+            add("error", key, f"{raw!r} must be a bare file name inside {where}", _drop(key))
         elif Path(raw).suffix.lower() not in allowed:
             hint = _EXTENSION_HINTS.get(key)
             add("error", key, f"{raw!r} is not one of {', '.join(sorted(allowed))}"
-                + (f" — {hint}" if hint else ""))
+                + (f" — {hint}" if hint else ""), _drop(key))
         elif folder is None:
-            add("error", key, f"{raw!r} — there is no {where} folder yet")
+            add("error", key, f"{raw!r} — there is no {where} folder yet", _drop(key))
         elif not (folder / raw).is_file():
-            add("error", key, f"{raw!r} is not in {where}")
+            add("error", key, f"{raw!r} is not in {where}", _drop(key))
 
 
 def _theme(cfg: dict, add) -> None:
@@ -231,21 +267,26 @@ def _theme(cfg: dict, add) -> None:
         raw = (cfgio.first(cfg, "font_scale") or "").strip()
         lo, hi = schema.FONT_SCALE_RANGE
         if config.cfg_font_scale(raw) is None:
-            add("warn", "font_scale", f"{raw!r} is ignored — not a number in {lo:g}–{hi:g}")
+            add("warn", "font_scale", f"{raw!r} is ignored — not a number in {lo:g}–{hi:g}",
+                _drop("font_scale"))
         elif "font" not in cfg:
-            add("warn", "font_scale", "ignored — there is no `font` for it to scale")
+            add("warn", "font_scale", "ignored — there is no `font` for it to scale",
+                _drop("font_scale"))
 
     accent = (cfgio.first(cfg, "accent") or "").strip()
     if accent:
         rgb = theme.parse_hex_color(accent)
         if rgb is None:
-            add("error", "accent", f"{accent!r} is not a hex colour (#abc or #aabbcc) — the gallery ignores it")
+            add("error", "accent", f"{accent!r} is not a hex colour (#abc or #aabbcc) — the gallery ignores it",
+                _drop("accent"))
         elif theme.accent_shades(rgb)["lifted"]:
             # Not an error: the gallery lightens it rather than ship an
             # unreadable page. But the colour on screen is then not the one in
             # the file, and that is worth saying out loud.
+            lifted = theme.accent_shades(rgb)["acc"]
             add("warn", "accent", f"{accent!r} is too dark to read on the black page — "
-                f"the gallery lightens it to {theme.accent_shades(rgb)['acc']}")
+                f"the gallery lightens it to {lifted}",
+                {"label": f"Use {lifted}", "key": "accent", "value": lifted})
 
     for key, span in (("wallpaper_tint", schema.WALLPAPER_TINT_RANGE),
                       ("wallpaper_dim", schema.WALLPAPER_DIM_RANGE)):
@@ -256,7 +297,7 @@ def _theme(cfg: dict, add) -> None:
         try:
             value = float(raw.replace(",", "."))
         except ValueError:
-            add("error", key, f"{raw!r} is not a number ({unit}) — ignored")
+            add("error", key, f"{raw!r} is not a number ({unit}) — ignored", _drop(key))
             continue
         if not span[0] <= value <= span[1]:
-            add("warn", key, f"{raw!r} is outside {unit} — ignored, the default stands")
+            add("warn", key, f"{raw!r} is outside {unit} — ignored, the default stands", _drop(key))

@@ -62,9 +62,22 @@ def test_every_issue_says_where_it_is(indexed, album_cfg):
     issues = checks.everything()
     assert issues
     for issue in issues:
-        assert set(issue) == {"scope", "album", "level", "key", "detail"}
+        assert set(issue) - {"fix"} == {"scope", "album", "level", "key", "detail"}
         assert issue["level"] in ("error", "warn")
         assert (issue["scope"] == "gallery") == (issue["album"] is None)
+        if "fix" in issue:
+            # one edit, spelled the way the console stages it
+            assert set(issue["fix"]) == {"label", "key", "value"}
+
+
+def test_a_fix_is_the_edit_that_makes_the_issue_go_away(indexed, album_cfg):
+    """Staged and saved, a fix must leave the file clean of the issue it
+    came with -- a removed line for an unknown key, the list without the one
+    entry for a featured photo that does not exist."""
+    album_cfg("name = Tech\ncolour = red\nfeatured = desk.jpg, nope.jpg\n")
+    issues = {i["key"]: i for i in checks.album("tech")}
+    assert issues["colour"]["fix"] == {"label": "Remove the line", "key": "colour", "value": None}
+    assert issues["featured"]["fix"]["value"] == ["desk.jpg"]
 
 
 def test_the_fixture_tree_is_clean(indexed):

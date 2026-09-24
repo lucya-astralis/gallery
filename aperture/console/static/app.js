@@ -308,10 +308,12 @@ function refreshAlbumViews() {
  * made, 'replace' on boot, 'none' when the address already says it (Back,
  * Forward). Returns false when unsaved changes kept you where you were. */
 async function select(sel, keepTab = false, how = 'push') {
-  if (!keepTab && state.sel && dirty() &&
-      !confirm('Discard the unsaved changes on this page?')) return false;
+  /* Unsaved edits are not thrown away and not asked about: they stay a
+   * draft of their file, listed in the bar's "unsaved" tray, and come back
+   * when you do. */
+  stashDraft();
   state.sel = sel;
-  state.edits = {};
+  state.edits = takeDraft(sel);
   state.browse = null;
   state.data = null;
   if (!keepTab) { state.tab = 'settings'; state.query = ''; }
@@ -343,7 +345,6 @@ async function select(sel, keepTab = false, how = 'push') {
   return true;
 }
 
-const dirty = () => Object.keys(state.edits).length > 0;
 
 /* The theme keys — accent, font, font_scale, both wallpapers — are spelled
  * identically in album.cfg and gallery.cfg, but one tier down they name a
@@ -2079,12 +2080,27 @@ function paintHome() {
       : !list.length
         ? el('p', { class: 'card__quiet',
                     text: 'Every config file checks out — nothing the gallery would ignore.' })
-        : foldedRows('issues', list, 6, (issue) => homeRow(
-            issue.scope === 'gallery' ? 'gallery.cfg'
-              : issue.scope === 'links' ? 'links.cfg' : issue.album,
-            issue.key, issue.detail,
-            () => select(issue.scope === 'album'
-              ? { kind: 'album', album: issue.album } : { kind: issue.scope }))),
+        : foldedRows('issues', list, 6, (issue) => {
+            const target = issue.scope === 'album'
+              ? { kind: 'album', album: issue.album } : { kind: issue.scope };
+            const row = homeRow(
+              issue.scope === 'gallery' ? 'gallery.cfg'
+                : issue.scope === 'links' ? 'links.cfg' : issue.album,
+              issue.key, issue.detail, () => go(target));
+            /* The fix opens the file with the edit already staged: it is
+             * reviewed and saved there, like any other change. */
+            if (issue.fix && !READ_ONLY && issue.scope !== 'links') {
+              row.append(el('button', {
+                type: 'button', class: 'btn btn--sm hrow__fix', icon: 'fa-screwdriver-wrench', text: issue.fix.label,
+                onclick: async (ev) => {
+                  ev.stopPropagation();
+                  await select(target);
+                  applyFix(issue.fix);
+                },
+              }));
+            }
+            return row;
+          }),
     el('div', { class: 'card__actions' },
       el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'Check again', onclick: checkAll })))));
 
@@ -2126,45 +2142,98 @@ function renderPane() {
   const selEnd = fk && active.selectionEnd !== undefined ? active.selectionEnd : null;
   paneScroll = pane.scrollTop;
   pane.innerHTML = '';
+  const raw = state.tab === 'raw';
 
-  const tabs = isGallery
-    ? [['settings', 'Settings', 'fa-sliders'], ['assets', 'Files', 'fa-folder-open'],
-       ['raw', 'Raw file', 'fa-file-code']]
-    : [['settings', 'Settings', 'fa-sliders'],
-       ['text', 'Description', 'fa-align-left'], ['assets', 'Files', 'fa-folder-open'],
-       ['raw', 'Raw file', 'fa-file-code']];
-  if (!tabs.some(([id]) => id === state.tab)) state.tab = tabs[0][0];
+  pane.append(el('div', { class: 'pane__top' }, renderHead(isGallery)));
 
-  /* Header and tabs travel together as one sticky block: on a settings page
-   * three screens tall, scrolling used to take the album's name and every
-   * tab with it. */
-  pane.append(el('div', { class: 'pane__top' },
-    renderHead(isGallery),
-    el('div', { class: 'tabs' }, tabs.map(([id, label, icon]) =>
-      el('button', {
-        class: 'tab' + (state.tab === id ? ' is-active' : ''),
-        type: 'button', icon, text: label,
-        onclick: () => { state.tab = id; renderPane(); },
-      })))));
+  if (raw) {
+    pane.append(renderRaw());
+  } else {
+    /* One page, in sections, with its table of contents beside it. Four
+     * tabs used to hide three quarters of an album behind clicks -- and
+     * nothing said which of them still had something unsaved. */
+    const groups = isGallery ? GALLERY_GROUPS : ALBUM_GROUPS;
+    const sections = groups.map(([title]) => [sectionId(title), title]);
+    if (!isGallery) sections.push(['sec-text', 'Text']);
+    sections.push(['sec-files', 'Files']);
 
-  if (state.data.issues && state.data.issues.length) {
-    pane.append(el('div', { class: 'issues' }, state.data.issues.map((issue) =>
-      el('div', { class: 'issue issue--' + (issue.level === 'error' ? 'error' : 'warn') },
-        el('span', { class: 'issue__key', text: issue.key }),
-        el('span', { class: 'issue__detail', text: issue.detail })))));
+    const body = el('div', { class: 'editor__body' });
+    const issues = renderIssues();
+    if (issues) body.append(issues);
+    body.append(renderSettings(groups));
+    if (!isGallery) {
+      body.append(el('section', { class: 'edsec', id: 'sec-text' },
+        el('h2', { class: 'edsec__title', text: 'Text' }), renderDescriptions()));
+    }
+    body.append(el('section', { class: 'edsec', id: 'sec-files' },
+      el('h2', { class: 'edsec__title', text: 'Files' }), renderAssets()));
+    body.append(renderSaveBar());
+    pane.append(el('div', { class: 'editor' }, editorToc(sections), body));
+    watchToc();
   }
-
-  if (state.tab === 'settings') {
-    pane.append(renderSettings(isGallery ? GALLERY_GROUPS : ALBUM_GROUPS));
-    pane.append(renderSaveBar());
-  } else if (state.tab === 'raw') pane.append(renderRaw());
-  else if (state.tab === 'text') pane.append(renderDescriptions());
-  else if (state.tab === 'assets') pane.append(renderAssets());
 
   pane.scrollTop = paneScroll;
   paneScrollLanded = pane.scrollTop;
   restoreFocus(fk, selStart, selEnd);
   syncDirtyMark();
+}
+
+const sectionId = (title) => 'sec-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+function editorToc(sections) {
+  return el('nav', { class: 'edtoc', 'aria-label': 'On this page' },
+    el('span', { class: 'edtoc__title', text: 'On this page' }),
+    sections.map(([id, title]) => el('a', {
+      class: 'edtoc__link', href: '#' + id, 'data-sec': id, text: title,
+      onclick: (ev) => {
+        ev.preventDefault();
+        const target = document.getElementById(id);
+        if (target) target.scrollIntoView({ block: 'start', behavior: 'instant' });
+      },
+    })));
+}
+
+/* Which section is on screen, lit in the table of contents. */
+let tocObserver = null;
+function watchToc() {
+  if (tocObserver) tocObserver.disconnect();
+  const pane = $('#pane');
+  const seen = new Map();
+  tocObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) seen.set(entry.target.id, entry.isIntersecting);
+    const first = $$('.editor__body [id^="sec-"]').find((node) => seen.get(node.id));
+    $$('.edtoc__link').forEach((link) => link.classList.toggle('is-on', !!first && link.dataset.sec === first.id));
+  }, { root: pane, rootMargin: '-120px 0px -55% 0px' });
+  $$('.editor__body [id^="sec-"]').forEach((node) => tocObserver.observe(node));
+}
+
+/* What the checks say about this file, each with its fix when there is one.
+ * A fix is staged like any edit -- it shows in the diff before anything is
+ * written. */
+function renderIssues() {
+  const list = (state.data.issues || []);
+  if (!list.length) return null;
+  return el('div', { class: 'issues' }, list.map((issue) => {
+    const staged = issue.fix && issue.fix.key in state.edits &&
+      JSON.stringify(state.edits[issue.fix.key]) === JSON.stringify(issue.fix.value);
+    return el('div', { class: 'issue issue--' + (issue.level === 'error' ? 'error' : 'warn') },
+      el('span', { class: 'issue__key', text: issue.key }),
+      el('span', { class: 'issue__detail', text: issue.detail }),
+      issue.fix && !READ_ONLY
+        ? el('button', {
+            type: 'button', class: 'btn btn--sm' + (staged ? ' is-on' : ''), disabled: staged,
+            icon: staged ? 'fa-check' : 'fa-screwdriver-wrench', text: staged ? 'Staged' : issue.fix.label,
+            title: staged ? 'Staged — review it with Save' : 'Stage this fix; it is saved with the rest',
+            onclick: () => applyFix(issue.fix),
+          })
+        : null);
+  }));
+}
+
+function applyFix(fix) {
+  state.edits[fix.key] = fix.value;
+  renderPane();
+  toast('Staged: ' + fix.label + ' — review it with Save');
 }
 
 /* One album out of the loaded tree, by path. */
@@ -2207,6 +2276,12 @@ function renderHead(isGallery) {
     meta.push(el('a', { class: 'btn', href: pathFor({ kind: 'library', album: state.sel.album }),
                         'data-go': true, icon: 'fa-images', text: 'Photos' }));
   }
+  meta.push(el('button', {
+    type: 'button', class: 'btn' + (state.tab === 'raw' ? ' is-on' : ''), icon: 'fa-file-code',
+    text: state.tab === 'raw' ? 'Back to the form' : 'Raw file',
+    title: 'The file exactly as it is on disk',
+    onclick: () => { state.tab = state.tab === 'raw' ? 'settings' : 'raw'; renderPane(); },
+  }));
   if (!isGallery && !READ_ONLY) meta.push(linkButton(state.sel.album, 'Link…'));
 
   const path = isGallery
@@ -2281,7 +2356,7 @@ function renderSettings(groups) {
     // "no result".
     const folded = !q && state.collapsed.has(groupId(title));
 
-    blocks.push(el('section', { class: 'group' + (folded ? ' is-folded' : '') },
+    blocks.push(el('section', { class: 'group' + (folded ? ' is-folded' : ''), id: sectionId(title) },
       el('header', {
         class: 'group__head', role: 'button', tabindex: '0',
         'aria-expanded': folded ? 'false' : 'true',
@@ -2365,18 +2440,28 @@ function renderField(key) {
            (unset ? ' is-unset' : '') + (edited ? ' is-edited' : ''),
     'data-key': key,
   },
-    el('div', { class: 'field__top' },
-      el('span', { class: 'field__label', text: key }),
-      edited ? el('span', { class: 'field__flag', text: 'edited',
-                            title: 'changed here, not yet written to the file' }) : null,
-      unset || READ_ONLY ? null : el('button', {
-        class: 'field__unset', type: 'button', icon: 'fa-xmark',
-        title: 'unset — remove this line from the file',
-        onclick: () => setValue(key, null),
-      })),
-    el('div', { class: 'field__control' }, buildControl(key, spec)),
-    help ? el('div', { class: 'field__help', text: help }) : null);
+    el('div', { class: 'field__text' },
+      el('div', { class: 'field__top' },
+        el('span', { class: 'field__name', text: humanKey(key) }),
+        el('code', { class: 'field__label', text: key }),
+        edited ? el('span', { class: 'field__flag', text: 'edited',
+                              title: 'changed here, not yet written to the file' }) : null,
+        unset || READ_ONLY ? null : el('button', {
+          class: 'field__unset', type: 'button', icon: 'fa-xmark',
+          title: 'unset — remove this line from the file',
+          'aria-label': 'Unset ' + key,
+          onclick: () => setValue(key, null),
+        })),
+      help ? el('div', { class: 'field__help', text: help }) : null),
+    el('div', { class: 'field__control' }, buildControl(key, spec)));
 }
+
+/* A key as words: the file spells it `wallpaper_mobile`, a person reads
+ * "Wallpaper mobile". The key itself stays beside it, as the file has it. */
+const humanKey = (key) => {
+  const words = key.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
 
 function buildControl(key, spec) {
   switch (spec.type) {
@@ -3021,8 +3106,9 @@ function renderSaveBar() {
       onclick: () => { state.edits = {}; renderPane(); },
     }) : null,
     el('button', {
-      class: 'btn btn--primary', type: 'button', icon: 'fa-floppy-disk', text: 'Save',
-      disabled: READ_ONLY || !changed.length, onclick: saveSettings,
+      class: 'btn btn--primary', type: 'button', icon: 'fa-floppy-disk', text: 'Review & save',
+      title: 'See exactly which lines change, then write them (Ctrl S)',
+      disabled: READ_ONLY || !changed.length, onclick: () => reviewDraft(currentDraft()),
     })));
   return bar;
 }
@@ -3042,21 +3128,207 @@ function revealField(key) {
   setTimeout(() => node.classList.remove('is-flash'), 1200);
 }
 
-async function saveSettings() {
+/* ----- drafts ------------------------------------------------------------
+ * Unsaved edits belong to their FILE, not to the screen: moving to another
+ * album keeps them, and the bar's "unsaved" mark lists every file with
+ * something waiting. Nothing reaches disk until it has been reviewed as a
+ * line diff -- the dry run the server renders with the same parser and the
+ * same apply() the save uses. */
+const drafts = new Map();          // file key -> {sel, edits}
+const descDrafts = {};             // "album|lang" -> text typed, not saved
+
+const draftKey = (sel) => !sel ? null
+  : sel.kind === 'gallery' ? 'gallery' : sel.kind === 'album' ? 'album:' + sel.album : null;
+const draftLabel = (sel) => (sel.kind === 'gallery' ? 'gallery.cfg' : sel.album + '/.album/album.cfg');
+
+function stashDraft() {
+  const key = draftKey(state.sel);
+  if (!key) return;
+  if (Object.keys(state.edits || {}).length) drafts.set(key, { sel: { ...state.sel }, edits: state.edits });
+  else drafts.delete(key);
+}
+
+function takeDraft(sel) {
+  const key = draftKey(sel);
+  return key && drafts.has(key) ? drafts.get(key).edits : {};
+}
+
+function currentDraft() {
+  return { key: draftKey(state.sel), sel: { ...state.sel }, edits: state.edits };
+}
+
+/* Every file with something unsaved, the one on screen first. */
+function pendingDrafts() {
+  const out = [];
+  const here = draftKey(state.sel);
+  if (here && Object.keys(state.edits || {}).length) out.push(currentDraft());
+  for (const [key, draft] of drafts) {
+    if (key !== here && Object.keys(draft.edits).length) out.push({ key, ...draft });
+  }
+  return out;
+}
+
+/* A line diff: the longest common run of lines, then what was taken out and
+ * what was put in around it. cfg files are a few hundred lines at most, so
+ * the plain table is fine. */
+function lineDiff(a, b) {
+  const x = a.split('\n');
+  const y = b.split('\n');
+  const n = x.length;
+  const m = y.length;
+  const t = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      t[i][j] = x[i] === y[j] ? t[i + 1][j + 1] + 1 : Math.max(t[i + 1][j], t[i][j + 1]);
+    }
+  }
+  const out = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (x[i] === y[j]) { out.push([' ', x[i]]); i++; j++; }
+    else if (t[i + 1][j] >= t[i][j + 1]) out.push(['-', x[i++]]);
+    else out.push(['+', y[j++]]);
+  }
+  while (i < n) out.push(['-', x[i++]]);
+  while (j < m) out.push(['+', y[j++]]);
+  return out;
+}
+
+/* The diff as hunks: every changed line with two lines of context, the
+ * unchanged stretches between them folded to a count. */
+function renderDiff(before, after) {
+  const lines = lineDiff(before.replace(/\n$/, ''), after.replace(/\n$/, ''));
+  const keep = new Set();
+  lines.forEach(([op], i) => {
+    if (op !== ' ') for (let k = Math.max(0, i - 2); k <= Math.min(lines.length - 1, i + 2); k++) keep.add(k);
+  });
+  const rows = [];
+  let skipped = 0;
+  lines.forEach(([op, text], i) => {
+    if (!keep.has(i)) { skipped++; return; }
+    if (skipped) { rows.push(el('div', { class: 'diff__skip', text: '… ' + skipped + ' unchanged line' + (skipped === 1 ? '' : 's') })); skipped = 0; }
+    rows.push(el('div', { class: 'diff__line diff__line--' + ({ ' ': 'ctx', '-': 'del', '+': 'add' })[op] },
+      el('span', { class: 'diff__op', text: op === ' ' ? '' : op }),
+      el('span', { class: 'diff__text', text: text || ' ' })));
+  });
+  if (skipped) rows.push(el('div', { class: 'diff__skip', text: '… ' + skipped + ' unchanged line' + (skipped === 1 ? '' : 's') }));
+  const added = lines.filter(([op]) => op === '+').length;
+  const removed = lines.filter(([op]) => op === '-').length;
+  return { node: el('div', { class: 'diff' }, rows), added, removed };
+}
+
+function reviewDialog() {
+  let dlg = $('#review');
+  if (!dlg) {
+    dlg = el('dialog', { class: 'dlg review', id: 'review', 'aria-labelledby': 'review-title' });
+    dlg.addEventListener('click', (ev) => { if (ev.target === dlg) dlg.close(); });
+    document.body.append(dlg);
+  }
+  return dlg;
+}
+
+/* One file's changes, as the lines that will change, with Save underneath.
+ * Opened from the page's save bar, Ctrl S, and the tray. */
+async function reviewDraft(draft, then) {
+  if (!draft || !draft.key || !Object.keys(draft.edits).length) return;
+  const isGallery = draft.sel.kind === 'gallery';
+  let preview;
   try {
-    const payload = await api(
-      state.sel.kind === 'gallery' ? '/api/gallery/cfg' : '/api/album/cfg',
-      { method: 'PUT', body: JSON.stringify({ album: state.sel.album || '', values: state.edits }) });
-    Object.assign(state.data, {
-      values: payload.values, raw: payload.raw, issues: payload.issues, exists: true,
+    preview = await api(isGallery ? '/api/gallery/cfg/preview' : '/api/album/cfg/preview', {
+      method: 'POST', body: JSON.stringify({ album: draft.sel.album || '', values: draft.edits }),
     });
-    state.edits = {};
-    renderPane();
-    refreshIssueDots();
-    toast('Saved');
+  } catch (err) {
+    toast(err.message, 'err');
+    return;
+  }
+  const dlg = reviewDialog();
+  const diff = renderDiff(preview.before, preview.after);
+  const warnings = (preview.issues || []);
+  dlg.replaceChildren(
+    el('header', { class: 'dlg__head' },
+      el('h2', { id: 'review-title', text: 'Review changes' }),
+      el('button', { type: 'button', class: 'btn btn--ghost btn--icon', 'aria-label': 'Close', onclick: () => dlg.close() },
+        ico('fa-xmark'))),
+    el('div', { class: 'dlg__body' },
+      el('p', { class: 'review__file' },
+        el('code', { text: draftLabel(draft.sel) }),
+        el('span', { class: 'review__count', text: '−' + diff.removed + ' +' + diff.added + ' lines · comments and every other line stay as they are' })),
+      diff.node,
+      warnings.length ? el('div', { class: 'review__after' },
+        el('h3', { class: 'insp__sub', text: 'After this save the check still says' }),
+        el('ul', { class: 'review__issues' }, warnings.map((w) => el('li', {},
+          el('code', { text: w.key }), ' ', w.detail)))) : null),
+    el('footer', { class: 'dlg__foot' },
+      el('button', { type: 'button', class: 'btn btn--ghost', text: 'Keep editing', onclick: () => dlg.close() }),
+      el('button', { type: 'button', class: 'btn btn--primary', icon: 'fa-floppy-disk', text: 'Save ' + (isGallery ? 'gallery.cfg' : 'album.cfg'),
+                     id: 'review-save', disabled: READ_ONLY,
+                     onclick: async (ev) => {
+                       ev.currentTarget.disabled = true;
+                       const ok = await writeDraft(draft);
+                       if (ok) { dlg.close(); if (then) then(); }
+                       else ev.currentTarget.disabled = false;
+                     } })));
+  if (!dlg.open) dlg.showModal();
+  $('#review-save').focus();
+}
+
+/* Write one draft. The file on screen takes the server's answer as its new
+ * state; a file elsewhere simply stops being a draft. */
+async function writeDraft(draft) {
+  const isGallery = draft.sel.kind === 'gallery';
+  let payload;
+  try {
+    payload = await api(isGallery ? '/api/gallery/cfg' : '/api/album/cfg',
+      { method: 'PUT', body: JSON.stringify({ album: draft.sel.album || '', values: draft.edits }) });
   } catch (err) {
     toast('Save failed: ' + err.message, 'err');
+    return false;
   }
+  drafts.delete(draft.key);
+  if (draftKey(state.sel) === draft.key) {
+    state.edits = {};
+    if (state.data) {
+      Object.assign(state.data, { values: payload.values, raw: payload.raw, issues: payload.issues, exists: true });
+    }
+    renderPane();
+  }
+  syncDirtyMark();
+  refreshIssueDots();
+  toast('Saved ' + draftLabel(draft.sel));
+  return true;
+}
+
+/* The tray: every file with something unsaved. */
+function openTray() {
+  const dlg = reviewDialog();
+  const list = pendingDrafts();
+  if (!list.length) { toast('Nothing unsaved'); return; }
+  dlg.replaceChildren(
+    el('header', { class: 'dlg__head' },
+      el('h2', { id: 'review-title', text: 'Unsaved changes' }),
+      el('button', { type: 'button', class: 'btn btn--ghost btn--icon', 'aria-label': 'Close', onclick: () => dlg.close() },
+        ico('fa-xmark'))),
+    el('div', { class: 'dlg__body' },
+      el('p', { class: 'insp__quiet', text: 'Edits wait here, per file, until they are reviewed and saved — moving to another album does not lose them.' }),
+      el('div', { class: 'tray' }, list.map((draft) => el('div', { class: 'tray__row' },
+        el('div', { class: 'tray__text' },
+          el('code', { class: 'tray__file', text: draftLabel(draft.sel) }),
+          el('span', { class: 'tray__keys', text: Object.keys(draft.edits).join(', ') })),
+        el('div', { class: 'tray__acts' },
+          el('button', { type: 'button', class: 'btn btn--sm', icon: 'fa-arrow-right', text: 'Open',
+                         onclick: () => { dlg.close(); go(draft.sel); } }),
+          el('button', { type: 'button', class: 'btn btn--sm', text: 'Discard',
+                         onclick: () => { discardDraft(draft); openTray(); } }),
+          el('button', { type: 'button', class: 'btn btn--sm btn--primary', icon: 'fa-floppy-disk', text: 'Review',
+                         disabled: READ_ONLY, onclick: () => reviewDraft(draft, () => { if (pendingDrafts().length) openTray(); }) })))))));
+  if (!dlg.open) dlg.showModal();
+}
+
+function discardDraft(draft) {
+  drafts.delete(draft.key);
+  if (draftKey(state.sel) === draft.key) { state.edits = {}; renderPane(); }
+  syncDirtyMark();
 }
 
 /* ----- raw tab ---------------------------------------------------------- */
@@ -3148,8 +3420,18 @@ function folderTile(folder, onOpen) {
 
 /* ----- description tab -------------------------------------------------- */
 function renderDescriptions() {
-  const area = el('textarea', { class: 'u-tall', spellcheck: 'false', disabled: READ_ONLY });
-  area.value = state.data.descriptions[state.descLang] || '';
+  /* The text section shares its page with the settings now, and a setting
+   * change redraws the page -- so what is typed here is kept as a draft of
+   * its own and put back, rather than living only in the textarea. */
+  const dkey = state.sel.album + '|' + state.descLang;
+  const area = el('textarea', {
+    class: 'u-tall', spellcheck: 'false', disabled: READ_ONLY, 'data-fk': 'desc',
+    oninput: (ev) => {
+      descDrafts[dkey] = ev.target.value === (state.data.descriptions[state.descLang] || '') ? null : ev.target.value;
+      syncDirtyMark();
+    },
+  });
+  area.value = descDrafts[dkey] ?? (state.data.descriptions[state.descLang] || '');
 
   return el('div', { class: 'tabpanel' },
     el('div', { class: 'field__help tabnote u-mb' },
@@ -3163,14 +3445,14 @@ function renderDescriptions() {
         type: 'button',
         text: 'album_' + lang + '.md' + (state.data.descriptions[lang] ? '' : ' (empty)'),
         onclick: () => {
-          state.data.descriptions[state.descLang] = area.value;
           state.descLang = lang;
           renderPane();
         },
       }))),
     area,
     el('div', { class: 'savebar' },
-      el('span', { class: 'savebar__note', text: 'editing album_' + state.descLang + '.md' }),
+      el('span', { class: 'savebar__note', text: descDrafts[dkey] != null
+        ? 'album_' + state.descLang + '.md has unsaved text' : 'album_' + state.descLang + '.md' }),
       el('button', {
         class: 'btn btn--primary', type: 'button', icon: 'fa-floppy-disk', text: 'Save description', disabled: READ_ONLY,
         onclick: async () => {
@@ -3180,6 +3462,7 @@ function renderDescriptions() {
               body: JSON.stringify({ album: state.sel.album, lang: state.descLang, text: area.value }),
             });
             state.data.descriptions[state.descLang] = payload.text;
+            descDrafts[dkey] = null;
             renderPane();
             toast('Description saved');
           } catch (err) {
@@ -3789,7 +4072,8 @@ async function refreshIssueDots() {
 }
 
 window.addEventListener('beforeunload', (ev) => {
-  if (dirty()) { ev.preventDefault(); ev.returnValue = ''; }
+  stashDraft();
+  if (drafts.size || Object.values(descDrafts).some(Boolean)) { ev.preventDefault(); ev.returnValue = ''; }
 });
 
 boot();

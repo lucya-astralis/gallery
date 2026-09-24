@@ -196,9 +196,13 @@ function watchLamp() {
 function syncDirtyMark() {
   const mark = $('#dirty-mark');
   if (!mark) return;
-  const n = Object.keys(state.edits || {}).length;
+  const files = pendingDrafts().length;
+  const texts = Object.values(descDrafts).filter((v) => v != null).length;
+  const n = files + texts;
   mark.hidden = !n;
   $('#dirty-count').textContent = String(n);
+  mark.title = n ? files + ' file' + (files === 1 ? '' : 's') + ' with unsaved settings' +
+    (texts ? ', ' + texts + ' unsaved text' + (texts === 1 ? '' : 's') : '') : '';
 }
 
 /* ----- albums: the place ---------------------------------------------------
@@ -363,6 +367,7 @@ function paletteItems() {
     ['Check every config file', 'fa-list-check', () => checkAll(), false],
     ['Reload albums and tags', 'fa-rotate', () => reloadAll(), false],
     ['New pretty link', 'fa-link', () => go({ kind: 'links' }), ro],
+    ['Review unsaved changes', 'fa-floppy-disk', () => openTray(), !pendingDrafts().length],
     ['Keyboard shortcuts', 'fa-keyboard', () => openKeys(), false],
   ];
   for (const [label, icon, run, off] of actions) {
@@ -548,9 +553,18 @@ const KEYS = [
     ['Ctrl K', 'Go to or run anything'],
     ['/', 'The same, when no field has focus'],
     ['?', 'This list'],
+    ['Ctrl S', 'Review and save the file you are editing'],
     ['Esc', 'Close a dialog'],
   ]],
   ['Places', PLACES.map((p) => ['g ' + p.key, p.label])],
+  ['Library', [
+    ['Ctrl A', 'Select everything that matches'],
+    ['Ctrl I', 'Invert the selection'],
+    ['T', 'Tag the selection'],
+    ['Ctrl Z', 'Undo a tag change'],
+    ['Space', 'Look closer'],
+    ['Esc', 'Let go of the selection'],
+  ]],
 ];
 
 function paintKeys() {
@@ -580,6 +594,13 @@ function wireKeys() {
   $('#keys').addEventListener('click', (ev) => { if (ev.target === $('#keys')) $('#keys').close(); });
 
   document.addEventListener('keydown', (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && ev.key.toLowerCase() === 's') {
+      // Save is always "review, then save" -- never a blind write.
+      ev.preventDefault();
+      if (draftKey(state.sel) && Object.keys(state.edits).length) reviewDraft(currentDraft());
+      else if (pendingDrafts().length) openTray();
+      return;
+    }
     if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && ev.key.toLowerCase() === 'k') {
       ev.preventDefault();
       if ($('#palette').open) closePalette();
@@ -613,7 +634,6 @@ function wireShell() {
   if (signout) signout.addEventListener('click', signOut);
   $('#dirty-mark').addEventListener('click', (ev) => {
     ev.preventDefault();
-    const bar = $('.savebar');
-    if (bar) bar.scrollIntoView({ block: 'end' });
+    openTray();
   });
 }

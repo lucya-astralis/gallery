@@ -63,7 +63,7 @@ pickers read (`.gallery/` vs that album's `.album/`) and the help text under
 each field.
 | `<photo>.tags` | next to each photo | per-photo tags, one photo or forty at a time |
 
-Every file also has a **Raw file** tab if you would rather just type.
+Every file also has a **Raw file** mode, one button in its header, if you would rather just type.
 
 ### Getting around
 
@@ -117,19 +117,28 @@ beside them rather than eleven tabs across the top: *Machine* (Indexer,
 Derivatives, Doctor), *Reports* (Featured, GPS, Front page, Translations,
 Lookup) and *Data & access* (Export, Password, About — the release notes).
 
-The pane's own header — file path, title, status marks and the tab strip —
+The pane's own header — file path, title, status marks and its buttons —
 **sticks** to the top while you scroll, and sheds the path once you are past
 the first line.
 
 Under 900px the rail keeps its glyphs and drops its words; on a phone it turns
 into a strip under the bar, the current place marked on its bottom edge.
 
-Settings are laid out as tiles rather than one full-width row per key. Simple
-controls (a toggle, a dropdown, a filename) sit two or three across; only the
-list-shaped keys — `featured`, `order`, the welcome reels, `album_order`,
-`stat` — take the full width they actually need. A key written in the file
-gets a violet edge and a filled tile; one left at its default recedes to an
-outline, so what an album actually overrides is visible without reading.
+### An album, or the site, as one page
+
+An album's editor — and the Site's, for `gallery.cfg` — is **one page of
+sections** with a table of contents beside it: the settings groups (*The
+album*, *Photos it leans on*, *Look*, *Backdrop*, *Text & stats*), then the
+album's **Text** in each language, then its **Files**. It used to be four tabs
+that hid three quarters of an album behind clicks. **Raw file** is a mode of
+the page, one button in its header.
+
+A setting is a **row**: its name in words ("Wallpaper mobile"), the key
+beside it as the file spells it (`wallpaper_mobile`), a line of prose, and
+the control on the right. List-shaped keys — `featured`, `order`, the welcome
+reels, `album_order`, `stat` — take the whole row, their control under the
+prose. The rows share their hairlines instead of each sitting in a box; a
+key the file does not set reads a step quieter.
 
 Above the groups sits one row of view controls, because grouping alone stopped
 being enough at `gallery.cfg`'s thirty-odd keys:
@@ -146,10 +155,20 @@ its keys the file writes. A filter overrules a fold, so a hit can never hide
 inside a shut group. The three switches persist across reloads; they are a
 habit, not a property of the album.
 
-A key you have changed but not yet saved is marked `edited` and switches its
-edge to amber, and the save bar lists one chip per staged key: the name jumps
-to that field — through a filter, through a fold — and the ✕ undoes that one
-change rather than all of them.
+A key you have changed but not yet saved is marked `edited` with an amber
+edge, and the save bar lists one chip per staged key: the name jumps to that
+field — through a filter, through a fold — and the ✕ undoes that one change.
+
+**Nothing is written blind.** **Review & save** (or `Ctrl S`) shows the save
+as a **line diff** before it happens — the dry run comes from
+`/api/album/cfg/preview` (and `/api/gallery/cfg/preview`), which runs the same
+parser and the same apply() the save does, so the diff is exactly what lands.
+Underneath it says what the check would still find afterwards.
+
+**Edits belong to their file, not to the screen.** Moving to another album
+keeps them: the bar's amber **unsaved** mark counts every file with something
+waiting and opens the tray, where each can be opened, reviewed and saved, or
+discarded. Leaving the page altogether still asks first.
 
 ### The Library
 
@@ -356,14 +375,21 @@ Before overwriting anything it also drops a timestamped copy into
 
 ## Validation
 
-The **Check all** button walks every album and reports what the gallery would
-silently ignore: unknown keys, a `cover` or `featured` entry matching no photo,
-a `sort = curated` with no `order` list behind it, an `effect` that isn't
-whitelisted, a `font`/`icon` naming a file that isn't in that album's
-`.album/`, an `album_order` entry with no matching folder, a `stat` line the gallery would
-drop. The result lands on **Home**, under *Needs attention*, where each line
-is a click from the key that caused it; errors also show as a red dot next to
-the album in the tree. It does not take over the screen you were working on.
+**Check all** (in the palette, and on the Overview) walks every album and
+reports what the gallery would silently ignore: unknown keys, a `cover` or
+`featured` entry matching no photo, a `sort = curated` with no `order` list
+behind it, an `effect` that isn't whitelisted, a `font`/`icon` naming a file
+that isn't in that album's `.album/`, an `album_order` entry with no matching
+folder, a `stat` line the gallery would drop. The result lands on the
+**Overview**, under *Needs attention*, where each line is a click from the key
+that caused it, and the rail's Overview mark turns red.
+
+Most issues come with their **fix**: remove the unknown line, take the
+missing photo out of `featured`, use the lightened accent the gallery would
+show anyway. `aperture/checks.py` attaches it as `{label, key, value}`; the
+console stages it as an ordinary edit — on the file's page or straight from
+the Overview — so it goes through the same diff and the same save as
+anything you typed. `doctor` ignores it.
 
 Checks resolve photos the way the gallery does, against its index, so what they
 call missing is what a visitor would not see; a photo added a second ago counts

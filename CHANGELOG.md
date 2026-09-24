@@ -65,8 +65,23 @@ root still land on the Overview.
   two by renaming one onto the other, delete one from every photo — each
   sidecar backed up and audited. It also points out tags that are probably
   the same one (`tokio` / `tokyo`) with a Merge button.
-* The bar shows the **indexer's lamp** on every screen, and an amber mark
-  while the page has unsaved edits.
+* **An album is one page**: its settings groups, its text in each language
+  and its files, down one page with a table of contents beside it, instead
+  of four tabs. The Site's `gallery.cfg` the same. Raw file is a button in
+  the header.
+* **A setting is a row**: its name in words, the key as the file spells it,
+  a line of prose, the control on the right.
+* **Review before save**: Save (or `Ctrl S`) shows the exact lines that will
+  change as a diff — rendered by the same parser and the same code path the
+  save uses — and what the check would still say afterwards.
+* **Unsaved edits wait per file**: moving to another album no longer asks
+  you to throw them away. The bar's amber mark counts every file with
+  something waiting and opens a tray to review, save or discard each.
+* **Fixes for what the check finds**: most issues come with a one-click fix
+  (remove the unknown line, drop the missing photo from `featured`, use the
+  lightened accent), on the file's page and on the Overview. A fix is staged
+  like any edit, so it goes through the same review.
+* The bar shows the **indexer's lamp** on every screen.
 
 **Changed**
 

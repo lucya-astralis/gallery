@@ -516,6 +516,21 @@ async def api_album_cfg(request: Request):
             "issues": checks.album(album, values)}
 
 
+@app.post("/api/album/cfg/preview")
+async def api_album_cfg_preview(request: Request):
+    """What a save WOULD write, without writing it: the file before and
+    after, and what the checks would say about the result. The same parser
+    and the same apply() the save runs, so the diff the console shows is the
+    diff that lands."""
+    body = await _json_body(request)
+    album = _album_or_400(body.get("album", ""))
+    cfg_file = cfgio.CfgFile.load(lib.cfg_path(album))
+    before = cfg_file.text()
+    cfg_file.apply(_updates_from(body.get("values", {})), schema.KEY_SPEC)
+    return {"before": before, "after": cfg_file.text(),
+            "issues": checks.album(album, cfg_file.values())}
+
+
 @app.put("/api/album/raw")
 async def api_album_raw(request: Request):
     _guard_write()
@@ -599,6 +614,17 @@ async def api_gallery_cfg(request: Request):
     return {"ok": True, "values": values, "raw": cfg_file.text(),
             "issues": checks.gallery(values),
             "assets": lib.brand_assets()}
+
+
+@app.post("/api/gallery/cfg/preview")
+async def api_gallery_cfg_preview(request: Request):
+    """gallery.cfg's dry run -- see api_album_cfg_preview."""
+    body = await _json_body(request)
+    cfg_file = cfgio.CfgFile.load(lib.gallery_cfg_path(), cfgio.GROUP_KEYS)
+    before = cfg_file.text()
+    cfg_file.apply(_updates_from(body.get("values", {})), schema.KEY_SPEC)
+    return {"before": before, "after": cfg_file.text(),
+            "issues": checks.gallery(cfg_file.values())}
 
 
 @app.put("/api/gallery/raw")
