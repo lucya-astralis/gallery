@@ -166,6 +166,13 @@ check has something to say about a red one. A search in the settings finder
 looks through every tab, and a save-bar chip, a fix or a palette hit opens
 the tab its key lives on. **History** stays in the header.
 
+The **Text** tab also takes files: **Upload .md**, or drop them anywhere on
+it — several at once, each going to the language its name says
+(`album_de.md`, `about-jp.md`, `text_ja.md`; one file naming none fills the
+language on screen). They become unsaved drafts, marked • on their
+language, and are written by **Save** / **Save all** through the same route,
+audit and backup as typed text; there is no upload route for them.
+
 A setting is a **row**: its name in words ("Wallpaper mobile"), the key
 beside it as the file spells it (`wallpaper_mobile`), a line of prose, and
 the control on the right. List-shaped keys — `featured`, `order`, the welcome

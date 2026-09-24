@@ -1908,6 +1908,12 @@ select option { background: var(--surface); color: var(--text); }
 
 .dropzone:hover { border-color: var(--line-strong); color: var(--text-dim); }
 .dropzone.is-over { border-color: var(--acc); color: var(--text); background: rgba(var(--acc-rgb), .06); }
+/* The text section takes dropped .md files too, the whole section rather than
+   a zone of its own; while a file hovers over it, it says so the way a
+   dropzone does, with an outline that does not move anything. */
+.desc-drop { outline: var(--hair) dashed transparent; outline-offset: var(--s-2); transition: outline-color var(--dur-1) var(--ease); }
+.desc-drop.is-dropping { outline-color: var(--acc); }
+.desc-drop.is-dropping textarea { border-color: var(--acc); }
 
 .fontsample {
   margin-top: var(--s-1);
