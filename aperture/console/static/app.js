@@ -1684,6 +1684,43 @@ function paintHome() {
 }
 
 
+/* An album's -- and the site's -- tabs. Not one per FILE, as the console
+ * once had (Settings / Description / Files / Raw), and not one long page
+ * with everything on it, which was too much at once: one per thing you
+ * came to change. Each settings tab holds one or two of the groups. */
+const ALBUM_TABS = [
+  ['details', 'Details', 'fa-circle-info', ['The album', 'Text & stats']],
+  ['photos', 'Photos', 'fa-star', ['Photos it leans on']],
+  ['look', 'Look', 'fa-palette', ['Look', 'Backdrop']],
+  ['text', 'Text', 'fa-align-left', null],
+  ['files', 'Files', 'fa-folder-open', null],
+  ['raw', 'Raw file', 'fa-file-code', null],
+];
+const GALLERY_TABS = [
+  ['identity', 'Identity', 'fa-id-card', ['Identity', 'Credit']],
+  ['look', 'Look', 'fa-palette', ['Look', 'Backdrop']],
+  ['front', 'Front page', 'fa-house', ['Welcome hero', 'Album list']],
+  ['footer', 'Footer', 'fa-shoe-prints', ['Operator & footer']],
+  ['files', 'Files', 'fa-folder-open', null],
+  ['raw', 'Raw file', 'fa-file-code', null],
+];
+
+function editorTabs() {
+  return state.sel.kind === 'gallery' ? GALLERY_TABS : ALBUM_TABS;
+}
+
+function editorGroups() {
+  return state.sel.kind === 'gallery' ? GALLERY_GROUPS : ALBUM_GROUPS;
+}
+
+/* The tab a key lives on -- where a search hit, a save-bar chip or a fix
+ * has to take you. */
+function tabOfKey(key) {
+  const group = editorGroups().find(([, , keys]) => keys.includes(key));
+  const tab = group && editorTabs().find(([, , , titles]) => titles && titles.includes(group[0]));
+  return tab ? tab[0] : editorTabs()[0][0];
+}
+
 function renderPane() {
   if (state.sel.kind === 'library') { renderLibrary(); return; }
   const pane = $('#pane');
@@ -1694,69 +1731,58 @@ function renderPane() {
   const selEnd = fk && active.selectionEnd !== undefined ? active.selectionEnd : null;
   paneScroll = pane.scrollTop;
   pane.innerHTML = '';
-  const raw = state.tab === 'raw';
 
-  pane.append(el('div', { class: 'pane__top' }, renderHead(isGallery)));
+  const tabs = editorTabs();
+  if (!tabs.some(([id]) => id === state.tab)) state.tab = tabs[0][0];
+  const [, , , titles] = tabs.find(([id]) => id === state.tab);
 
-  if (raw) {
+  /* Which tabs have something to say: an unsaved edit (amber), an issue
+   * (red). A tab that hides a change is how an edit gets forgotten. */
+  const issueKeys = new Set((state.data.issues || []).map((i) => i.key));
+  const mark = (groupTitles) => {
+    if (!groupTitles) return null;
+    const keys = editorGroups().filter(([t]) => groupTitles.includes(t)).flatMap(([, , k]) => k);
+    if (keys.some((k) => k in state.edits)) return 'edit';
+    if (keys.some((k) => issueKeys.has(k))) return 'issue';
+    return null;
+  };
+
+  /* Header and tabs travel together as one sticky block. */
+  pane.append(el('div', { class: 'pane__top' },
+    renderHead(isGallery),
+    el('div', { class: 'tabs', role: 'tablist' }, tabs.map(([id, label, icon, groupTitles]) => {
+      const m = mark(groupTitles);
+      return el('button', {
+        class: 'tab' + (state.tab === id ? ' is-active' : '') + (m ? ' has-' + m : ''),
+        type: 'button', role: 'tab', 'aria-selected': String(state.tab === id), icon, text: label,
+        title: m === 'edit' ? 'Unsaved changes on this tab' : m === 'issue' ? 'The check has something to say here' : null,
+        onclick: () => { state.tab = id; state.query = ''; paneScroll = 0; renderPane(); $('#pane').scrollTop = 0; },
+      });
+    }))));
+
+  if (state.tab === 'raw') {
     pane.append(renderRaw());
   } else {
-    /* One page, in sections, with its table of contents beside it. Four
-     * tabs used to hide three quarters of an album behind clicks -- and
-     * nothing said which of them still had something unsaved. */
-    const groups = isGallery ? GALLERY_GROUPS : ALBUM_GROUPS;
-    const sections = groups.map(([title]) => [sectionId(title), title]);
-    if (!isGallery) sections.push(['sec-text', 'Text']);
-    sections.push(['sec-files', 'Files']);
-
-    const body = el('div', { class: 'editor__body' });
     const issues = renderIssues();
-    if (issues) body.append(issues);
-    body.append(renderSettings(groups));
-    if (!isGallery) {
-      body.append(el('section', { class: 'edsec', id: 'sec-text' },
-        el('h2', { class: 'edsec__title', text: 'Text' }), renderDescriptions()));
+    if (issues) pane.append(issues);
+    if (titles || state.query.trim()) {
+      /* A search looks through every tab, so a key is found wherever it
+       * lives; without one, the tab shows its own groups. */
+      const groups = state.query.trim() ? editorGroups()
+        : editorGroups().filter(([title]) => titles.includes(title));
+      pane.append(renderSettings(groups));
+      pane.append(renderSaveBar());
+    } else if (state.tab === 'text') {
+      pane.append(renderDescriptions());
+    } else if (state.tab === 'files') {
+      pane.append(renderAssets());
     }
-    body.append(el('section', { class: 'edsec', id: 'sec-files' },
-      el('h2', { class: 'edsec__title', text: 'Files' }), renderAssets()));
-    body.append(renderSaveBar());
-    pane.append(el('div', { class: 'editor' }, editorToc(sections), body));
-    watchToc();
   }
 
   pane.scrollTop = paneScroll;
   paneScrollLanded = pane.scrollTop;
   restoreFocus(fk, selStart, selEnd);
   syncDirtyMark();
-}
-
-const sectionId = (title) => 'sec-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-
-function editorToc(sections) {
-  return el('nav', { class: 'edtoc', 'aria-label': 'On this page' },
-    el('span', { class: 'edtoc__title', text: 'On this page' }),
-    sections.map(([id, title]) => el('a', {
-      class: 'edtoc__link', href: '#' + id, 'data-sec': id, text: title,
-      onclick: (ev) => {
-        ev.preventDefault();
-        const target = document.getElementById(id);
-        if (target) target.scrollIntoView({ block: 'start', behavior: 'instant' });
-      },
-    })));
-}
-
-/* Which section is on screen, lit in the table of contents. */
-let tocObserver = null;
-function watchToc() {
-  if (tocObserver) tocObserver.disconnect();
-  const pane = $('#pane');
-  const seen = new Map();
-  tocObserver = new IntersectionObserver((entries) => {
-    for (const entry of entries) seen.set(entry.target.id, entry.isIntersecting);
-    const first = $$('.editor__body [id^="sec-"]').find((node) => seen.get(node.id));
-    $$('.edtoc__link').forEach((link) => link.classList.toggle('is-on', !!first && link.dataset.sec === first.id));
-  }, { root: pane, rootMargin: '-120px 0px -55% 0px' });
-  $$('.editor__body [id^="sec-"]').forEach((node) => tocObserver.observe(node));
 }
 
 /* What the checks say about this file, each with its fix when there is one.
@@ -1784,6 +1810,7 @@ function renderIssues() {
 
 function applyFix(fix) {
   state.edits[fix.key] = fix.value;
+  state.tab = tabOfKey(fix.key);
   renderPane();
   toast('Staged: ' + fix.label + ' — review it with Save');
 }
@@ -1833,12 +1860,7 @@ function renderHead(isGallery) {
     title: 'Earlier versions of this file, and putting one back',
     onclick: () => openHistory(isGallery ? { file: 'gallery' } : { file: 'album', album: state.sel.album }),
   }));
-  meta.push(el('button', {
-    type: 'button', class: 'btn' + (state.tab === 'raw' ? ' is-on' : ''), icon: 'fa-file-code',
-    text: state.tab === 'raw' ? 'Back to the form' : 'Raw file',
-    title: 'The file exactly as it is on disk',
-    onclick: () => { state.tab = state.tab === 'raw' ? 'settings' : 'raw'; renderPane(); },
-  }));
+
   if (!isGallery && !READ_ONLY) meta.push(linkButton(state.sel.album, 'Link…'));
 
   const path = isGallery
@@ -1913,7 +1935,7 @@ function renderSettings(groups) {
     // "no result".
     const folded = !q && state.collapsed.has(groupId(title));
 
-    blocks.push(el('section', { class: 'group' + (folded ? ' is-folded' : ''), id: sectionId(title) },
+    blocks.push(el('section', { class: 'group' + (folded ? ' is-folded' : '') },
       el('header', {
         class: 'group__head', role: 'button', tabindex: '0',
         'aria-expanded': folded ? 'false' : 'true',
@@ -2676,6 +2698,7 @@ function revealField(key) {
   state.query = '';
   state.setOnly = false;
   state.collapsed.clear();
+  state.tab = tabOfKey(key);
   savePrefs();
   renderPane();
   const node = document.querySelector('.field[data-key="' + CSS.escape(key) + '"]');

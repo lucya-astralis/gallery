@@ -3488,65 +3488,28 @@ kbd + kbd { margin-left: var(--s-1); }
 
 
 /* ================================================================
-   THE EDITOR  —  a file as one page of sections
+   THE EDITOR  —  an album or the site, one tab per thing to change
    ------------------------------------------------------------------
-   An album or the site's gallery.cfg: its settings groups, its text and
-   its files, down one page with a table of contents beside it. A setting
-   is NEBULA's .set row -- the name and a line of prose, then the control
-   -- in a hairline stack, not a pile of boxes. Nothing is written until
-   it has been read as a diff (the review dialog below).
+   Tabs by topic (Details, Photos, Look, Text, Files, Raw), each holding
+   one or two settings groups -- one long page was too much at once. A
+   setting is NEBULA's .set row -- the name and a line of prose, then the
+   control -- in a hairline stack, not a pile of boxes. Nothing is written
+   until it has been read as a diff (the review dialog below).
    ================================================================ */
-.editor {
-  display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
-  gap: var(--s-7);
-  align-items: start;
+/* A tab that holds an unsaved edit, or something the check found: a square
+   mark after its word -- amber for the edit, red for the issue -- so a change
+   on another tab is never out of sight. */
+.tab.has-edit::after,
+.tab.has-issue::after {
+  content: '';
+  display: inline-block;
+  width: var(--s-2);
+  height: var(--s-2);
+  margin-left: var(--s-2);
+  vertical-align: middle;
 }
-.editor__body { min-width: 0; }
-.editor__body > .savebar { margin-left: 0; }
-
-.edtoc {
-  position: sticky;
-  top: var(--s-6);
-  display: flex;
-  flex-direction: column;
-  padding-top: var(--s-6);
-}
-.edtoc__title {
-  margin-bottom: var(--s-3);
-  font-family: var(--mono);
-  font-size: var(--fs-chrome-xs);
-  letter-spacing: var(--tr-chrome-xs);
-  text-transform: uppercase;
-  color: var(--text-ghost);
-}
-.edtoc__link {
-  padding: var(--s-2) var(--s-3);
-  border-left: var(--hair) solid var(--line);
-  color: var(--text-dim);
-  font-size: var(--fs-text-md);
-  text-decoration: none;
-}
-@media (hover: hover) {
-  .edtoc__link:hover { color: var(--text); }
-}
-.edtoc__link.is-on {
-  color: var(--text);
-  border-left: 2px solid var(--acc);
-  padding-left: calc(var(--s-3) - 1px);
-}
-
-.edsec { margin-top: var(--s-8); scroll-margin-top: var(--s-6); }
-.edsec__title {
-  margin: 0 0 var(--s-4);
-  padding-bottom: var(--s-3);
-  border-bottom: var(--hair) solid var(--line);
-  font-size: var(--fs-text-lg);
-  font-weight: 600;
-  letter-spacing: var(--tr-head);
-  color: var(--text-head);
-}
-.edsec > .tabpanel { padding-top: 0; padding-bottom: 0; }
+.tab.has-edit::after { background: var(--amb); }
+.tab.has-issue::after { background: var(--red); }
 .group { scroll-margin-top: var(--s-6); }
 
 /* ----- a setting is a row ---------------------------------------------- */
@@ -3649,8 +3612,6 @@ kbd + kbd { margin-left: var(--s-1); }
 .tray__acts { display: flex; gap: var(--s-2); }
 
 @media (max-width: 900px) {
-  .editor { grid-template-columns: minmax(0, 1fr); gap: 0; }
-  .edtoc { display: none; }
   .field { grid-template-columns: minmax(0, 1fr); }
   .hrow:has(.hrow__fix) { grid-template-columns: minmax(0, 1fr); }
 }

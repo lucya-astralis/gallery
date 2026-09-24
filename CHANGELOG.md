@@ -65,10 +65,10 @@ root still land on the Overview.
   two by renaming one onto the other, delete one from every photo — each
   sidecar backed up and audited. It also points out tags that are probably
   the same one (`tokio` / `tokyo`) with a Merge button.
-* **An album is one page**: its settings groups, its text in each language
-  and its files, down one page with a table of contents beside it, instead
-  of four tabs. The Site's `gallery.cfg` the same. Raw file is a button in
-  the header.
+* **An album's tabs are topics, not files**: Details, Photos, Look, Text,
+  Files, Raw file (the Site: Identity, Look, Front page, Footer, Files, Raw
+  file). A tab with an unsaved edit carries an amber mark, one with an issue
+  a red one; a search in the settings looks through every tab.
 * **A setting is a row**: its name in words, the key as the file spells it,
   a line of prose, the control on the right.
 * **Review before save**: Save (or `Ctrl S`) shows the exact lines that will

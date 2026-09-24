@@ -140,14 +140,18 @@ the first line.
 Under 900px the rail keeps its glyphs and drops its words; on a phone it turns
 into a strip under the bar, the current place marked on its bottom edge.
 
-### An album, or the site, as one page
+### An album, or the site, in tabs by topic
 
-An album's editor — and the Site's, for `gallery.cfg` — is **one page of
-sections** with a table of contents beside it: the settings groups (*The
-album*, *Photos it leans on*, *Look*, *Backdrop*, *Text & stats*), then the
-album's **Text** in each language, then its **Files**. It used to be four tabs
-that hid three quarters of an album behind clicks. **Raw file** is a mode of
-the page, one button in its header.
+An album's editor has one tab per thing you came to change — **Details**
+(*The album*, *Text & stats*), **Photos** (the photos it leans on), **Look**
+(*Look*, *Backdrop*), **Text**, **Files** and **Raw file**. The Site's has
+**Identity**, **Look**, **Front page**, **Footer**, **Files** and **Raw
+file**. It used to be one tab per file (Settings / Description / Files /
+Raw), and for a while one long page with a table of contents; that was too
+much at once. A tab holding an unsaved edit carries an amber mark, one the
+check has something to say about a red one. A search in the settings finder
+looks through every tab, and a save-bar chip, a fix or a palette hit opens
+the tab its key lives on. **History** stays in the header.
 
 A setting is a **row**: its name in words ("Wallpaper mobile"), the key
 beside it as the file spells it (`wallpaper_mobile`), a line of prose, and

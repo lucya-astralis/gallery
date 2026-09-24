@@ -562,7 +562,7 @@ async function openSetting(sel, key) {
     const went = await select(sel);
     if (went === false) return;
   }
-  state.tab = 'settings';
+  state.tab = tabOfKey(key);
   state.query = key;
   renderPane();
   const input = $('input[data-fk="__q"]');
