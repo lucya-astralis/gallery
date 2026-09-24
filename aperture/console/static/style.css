@@ -3550,11 +3550,15 @@ kbd + kbd { margin-left: var(--s-1); }
 .group { scroll-margin-top: var(--s-6); }
 
 /* ----- a setting is a row ---------------------------------------------- */
+/* NEBULA's .stack: ONE pane of glass with a hairline between its rows.
+   Not a one-hair gap over a --line fill -- over glass rows that lets the 9%
+   white through every row, and the whole group turns into a lighter box. */
 .fields {
   display: flex;
   flex-direction: column;
-  gap: var(--hair);
-  background: var(--line);
+  background-color: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: var(--hair) solid var(--line);
 }
 .field {
@@ -3564,11 +3568,12 @@ kbd + kbd { margin-left: var(--s-1); }
   align-items: start;
   padding: var(--s-4) var(--s-5);
   box-shadow: none;
-  background: var(--glass);
+  background: none;
 }
-.field.is-unset { background: var(--glass); }
+.field + .field { border-top: var(--hair) solid var(--line); }
+.field.is-unset { background: none; }
 .field.is-unset .field__name { color: var(--text-dim); }
-.field.is-edited { box-shadow: inset 2px 0 0 var(--amb); }
+.field.is-edited { box-shadow: inset 2px 0 0 var(--amb); background: rgba(var(--amb-rgb), .04); }
 /* a list is a thing of its own width: its control goes under the prose */
 .field--wide { grid-template-columns: minmax(0, 1fr); }
 .field__text { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
@@ -3635,8 +3640,9 @@ kbd + kbd { margin-left: var(--s-1); }
 }
 
 /* ----- the tray -------------------------------------------------------- */
-.tray { display: flex; flex-direction: column; gap: var(--hair); background: var(--line); border: var(--hair) solid var(--line); margin-top: var(--s-4); }
-.tray__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-5); padding: var(--s-4); background: var(--overlay); }
+.tray { display: flex; flex-direction: column; border: var(--hair) solid var(--line); margin-top: var(--s-4); }
+.tray__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3) var(--s-5); padding: var(--s-4); }
+.tray__row + .tray__row { border-top: var(--hair) solid var(--line); }
 .tray__text { flex: 1 1 260px; display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
 .tray__file { font-family: var(--mono); font-size: var(--fs-chrome-md); color: var(--text); overflow-wrap: anywhere; }
 .tray__keys { font-family: var(--mono); font-size: var(--fs-chrome-sm); color: var(--amb); overflow-wrap: anywhere; }
