@@ -648,8 +648,60 @@ function inspectOne(p) {
       exposure ? fact('Exposure', exposure) : null),
     tagEditor([p]),
     selectionActions([p]),
+    el('details', {
+      class: 'insp__block insp__diag',
+      ontoggle: (ev) => { if (ev.currentTarget.open) loadDiagnostics(p, ev.currentTarget); },
+    },
+      el('summary', { class: 'insp__sub insp__summary', icon: 'fa-stethoscope', text: 'Diagnostics' }),
+      el('div', { class: 'insp__diagbody' })),
     undoLine(),
   ];
+}
+
+/* What the app knows about one photo beyond what it looks like: when it was
+ * indexed, whether the file changed since, the state of its thumbnail and
+ * preview, which album.cfg features it, the addresses it is served at. It
+ * used to be System's Lookup; a photo is looked at here. */
+async function loadDiagnostics(p, box) {
+  const body = box.querySelector('.insp__diagbody');
+  body.replaceChildren(el('p', { class: 'insp__quiet', text: 'Asking the index…' }));
+  let r;
+  try {
+    r = await api('/api/ops/photo?' + qs({ path: p.rel }));
+  } catch (err) {
+    body.replaceChildren(el('p', { class: 'insp__quiet', text: err.message }));
+    return;
+  }
+  const stamp = (ts) => (typeof ts === 'number' ? new Date(ts * 1000).toISOString().replace('T', ' ').slice(0, 19) : '—');
+  const drift = r.file_mtime != null && Math.abs(r.file_mtime - r.mtime) >= 1;
+  body.replaceChildren(
+    el('dl', { class: 'facts' },
+      fact('Indexed', r.indexed_at || '—'),
+      fact('File', r.file_exists ? (drift ? 'changed since — ' + stamp(r.file_mtime) + '; the next scan reads it again' : 'unchanged since')
+        : 'gone — the row is stale', r.file_exists && !drift ? null : 'warn'),
+      fact('Featured by', r.featured_by.length
+        ? r.featured_by.map((f) => f.album + ' → ' + f.entry).join(', ') : 'no album.cfg'),
+      ...Object.entries(r.derivatives).map(([k, info]) =>
+        fact(k.charAt(0).toUpperCase() + k.slice(1), info.state, info.state === 'ok' ? null : 'warn'))),
+    el('div', { class: 'insp__urls' }, r.urls.map((url) => el('code', { text: url }))));
+}
+
+/* One photo, wherever a report names it: the Library, on its folder, with
+ * the photo picked and the inspector showing it. */
+async function showPhoto(rel) {
+  const album = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '';
+  L.q = '';
+  L.tags.clear();
+  L.cameras.clear();
+  L.years.clear();
+  L.untagged = L.featured = L.unindexed = false;
+  L.sel = new Set([rel]);
+  await select({ kind: 'library', album });
+  const i = L.shown.findIndex((x) => x.rel === rel);
+  if (i < 0) { toast('That photo is not on disk any more', 'warn'); return; }
+  L.anchor = i;
+  setFocus(i);
+  paintSelection();
 }
 
 function inspectMany(photos) {

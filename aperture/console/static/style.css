@@ -4556,6 +4556,19 @@ kbd + kbd { margin-left: var(--s-1); }
 .release__toggle .fa { margin-right: var(--s-2); transition: rotate var(--dur-1) ease; }
 .release[open] .release__toggle { margin-bottom: var(--s-4); }
 .release[open] .release__toggle .fa { rotate: 180deg; }
+/* the Indexer's rarely needed half, folded the same way */
+.ops__more { margin-top: var(--s-4); }
+.ops__more[open] .release__toggle { margin-bottom: var(--s-3); }
+.ops__more[open] .release__toggle .fa { rotate: 180deg; }
+.ops__more .ops__form + .ops__form { margin-top: var(--s-3); }
+
+/* a photo's diagnostics in the Library's inspector */
+.insp__summary { cursor: pointer; list-style: none; margin: 0; display: flex; align-items: center; gap: var(--s-2); }
+.insp__summary::-webkit-details-marker { display: none; }
+.insp__summary > .fa { color: var(--label); font-size: var(--icon-md); }
+.insp__diag[open] .insp__summary { margin-bottom: var(--s-3); }
+.insp__urls { display: flex; flex-direction: column; gap: var(--s-1); margin-top: var(--s-3); }
+.insp__urls code { font-family: var(--mono); font-size: var(--fs-chrome-sm); color: var(--text-dim); overflow-wrap: anywhere; }
 @media (hover: hover) {
   .release__toggle:hover { color: var(--chrome); }
 }

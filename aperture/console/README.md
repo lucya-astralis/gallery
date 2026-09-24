@@ -112,11 +112,26 @@ header says what the album is — its cover, the name it calls itself, and
 whether anyone has written about it yet — and carries **Photos** into the
 Library.
 
-**System** is the machine and the reports, with its sections in a column
-beside them rather than eleven tabs across the top: *Machine* (Indexer,
-Derivatives, Doctor), *Reports* (Featured, GPS, Front page, Translations,
-Lookup) and *Data & access* (Activity — every write this console has made,
-filterable — Export, Password, About — the release notes).
+**System** is the machine, in eight sections in a column beside them:
+
+| | |
+| --- | --- |
+| *Machine* — **Indexer** | its lamp, the last scan and what it did, Scan and Pause (scope, force and a reason folded underneath), and where everything lives |
+| *Machine* — **Storage** | what thumbnails and previews cost next to the originals, the volumes they sit on, and what is missing, stale or left over — with Build, Delete and Rebuild as jobs |
+| *Machine* — **Health check** | `doctor`: index, files, thumbnails, featured flags and cfg held against each other, each finding a click from its photo or album and each kind of problem a button for the job that fixes it |
+| *Data* — **Privacy** | Hide GPS / Strip GPS, which originals still carry coordinates, and the one job that rewrites originals to strip them |
+| *Data* — **Backup** | every hand-written file as one `.tar.gz` |
+| *Data* — **Activity** | every write this console has made |
+| *Console* — **Password**, **About** | the door, and the release notes |
+
+Four sections went when the rest of the console grew their jobs: *Featured*
+(featuring is done in the Library, broken entries come with a fix, flag
+drift is part of the Health check), *Front page* (the welcome lists are the
+Site's and its check's), *Translations* (a developer's check —
+`python -m aperture.cli i18n` still runs it) and *Lookup* (the palette, the
+Library and a photo's **Diagnostics** in the inspector cover it). Their API
+routes stay. Old addresses such as `/system/doctor` land on the section that
+took the job over.
 
 The pane's own header — file path, title, status marks and its buttons —
 **sticks** to the top while you scroll, and sheds the path once you are past

@@ -66,7 +66,10 @@ function selFromPath(pathname) {
     case 'links': return { kind: 'links' };
     case 'system':
       if (tail === 'about') return { kind: 'changelog' };
-      return { kind: 'ops', tab: SYSTEM_TABS.some(([id]) => id === tail) ? tail : 'overview' };
+      {
+        const tab = SYSTEM_ALIASES[tail] || tail;
+        return { kind: 'ops', tab: SYSTEM_TABS.some(([id]) => id === tab) ? tab : 'overview' };
+      }
     default: return { kind: 'home' };
   }
 }

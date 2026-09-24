@@ -97,9 +97,16 @@ root still land on the Overview.
 
 * An album's editor no longer has a Photos tab; its **Photos** button opens
   the album in the Library.
-* **System** lists its sections in a column (Machine, Reports, Data &
-  access) instead of a tab strip that wrapped onto two rows. The release
-  notes are its **About** section.
+* **System is eight sections instead of eleven tabs**, in a column: Indexer,
+  Storage, Health check, Privacy, Backup, Activity, Password, About.
+  *Storage* joins the disk figures and the thumbnail/preview report that
+  were two screens; the Indexer drops the counts and statistics the
+  Overview already shows and folds scope/force away. *Featured*, *Front
+  page*, *Translations* and *Lookup* are gone from the console — their jobs
+  moved into the Library, the Site editor, the checks and a photo's new
+  **Diagnostics** in the inspector; `python -m aperture.cli` still has all
+  of them, and old addresses land on the section that took over. A photo a
+  report names now opens in the Library, picked.
 * Tags moved out of Operations into a place of their own.
 
 ---
