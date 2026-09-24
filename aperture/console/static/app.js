@@ -513,12 +513,7 @@ function systemNav() {
 
 /* A System screen: the section list, and the section beside it. */
 function systemFrame(pane, title, crumb, meta, fill) {
-  pane.append(el('div', { class: 'pane__top' },
-    el('div', { class: 'head' },
-      el('div', { class: 'head__crumb', text: crumb || '' }),
-      el('div', { class: 'head__line' },
-        el('h1', { class: 'head__title', text: title }),
-        el('div', { class: 'head__meta' }, meta)))));
+  pane.append(el('div', { class: 'pane__top' }, pageHead(title, meta, { tip: crumb || null })));
   const body = el('div', { class: 'home' });
   pane.append(el('div', { class: 'sysgrid' }, systemNav(), body));
   fill(body);
@@ -1472,6 +1467,36 @@ async function renderHome() {
   paintHome();
 }
 
+/* Every place's header, one level: [cover] the title with one line of facts
+ * under it, and the actions on the right -- all centred on one axis. It
+ * used to stack a file path, then a title with pills and buttons wrapping
+ * beside it at three different heights, and folded the path away on scroll,
+ * which left the spacing lopsided. The path is the title's tooltip now.
+ * `meta` takes what the places already hand it: a .pill becomes a fact on
+ * the line under the title, anything else is an action. */
+function pageHead(title, meta = [], { cover = null, tip = null } = {}) {
+  const facts = [];
+  const actions = [];
+  for (const node of [].concat(meta).flat(Infinity)) {
+    if (!node) continue;
+    if (node.classList && node.classList.contains('pill')) {
+      const tone = ['pill--ok', 'pill--warn', 'pill--err'].find((c) => node.classList.contains(c));
+      node.classList.remove('pill');
+      if (tone) node.classList.replace(tone, 'fact--' + tone.slice(6));
+      node.classList.add('fact');
+      facts.push(node);
+    } else {
+      actions.push(node);
+    }
+  }
+  return el('div', { class: 'head' + (cover ? ' head--cover' : '') },
+    cover,
+    el('div', { class: 'head__id' },
+      el('h1', { class: 'head__title', text: title, title: tip }),
+      facts.length ? el('div', { class: 'head__facts' }, facts) : null),
+    actions.length ? el('div', { class: 'head__actions' }, actions) : null);
+}
+
 function card(icon, title, note, ...body) {
   return el('section', { class: 'card' },
     el('header', { class: 'card__head' },
@@ -1560,13 +1585,11 @@ function paintHome() {
   const ro = !!st.read_only || READ_ONLY;
 
   pane.innerHTML = '';
-  pane.append(el('div', { class: 'pane__top' },
-    el('div', { class: 'head' },
-      el('div', { class: 'head__crumb', text: paths.photos || state.meta.photos_dir }),
-      el('div', { class: 'head__line' },
-        el('h1', { class: 'head__title', text: title }),
-        el('div', { class: 'head__meta' },
-          ro ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null)))));
+  pane.append(el('div', { class: 'pane__top' }, pageHead(title, [
+    el('span', { class: 'pill', icon: 'fa-image', text: (st.index && st.index.images != null ? st.index.images : '—') + ' photos' }),
+    el('span', { class: 'pill', icon: 'fa-folder-tree', text: (state.tree ? countAlbums(state.tree) : '—') + ' albums' }),
+    ro ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null,
+  ], { tip: paths.photos || state.meta.photos_dir })));
 
   const grid = el('div', { class: 'home' });
   pane.append(grid);
@@ -1830,27 +1853,25 @@ function treeNode(path, node) {
 function renderHead(isGallery) {
   const data = state.data;
   const meta = [el('span', {
-    class: 'pill ' + (data.exists ? 'pill--ok' : ''),
-    icon: data.exists ? 'fa-circle-check' : 'fa-file',
-    text: data.exists ? 'cfg present' : 'no cfg yet',
+    class: 'pill' + (data.exists ? '' : ' pill--warn'),
+    icon: data.exists ? 'fa-file-code' : 'fa-file',
+    text: data.exists ? (isGallery ? 'gallery.cfg' : 'album.cfg') : 'no cfg yet',
   })];
   if (!isGallery) {
-    meta.push(el('span', { class: 'pill', icon: 'fa-image', text: data.own_count + ' here' }));
-    if (data.photo_count !== data.own_count) {
-      meta.push(el('span', { class: 'pill', icon: 'fa-folder-tree', text: data.photo_count + ' subtree' }));
-    }
+    meta.push(el('span', { class: 'pill', icon: 'fa-image', text: data.photo_count === data.own_count
+      ? data.own_count + ' photos' : data.own_count + ' here · ' + data.photo_count + ' with sub-albums' }));
     /* Whether anyone has written about this album. It is the one thing the
      * header could not say, and the thing most often still undone. */
     const langs = Object.keys(data.descriptions || {})
       .filter((lang) => (data.descriptions[lang] || '').trim());
     meta.push(langs.length
-      ? el('span', { class: 'pill', icon: 'fa-align-left', text: 'text ' + langs.join(' ') })
-      : el('span', { class: 'pill', icon: 'fa-align-left', text: 'no text yet' }));
+      ? el('span', { class: 'pill', icon: 'fa-align-left', text: 'text ' + langs.join(' ').toUpperCase() })
+      : el('span', { class: 'pill pill--warn', icon: 'fa-align-left', text: 'no text yet' }));
   }
   const errors = (data.issues || []).filter((i) => i.level === 'error').length;
   const warns = (data.issues || []).filter((i) => i.level === 'warn').length;
-  if (errors) meta.push(el('span', { class: 'pill pill--err', icon: 'fa-circle-exclamation', text: errors + ' errors' }));
-  if (warns) meta.push(el('span', { class: 'pill pill--warn', icon: 'fa-triangle-exclamation', text: warns + ' warnings' }));
+  if (errors) meta.push(el('span', { class: 'pill pill--err', icon: 'fa-circle-exclamation', text: errors + (errors === 1 ? ' error' : ' errors') }));
+  if (warns) meta.push(el('span', { class: 'pill pill--warn', icon: 'fa-triangle-exclamation', text: warns + (warns === 1 ? ' warning' : ' warnings') }));
   if (!isGallery) {
     meta.push(el('a', { class: 'btn', href: pathFor({ kind: 'library', album: state.sel.album }),
                         'data-go': true, icon: 'fa-images', text: 'Photos' }));
@@ -1867,8 +1888,6 @@ function renderHead(isGallery) {
     ? state.meta.photos_dir + '/gallery.cfg'
     : state.meta.photos_dir + '/' + state.sel.album + '/.album/album.cfg';
 
-  /* Title and pills share one line so the sticky block stays short; the file
-   * path is the part that folds away under the pane's edge on scroll. */
   /* The album's own name for itself, when it has one: the folder name is in
    * the path above, and repeating it in the title says nothing twice. */
   const named = !isGallery && (data.values.name || []).join(', ').trim();
@@ -1878,12 +1897,7 @@ function renderHead(isGallery) {
                   onerror: (ev) => ev.target.remove() })
     : null;
 
-  return el('div', { class: 'head' },
-    el('div', { class: 'head__crumb', text: path, title: path }),
-    el('div', { class: 'head__line' },
-      cover,
-      el('h1', { class: 'head__title', text: isGallery ? 'Site' : (named || data.name) }),
-      el('div', { class: 'head__meta' }, meta)));
+  return pageHead(isGallery ? 'Site' : (named || data.name), meta, { cover, tip: path });
 }
 
 /* ----- settings --------------------------------------------------------- */
@@ -3384,16 +3398,11 @@ function paintLinks() {
   const broken = d.links.filter((l) => l.issues.length).length;
   pane.innerHTML = '';
 
-  pane.append(el('div', { class: 'pane__top' },
-    el('div', { class: 'head' },
-      el('div', { class: 'head__crumb', text: state.meta.photos_dir + '/.gallery/links.cfg' }),
-      el('div', { class: 'head__line' },
-        el('h1', { class: 'head__title', text: 'Links' }),
-        el('div', { class: 'head__meta' },
-          el('span', { class: 'pill' + (d.links.length ? ' pill--ok' : ''), icon: 'fa-link',
-                       text: d.links.length + (d.links.length === 1 ? ' link' : ' links') }),
-          broken ? el('span', { class: 'pill pill--err', icon: 'fa-link-slash', text: broken + ' broken' }) : null,
-          READ_ONLY ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null)))));
+  pane.append(el('div', { class: 'pane__top' }, pageHead('Links', [
+    el('span', { class: 'pill', icon: 'fa-link', text: d.links.length + (d.links.length === 1 ? ' link' : ' links') }),
+    broken ? el('span', { class: 'pill pill--err', icon: 'fa-link-slash', text: broken + ' broken' }) : null,
+    READ_ONLY ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null,
+  ], { tip: state.meta.photos_dir + '/.gallery/links.cfg' })));
 
   const grid = el('div', { class: 'home' });
   pane.append(grid);

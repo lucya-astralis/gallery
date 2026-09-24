@@ -221,13 +221,10 @@ function renderAlbums() {
   const withPhotos = rows.filter((r) => r.node.own_photos);
 
   pane.append(el('div', { class: 'pane__top' },
-    el('div', { class: 'head' },
-      el('div', { class: 'head__crumb', text: state.meta.photos_dir }),
-      el('div', { class: 'head__line' },
-        el('h1', { class: 'head__title', text: 'Albums' }),
-        el('div', { class: 'head__meta' },
-          el('span', { class: 'pill', icon: 'fa-folder-tree', text: rows.length + ' folders' }),
-          el('span', { class: 'pill', icon: 'fa-image', text: withPhotos.length + ' with photos' })))),
+    pageHead('Albums', [
+      el('span', { class: 'pill', icon: 'fa-folder-tree', text: rows.length + ' folders' }),
+      el('span', { class: 'pill', icon: 'fa-image', text: withPhotos.length + ' with photos' }),
+    ], { tip: state.meta.photos_dir }),
     el('div', { class: 'tbar' },
       searchbox({
         type: 'search', class: 'fieldsearch', id: 'albums-filter', value: albumsView.filter,

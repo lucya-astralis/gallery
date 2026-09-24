@@ -219,14 +219,11 @@ async function renderLibrary() {
   pane.innerHTML = '';
   pane.classList.add('pane--library');
   pane.append(el('div', { class: 'pane__top' },
-    el('div', { class: 'head' },
-      el('div', { class: 'head__crumb', text: state.meta.photos_dir + (L.album ? '/' + L.album : '') }),
-      el('div', { class: 'head__line' },
-        el('h1', { class: 'head__title', text: node ? node.name : 'Library' }),
-        el('div', { class: 'head__meta' },
-          el('span', { class: 'pill', icon: 'fa-image', id: 'lib-count' }),
-          node ? el('a', { class: 'btn', href: pathFor({ kind: 'album', album: L.album }), 'data-go': true,
-                           icon: 'fa-sliders', text: 'Album settings' }) : null))),
+    pageHead(node ? node.name : 'Library', [
+      el('span', { class: 'pill', icon: 'fa-image', id: 'lib-count' }),
+      node ? el('a', { class: 'btn', href: pathFor({ kind: 'album', album: L.album }), 'data-go': true,
+                       icon: 'fa-sliders', text: 'Album settings' }) : null,
+    ], { tip: state.meta.photos_dir + (L.album ? '/' + L.album : '') }),
     libToolbar()));
 
   pane.append(el('div', { class: 'lib' + (L.facetsOpen ? ' is-facets-open' : '') },
@@ -1155,15 +1152,12 @@ function paintTagsPlace() {
   const tagged = (L.photos || []).filter((p) => p.tags.length).length;
   pane.innerHTML = '';
   pane.append(el('div', { class: 'pane__top' },
-    el('div', { class: 'head' },
-      el('div', { class: 'head__crumb', text: 'every .tags sidecar under ' + state.meta.photos_dir }),
-      el('div', { class: 'head__line' },
-        el('h1', { class: 'head__title', text: 'Tags' }),
-        el('div', { class: 'head__meta' },
-          el('span', { class: 'pill', icon: 'fa-tags', text: stats.length + ' tags' }),
-          el('span', { class: 'pill', icon: 'fa-image', text: tagged + ' of ' + L.photos.length + ' photos tagged' }),
-          el('a', { class: 'btn', href: '/library', 'data-go': true, icon: 'fa-tag', text: 'Tag untagged photos',
-                    onclick: (ev) => { ev.preventDefault(); clearFilters(); L.untagged = true; go({ kind: 'library' }); } })))),
+    pageHead('Tags', [
+      el('span', { class: 'pill', icon: 'fa-tags', text: stats.length + ' tags' }),
+      el('span', { class: 'pill', icon: 'fa-image', text: tagged + ' of ' + L.photos.length + ' photos tagged' }),
+      el('a', { class: 'btn', href: '/library', 'data-go': true, icon: 'fa-tag', text: 'Tag untagged photos',
+                onclick: (ev) => { ev.preventDefault(); clearFilters(); L.untagged = true; go({ kind: 'library' }); } }),
+    ], { tip: 'every .tags sidecar under ' + state.meta.photos_dir }),
     el('div', { class: 'tbar' },
       searchbox({ type: 'search', class: 'fieldsearch', id: 'tags-filter', value: tagsView.filter,
                   placeholder: 'Filter tags…', autocomplete: 'off',

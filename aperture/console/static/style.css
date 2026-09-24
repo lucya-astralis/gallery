@@ -986,11 +986,6 @@ html.is-booting .openbar { opacity: 0; }
   /* The sticky header sits inside the scrollport, so it is what carries the
      top spacing now. */
   scroll-padding-top: 120px;
-  /* What of the header folds away under the pane's top edge on scroll: its
-     top padding and the file path. Both are fixed measures, so this is one
-     number the stylesheet can know without asking the page. */
-  --crumb-h: 14px;
-  --head-fold: calc(var(--pane-top) + var(--crumb-h));
 }
 
 /* The check-all view writes its heading straight into the pane instead of
@@ -1006,35 +1001,31 @@ html.is-booting .openbar { opacity: 0; }
 }
 
 /* ----- pane header ----------------------------------------------------- */
-/* Header and tabs are one sticky block. A settings page runs three screens
-   deep; without this, scrolling into the middle of it left you with no album
-   name, no tabs and no save bar in view. */
+/* Header and tabs are one sticky block, pinned at the pane's top edge. It
+   used to pin at minus a "fold" so a file path could slide away under the
+   edge on scroll -- which left 8px above the title and 28px below it once
+   folded. There is no path line any more (it is the title's tooltip), so
+   there is nothing to fold: one height, the same spacing scrolled or not.
+   Nothing keyed on the scroll may change a size here
+   (tests/test_console_chrome.py holds that). */
 .pane__top {
   position: sticky;
-  /* Pinned at MINUS the fold, not at 0. The block keeps one height in the
-     flow whatever the scroll, so the first --head-fold pixels carry the top
-     padding and the file path up under the pane's edge exactly as fast as
-     the page moves, and then it holds -- and scrolling back brings them
-     down the same way. It used to pin at 0 and swap to a layout 40px
-     shorter past 18px: everything under it lurched at once, and a page
-     near that point flipped between the two. Nothing keyed on the scroll
-     may change a size here (tests/test_console_chrome.py holds that). */
-  top: calc(var(--head-fold) * -1);
+  top: 0;
   z-index: 30;
   margin: 0 calc(var(--pane-x) * -1);
-  padding: var(--pane-top) var(--pane-x) 0;
-  padding-bottom: 14px;
-  /* The same bar as .nav, so the same surface: a flat --pane fill, not a
-     gradient falling down its face. That wash was a GLOSS, and a gloss is
-     what makes translucency read as Aero — a raised, moulded sheet with a
-     thickness to it, which argues with the square corners underneath it. A
-     pane here is a fill, a blur and a hairline. */
+  padding: var(--s-5) var(--pane-x);
+  /* The same bar as .nav, so the same surface: a flat --pane fill, a blur
+     and a hairline -- no gradient falling down its face. */
   background-color: var(--pane);
   backdrop-filter: var(--pane-blur);
   -webkit-backdrop-filter: var(--pane-blur);
   border-bottom: var(--hair) solid var(--line);
   transition: background-color var(--dur-2) ease, box-shadow var(--dur-2) ease;
 }
+/* what follows the head inside the block -- the tabs, a toolbar -- keeps
+   one rhythm with it */
+.pane__top > * + * { margin-top: var(--s-4); }
+.pane__top > .tbar { padding-bottom: 0; }
 
 /* Once it is floating over content it grows the nav's signature edge, the
    same gradient at the same strength — the two bars are the same bar. */
@@ -1053,46 +1044,38 @@ html.is-booting .openbar { opacity: 0; }
 
 .pane.is-scrolled .pane__top::after { opacity: .85; }
 
-.head { margin-bottom: 14px; }
-
-.head__crumb {
-  font-family: var(--mono);
-  font-size:var(--fs-chrome-sm);
-  letter-spacing:var(--tr-chrome-lg);
-  color: var(--text-ghost);
-  margin-bottom:var(--s-3);
-  /* a fixed line, even when empty: its height is part of --head-fold */
-  height: var(--crumb-h);
-  line-height: var(--crumb-h);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* ONE level: [cover] the title with its facts under it, the actions on the
+   right, all on one centre line. */
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-3) var(--s-5);
 }
-
-/* Title and status pills share a line — two rows of chrome above every tab
-   was most of the reason the header had to scroll away in the first place. */
-.head__line {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--s-3) 14px;
+.head--cover { grid-template-columns: auto minmax(0, 1fr) auto; }
+.head__id { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
+.head__cover {
+  width: var(--s-8);
+  height: var(--s-8);
+  object-fit: cover;
+  border: var(--hair) solid var(--line);
+  display: block;
 }
 
 /* The gallery's page title, to the letter: Space Grotesk 700, the same
-   clamp, and the white-to-grey fall that keeps the largest text on a page
-   from being the same flat white as everything under it. It used to be set
-   in the display face in caps — which is the WORDMARK's voice over there,
-   not a heading's, and it also uppercased data: `japan_2026` is a folder
-   name and `gallery.cfg` is a filename. Neither is ours to restyle. */
+   clamp, and the white-to-grey fall. Never the display face and never
+   cased: `japan_2026` is a folder name, not ours to restyle. */
 .head__title {
   margin: 0;
   font-family: var(--sans);
   font-size: clamp(20px, 2.2vw, 28px);
   font-weight: 700;
-  letter-spacing:var(--tr-title);
-  line-height: 1.06;
+  letter-spacing: var(--tr-title);
+  line-height: 1.1;
   min-width: 0;
-  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--title-a);
   background: linear-gradient(175deg, var(--title-a) 18%, var(--title-b) 96%);
   -webkit-background-clip: text;
@@ -1103,26 +1086,42 @@ html.is-booting .openbar { opacity: 0; }
 
 .head__title::selection { -webkit-text-fill-color: var(--text); }
 
-.head__meta { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
-
-/* The path fades as it folds, where a browser can tie an animation to the
-   scroll position itself (Chromium; Safari 26). Elsewhere it simply slides
-   out under the edge, which is already right. */
-@supports (animation-timeline: scroll()) {
-  .pane__top .head__crumb {
-    animation: crumb-fold linear both;
-    animation-timeline: scroll(nearest block);
-    animation-range: 0px var(--head-fold);
-  }
+/* The facts under the title: one mono line, the status marks as words with
+   a glyph, a dot between them. Not a row of boxed pills beside the title,
+   which is what sat at a third height. */
+.head__facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--s-2);
+  row-gap: var(--s-1);
+  min-width: 0;
 }
-@keyframes crumb-fold { to { opacity: 0; } }
+.fact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-sm);
+  letter-spacing: var(--tr-chrome-sm);
+  text-transform: uppercase;
+  color: var(--label);
+  white-space: nowrap;
+}
+.fact > .fa { font-size: var(--icon-md); color: var(--text-ghost); margin: 0; }
+.fact + .fact::before { content: '·'; color: var(--text-ghost); margin-right: var(--s-1); }
+.fact--ok > .fa { color: var(--ok); }
+.fact--warn { color: var(--amb); }
+.fact--warn > .fa { color: var(--amb); }
+.fact--err { color: var(--red); }
+.fact--err > .fa { color: var(--red); }
+
+.head__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--s-2); }
 
 /* Once content runs under the bar it darkens and casts its shadow. PAINT
    ONLY: this class flips at a threshold, and a threshold that moves
    anything is exactly what made this header shake. */
 .pane.is-scrolled .pane__top {
-  /* the same state cue the gallery's .nav--scrolled carries: the bar goes to
-     --pane-scrolled and casts a shadow once there is content under it */
   background-color: var(--pane-scrolled);
   box-shadow: 0 12px 24px -18px rgba(0, 0, 0, .95);
 }
@@ -2561,7 +2560,12 @@ img.is-broken { opacity: .2; }
   }
 
   .head__title { font-size:var(--fs-text-xl); }
-  .head__crumb { font-size: var(--fs-chrome-xs); }
+  /* the actions take their own row under the title rather than squeezing it */
+  .head { grid-template-columns: minmax(0, 1fr); }
+  .head--cover { grid-template-columns: auto minmax(0, 1fr); }
+  .head__actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .head__cover { width: var(--s-7); height: var(--s-7); }
+  .pane__top { padding-top: var(--s-4); padding-bottom: var(--s-4); }
 
   /* Five tabs do not fit across a phone, and a strip that scrolls sideways
      hides the last two behind an edge with nothing to say they are there.

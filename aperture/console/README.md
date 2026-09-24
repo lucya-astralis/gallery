@@ -133,9 +133,12 @@ Library and a photo's **Diagnostics** in the inspector cover it). Their API
 routes stay. Old addresses such as `/system/doctor` land on the section that
 took the job over.
 
-The pane's own header — file path, title, status marks and its buttons —
-**sticks** to the top while you scroll, and sheds the path once you are past
-the first line.
+Every place's header is **one level**: the album's cover (where there is
+one), the title with one line of facts under it — `album.cfg · 28 photos ·
+text EN DE JP · 1 warning` — and the actions on the right, all on one centre
+line, with the tabs or the toolbar under it. The file path is the title's
+tooltip. The whole block **sticks** to the top while you scroll and keeps one
+height, so its spacing is the same scrolled or not.
 
 Under 900px the rail keeps its glyphs and drops its words; on a phone it turns
 into a strip under the bar, the current place marked on its bottom edge.
