@@ -166,12 +166,11 @@ check has something to say about a red one. A search in the settings finder
 looks through every tab, and a save-bar chip, a fix or a palette hit opens
 the tab its key lives on. **History** stays in the header.
 
-The **Text** tab also takes files: **Upload .md**, or drop them anywhere on
-it — several at once, each going to the language its name says
-(`album_de.md`, `about-jp.md`, `text_ja.md`; one file naming none fills the
-language on screen). They become unsaved drafts, marked • on their
-language, and are written by **Save** / **Save all** through the same route,
-audit and backup as typed text; there is no upload route for them.
+An album's **Files** tab also takes its texts: drop album_en.md,
+album_de.md or album_jp.md there with the icons and fonts, several at once
+(`tech-ja.md` counts as Japanese). They are not assets, so they go through
+the description route — the same audit and backup as text typed on the
+**Text** tab, whose History has the previous version.
 
 A setting is a **row**: its name in words ("Wallpaper mobile"), the key
 beside it as the file spells it (`wallpaper_mobile`), a line of prose, and

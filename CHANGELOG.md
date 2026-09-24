@@ -85,12 +85,11 @@ root still land on the Overview.
   already kept are listed per file, with a diff of what restoring one would
   change and a Restore button. A restore is itself backed up, so it can be
   undone the same way.
-* **Upload descriptions as .md files**: an album's Text tab takes
-  album_{en,de,jp}.md by button or by dropping them on it, several at once;
-  the name says the language (`album_de.md`, `…-ja.md`), a single file
-  whose name says none fills the one on screen. They arrive as unsaved
-  drafts — review, then **Save** or **Save all** — so nothing is written
-  that was not looked at, and each save is backed up like a typed one.
+* **Upload descriptions as .md files**: an album's **Files** tab takes
+  album_en.md / album_de.md / album_jp.md next to icons and fonts, several
+  at once; the name says the language (`album_de.md`, `tech-ja.md`). They go
+  through the description route, so each write is audited and backed up and
+  the old text is one click away under History.
 * **Many albums at once**: tick albums in the Albums table and set (or
   remove) one key on all of them, after previewing every file's diff.
 * **Saved views** in the Library: name the current filters and apply them

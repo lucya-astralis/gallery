@@ -3158,9 +3158,9 @@ function folderTile(folder, onOpen) {
 }
 
 /* ----- description tab -------------------------------------------------- */
-/* Which language a dropped or picked file is for, from its name alone:
+/* Which language an uploaded description is for, from its name alone:
  * album_de.md, de.md, about-de.md, text.jp.markdown, anything_ja.txt.
- * Null when the name does not say -- then it is the language on screen. */
+ * Null when the name does not say. */
 const DESC_MAX_BYTES = 512 * 1024;
 function langOfFile(name) {
   const stem = name.toLowerCase().replace(/\.(md|markdown|txt)$/, '');
@@ -3168,43 +3168,6 @@ function langOfFile(name) {
   if (!m) return null;
   const code = m[1] === 'ja' ? 'jp' : m[1];
   return state.meta.langs.includes(code) ? code : null;
-}
-
-/* Files become DRAFTS, never writes: what was uploaded sits in the editor
- * like typed text, marked unsaved, and goes to disk through the same Save
- * (and the same audit and backup) as anything typed. So a wrong file costs
- * nothing, and there is no second way to write a description. */
-async function loadDescFiles(files) {
-  const album = state.sel.album;
-  const list = [...files];
-  const loaded = [];
-  const skipped = [];
-  for (const file of list) {
-    if (!/\.(md|markdown|txt)$/i.test(file.name)) { skipped.push(file.name + ' (not a text file)'); continue; }
-    if (file.size > DESC_MAX_BYTES) { skipped.push(file.name + ' (larger than 512 KB)'); continue; }
-    const lang = langOfFile(file.name) || (list.length === 1 ? state.descLang : null);
-    if (!lang) { skipped.push(file.name + ' (its name names no language)'); continue; }
-    if (loaded.some((l) => l.lang === lang)) { skipped.push(file.name + ' (a second file for ' + lang + ')'); continue; }
-    const text = (await file.text()).replace(/^﻿/, '').replace(/\r\n?/g, '\n');
-    const same = text === (state.data.descriptions[lang] || '');
-    descDrafts[album + '|' + lang] = same ? null : text;
-    loaded.push({ lang, same });
-  }
-  if (!state.sel || state.sel.album !== album) return;   /* navigated away */
-  if (loaded.length) state.descLang = loaded[0].lang;
-  syncDirtyMark();
-  renderPane();
-  /* One message, not two: a toast replaces the one before it. */
-  const changed = loaded.filter((l) => !l.same);
-  const said = [];
-  if (changed.length) said.push('Loaded ' + changed.map((l) => 'album_' + l.lang + '.md').join(', ') + ' — review, then save');
-  else if (loaded.length) said.push('Same text as what is saved — nothing to do');
-  if (skipped.length) said.push('Skipped ' + skipped.join(', '));
-  if (said.length) toast(said.join('. '), !skipped.length ? 'ok' : loaded.length ? 'warn' : 'err');
-}
-
-function descPendingLangs() {
-  return state.meta.langs.filter((lang) => descDrafts[state.sel.album + '|' + lang] != null);
 }
 
 async function saveDescriptions(langs) {
@@ -3244,19 +3207,11 @@ function renderDescriptions() {
   });
   area.value = descDrafts[dkey] ?? (state.data.descriptions[state.descLang] || '');
 
-  const picker = el('input', {
-    type: 'file', class: 'u-hidden', multiple: true,
-    accept: '.md,.markdown,.txt,text/markdown,text/plain',
-    onchange: (ev) => { loadDescFiles(ev.target.files); ev.target.value = ''; },
-  });
-  const pending = descPendingLangs();
-
-  const panel = el('div', { class: 'tabpanel desc-drop' },
+  return el('div', { class: 'tabpanel' },
     el('div', { class: 'field__help tabnote u-mb' },
       'Markdown shown under the album hero, one file per language. Saving an empty ' +
-      'editor deletes that language’s file. Upload or drop .md files to fill it: ' +
-      'album_de.md goes to German, album_jp.md to Japanese, and a file whose name names ' +
-      'no language goes to the one on screen. Nothing is written until you save.'),
+      'editor deletes that language’s file. To bring finished .md files in, drop them ' +
+      'on the Files tab.'),
     /* The gallery's own language selector is a segmented control, and this
      * is the same choice being made — so it is the same control. */
     el('div', { class: 'toggle desc-langs' }, state.meta.langs.map((lang) =>
@@ -3275,21 +3230,10 @@ function renderDescriptions() {
     el('div', { class: 'savebar' },
       el('span', { class: 'savebar__note', text: descDrafts[dkey] != null
         ? 'album_' + state.descLang + '.md has unsaved text' : 'album_' + state.descLang + '.md' }),
-      picker,
-      el('button', {
-        class: 'btn btn--ghost', type: 'button', icon: 'fa-file-arrow-up', text: 'Upload .md', disabled: READ_ONLY,
-        onclick: () => picker.click(),
-      }),
       el('button', {
         class: 'btn btn--ghost', type: 'button', icon: 'fa-clock-rotate-left', text: 'History',
         onclick: () => openHistory({ file: 'desc', album: state.sel.album, lang: state.descLang }),
       }),
-      pending.some((lang) => lang !== state.descLang) ? el('button', {
-        class: 'btn', type: 'button', icon: 'fa-floppy-disk', disabled: READ_ONLY,
-        text: 'Save all ' + pending.length,
-        title: 'Save ' + pending.map((l) => 'album_' + l + '.md').join(', '),
-        onclick: () => saveDescriptions(pending),
-      }) : null,
       el('button', {
         class: 'btn btn--primary', type: 'button', icon: 'fa-floppy-disk', text: 'Save description', disabled: READ_ONLY,
         onclick: () => {
@@ -3297,27 +3241,6 @@ function renderDescriptions() {
           saveDescriptions([state.descLang]);
         },
       })));
-
-  /* Drop anywhere on the text section, not just the textarea: a file
-   * dropped on the language buttons means the same thing. */
-  if (!READ_ONLY) {
-    const hasFiles = (ev) => [...((ev.dataTransfer && ev.dataTransfer.types) || [])].includes('Files');
-    panel.addEventListener('dragover', (ev) => {
-      if (!hasFiles(ev)) return;
-      ev.preventDefault();
-      panel.classList.add('is-dropping');
-    });
-    panel.addEventListener('dragleave', (ev) => {
-      if (!panel.contains(ev.relatedTarget)) panel.classList.remove('is-dropping');
-    });
-    panel.addEventListener('drop', (ev) => {
-      if (!hasFiles(ev)) return;
-      ev.preventDefault();
-      panel.classList.remove('is-dropping');
-      loadDescFiles(ev.dataTransfer.files);
-    });
-  }
-  return panel;
 }
 
 /* ----- assets tab ------------------------------------------------------- */
@@ -3336,8 +3259,8 @@ function renderAssets() {
         : 'Nothing in this album’s .album/ folder yet.' }));
 
   const input = el('input', {
-    type: 'file', class: 'u-hidden',
-    onchange: (ev) => { if (ev.target.files.length) upload(ev.target.files[0]); },
+    type: 'file', class: 'u-hidden', multiple: !gallery,
+    onchange: (ev) => { uploadAll(ev.target.files); ev.target.value = ''; },
   });
   const drop = el('div', {
     class: 'dropzone', icon: 'fa-upload',
@@ -3345,17 +3268,63 @@ function renderAssets() {
       : gallery
         ? 'Drop a mark, a badge, a display face or a backdrop here, or click to choose. Accepted: ' +
           (state.meta.brand_exts || []).join(', ')
-        : 'Drop an icon or a title font here, or click to choose. Accepted: ' +
-          state.meta.icon_exts.concat(state.meta.font_exts).join(', '),
+        : 'Drop an icon, a title font or the album’s texts (album_en.md, album_de.md, ' +
+          'album_jp.md) here, or click to choose — several at once. Accepted: ' +
+          state.meta.icon_exts.concat(state.meta.font_exts, ['.md']).join(', '),
     onclick: () => { if (!READ_ONLY) input.click(); },
     ondragover: (ev) => { ev.preventDefault(); drop.classList.add('is-over'); },
     ondragleave: () => drop.classList.remove('is-over'),
     ondrop: (ev) => {
       ev.preventDefault();
       drop.classList.remove('is-over');
-      if (!READ_ONLY && ev.dataTransfer.files.length) upload(ev.dataTransfer.files[0]);
+      if (!READ_ONLY) uploadAll(ev.dataTransfer.files);
     },
   });
+
+  /* An album's texts are not assets -- they are album_<lang>.md beside the
+   * album.cfg, and have their own route with its own audit and backup. So a
+   * text file dropped here goes THERE, with its language read off its name,
+   * and anything else goes to /api/asset as before. The site has no texts. */
+  const isText = (file) => /\.(md|markdown|txt)$/i.test(file.name);
+  async function uploadAll(fileList) {
+    const files = [...fileList];
+    if (!files.length) return;
+    if (gallery) { upload(files[0]); return; }
+    const texts = files.filter(isText);
+    for (const file of files.filter((f) => !isText(f))) await upload(file);
+    if (texts.length) await uploadTexts(texts);
+  }
+
+  async function uploadTexts(files) {
+    const album = state.sel.album;
+    const wrote = [];
+    const skipped = [];
+    const seen = new Set();
+    for (const file of files) {
+      const lang = langOfFile(file.name);
+      if (!lang) { skipped.push(file.name + ' (name it album_en.md, album_de.md or album_jp.md)'); continue; }
+      if (seen.has(lang)) { skipped.push(file.name + ' (a second text for ' + lang + ')'); continue; }
+      if (file.size > DESC_MAX_BYTES) { skipped.push(file.name + ' (larger than 512 KB)'); continue; }
+      seen.add(lang);
+      const text = (await file.text()).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+      try {
+        const payload = await api('/api/album/description', {
+          method: 'PUT', body: JSON.stringify({ album, lang, text }),
+        });
+        if (state.data && state.data.descriptions) state.data.descriptions[lang] = payload.text;
+        descDrafts[album + '|' + lang] = null;
+        wrote.push('album_' + lang + '.md');
+      } catch (err) {
+        skipped.push(file.name + ' (' + err.message + ')');
+      }
+    }
+    syncDirtyMark();
+    if (state.sel && state.sel.album === album) renderPane();
+    const said = [];
+    if (wrote.length) said.push('Wrote ' + wrote.join(', ') + ' — see the Text tab; History has the old ones');
+    if (skipped.length) said.push('Skipped ' + skipped.join(', '));
+    toast(said.join('. '), !skipped.length ? 'ok' : wrote.length ? 'warn' : 'err');
+  }
 
   async function upload(file) {
     const form = new FormData();
@@ -3389,7 +3358,8 @@ function renderAssets() {
         'keys at it on the Settings tab.'
       : 'Files here live in ' + state.sel.album + '/.album/ next to the album.cfg. ' +
         'Uploading one does not select it — point `icon`, `font` or one of the ' +
-        'wallpaper keys at it on the Settings tab.'),
+        'wallpaper keys at it on the Settings tab. An album_<lang>.md is the ' +
+        'album’s text in that language and is live as soon as it is uploaded.'),
     list, el('div', { class: 'u-gap' }), drop, input);
 }
 
