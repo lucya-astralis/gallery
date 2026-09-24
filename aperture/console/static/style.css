@@ -3748,6 +3748,149 @@ kbd + kbd { margin-left: var(--s-1); }
 }
 
 
+/* ================================================================
+   THE OVERVIEW'S CHARTS  —  static/charts.js
+   ------------------------------------------------------------------
+   One series each, so one neutral ink: --label for a column, --chrome
+   under the pointer. Square ends (rule 2), a 2px gap between columns,
+   two recessive gridlines with their values, the axis labelled only
+   where a year starts. The accent appears once: the tag coverage meter,
+   which is a progress fill -- the one thing rule 1 licenses it for.
+   ================================================================ */
+.colchart { display: flex; flex-direction: column; gap: var(--s-2); }
+.colchart__plot { position: relative; height: 160px; padding-left: var(--s-7); }
+.colchart--s .colchart__plot { height: 96px; }
+.colchart__grid { position: absolute; inset: 0 0 0 var(--s-7); pointer-events: none; }
+.colchart__gl {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: var(--hair) dashed var(--line);
+}
+.colchart__gl:nth-child(1) { top: 0; }
+.colchart__gl:nth-child(2) { top: 50%; }
+.colchart__gl--base { bottom: 0; top: auto; border-top: var(--hair) solid var(--line-strong); }
+.colchart__gl::before {
+  content: attr(data-v);
+  position: absolute;
+  right: calc(100% + var(--s-2));
+  top: 0;
+  translate: 0 -50%;
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  color: var(--text-ghost);
+  font-variant-numeric: tabular-nums;
+}
+.colchart__cols {
+  position: absolute;
+  inset: 0 0 0 var(--s-7);
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+.colchart__col {
+  appearance: none;
+  flex: 1 1 0;
+  min-width: 1px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: flex-end;
+  cursor: default;
+}
+button.colchart__col { cursor: pointer; }
+.colchart__bar {
+  display: block;
+  width: 100%;
+  height: var(--h, 0%);
+  min-height: 1px;
+  background: var(--label);
+  opacity: .72;
+  transition: opacity var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
+}
+.colchart__col.is-zero .colchart__bar { opacity: .18; }
+.colchart__col.is-on .colchart__bar,
+.colchart__col:focus-visible .colchart__bar { background: var(--chrome); opacity: 1; }
+.colchart__col:focus-visible { outline: none; }
+.colchart__tip {
+  position: absolute;
+  left: calc(var(--s-7) + (100% - var(--s-7)) * var(--xf, 0));
+  bottom: calc(var(--h, 0%) + var(--s-3));
+  translate: -50% 0;
+  z-index: 2;
+  padding: var(--s-1) var(--s-3);
+  border: var(--hair) solid var(--line-strong);
+  background-color: var(--overlay);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-sm);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.colchart__tip.is-left { translate: -12px 0; }
+.colchart__tip.is-right { translate: calc(-100% + 12px) 0; }
+.colchart__axis { display: flex; gap: 2px; margin-left: var(--s-7); }
+.colchart__tick {
+  flex: 1 1 0;
+  min-width: 1px;
+  overflow: visible;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: var(--tr-num);
+  color: var(--text-ghost);
+}
+.colchart__tick:not(:empty) { border-left: var(--hair) solid var(--line-strong); padding-left: var(--s-1); }
+
+.coverage { display: flex; align-items: center; gap: var(--s-4); margin-bottom: var(--s-4); }
+.coverage .meter { flex: 1 1 auto; height: var(--s-3); }
+.coverage__v { font-family: var(--mono); font-size: var(--fs-chrome-lg); color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ----- to do ------------------------------------------------------------ */
+.todo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  border: var(--hair) solid var(--line);
+}
+.todo__item {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-5);
+  border: 0;
+  border-right: var(--hair) solid var(--line);
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+.todo__item:last-child { border-right: 0; }
+.todo__n { font-family: var(--mono); font-size: var(--fs-chrome-xl); color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
+.todo__what { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-text-md); }
+.todo__what > .fa { color: var(--text-ghost); font-size: var(--icon-md); }
+.todo__item > .fa.is-end { position: absolute; top: var(--s-4); right: var(--s-4); color: var(--text-ghost); }
+@media (hover: hover) {
+  .todo__item:not(:disabled):hover { background: rgba(255, 255, 255, .03); color: var(--text); }
+  .todo__item:not(:disabled):hover > .fa.is-end { color: var(--chrome); }
+}
+.todo__item.is-warn .todo__n { color: var(--amb); }
+.todo__item.is-err .todo__n { color: var(--red); }
+.todo__item.is-done { cursor: default; }
+.todo__item.is-done .todo__n { color: var(--ok); font-size: var(--fs-chrome-lg); }
+.todo__item.is-done .todo__what { color: var(--text-ghost); }
+.todo__item:focus-visible { outline: var(--hair) solid var(--acc); outline-offset: -2px; }
+@media (max-width: 620px) {
+  .todo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .todo__item { border-bottom: var(--hair) solid var(--line); }
+}
+
+
 /* ============================================================
    THE DOOR
    ------------------------------------------------------------

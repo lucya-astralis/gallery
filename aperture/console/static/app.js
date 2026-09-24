@@ -1459,6 +1459,7 @@ async function renderHome() {
     api('/api/audit?limit=8').catch(() => null),
     api('/api/gallery').catch(() => null),
     loadUpdates(),
+    loadLibrary().catch(() => null),
   ]);
   if (!state.sel || state.sel.kind !== 'home') return;   /* navigated away */
   if (issues) { home.issues = issues; countIssues(issues); refreshAlbumViews(); }
@@ -1599,6 +1600,54 @@ function paintHome() {
     grid.append(el('div', { class: 'home__wide' }, updateCard(updates.info, false)));
   }
 
+  /* ---- what is waiting for you ---- */
+  grid.append(wide(todoCard()));
+
+  /* ---- what the archive is made of ---- */
+  const photos = L.photos || [];
+  if (photos.length) {
+    const over = photosOverTime(photos, (key, quarterly) => libraryWith({
+      q: quarterly ? '' : 'date:' + key,
+      years: quarterly ? [key.slice(0, 4)] : [],
+    }));
+    const undated = photos.filter((p) => !p.taken).length;
+    if (over) {
+      grid.append(wide(card('fa-chart-simple', 'Photos over time',
+        (over.quarterly ? 'per quarter' : 'per month') + ' they were taken' + (undated ? ' · ' + undated + ' undated' : ''),
+        over.node,
+        quiet('Click a ' + (over.quarterly ? 'quarter' : 'month') + ' to see its photos in the Library.'))));
+    }
+
+    const byAlbum = new Map();
+    for (const p of photos) {
+      const top = p.album.split('/')[0] || 'photos';
+      byAlbum.set(top, (byAlbum.get(top) || 0) + 1);
+    }
+    grid.append(card('fa-folder-tree', 'Albums', 'photos per album, sub-albums included',
+      ...rankedBars([...byAlbum].map(([label, value]) => ({ label, value }))
+        .sort((x, y) => y.value - x.value), { onRow: (r) => go({ kind: 'library', album: r.label === 'photos' ? '' : r.label }) })));
+
+    const tagged = photos.filter((p) => p.tags.length).length;
+    const tagRows = (state.vocab || []).map((t) => ({ label: t.name, value: t.count }));
+    grid.append(card('fa-tags', 'Tags', tagged + ' of ' + photos.length + ' photos tagged',
+      el('div', { class: 'coverage' },
+        meter(tagged, photos.length, 'acc'),
+        el('span', { class: 'coverage__v', text: Math.round(tagged / photos.length * 100) + '%' })),
+      tagRows.length
+        ? rankedBars(tagRows, { limit: 6, onRow: (r) => openTag(r.label) })
+        : quiet('No photo carries a tag yet.'),
+      el('div', { class: 'card__actions' },
+        el('button', { type: 'button', class: 'btn', icon: 'fa-tag', text: 'Tag the untagged',
+                       disabled: tagged === photos.length,
+                       onclick: () => libraryWith({ untagged: true }) }))));
+
+    const cams = new Map();
+    for (const p of photos) cams.set(p.camera || 'Unknown', (cams.get(p.camera || 'Unknown') || 0) + 1);
+    grid.append(card('fa-camera', 'Cameras', cams.size + (cams.size === 1 ? ' camera' : ' cameras'),
+      ...rankedBars([...cams].map(([label, value]) => ({ label, value })).sort((x, y) => y.value - x.value),
+        { limit: 5, onRow: (r) => libraryWith({ cameras: [r.label] }) })));
+  }
+
   /* ---- is the machine working ---- */
   const tone = paused ? 'warn' : live ? 'ok' : 'bad';
   const word = paused ? 'paused' : scanning ? 'scanning' : live ? 'running' : 'not running';
@@ -1635,20 +1684,10 @@ function paintHome() {
         onclick: () => go({ kind: 'ops' }),
       }))));
 
-  /* ---- what is in it ---- */
-  grid.append(card('fa-box-archive', 'Archive', 'what the index holds',
-    el('div', { class: 'tiles' },
-      tile('photos', String(idx.images ?? '—')),
-      tile('albums', String(idx.albums ?? '—')),
-      tile('featured', String(idx.featured ?? '—')),
-      tile('tags', String(idx.tags ?? '—')),
-      tile('originals', bytes(idx.bytes)),
-      tile('database', bytes(idx.db_bytes)))));
-
   /* ---- is anything broken ---- */
   const issues = home.issues;
   const list = (issues && issues.issues) || [];
-  grid.append(el('div', { class: 'home__wide' }, card('fa-triangle-exclamation', 'Needs attention',
+  grid.append(el('div', { class: 'home__wide', id: 'needs' }, card('fa-triangle-exclamation', 'Needs attention',
     issues ? issues.errors + ' error(s) · ' + issues.warnings + ' warning(s)' : null,
     !issues
       ? el('p', { class: 'card__quiet', text: 'The check did not run.' })
@@ -1679,22 +1718,6 @@ function paintHome() {
     el('div', { class: 'card__actions' },
       el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'Check again', onclick: checkAll })))));
 
-  /* ---- what is still unwritten ---- */
-  const albums = [];
-  (function walk(node) {
-    for (const child of node.children || []) { albums.push(child); walk(child); }
-  })(state.tree || { children: [] });
-  const noCfg = albums.filter((a) => a.own_photos && !a.has_cfg);
-  const noText = albums.filter((a) => a.own_photos && !a.has_desc);
-  grid.append(card('fa-pen-to-square', 'Unwritten', albums.length + ' album(s) in the tree',
-    !noCfg.length && !noText.length
-      ? el('p', { class: 'card__quiet', text: 'Every album with photos has a cfg and a text.' })
-      : foldedRows('unwritten', [
-          ...noCfg.map((a) => [a, 'no cfg', a.own_photos + ' photo(s), nothing configured']),
-          ...noText.map((a) => [a, 'no text', a.own_photos + ' photo(s), no album_<lang>.md']),
-        ], 8, ([a, key, detail]) => homeRow(a.path, key, detail,
-          () => select({ kind: 'album', album: a.path })))));
-
   /* ---- what happened here ---- */
   grid.append(card('fa-clock-rotate-left', 'Recent changes', 'this console, not the gallery',
     !home.audit.length
@@ -1706,6 +1729,47 @@ function paintHome() {
         }))));
 }
 
+
+/* What is waiting: each count a tile that goes where it is done. A zero is
+ * shown too, as done -- the strip is also the answer to "is there anything
+ * left?". */
+function todoCard() {
+  const photos = L.photos || [];
+  const albums = allAlbums().map((r) => r.node).filter((a) => a.own_photos);
+  const issues = home.issues ? home.issues.errors + home.issues.warnings : null;
+  const drafts = pendingDrafts().length;
+  const items = [
+    { n: photos.filter((p) => !p.tags.length).length, what: 'photos without a tag', done: 'every photo has a tag', icon: 'fa-tag',
+      go: () => libraryWith({ untagged: true }), known: !!L.photos },
+    { n: albums.filter((a) => !a.has_desc).length, what: 'albums without a text', done: 'every album has a text', icon: 'fa-align-left',
+      go: () => { albumsView.show = 'unwritten'; go({ kind: 'albums' }); }, known: !!state.tree },
+    { n: albums.filter((a) => !a.has_cfg).length, what: 'albums without a cfg', done: 'every album has a cfg', icon: 'fa-file',
+      go: () => { albumsView.show = 'unwritten'; go({ kind: 'albums' }); }, known: !!state.tree },
+    { n: issues, what: 'things the check found', done: 'the check finds nothing', icon: 'fa-triangle-exclamation', tone: home.issues && home.issues.errors ? 'err' : 'warn',
+      go: () => { const t = $('#needs'); if (t) t.scrollIntoView({ block: 'start', behavior: 'instant' }); }, known: issues != null },
+    { n: photos.filter((p) => !p.indexed).length, what: 'photos not indexed yet', done: 'everything is indexed', icon: 'fa-clock-rotate-left',
+      go: () => go({ kind: 'ops' }), known: !!L.photos },
+  ];
+  if (drafts) items.push({ n: drafts, what: 'files with unsaved edits', icon: 'fa-pen', tone: 'warn', go: openTray, known: true });
+  return card('fa-list-check', 'To do', null,
+    el('div', { class: 'todo' }, items.filter((i) => i.known).map((i) => el('button', {
+      type: 'button', class: 'todo__item' + (i.n ? (i.tone ? ' is-' + i.tone : '') : ' is-done'),
+      onclick: i.go, disabled: !i.n,
+    },
+      el('span', { class: 'todo__n' }, i.n ? String(i.n) : ico('fa-check')),
+      el('span', { class: 'todo__what' }, ico(i.icon), i.n ? i.what : i.done),
+      i.n ? ico('fa-arrow-right', true) : null))));
+}
+
+/* The Library, opened on a filter. */
+function libraryWith({ untagged = false, q = '', years = [], cameras = [], album = '' } = {}) {
+  clearFilters();
+  L.untagged = untagged;
+  L.q = q;
+  L.years = new Set(years);
+  L.cameras = new Set(cameras);
+  go({ kind: 'library', album });
+}
 
 /* An album's -- and the site's -- tabs. Not one per FILE, as the console
  * once had (Settings / Description / Files / Raw), and not one long page

@@ -91,6 +91,11 @@ root still land on the Overview.
   again with one click (kept in this browser).
 * **Activity** in System: every write this console has made, filterable,
   each a click from the file it touched.
+* **The Overview reads the archive**: a To do strip (untagged photos,
+  albums without text or cfg, what the check found, photos not indexed,
+  unsaved files — each a click from where it is done), photos over time as
+  a column per month, and ranked bars for albums, tags (with how much is
+  tagged) and cameras, every row a click into the Library filtered to it.
 * The bar shows the **indexer's lamp** on every screen.
 
 **Changed**

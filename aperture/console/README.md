@@ -86,20 +86,27 @@ reload, sign out. `?` lists the keys; `g` then a letter jumps to a place
 indexer's lamp, and an amber mark while the page you are on has unsaved
 edits.
 
-**Home** is what it opens on, and it is a reading rather than a form:
+**Overview** is what it opens on, and it is a reading rather than a form:
 
 | | |
 | --- | --- |
-| is the machine working | one lamp, the last scan and what it did, with Scan and Pause right there |
-| what is in it | six figures out of the index |
-| is anything broken | what the config check found, each line a click from the key that caused it |
-| what is still unwritten | albums that have photos but no cfg, or no text |
-| what happened here | the audit log — every write this console has made |
+| **To do** | a strip of counts, each a click from where it is done: photos without a tag (the Library, on *Untagged*), albums without a text or a cfg (the Albums table, on *Unwritten*), what the check found, photos not indexed yet, files with unsaved edits. A zero shows as done. |
+| **Photos over time** | a column per month they were taken (per quarter past six years), gaps kept as zeros, the earliest 2% — the camera that thinks it is 2001 — folded into one column so the axis starts where the photos do. Hover for the figure, click a month for its photos in the Library. |
+| **Albums**, **Tags**, **Cameras** | ranked bars, each row a click into the Library filtered to it; Tags leads with how much of the archive is tagged |
+| **Indexer** | the lamp, the last scan and what it did, with Scan and Pause right there |
+| **Needs attention** | what the config check found, each line a click from the key — and most with a Fix |
+| **Recent changes** | the audit log — every write this console has made |
 
-None of it is computed on that screen. The lamp is the same `/api/ops/status`
-Operations reads, the issues are the same check the tree's red dots come from,
-and the log is the one every save has written since the door went in. A
-dashboard with figures of its own would be a second opinion to keep in step.
+The charts show one series each, so they take one neutral ink and no palette;
+the accent is state in Nebula, and the only fill that wears it is the tag
+coverage meter, which is progress. They are plain HTML (`static/charts.js`),
+sized through the CSSOM because the CSP drops a style attribute.
+
+None of the figures is a second opinion: the counts and charts come from the
+same `/api/library` the Library reads, the lamp from the same
+`/api/ops/status` System reads, the issues from the same check the Albums
+table shows, and the log is the one every save has written since the door
+went in.
 
 **Albums** is every folder as a row: cover, name, photos (in the folder / with
 sub-albums), whether it has an `album.cfg` or issues, whether it has a text.
