@@ -1777,7 +1777,7 @@ function paintHome() {
  * left?". */
 function todoCard() {
   const photos = L.photos || [];
-  const albums = allAlbums().map((r) => r.node).filter((a) => a.own_photos);
+  const albums = allAlbums().map((r) => r.node).filter(hasPage);
   const issues = home.issues ? home.issues.errors + home.issues.warnings : null;
   const drafts = pendingDrafts().length;
   const items = [

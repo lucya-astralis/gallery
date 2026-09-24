@@ -214,6 +214,12 @@ function syncDirtyMark() {
  * "unwritten" is a column here, so it can be sorted and filtered. */
 const albumsView = { filter: '', show: 'all', sort: 'tree', sel: new Set() };
 
+/* Whether a folder is an album someone can open: it has photos anywhere
+ * below it. A collection (teamlab: its photos are all in sub-albums) has a
+ * page, a hero and a text like any album, so it can be unwritten too --
+ * only an empty folder has nothing to write about. */
+const hasPage = (node) => (node.total_photos || 0) > 0;
+
 function renderAlbums() {
   const pane = $('#pane');
   pane.innerHTML = '';
@@ -276,7 +282,7 @@ function paintAlbumRows() {
   const q = albumsView.filter.trim().toLowerCase();
   let rows = allAlbums().filter(({ node }) => {
     if (q && !node.path.toLowerCase().includes(q)) return false;
-    if (albumsView.show === 'unwritten') return node.own_photos && (!node.has_cfg || !node.has_desc);
+    if (albumsView.show === 'unwritten') return hasPage(node) && (!node.has_cfg || !node.has_desc);
     if (albumsView.show === 'issues') return (state.issuesByAlbum[node.path] || 0) > 0;
     return true;
   });
@@ -328,10 +334,10 @@ function paintAlbumRows() {
         ? el('span', { class: 'status status--err', icon: 'fa-circle-exclamation', text: issues + ' issue' + (issues === 1 ? '' : 's') })
         : node.has_cfg
           ? el('span', { class: 'status status--ok', icon: 'fa-circle-check', text: 'album.cfg' })
-          : el('span', { class: 'status', text: node.own_photos ? 'none yet' : '—' })),
+          : el('span', { class: 'status', text: hasPage(node) ? 'none yet' : '—' })),
       el('td', {}, node.has_desc
         ? el('span', { class: 'status status--ok', icon: 'fa-circle-check', text: 'written' })
-        : el('span', { class: 'status', text: node.own_photos ? 'none yet' : '—' })),
+        : el('span', { class: 'status', text: hasPage(node) ? 'none yet' : '—' })),
       el('td', { class: 'r' },
         el('a', { class: 'btn btn--ghost', href: pathFor({ kind: 'library', album: node.path }),
                   'data-go': true, icon: 'fa-images', text: 'Photos' })));
