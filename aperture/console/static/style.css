@@ -371,6 +371,8 @@
      submit button on the door is 44px on a desktop too. */
   --tap:         44px;
   --door-w:      420px;
+  /* The rail: wide enough for "Overview" and a count beside it. */
+  --rail-w:      208px;
 
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
   --sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -452,8 +454,8 @@ html.fx-lite {
     --glow-acc: none; --shadow-1: none; --shadow-2: none;
   }
   .nav, .pane, .field__control input, .field__control select,
-  .field__control textarea, .chip, .btn, .tab, .toggle, .navmenu,
-  .savebar, .sidebar, .modal__box, .foldertile, .cell, .asset {
+  .field__control textarea, .chip, .btn, .tab, .toggle, .cmdk,
+  .savebar, .rail, .modal__box, .foldertile, .cell, .asset {
     border: var(--hair) solid CanvasText;
   }
 }
@@ -902,43 +904,6 @@ html.is-booting .openbar { opacity: 0; }
   min-width: 0;
 }
 
-/* The drawer handle. Only exists below 900px, where the album tree stops
-   being a column and becomes an overlay. */
-.navmenu {
-  display: none;
-  appearance: none;
-  flex: 0 0 auto;
-  width: 38px;
-  height: 34px;
-  padding: 0;
-  background: rgba(255, 255, 255, .04);
-  border: var(--hair) solid var(--line-strong);
-  border-radius: var(--radius);
-  cursor: pointer;
-  position: relative;
-}
-
-.navmenu__bars,
-.navmenu__bars::before,
-.navmenu__bars::after {
-  position: absolute;
-  left: 50%;
-  width: 16px;
-  height: 1.5px;
-  margin-left: -8px;
-  background: var(--text-dim);
-  content: "";
-}
-
-.navmenu__bars { top: 50%; margin-top: -.75px; }
-.navmenu__bars::before { top: -5px; margin-left: 0; left: 0; }
-.navmenu__bars::after  { top:var(--s-2); margin-left: 0; left: 0; }
-
-body.drawer-open .navmenu { border-color: var(--acc); }
-body.drawer-open .navmenu__bars { background: var(--acc); }
-body.drawer-open .navmenu__bars::before,
-body.drawer-open .navmenu__bars::after { background: var(--acc); }
-
 .nav__brand {
   display: flex;
   align-items: center;
@@ -946,6 +911,7 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   color: var(--text);
   white-space: nowrap;
   min-width: 0;
+  flex: 0 0 auto;
 }
 
 
@@ -1000,46 +966,15 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
 }
 
 /* ----- layout ---------------------------------------------------------- */
+/* The rail and the pane. The rail used to be a 312px album tree the whole
+   console shared its width with; it is the app's places now, and albums are
+   one of them. */
 .layout {
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: 312px 1fr;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr);
   min-height: 0;
 }
-
-.sidebar {
-  border-right: var(--hair) solid var(--line);
-  background-color: var(--glass-hi);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.sidebar__search {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-4);
-  border-bottom: var(--hair) solid var(--line);
-}
-
-/* Only in the drawer: on desktop the sidebar is a column and has nothing to
-   close. */
-.sidebar__close { display: none; flex: 0 0 auto; }
-
-/* Dims the pane while the drawer is over it, and swallows the tap that
-   closes it. Inert on desktop -- it is only ever unhidden by setDrawer(). */
-.scrim {
-  position: fixed;
-  inset: var(--nav-h) 0 0;
-  z-index: 140;
-  background-color: var(--scrim-hi);
-  backdrop-filter: var(--scrim-blur);
-  -webkit-backdrop-filter: var(--scrim-blur);
-}
-
 
 .pane {
   min-height: 0;
@@ -1069,106 +1004,6 @@ body.drawer-open .navmenu__bars::after { background: var(--acc); }
   text-align: center;
   font-size: var(--fs-text-md);
 }
-
-/* ----- tree ------------------------------------------------------------ */
-.tree {
-  list-style: none;
-  margin: 0;
-  padding: var(--s-3) 0 28px;
-  overflow-y: auto;
-  flex: 1 1 auto;
-}
-
-.tree ul { list-style: none; margin: 0; padding: 0; }
-
-.tree__empty {
-  padding: var(--s-4);
-  color: var(--text-dim);
-  font-size: var(--fs-text-sm);
-}
-
-.tree__row {
-  display: flex;
-  align-items: center;
-  gap:var(--s-3);
-  padding: var(--s-2) var(--s-4) var(--s-2) 0;
-  cursor: pointer;
-  border-left: 2px solid transparent;
-  color: var(--text-dim);
-  user-select: none;
-  font-size:var(--fs-text-md);
-}
-
-/* The sub-album indent. A style attribute cannot do this here (see the CSP
-   note at the top of this sheet), so depth rides an attribute and the rule
-   lives where every other measure does. */
-.tree__row[data-depth="1"] { padding-left: var(--s-4); }
-.tree__row[data-depth="2"] { padding-left: var(--s-7); }
-.tree__row[data-depth="3"] { padding-left: calc(var(--s-7) + var(--s-5)); }
-.tree__row[data-depth="4"] { padding-left: calc(var(--s-7) + var(--s-7)); }
-.tree__row[data-depth="5"] { padding-left: calc(var(--s-8) + var(--s-6)); }
-.tree__row[data-depth="6"] { padding-left: calc(var(--s-8) + var(--s-7)); }
-.tree__row[data-depth="7"] { padding-left: calc(var(--s-9) + var(--s-5)); }
-.tree__row[data-depth="8"] { padding-left: calc(var(--s-9) + var(--s-6)); }
-
-.tree__row:hover {
-  background: rgba(255, 255, 255, .035);
-  color: var(--text);
-}
-
-.tree__row.is-active {
-  background: linear-gradient(90deg, rgba(var(--acc-rgb), .18), transparent 85%);
-  border-left-color: var(--acc);
-  color: var(--text);
-}
-
-.tree__twisty {
-  width: 16px;
-  flex: 0 0 16px;
-  text-align: center;
-  color: var(--text-ghost);
-  font-size: 9px;
-  transition: transform var(--dur-1) ease;
-}
-
-.tree__twisty.is-open { transform: rotate(90deg); }
-.tree__twisty.is-leaf { visibility: hidden; }
-
-.tree__name {
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tree__count {
-  font-family: var(--mono);
-  font-size:var(--fs-chrome-sm);
-  color: var(--text-ghost);
-  flex: 0 0 auto;
-  letter-spacing:var(--tr-chrome-xl);
-}
-
-/* The album's own cover, so the tree reads as pictures rather than paths.
-   The ring carries what the old status dot said: violet = has an album.cfg,
-   red = that cfg has issues. */
-.tree__cover {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: var(--bg-2);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-
-.tree__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-.tree__cover.has-cfg { box-shadow: inset 0 0 0 1px var(--acc-soft); }
-.tree__cover.has-err { box-shadow: inset 0 0 0 1px var(--red), 0 0 6px rgba(var(--red-rgb), .55); }
-
-/* Bigger rows now that each carries a picture. */
-.tree__row { padding: var(--s-1) var(--s-4) var(--s-1) 0; }
 
 /* ----- pane header ----------------------------------------------------- */
 /* Header and tabs are one sticky block. A settings page runs three screens
@@ -2670,36 +2505,10 @@ img.is-broken { opacity: .2; }
 }
 ::-webkit-scrollbar-thumb:hover { background: rgba(var(--chrome-rgb), .3); background-clip: content-box; }
 
-/* ----- narrow: the album tree becomes a drawer -------------------------- */
-/* Under 900px the two-column layout stops working: the sidebar used to keep
-   a 38vh band at the top of every page, which cost a third of a phone screen
-   permanently and still only listed four albums. It slides in over the pane
-   instead, and closes as soon as one is picked. */
+/* ----- narrow ------------------------------------------------------------ */
+/* Under 900px the rail keeps its places and drops their words: seven glyphs
+   in a 56px column cost less than one line of a settings page. */
 @media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; }
-
-  .sidebar {
-    position: fixed;
-    top: var(--nav-h);
-    bottom: 0;
-    left: 0;
-    width: min(330px, 86vw);
-    z-index: 150;
-    /* the drawer is a menu over the whole page, so it is --overlay */
-    border-right: var(--hair) solid var(--line-strong);
-    background-color: var(--overlay);
-    transform: translateX(-101%);
-    transition: transform var(--dur-1) ease;
-  }
-
-  body.drawer-open .sidebar {
-    transform: translateX(0);
-    box-shadow: 24px 0 60px -20px rgba(0, 0, 0, .95);
-  }
-
-  .navmenu { display: block; }
-  .sidebar__close { display: inline-flex; }
-
   .nav__inner { gap: var(--s-4); padding: 0 var(--s-4); }
   .nav__actions { gap: var(--s-2); }
 
@@ -2722,11 +2531,10 @@ img.is-broken { opacity: .2; }
 /* ----- phone ------------------------------------------------------------ */
 @media (max-width: 620px) {
   :root {
-    /* two rows: the mark and the buttons, then the places */
-    --nav-h:    92px;
     --pane-x:   14px;
     --pane-top: 12px;
   }
+
 
   body { font-size:var(--fs-text-lg); }
 
@@ -2754,20 +2562,6 @@ img.is-broken { opacity: .2; }
 
   .head__title { font-size:var(--fs-text-xl); }
   .head__crumb { font-size: var(--fs-chrome-xs); }
-
-  /* The same reasoning as the tabs below: the three places do not fit beside
-     the mark and the buttons across 375px, and a bar that scrolls sideways
-     hides a place behind an edge. So the nav becomes two rows here -- which
-     the drawer and the layout follow on their own, because both measure
-     themselves in --nav-h. */
-  .nav__inner {
-    flex-wrap: wrap;
-    align-content: center;
-    gap: var(--s-3) var(--s-4);
-    padding: var(--s-2) var(--s-4);
-  }
-  .places { order: 3; width: 100%; justify-content: space-between; }
-  .place { flex: 1 1 auto; text-align: center; }
 
   /* Five tabs do not fit across a phone, and a strip that scrolls sideways
      hides the last two behind an edge with nothing to say they are there.
@@ -2807,10 +2601,6 @@ img.is-broken { opacity: .2; }
   .folders { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s-3); }
   .cell__pick { width: 26px; height: 26px; font-size:var(--fs-text-md); }
   .cell__roles { left: 38px; }
-
-  /* the drawer is a touch target list, not a dense desktop tree */
-  .tree__row { padding: var(--s-3) var(--s-4) var(--s-3) 0; font-size:var(--fs-text-md); }
-  .sidebar__search { padding: 10px var(--s-4); }
 
   .pickitem { gap: var(--s-3); padding: var(--s-2); }
   .pickitem__thumb { width: 38px; height: 38px; flex-basis: 38px; }
@@ -2853,7 +2643,6 @@ img.is-broken { opacity: .2; }
    touch screen that repaint eats the first tap — the second one is what
    actually opens the album. */
 @media (hover: none) {
-  .tree__row:hover { background: none; color: var(--text-dim); }
   .foldertile:hover { background: var(--surface); border-color: var(--line); }
   .pickitem:hover { border-left-color: var(--line-strong); }
   .cell:hover { border-color: var(--line); }
@@ -2861,6 +2650,453 @@ img.is-broken { opacity: .2; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
+}
+
+
+/* ================================================================
+   THE SHELL  —  the bar, the rail, the palette
+   ------------------------------------------------------------------
+   The frame every place sits in (static/shell.js). The rail is NEBULA's
+   .rail: the places of this app, standing still, the current one marked
+   on its leading edge. The palette is a .dlg on --overlay. Nothing here
+   introduces a colour: the accent marks where you ARE, and nothing else.
+   ================================================================ */
+
+/* The shell's links are places, not prose: no underline, their own colour. */
+.nav__brand, .rail__link, .subnav__link, .navlamp, .dirtymark,
+.albums__name { text-decoration: none; color: inherit; }
+a.btn { text-decoration: none; }
+
+/* ----- the bar's search: the palette's face ---------------------------- */
+.cmdk {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex: 0 1 380px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 var(--s-3) 0 var(--s-4);
+  border: var(--hair) solid var(--line);
+  border-radius: var(--radius);
+  background: var(--glass);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: var(--fs-text-md);
+  cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.cmdk > .fa { color: var(--text-ghost); font-size: var(--icon-md); }
+.cmdk__hint { flex: 1 1 auto; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) {
+  .cmdk:hover { border-color: var(--line-strong); color: var(--text); }
+}
+.cmdk:focus-visible { outline: var(--hair) solid var(--acc); outline-offset: 2px; }
+
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 var(--s-1);
+  border: var(--hair) solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  color: var(--label);
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  line-height: 1.7;
+  text-align: center;
+  white-space: nowrap;
+}
+kbd + kbd { margin-left: var(--s-1); }
+
+/* ----- the lamp in the bar --------------------------------------------- */
+.navlamp {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-2);
+  height: 34px;
+  color: var(--label);
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: var(--tr-chrome-xs);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+@media (hover: hover) {
+  .navlamp:hover { color: var(--text); }
+}
+
+/* Unsaved edits on this page: a status, so amber, with a glyph. */
+.dirtymark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 34px;
+  padding: 0 var(--s-3);
+  border: var(--hair) solid rgba(var(--amb-rgb), .5);
+  color: var(--amb);
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: var(--tr-chrome-xs);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ----- the rail -------------------------------------------------------- */
+.rail {
+  border-right: var(--hair) solid var(--line);
+  background-color: var(--glass-hi);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  padding: var(--s-4) 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+.rail__nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-0);
+}
+.rail__link {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  height: 38px;
+  padding: 0 var(--s-5);
+  color: var(--text-dim);
+  font-size: var(--fs-text-md);
+  font-weight: 500;
+  transition: color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
+}
+.rail__link > .fa { width: 1.2em; text-align: center; color: var(--label); font-size: var(--icon-md); }
+.rail__label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail__count {
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: var(--tr-num);
+  color: var(--text-ghost);
+  font-variant-numeric: tabular-nums;
+}
+@media (hover: hover) {
+  .rail__link:hover { color: var(--text); background-color: rgba(255, 255, 255, .04); }
+}
+/* Where you are: the accent on the leading edge, the words to full text. */
+.rail__link.is-active {
+  color: var(--text);
+  background-color: rgba(var(--acc-rgb), .08);
+  box-shadow: inset 2px 0 0 var(--acc);
+}
+.rail__link.is-active > .fa { color: var(--text); }
+.rail__link:focus-visible { outline: var(--hair) solid var(--acc); outline-offset: -2px; }
+/* Overview has something to fix, System has a release to get: a square
+   dot, because both are states, and a title saying which. */
+.rail__link.has-issues > .fa,
+.rail__link.has-update > .fa { position: relative; }
+.rail__link.has-issues > .fa::after,
+.rail__link.has-update > .fa::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: -2px;
+  width: var(--s-2);
+  height: var(--s-2);
+}
+.rail__link.has-issues > .fa::after { background: var(--red); }
+.rail__link.has-update > .fa::after { background: var(--acc); }
+
+/* ----- a place's own toolbar ------------------------------------------- */
+.tbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3) var(--s-4);
+  padding-bottom: var(--s-4);
+}
+.tbar > .searchbox { flex: 1 1 260px; max-width: 420px; }
+
+/* NEBULA's .seg: pick one of these. */
+.seg {
+  display: inline-flex;
+  border: var(--hair) solid var(--line);
+  background: var(--glass);
+}
+.seg__opt {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: var(--s-2) var(--s-4);
+  color: var(--label);
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: var(--tr-chrome-xs);
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+@media (hover: hover) {
+  .seg__opt:hover { color: var(--text); }
+}
+.seg__opt.is-on { background: var(--acc); color: var(--on-acc); }
+.seg__opt:focus-visible { outline: var(--hair) solid var(--acc); outline-offset: -2px; }
+
+/* ----- NEBULA's .tbl: rows of facts ------------------------------------ */
+.tbl-wrap { overflow-x: auto; border: var(--hair) solid var(--line); background: var(--glass); }
+.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-text-md); }
+.tbl th {
+  text-align: left;
+  padding: var(--s-3) var(--s-5);
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  font-weight: 400;
+  letter-spacing: var(--tr-chrome-xs);
+  text-transform: uppercase;
+  color: var(--label);
+  border-bottom: var(--hair) solid var(--line);
+  white-space: nowrap;
+}
+.tbl td {
+  padding: var(--s-3) var(--s-5);
+  border-bottom: var(--hair) solid var(--line);
+  vertical-align: middle;
+  color: var(--text-dim);
+}
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl td.num {
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-md);
+  letter-spacing: var(--tr-num);
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tbl .r { text-align: right; }
+
+/* NEBULA's .status: never colour alone -- a glyph and a word. */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-text-sm);
+  color: var(--text-ghost);
+  white-space: nowrap;
+}
+.status > .fa { font-size: var(--icon-md); }
+.status--ok { color: var(--text-dim); }
+.status--ok > .fa { color: var(--ok); }
+.status--err { color: var(--red); }
+
+/* ----- the Albums place ------------------------------------------------ */
+.albums__row { cursor: pointer; transition: background-color var(--dur-1) var(--ease); }
+@media (hover: hover) {
+  .albums__row:hover { background-color: rgba(255, 255, 255, .03); }
+  .albums__row:hover .albums__title { color: var(--text); }
+}
+.albums__name { display: flex; align-items: center; gap: var(--s-4); min-width: 0; }
+.albums__name[data-depth="1"] { padding-left: var(--s-6); }
+.albums__name[data-depth="2"] { padding-left: calc(var(--s-6) * 2); }
+.albums__name[data-depth="3"] { padding-left: calc(var(--s-6) * 3); }
+.albums__name[data-depth="4"],
+.albums__name[data-depth="5"],
+.albums__name[data-depth="6"] { padding-left: calc(var(--s-6) * 4); }
+.albums__cover {
+  flex: 0 0 auto;
+  width: var(--s-8);
+  height: var(--s-7);
+  background: var(--bg-2);
+  border: var(--hair) solid var(--line);
+  overflow: hidden;
+}
+.albums__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.albums__text { display: flex; flex-direction: column; min-width: 0; }
+.albums__title { color: var(--text-head); font-weight: 500; overflow-wrap: anywhere; }
+.albums__path { font-family: var(--mono); font-size: var(--fs-chrome-sm); color: var(--text-ghost); overflow-wrap: anywhere; }
+.albums__none { text-align: center; padding: var(--s-7) var(--s-5); }
+.albums .btn { white-space: nowrap; }
+
+/* ----- System: the section list beside the section -------------------- */
+.sysgrid {
+  display: grid;
+  grid-template-columns: 184px minmax(0, 1fr);
+  gap: var(--s-6);
+  align-items: start;
+}
+/* One column beside the list: the sections are reports, read top to
+   bottom, and two cards side by side made half of them a narrow strip. */
+.sysgrid > .home { grid-template-columns: minmax(0, 1fr); }
+
+.subnav {
+  position: sticky;
+  top: calc(var(--s-9) * 2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  padding-top: var(--s-5);
+}
+.subnav__group { display: flex; flex-direction: column; gap: var(--s-0); }
+.subnav__title {
+  margin-bottom: var(--s-2);
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: var(--tr-chrome-xs);
+  text-transform: uppercase;
+  color: var(--text-ghost);
+}
+.subnav__link {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  color: var(--text-dim);
+  font-size: var(--fs-text-md);
+  border-left: var(--hair) solid var(--line);
+}
+.subnav__link > .fa { width: 1.2em; text-align: center; color: var(--text-ghost); font-size: var(--icon-md); }
+@media (hover: hover) {
+  .subnav__link:hover { color: var(--text); }
+}
+.subnav__link.is-active {
+  color: var(--text);
+  border-left: 2px solid var(--acc);
+  padding-left: calc(var(--s-3) - 1px);
+}
+.subnav__link.is-active > .fa { color: var(--text); }
+
+/* ----- NEBULA's .dlg --------------------------------------------------- */
+.dlg {
+  padding: 0;
+  border: var(--hair) solid var(--line-strong);
+  border-radius: var(--radius);
+  background-color: var(--overlay);
+  backdrop-filter: var(--overlay-blur);
+  -webkit-backdrop-filter: var(--overlay-blur);
+  color: var(--text);
+  box-shadow: var(--shadow-2);
+  max-width: min(calc(100vw - 2 * var(--page-pad)), 560px);
+  width: 100%;
+}
+.dlg::backdrop {
+  background-color: var(--scrim-hi);
+  backdrop-filter: var(--scrim-blur);
+  -webkit-backdrop-filter: var(--scrim-blur);
+}
+.dlg__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: var(--hair) solid var(--line);
+}
+.dlg__head h2 { margin: 0; font-size: var(--fs-text-lg); font-weight: 600; letter-spacing: var(--tr-head); color: var(--text-head); }
+.dlg__body { padding: var(--s-5); max-height: 70vh; overflow-y: auto; }
+
+/* ----- the palette ----------------------------------------------------- */
+.palette { margin-top: 12vh; max-width: min(calc(100vw - 2 * var(--page-pad)), 620px); }
+.palette__field {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: 0 var(--s-5);
+  border-bottom: var(--hair) solid var(--line);
+}
+.palette__field > .fa { color: var(--label); }
+.palette__field input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: var(--fs-text-xl);
+  outline: none;
+}
+.palette__list {
+  list-style: none;
+  margin: 0;
+  padding: var(--s-2) 0;
+  max-height: min(60vh, 440px);
+  overflow-y: auto;
+}
+.palette__group {
+  padding: var(--s-3) var(--s-5) var(--s-1);
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: var(--tr-chrome-xs);
+  text-transform: uppercase;
+  color: var(--text-ghost);
+}
+.palette__item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-5);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.palette__item > .fa { width: 1.2em; text-align: center; color: var(--label); font-size: var(--icon-md); }
+.palette__label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.palette__sub { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-text-sm); color: var(--text-ghost); }
+.palette__item.is-on { background-color: rgba(var(--acc-rgb), .14); box-shadow: inset 2px 0 0 var(--acc); }
+.palette__item.is-on > .fa { color: var(--text); }
+.palette__none { padding: var(--s-6) var(--s-5); color: var(--text-dim); text-align: center; }
+.palette__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-5);
+  padding: var(--s-3) var(--s-5);
+  border-top: var(--hair) solid var(--line);
+  color: var(--text-ghost);
+  font-size: var(--fs-text-sm);
+}
+
+/* ----- the key map ----------------------------------------------------- */
+.keys__group + .keys__group { margin-top: var(--s-5); }
+.keys__title { margin: 0 0 var(--s-3); font-size: var(--fs-text-md); font-weight: 600; color: var(--text-head); }
+.keys__list { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-2) var(--s-5); margin: 0; }
+.keys__list dt { white-space: nowrap; }
+.keys__list dd { margin: 0; color: var(--text-dim); font-size: var(--fs-text-md); }
+
+/* ----- the shell, narrower --------------------------------------------- */
+/* Under 900px the rail keeps its places and drops their words: seven glyphs
+   in a 56px column cost less than one line of a settings page. System's
+   section list goes from a column to a wrapped row over the section. */
+@media (max-width: 900px) {
+  :root { --rail-w: 56px; }
+  .rail__label, .rail__count { display: none; }
+  .rail__link { justify-content: center; padding: 0; }
+  .cmdk__key { display: none; }
+
+  .sysgrid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .subnav { position: static; flex-direction: row; flex-wrap: wrap; gap: var(--s-1) var(--s-4); }
+  .subnav__group { flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--s-1); }
+  .subnav__title { display: none; }
+  .subnav__link { border-left: 0; padding: var(--s-2) var(--s-3); }
+  .subnav__link.is-active { border-left: 0; padding-left: var(--s-3); box-shadow: inset 0 -2px 0 var(--acc); }
+  .albums .num, .albums th.r { display: none; }
+}
+
+/* On a phone the rail turns into a strip under the bar -- NEBULA's .rail
+   as a strip: the marker moves from the leading edge to the bottom one.
+   Seven glyphs fit across 375px, so nothing scrolls sideways. */
+@media (max-width: 620px) {
+  .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .rail { border-right: 0; border-bottom: var(--hair) solid var(--line); padding: 0; overflow: visible; }
+  .rail__nav { flex-direction: row; justify-content: space-between; padding: 0 var(--s-2); }
+  .rail__nav > li { flex: 1 1 0; }
+  .rail__link { height: var(--tap); }
+  .rail__link.is-active { box-shadow: inset 0 -2px 0 var(--acc); }
+  .cmdk { flex: 1 1 auto; height: var(--tap); }
+  .cmdk__hint { display: none; }
+  .navlamp__word { display: none; }
+  .albums td:nth-child(4), .albums th:nth-child(4),
+  .albums td:nth-child(5), .albums th:nth-child(5) { display: none; }
+  .tbl th, .tbl td { padding-left: var(--s-4); padding-right: var(--s-4); }
+  .palette { margin-top: var(--s-4); }
 }
 
 
@@ -3205,78 +3441,6 @@ img.is-broken { opacity: .2; }
    every measure below comes off the named scales.
    ================================================================ */
 
-/* ----- the three places ------------------------------------------------ */
-/* Same object as a tab, one tier up: this is which room you are in, the tabs
-   are which face of the thing in front of you. Operations and gallery.cfg
-   used to be rows in the album list, where a tool and a file read as two odd
-   albums. */
-.places {
-  display: flex;
-  align-items: center;
-  gap: var(--s-0);
-  flex: 0 0 auto;
-  padding: var(--s-1);
-  border: var(--hair) solid var(--line);
-  border-radius: var(--radius);
-  background: var(--glass);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-}
-
-.place {
-  appearance: none;
-  background: none;
-  border: 0;
-  border-radius: var(--radius);
-  color: var(--text-ghost);
-  font-family: var(--mono);
-  font-size: var(--fs-chrome-sm);
-  letter-spacing: var(--tr-chrome-sm);
-  text-transform: uppercase;
-  padding: var(--s-2) var(--s-4);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color var(--dur-1) ease, background var(--dur-1) ease;
-}
-.place:hover { color: var(--text); background: rgba(255, 255, 255, .05); }
-.place.is-active {
-  color: var(--text);
-  background: rgba(var(--acc-rgb), .12);
-  box-shadow: inset 0 0 0 var(--hair) rgba(var(--acc-rgb), .35);
-}
-/* a release newer than this build: the accent is state, and this is one */
-.place.has-update::after {
-  content: '';
-  display: inline-block;
-  width: var(--s-2);
-  height: var(--s-2);
-  margin-left: var(--s-2);
-  vertical-align: middle;
-  background: var(--acc);
-}
-
-/* ----- the sidebar is one kind of thing now ---------------------------- */
-.sidebar__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s-3);
-  padding: var(--s-5) var(--s-5) var(--s-2);
-}
-.sidebar__title {
-  font-family: var(--mono);
-  font-size: var(--fs-chrome-sm);
-  letter-spacing: var(--tr-chrome-sm);
-  text-transform: uppercase;
-  color: var(--label);
-}
-.sidebar__count {
-  font-family: var(--mono);
-  font-size: var(--fs-chrome-xs);
-  color: var(--text-ghost);
-  font-variant-numeric: tabular-nums;
-}
-
 /* ----- the album's own face in its header ------------------------------ */
 .head__cover {
   width: 34px;
@@ -3607,7 +3771,6 @@ img.is-broken { opacity: .2; }
 
 /* leading: a marker before the word, with the air tracked-out caps need */
 .btn > .fa,
-.place > .fa,
 .tab > .fa,
 .chipbtn > .fa,
 .pill > .fa,
@@ -3618,7 +3781,6 @@ img.is-broken { opacity: .2; }
 /* headings: grey furniture, as the gallery's panel headings are. The
    accent is state, and a card title is not one. */
 .card__title > .fa,
-.sidebar__title > .fa,
 .detail__sub > .fa { margin-right: .75em; color: var(--text-dim); }
 
 /* trailing: "further on" or "leaves this page" -- a size down, so it reads
@@ -3652,16 +3814,6 @@ img.is-broken { opacity: .2; }
 }
 .searchbox:focus-within > .fa { color: var(--acc); }
 .searchbox > .fieldsearch { padding-left: calc(var(--s-4) + 11px + var(--s-3)); }
-.sidebar__search > .searchbox { flex: 1 1 auto; }
-
-/* The five places share one row across a phone, and their words already fill
-   it: with a glyph each, OPERATIONS ran off the edge at 375px. The words stay.
-   Since the fifth (Changelog) the side padding steps down one notch as well,
-   or CHANGELOG ends on the edge -- the words and the tap height do not change. */
-@media (max-width: 480px) {
-  .place > .fa { display: none; }
-  .place { padding-left: var(--s-2); padding-right: var(--s-2); }
-}
 
 /* ----- changelog: who makes it, and the release notes ------------------ */
 /* The maker card mirrors the gallery's operator card (.foot__op): a square

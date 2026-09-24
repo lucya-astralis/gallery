@@ -18,6 +18,41 @@ notes are never one commit apart.
 
 ---
 
+## 1.12.0 — 2026-09-24
+
+The console, rebuilt around what you came to do. This is the first step of a
+larger rework: the frame is new, and the screens inside it follow.
+
+**New**
+
+* **Seven places on a rail**: Overview, Library, Albums, Tags, Site, Links
+  and System. They replace the header's five places, the album tree in the
+  sidebar and Operations' eleven tabs.
+* **Every place has an address**, so Back, a reload and a bookmark land
+  where they were: `/library/japan_2026/kansai`, `/albums/berlin_dec_2025`,
+  `/system/doctor`.
+* **A command palette** (`Ctrl K` or `/`) reaches every place, album,
+  setting, tag and action by typing. `Shift Enter` on an album opens its
+  photos.
+* **Keyboard**: `?` lists the keys, `g` and a letter jumps to a place.
+* **Albums is a table**: cover, photos, config and text state per album,
+  with a filter, "unwritten" and "with issues" views and three sort orders.
+* **The Library** browses every photo from the root down, with the same
+  selection and bulk tagging an album's Photos tab had.
+* The bar shows the **indexer's lamp** on every screen, and an amber mark
+  while the page has unsaved edits.
+
+**Changed**
+
+* An album's editor no longer has a Photos tab; its **Photos** button opens
+  the album in the Library.
+* **System** lists its sections in a column (Machine, Reports, Data &
+  access) instead of a tab strip that wrapped onto two rows. The release
+  notes are its **About** section.
+* Tags moved out of Operations into a place of their own.
+
+---
+
 ## 1.11.3 — 2026-09-23
 
 Both surfaces caught up with the rules Nebula wrote down since 1.11.2.

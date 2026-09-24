@@ -162,32 +162,22 @@ function toLogin(reason = 'timeout') {
   if (reason === 'timeout' && state.sel) {
     /* sessionStorage, not local: the note belongs to THIS tab and to this
      * one trip through the door. One-shot — boot() deletes it on the way
-     * back out, so a later plain reload still lands on home. */
-    try { sessionStorage.setItem(RETURN_KEY, JSON.stringify(state.sel)); } catch (_) { /* fine */ }
+     * back out, so a later plain reload lands where its address says. */
+    try { sessionStorage.setItem(RETURN_KEY, pathFor(state.sel)); } catch (_) { /* fine */ }
   }
   window.location.replace('/login?reason=' + encodeURIComponent(reason));
 }
 
-/* The note, consumed. Validated against the tree that has just loaded rather
- * than trusted: an album can have been renamed or deleted while the door was
- * open, and select() on a path that is no longer there is a broken screen. */
+/* The note, consumed: an address, which selFromPath() checks against the
+ * tree that has just loaded rather than trusting it -- an album can have
+ * been renamed while the door was open. */
 function takeReturnNote() {
   let raw = null;
   try {
     raw = sessionStorage.getItem(RETURN_KEY);
     sessionStorage.removeItem(RETURN_KEY);
   } catch (_) { return null; }
-  if (!raw) return null;
-  let sel = null;
-  try { sel = JSON.parse(raw); } catch (_) { return null; }
-  if (!sel || typeof sel !== 'object') return null;
-  if (['gallery', 'ops', 'home', 'links', 'changelog'].includes(sel.kind)) {
-    return { kind: sel.kind };
-  }
-  if (sel.kind === 'album' && typeof sel.album === 'string' && albumExists(sel.album)) {
-    return { kind: 'album', album: sel.album };
-  }
-  return null;
+  return typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//') ? raw : null;
 }
 
 function albumExists(path) {
@@ -247,24 +237,6 @@ function splitPath(value) {
 
 const strip = (v) => String(v).replace(/^\/+/, '');
 
-/* ----- drawer ----------------------------------------------------------- */
-/* Below 900px the album tree is an overlay rather than a column: as a 38vh
- * band above the editor it ate a third of a phone screen on every page and
- * still only showed four albums. It slides in over the pane instead, and
- * closes the moment an album is picked — the choice is the whole errand. */
-function drawerOpen() {
-  return document.body.classList.contains('drawer-open');
-}
-
-function setDrawer(open) {
-  document.body.classList.toggle('drawer-open', open);
-  $('#scrim').hidden = !open;
-  $('#btn-menu').setAttribute('aria-expanded', open ? 'true' : 'false');
-  if (open) $('#tree-filter').focus();
-}
-
-const isNarrow = () => window.matchMedia('(max-width: 900px)').matches;
-
 /* ----- boot ------------------------------------------------------------- */
 async function boot() {
   loadPrefs();
@@ -272,46 +244,23 @@ async function boot() {
   await refreshSession();
   try {
     state.meta = await api('/api/meta');
-    await Promise.all([loadTree(), loadVocab()]);
-    /* Home is the landing screen on purpose — the console stopped being a
-     * form you land in the middle of. The one exception is coming back
-     * through the door after a timeout, which nobody chose. */
-    select(takeReturnNote() || { kind: 'home' });
+    await Promise.all([loadTree(), loadVocab(), loadOpsStatus()]);
+    wireShell();
+    /* The address says where to start. Coming back through the door after a
+     * timeout is the one exception: the door sends everyone to /, so the
+     * address that was lost rides in a one-shot note instead. */
+    const back = takeReturnNote();
+    await select(selFromPath(back || location.pathname), false, 'replace');
     loadUpdates();
   } catch (err) {
     $('#pane').innerHTML = '';
     $('#pane').append(el('div', { class: 'pane__empty', text: 'Cannot reach the backend: ' + err.message }));
   }
-  /* The boot screen is waiting on this: it covers the four "Loading..."
-   * strings above, so it has to know when there is something behind it. Sent
-   * on the failure path too — an error message is also something to read,
-   * and a splash that hangs over one is worse than no splash. */
+  /* The boot screen is waiting on this: it covers the "Loading..." strings
+   * above, so it has to know when there is something behind it. Sent on the
+   * failure path too — an error message is also something to read, and a
+   * splash that hangs over one is worse than no splash. */
   document.dispatchEvent(new Event('aperture:ready'));
-  $('#btn-reload').addEventListener('click', async () => {
-    photoCache.clear();
-    await Promise.all([loadTree(), loadVocab()]);
-    if (state.sel) select(state.sel, true);
-    toast('Reloaded');
-  });
-  $('#btn-check').addEventListener('click', () => { setDrawer(false); checkAll(); });
-  $$('.place').forEach((button) => button.addEventListener('click', () => {
-    setDrawer(false);
-    select({ kind: button.dataset.place });
-  }));
-  const signout = $('#btn-signout');
-  if (signout) {
-    signout.addEventListener('click', async () => {
-      try { await api('/api/session', { method: 'DELETE' }); } catch (_) { /* going anyway */ }
-      toLogin('signout');
-    });
-  }
-  $('#tree-filter').addEventListener('input', renderTree);
-  $('#btn-menu').addEventListener('click', () => setDrawer(!drawerOpen()));
-  $('#btn-menu-close').addEventListener('click', () => setDrawer(false));
-  $('#scrim').addEventListener('click', () => setDrawer(false));
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape' && drawerOpen()) setDrawer(false);
-  });
   // The pane's own header sticks, and folds by CSS alone (a negative sticky
   // top, see .pane__top). The script only tells the bar that content runs
   // under it, which changes its paint and never its size.
@@ -338,7 +287,7 @@ function wirePaneShrink() {
 
 async function loadTree() {
   state.tree = (await api('/api/tree')).root;
-  renderTree();
+  refreshAlbumViews();
 }
 
 async function loadVocab() {
@@ -347,133 +296,39 @@ async function loadVocab() {
   } catch (_) { state.vocab = []; }
 }
 
-/* ----- album tree ------------------------------------------------------- */
-function renderTree() {
-  const list = $('#tree');
-  const filter = $('#tree-filter').value.trim().toLowerCase();
-  list.innerHTML = '';
-
-  /* Albums, and nothing else. Operations and gallery.cfg used to sit at the
-   * top of this list, where a tool and a file read as two odd albums; they
-   * are places now, in the nav. */
-  if (!state.tree) return;
-  for (const child of state.tree.children) {
-    const item = renderNode(child, 1, filter);
-    if (item) list.append(item);
-  }
-  if (!list.children.length) {
-    list.append(el('li', { class: 'tree__empty',
-                          text: filter ? 'No album matches.' : 'No albums yet.' }));
-  }
-  /* With a filter typed it reads "3 / 31": how much of the tree is in front
-   * of you, and how much there is. */
-  const count = $('#tree-count');
-  if (count) {
-    const total = countAlbums(state.tree);
-    const shown = list.querySelectorAll('.tree__row').length;
-    count.textContent = filter ? shown + ' / ' + total : String(total);
-  }
-}
-
-/* Every folder below the root that can carry an album.cfg. */
-function countAlbums(node) {
-  return (node.children || []).reduce((n, child) => n + 1 + countAlbums(child), 0);
-}
-
-/* Which place is lit. The album tree lights its own row, and an album is not
- * a place -- so on an album none of the three is active, which is the truth:
- * you are in the sidebar's world, not in one of theirs. */
-function syncPlaces() {
-  const kind = state.sel ? state.sel.kind : null;
-  $$('.place').forEach((button) => {
-    const on = button.dataset.place === kind;
-    button.classList.toggle('is-active', on);
-    button.setAttribute('aria-current', on ? 'true' : 'false');
-  });
-}
-
-function renderNode(node, depth, filter) {
-  const selfMatch = !filter || node.path.toLowerCase().includes(filter);
-  const kids = node.children
-    .map((c) => renderNode(c, depth + 1, selfMatch ? '' : filter))
-    .filter(Boolean);
-  if (!selfMatch && !kids.length) return null;
-
-  const active = state.sel && state.sel.kind === 'album' && state.sel.album === node.path;
-  const open = filter ? true : state.openPaths.has(node.path);
-  const errored = (state.issuesByAlbum[node.path] || 0) > 0;
-
-  /* Depth as an ATTRIBUTE, not a style. This console serves itself under
-   * `style-src 'self'`, so the inline padding that used to sit here was
-   * dropped by the browser and every sub-album has been rendered flush left
-   * -- while the CSP logged a refusal per row. */
-  const row = el('div', {
-    class: 'tree__row' + (active ? ' is-active' : ''),
-    'data-depth': String(Math.min(depth, 8)),
-    title: node.path,
-    onclick: () => select({ kind: 'album', album: node.path }),
-  },
-    el('span', {
-      class: 'tree__twisty' + (kids.length ? '' : ' is-leaf') + (open ? ' is-open' : ''),
-      icon: 'fa-chevron-right',
-      onclick: (ev) => {
-        ev.stopPropagation();
-        if (state.openPaths.has(node.path)) state.openPaths.delete(node.path);
-        else state.openPaths.add(node.path);
-        renderTree();
-      },
-    }),
-    el('span', {
-      class: 'tree__cover' + (errored ? ' has-err' : node.has_cfg ? ' has-cfg' : ''),
-      title: errored ? 'has config issues' : node.has_cfg ? 'has an album.cfg' : '',
-    }, node.cover
-      ? el('img', { src: thumbUrl(node.cover), alt: '', loading: 'lazy',
-                    onerror: (ev) => { ev.target.remove(); } })
-      : null),
-    el('span', { class: 'tree__name', text: node.name }),
-    el('span', { class: 'tree__count', text: String(node.total_photos || '') }));
-
-  const item = el('li', {}, row);
-  if (kids.length && open) item.append(el('ul', {}, kids));
-  return item;
+/* The album tree changed, or what the check says about it did: the rail's
+ * counts and, if it is on screen, the Albums table follow. */
+function refreshAlbumViews() {
+  renderRail();
+  if (state.sel && state.sel.kind === 'albums') paintAlbumRows();
 }
 
 /* ----- selection -------------------------------------------------------- */
-async function select(sel, keepTab = false) {
+/* Draw a place. `how` is what happens to the address: 'push' for a move you
+ * made, 'replace' on boot, 'none' when the address already says it (Back,
+ * Forward). Returns false when unsaved changes kept you where you were. */
+async function select(sel, keepTab = false, how = 'push') {
   if (!keepTab && state.sel && dirty() &&
-      !confirm('Discard the unsaved changes on this page?')) return;
+      !confirm('Discard the unsaved changes on this page?')) return false;
   state.sel = sel;
   state.edits = {};
   state.browse = null;
-  /* An album lands on its photos: the settings are twenty-one keys, and
-   * looking at what is in the folder is the more common errand. The
-   * gallery's own file has no photos to land on. */
-  if (!keepTab) { state.tab = sel.kind === 'album' ? 'photos' : 'settings'; state.query = ''; }
-  if (isNarrow()) setDrawer(false);
-  if (sel.kind === 'album') {
-    const parts = sel.album.split('/');
-    for (let i = 1; i < parts.length; i++) state.openPaths.add(parts.slice(0, i).join('/'));
-  }
-  renderTree();
-  syncPlaces();
+  state.data = null;
+  if (!keepTab) { state.tab = 'settings'; state.query = ''; }
+  if (sel.kind === 'ops') opsState.tab = sel.tab || 'overview';
+  if (sel.kind === 'tags') opsState.tab = 'tags';
+  if (how !== 'none') setAddress(sel, how === 'replace');
+  syncRail();
+  syncDirtyMark();
+  $('#pane').scrollTop = 0;
   $('#pane').innerHTML = '';
   $('#pane').append(el('div', { class: 'pane__empty', text: 'Loading…' }));
-  if (sel.kind === 'home') {
-    await renderHome();
-    return;
-  }
-  if (sel.kind === 'ops') {
-    await renderOps();
-    return;
-  }
-  if (sel.kind === 'links') {
-    await renderLinks(sel.draft);
-    return;
-  }
-  if (sel.kind === 'changelog') {
-    await renderChangelog();
-    return;
-  }
+  if (sel.kind === 'home') { await renderHome(); return true; }
+  if (sel.kind === 'ops' || sel.kind === 'tags') { await renderOps(); return true; }
+  if (sel.kind === 'links') { await renderLinks(sel.draft); return true; }
+  if (sel.kind === 'changelog') { await renderChangelog(); return true; }
+  if (sel.kind === 'albums') { renderAlbums(); return true; }
+  if (sel.kind === 'library') { renderLibrary(); return true; }
   try {
     state.data = sel.kind === 'gallery'
       ? await api('/api/gallery')
@@ -481,9 +336,10 @@ async function select(sel, keepTab = false) {
   } catch (err) {
     $('#pane').innerHTML = '';
     $('#pane').append(el('div', { class: 'pane__empty', text: err.message }));
-    return;
+    return true;
   }
   renderPane();
+  return true;
 }
 
 const dirty = () => Object.keys(state.edits).length > 0;
@@ -506,6 +362,8 @@ function helpFor(key) {
 
 function value(key) {
   if (key in state.edits) return state.edits[key];
+  // The Library has no file open: nothing is set, so nothing is marked.
+  if (!state.data || !state.data.values) return null;
   const raw = state.data.values[key];
   if (raw === undefined) return null;
   const spec = specFor(key);
@@ -606,21 +464,68 @@ const opsState = {
   lookup: null,                // {kind, value} of the Lookup tab's last question
 };
 
-/* One tab per CLI command that means anything outside a terminal. `menu`,
- * `help` and `term` are about the terminal itself, so they have none. */
-const OPS_TABS = [
-  ['overview', 'Overview', 'fa-gauge'],
-  ['doctor', 'Doctor', 'fa-stethoscope'],
-  ['derivatives', 'Derivatives', 'fa-images'],
-  ['featured', 'Featured', 'fa-star'],
-  ['tags', 'Tags', 'fa-tags'],
-  ['gps', 'GPS', 'fa-location-dot'],
-  ['frontpage', 'Front page', 'fa-house'],
-  ['lookup', 'Lookup', 'fa-magnifying-glass'],
-  ['i18n', 'Translations', 'fa-language'],
-  ['export', 'Export', 'fa-box-archive'],
-  ['access', 'Password', 'fa-key'],
+/* System's sections: one per CLI command that means anything outside a
+ * terminal, grouped by what you came to do. Tags left for a place of their
+ * own; the release notes joined as About. `menu`, `help` and `term` are
+ * about the terminal itself, so they have none. */
+const SYSTEM_GROUPS = [
+  ['Machine', [
+    ['overview', 'Indexer', 'fa-microchip'],
+    ['derivatives', 'Derivatives', 'fa-images'],
+    ['doctor', 'Doctor', 'fa-stethoscope'],
+  ]],
+  ['Reports', [
+    ['featured', 'Featured', 'fa-star'],
+    ['gps', 'GPS', 'fa-location-dot'],
+    ['frontpage', 'Front page', 'fa-house'],
+    ['i18n', 'Translations', 'fa-language'],
+    ['lookup', 'Lookup', 'fa-magnifying-glass'],
+  ]],
+  ['Data & access', [
+    ['export', 'Export', 'fa-box-archive'],
+    ['access', 'Password', 'fa-key'],
+    ['about', 'About', 'fa-scroll'],
+  ]],
 ];
+const SYSTEM_TABS = SYSTEM_GROUPS.flatMap(([, tabs]) => tabs);
+
+/* The section list down the side of System. A column, not a strip: eleven
+ * tabs across the top wrapped onto two rows at every laptop width. */
+function systemNav() {
+  const current = state.sel.kind === 'changelog' ? 'about' : opsState.tab;
+  return el('nav', { class: 'subnav', 'aria-label': 'System' },
+    SYSTEM_GROUPS.map(([title, tabs]) => el('div', { class: 'subnav__group' },
+      el('span', { class: 'subnav__title', text: title }),
+      tabs.map(([id, label, icon]) => el('a', {
+        class: 'subnav__link' + (current === id ? ' is-active' : ''),
+        href: id === 'about' ? '/system/about' : '/system' + (id === 'overview' ? '' : '/' + id),
+        'aria-current': current === id ? 'page' : null, icon, text: label,
+        onclick: (ev) => {
+          if (ev.metaKey || ev.ctrlKey || ev.shiftKey) return;
+          ev.preventDefault();
+          if (id === 'about') { go({ kind: 'changelog' }); return; }
+          if (state.sel.kind !== 'ops') { go({ kind: 'ops', tab: id }); return; }
+          opsState.tab = id;
+          state.sel = { kind: 'ops', tab: id };
+          setAddress(state.sel);
+          paintOps();
+          $('#pane').scrollTop = 0;
+        },
+      })))));
+}
+
+/* A System screen: the section list, and the section beside it. */
+function systemFrame(pane, title, crumb, meta, fill) {
+  pane.append(el('div', { class: 'pane__top' },
+    el('div', { class: 'head' },
+      el('div', { class: 'head__crumb', text: crumb || '' }),
+      el('div', { class: 'head__line' },
+        el('h1', { class: 'head__title', text: title }),
+        el('div', { class: 'head__meta' }, meta)))));
+  const body = el('div', { class: 'home' });
+  pane.append(el('div', { class: 'sysgrid' }, systemNav(), body));
+  fill(body);
+}
 
 const ago = (ts) => {
   if (typeof ts !== 'number') return 'never';
@@ -660,7 +565,7 @@ const onEnter = (fn) => (ev) => { if (ev.key === 'Enter') { ev.preventDefault();
 const wide = (node) => el('div', { class: 'home__wide' }, node);
 const quiet = (text) => el('p', { class: 'card__quiet', text });
 const sizeOr0 = (n) => (n ? bytes(n) : '0 B');
-const onOps = () => state.sel && state.sel.kind === 'ops';
+const onOps = () => !!state.sel && (state.sel.kind === 'ops' || state.sel.kind === 'tags');
 
 /* A field whose value outlives a repaint: a job finishing repaints the whole
  * screen, and a half-typed album path should still be there afterwards. */
@@ -763,33 +668,37 @@ function paintOps() {
   const st = opsState.status || {};
   const ro = !!st.read_only || READ_ONLY;
   const scroll = pane.scrollTop;
+  const tagsPlace = state.sel.kind === 'tags';
   pane.innerHTML = '';
 
-  pane.append(el('div', { class: 'pane__top' },
-    el('div', { class: 'head' },
-      el('div', { class: 'head__crumb', text: st.control_dir || '' }),
-      el('div', { class: 'head__line' },
-        el('h1', { class: 'head__title', text: 'Operations' }),
-        el('div', { class: 'head__meta' },
-          el('span', { class: 'pill', icon: 'fa-server', text: 'role ' + (st.role || '—') }),
-          ro ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null))),
-    el('div', { class: 'tabs tabs--many', role: 'tablist' }, OPS_TABS.map(([id, label, icon]) =>
-      el('button', {
-        class: 'tab' + (opsState.tab === id ? ' is-active' : ''),
-        type: 'button', role: 'tab', 'aria-selected': String(opsState.tab === id), icon, text: label,
-        onclick: () => { opsState.tab = id; paintOps(); $('#pane').scrollTop = 0; },
-      })))));
+  const fill = (grid) => {
+    if (st.error) {
+      grid.append(el('div', { class: 'home__wide pane__empty', text: st.error }));
+      return;
+    }
+    const job = jobCard();
+    if (job) grid.append(el('div', { class: 'home__wide', id: 'ops-job' }, job));
+    (OPS_PAINT[opsState.tab] || paintOpsOverview)(grid, st, ro);
+  };
 
-  if (st.error) {
-    pane.append(el('div', { class: 'pane__empty', text: st.error }));
-    return;
+  if (tagsPlace) {
+    pane.append(el('div', { class: 'pane__top' },
+      el('div', { class: 'head' },
+        el('div', { class: 'head__crumb', text: 'every .tags sidecar under ' + state.meta.photos_dir }),
+        el('div', { class: 'head__line' },
+          el('h1', { class: 'head__title', text: 'Tags' }),
+          el('div', { class: 'head__meta' },
+            el('span', { class: 'pill', icon: 'fa-tags', text: (state.vocab || []).length + ' in use' }))))));
+    const grid = el('div', { class: 'home' });
+    pane.append(grid);
+    fill(grid);
+  } else {
+    const label = (SYSTEM_TABS.find(([id]) => id === opsState.tab) || SYSTEM_TABS[0])[1];
+    systemFrame(pane, label, st.control_dir || '', [
+      el('span', { class: 'pill', icon: 'fa-server', text: 'role ' + (st.role || '—') }),
+      ro ? el('span', { class: 'pill pill--warn', icon: 'fa-lock', text: 'read-only' }) : null,
+    ], fill);
   }
-
-  const grid = el('div', { class: 'home' });
-  pane.append(grid);
-  const job = jobCard();
-  if (job) grid.append(el('div', { class: 'home__wide', id: 'ops-job' }, job));
-  (OPS_PAINT[opsState.tab] || paintOpsOverview)(grid, st, ro);
   pane.scrollTop = scroll;
 }
 
@@ -1791,7 +1700,8 @@ function pollJob() {
  * the home screen because that is where the code used to live is how a tool
  * teaches people not to trust its buttons. */
 function repaintOps() {
-  if (state.sel && state.sel.kind === 'ops') paintOps();
+  syncLamp();
+  if (onOps()) paintOps();
   else if (state.sel && state.sel.kind === 'home') paintHome();
 }
 
@@ -1856,7 +1766,7 @@ async function doPause(reason) {
   delete opsState.inputs.reason;
   await loadOpsStatus();
   repaintOps();
-  renderTree();
+  refreshAlbumViews();
 }
 
 async function doResume(scan) {
@@ -1871,7 +1781,7 @@ async function doResume(scan) {
   delete opsState.inputs['resume-scan'];
   await loadOpsStatus();
   repaintOps();
-  renderTree();
+  refreshAlbumViews();
 }
 
 /* ----- home ------------------------------------------------------------- */
@@ -1900,7 +1810,7 @@ function loadUpdates(fresh = false) {
 }
 
 function syncUpdateMark() {
-  const button = $('.place[data-place="changelog"]');
+  const button = $('.rail__link[data-place="ops"]');
   if (!button) return;
   const info = updates.info;
   const on = !!info && info.state === 'available';
@@ -1970,19 +1880,13 @@ async function renderChangelog() {
   if (!state.sel || state.sel.kind !== 'changelog') return;   /* navigated away */
   const pane = $('#pane');
   pane.innerHTML = '';
-  pane.append(el('div', { class: 'pane__top' },
-    el('div', { class: 'head' },
-      el('div', { class: 'head__crumb', text: about.repo }),
-      el('div', { class: 'head__line' },
-        el('h1', { class: 'head__title', text: 'Changelog' }),
-        el('div', { class: 'head__meta' },
-          el('span', { class: 'pill', icon: 'fa-code-branch', text: about.product + ' ' + about.version }),
-          info && info.state === 'available'
-            ? el('span', { class: 'pill pill--warn', icon: 'fa-circle-up', text: info.latest.version + ' available' })
-            : null)))));
-
-  const grid = el('div', { class: 'home' });
-  pane.append(grid);
+  let grid = null;
+  systemFrame(pane, 'About', about.repo, [
+    el('span', { class: 'pill', icon: 'fa-code-branch', text: about.product + ' ' + about.version }),
+    info && info.state === 'available'
+      ? el('span', { class: 'pill pill--warn', icon: 'fa-circle-up', text: info.latest.version + ' available' })
+      : null,
+  ], (body) => { grid = body; });
   grid.append(el('div', { class: 'home__wide' }, updateCard(info, true)));
 
   const maker = about.maker || {};
@@ -2032,7 +1936,7 @@ async function renderHome() {
     loadUpdates(),
   ]);
   if (!state.sel || state.sel.kind !== 'home') return;   /* navigated away */
-  if (issues) { home.issues = issues; countIssues(issues); renderTree(); }
+  if (issues) { home.issues = issues; countIssues(issues); refreshAlbumViews(); }
   home.audit = (audit && audit.entries) || [];
   home.gallery = gallery;
   paintHome();
@@ -2174,8 +2078,8 @@ function paintHome() {
         onclick: () => (paused ? doResume() : doPause('')),
       }),
       el('button', {
-        type: 'button', class: 'btn btn--ghost', text: 'Operations', iconEnd: 'fa-arrow-right',
-        onclick: () => select({ kind: 'ops' }),
+        type: 'button', class: 'btn btn--ghost', text: 'System', iconEnd: 'fa-arrow-right',
+        onclick: () => go({ kind: 'ops' }),
       }))));
 
   /* ---- what is in it ---- */
@@ -2236,6 +2140,7 @@ function paintHome() {
 
 
 function renderPane() {
+  if (state.sel.kind === 'library') { renderLibrary(); return; }
   const pane = $('#pane');
   const isGallery = state.sel.kind === 'gallery';
   const active = document.activeElement;
@@ -2248,7 +2153,7 @@ function renderPane() {
   const tabs = isGallery
     ? [['settings', 'Settings', 'fa-sliders'], ['assets', 'Files', 'fa-folder-open'],
        ['raw', 'Raw file', 'fa-file-code']]
-    : [['photos', 'Photos', 'fa-images'], ['settings', 'Settings', 'fa-sliders'],
+    : [['settings', 'Settings', 'fa-sliders'],
        ['text', 'Description', 'fa-align-left'], ['assets', 'Files', 'fa-folder-open'],
        ['raw', 'Raw file', 'fa-file-code']];
   if (!tabs.some(([id]) => id === state.tab)) state.tab = tabs[0][0];
@@ -2276,13 +2181,13 @@ function renderPane() {
     pane.append(renderSettings(isGallery ? GALLERY_GROUPS : ALBUM_GROUPS));
     pane.append(renderSaveBar());
   } else if (state.tab === 'raw') pane.append(renderRaw());
-  else if (state.tab === 'photos') pane.append(renderPhotosTab());
   else if (state.tab === 'text') pane.append(renderDescriptions());
   else if (state.tab === 'assets') pane.append(renderAssets());
 
   pane.scrollTop = paneScroll;
   paneScrollLanded = pane.scrollTop;
   restoreFocus(fk, selStart, selEnd);
+  syncDirtyMark();
 }
 
 /* One album out of the loaded tree, by path. */
@@ -2321,6 +2226,10 @@ function renderHead(isGallery) {
   const warns = (data.issues || []).filter((i) => i.level === 'warn').length;
   if (errors) meta.push(el('span', { class: 'pill pill--err', icon: 'fa-circle-exclamation', text: errors + ' errors' }));
   if (warns) meta.push(el('span', { class: 'pill pill--warn', icon: 'fa-triangle-exclamation', text: warns + ' warnings' }));
+  if (!isGallery) {
+    meta.push(el('a', { class: 'btn', href: pathFor({ kind: 'library', album: state.sel.album }),
+                        'data-go': true, icon: 'fa-images', text: 'Photos' }));
+  }
   if (!isGallery && !READ_ONLY) meta.push(linkButton(state.sel.album, 'Link…'));
 
   const path = isGallery
@@ -2342,7 +2251,7 @@ function renderHead(isGallery) {
     el('div', { class: 'head__crumb', text: path, title: path }),
     el('div', { class: 'head__line' },
       cover,
-      el('h1', { class: 'head__title', text: isGallery ? 'gallery.cfg' : (named || data.name) }),
+      el('h1', { class: 'head__title', text: isGallery ? 'Site' : (named || data.name) }),
       el('div', { class: 'head__meta' }, meta)));
 }
 
@@ -3271,10 +3180,45 @@ function folderTile(folder, onOpen) {
                    text: folder.count + (folder.count === 1 ? ' photo' : ' photos') })));
 }
 
+/* ----- the Library ------------------------------------------------------
+ * Every photo in the archive, browsed from the root down. An album is a
+ * place in it, and the address follows the folder you are in, so Back
+ * climbs back out. */
+function renderLibrary() {
+  const pane = $('#pane');
+  paneScroll = pane.scrollTop;
+  const b = state.browse;
+  if (b && b.path !== (state.sel.album || '')) {
+    state.sel = { kind: 'library', album: b.path };
+    setAddress(state.sel);
+    paneScroll = 0;
+  }
+  pane.innerHTML = '';
+  const album = state.sel.album || '';
+  const node = album ? treeNode(album) : null;
+  const idx = (opsState.status && opsState.status.index) || {};
+  pane.append(el('div', { class: 'pane__top' },
+    el('div', { class: 'head' },
+      el('div', { class: 'head__crumb', text: state.meta.photos_dir + (album ? '/' + album : '') }),
+      el('div', { class: 'head__line' },
+        el('h1', { class: 'head__title', text: node ? node.name : 'Library' }),
+        el('div', { class: 'head__meta' },
+          el('span', { class: 'pill', icon: 'fa-image', text: (node ? node.total_photos : idx.images ?? '—') + ' photos' }),
+          node ? el('a', { class: 'btn', href: pathFor({ kind: 'album', album }), 'data-go': true,
+                           icon: 'fa-sliders', text: 'Album settings' }) : null)))));
+  pane.append(renderPhotosTab());
+  pane.scrollTop = paneScroll;
+  paneScrollLanded = pane.scrollTop;
+}
+
 /* ----- Photos & tags tab ------------------------------------------------ */
+/* Where a photo browser starts: the Library from the photo root, so its
+ * breadcrumb climbs all the way up; anything else from its own album. */
+const browseRoot = () => (state.sel.kind === 'library' ? '' : state.sel.album || '');
+
 function renderPhotosTab() {
-  const album = state.sel.album;
-  if (!state.browse) state.browse = { path: album, selected: new Set(), detail: null };
+  const album = browseRoot();
+  if (!state.browse) state.browse = { path: state.sel.album || '', selected: new Set(), detail: null };
   const b = state.browse;
 
   const panel = el('div', { class: 'tabpanel' });
@@ -3334,7 +3278,7 @@ function renderPhotosTab() {
  * the grid, then the tiles. Split out of renderPhotosTab so a folder that
  * is already cached can be drawn without waiting for a microtask. */
 function fillBrowser(body, b, payload) {
-  const album = state.sel.album;
+  const album = browseRoot();
   body.innerHTML = '';
 
 
@@ -4222,7 +4166,7 @@ async function checkAll() {
     return;
   }
   countIssues(payload);
-  renderTree();
+  refreshAlbumViews();
   /* The result belongs on the screen that is about the state of the archive,
    * not on a screen of its own that replaces whatever was open. */
   home.issues = payload;
@@ -4249,7 +4193,7 @@ function countIssues(payload) {
 async function refreshIssueDots() {
   try {
     countIssues(await api('/api/validate'));
-    renderTree();
+    refreshAlbumViews();
   } catch (_) { /* the dots are a nicety, not worth a toast */ }
 }
 

@@ -57,6 +57,7 @@
 .fa-chevron-left{ --fa:"\f053"; }
 .fa-chevron-right{ --fa:"\f054"; }
 .fa-chevron-up{ --fa:"\f077"; }
+.fa-circle{ --fa:"\f111"; }
 .fa-circle-check{ --fa:"\f058"; }
 .fa-circle-exclamation{ --fa:"\f06a"; }
 .fa-circle-info{ --fa:"\f05a"; }
@@ -80,7 +81,7 @@
 .fa-folder-open{ --fa:"\f07c"; }
 .fa-folder-tree{ --fa:"\f802"; }
 .fa-gauge{ --fa:"\f624"; }
-.fa-gauge-high{ --fa:"\f625"; }
+.fa-globe{ --fa:"\f0ac"; }
 .fa-grip-vertical{ --fa:"\f58e"; }
 .fa-hammer{ --fa:"\f6e3"; }
 .fa-hard-drive{ --fa:"\f0a0"; }
@@ -89,6 +90,7 @@
 .fa-image{ --fa:"\f03e"; }
 .fa-images{ --fa:"\f302"; }
 .fa-key{ --fa:"\f084"; }
+.fa-keyboard{ --fa:"\f11c"; }
 .fa-language{ --fa:"\f1ab"; }
 .fa-layer-group{ --fa:"\f5fd"; }
 .fa-link{ --fa:"\f0c1"; }

@@ -69,61 +69,44 @@
 
   <nav class="nav">
     <div class="nav__inner">
-      {# Phone-only: the album tree is a drawer there, this is its handle. #}
-      <button type="button" class="navmenu" id="btn-menu"
-              aria-label="Albums" aria-expanded="false" aria-controls="sidebar">
-        <span class="navmenu__bars"></span>
-      </button>
-
-      <span class="nav__brand">
+      <a class="nav__brand" href="/" data-go>
         {{ brandmark.mark('mark--nav', ghosts=true) }}
         <span class="brand-text">
           <span class="brand-name">lucya.systems</span>
           <span class="brand-sub">console</span>
         </span>
-      </span>
-      {# The places this tool has. They used to sit in the album list, which
-         made a tool and a file look like two odd albums. #}
-      <div class="places" role="group" aria-label="Sections">
-        <button type="button" class="place" data-place="home"><i class="fa fa-house" aria-hidden="true"></i>Home</button>
-        <button type="button" class="place" data-place="gallery"><i class="fa fa-images" aria-hidden="true"></i>Gallery</button>
-        <button type="button" class="place" data-place="links"><i class="fa fa-link" aria-hidden="true"></i>Links</button>
-        <button type="button" class="place" data-place="ops"><i class="fa fa-gauge-high" aria-hidden="true"></i>Operations</button>
-        <button type="button" class="place" data-place="changelog"><i class="fa fa-scroll" aria-hidden="true"></i>Changelog</button>
-      </div>
+      </a>
+
+      {# The one way to anywhere: every place, album, setting, tag and
+         action, by typing. Ctrl K or / opens it from anywhere. #}
+      <button type="button" class="cmdk" id="btn-palette" aria-haspopup="dialog">
+        <i class="fa fa-magnifying-glass" aria-hidden="true"></i>
+        <span class="cmdk__hint">Go to or run&hellip;</span>
+        <kbd class="cmdk__key">Ctrl K</kbd>
+      </button>
 
       <div class="nav__actions">
+        <a class="dirtymark" id="dirty-mark" href="#" hidden title="This page has changes that are not saved yet"><i class="fa fa-pen" aria-hidden="true"></i><span id="dirty-count"></span> unsaved</a>
         {# Only the read-only case is worth a mark: it is the one that changes
-           what the tool can do. A "READWRITE" lamp on every normal session was
-           a green light reporting that nothing is wrong. #}
+           what the tool can do. #}
         {% if read_only %}<span class="pill pill--warn" title="the photo mount is read-only — every write is disabled"><i class="fa fa-lock" aria-hidden="true"></i>read-only</span>{% endif %}
-        <button type="button" class="btn" id="btn-check"><i class="fa fa-list-check" aria-hidden="true"></i>Check<span class="u-wide-only"> all</span></button>
-        <button type="button" class="btn" id="btn-reload"><i class="fa fa-rotate" aria-hidden="true"></i>Reload</button>
-        {# Only shown when there IS a session to end. An open console has no
-           sign-out, and pretending otherwise would be the same lie as a
-           "READWRITE" lamp. #}
+        <a class="navlamp" id="nav-lamp" href="/system" data-go title="The indexer">
+          <span class="lamp__dot" id="nav-lamp-dot"></span><span class="navlamp__word" id="nav-lamp-word">indexer</span>
+        </a>
+        <button type="button" class="btn btn--ghost btn--icon" id="btn-keys" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)"><i class="fa fa-keyboard" aria-hidden="true"></i></button>
         {% if auth_mode == "password" %}
-        <button type="button" class="btn btn--ghost" id="btn-signout"
-                title="End this session"><i class="fa fa-right-from-bracket" aria-hidden="true"></i>Sign out</button>
+        <button type="button" class="btn btn--ghost btn--icon" id="btn-signout"
+                aria-label="Sign out" title="End this session"><i class="fa fa-right-from-bracket" aria-hidden="true"></i></button>
         {% endif %}
       </div>
     </div>
   </nav>
 
   <main class="layout">
-    <div class="scrim" id="scrim" hidden></div>
-
-    <nav class="sidebar" id="sidebar">
-      <div class="sidebar__head">
-        <span class="sidebar__title"><i class="fa fa-folder-tree" aria-hidden="true"></i>Albums</span>
-        <span class="sidebar__count" id="tree-count"></span>
-      </div>
-      <div class="sidebar__search">
-        <label class="searchbox"><i class="fa fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="tree-filter" class="fieldsearch" placeholder="Filter albums&hellip;" autocomplete="off"></label>
-        <button type="button" class="btn btn--ghost btn--icon sidebar__close" id="btn-menu-close"
-                aria-label="Close the album list"><i class="fa fa-xmark" aria-hidden="true"></i></button>
-      </div>
-      <ul class="tree" id="tree"><li class="tree__empty">Loading&hellip;</li></ul>
+    {# NEBULA's .rail: the places of this app, standing still. A place is a
+       job, not a file -- and none of them is an album; albums are a place. #}
+    <nav class="rail" id="rail" aria-label="Places">
+      <ul class="rail__nav" id="rail-nav"></ul>
     </nav>
 
     <section class="pane" id="pane">
@@ -162,6 +145,31 @@
     </div>
   </div>
 
+  {# The command palette and the key map. Real <dialog>s: the browser owns
+     the top layer, the focus trap and Escape. #}
+  <dialog class="dlg palette" id="palette" aria-label="Go to or run">
+    <div class="palette__field">
+      <i class="fa fa-magnifying-glass" aria-hidden="true"></i>
+      <input type="text" id="palette-input" placeholder="Albums, places, settings, tags, actions&hellip;"
+             autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true"
+             aria-controls="palette-list" aria-autocomplete="list">
+      <kbd>Esc</kbd>
+    </div>
+    <ul class="palette__list" id="palette-list" role="listbox"></ul>
+    <div class="palette__foot">
+      <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> move</span>
+      <span><kbd>&crarr;</kbd> open</span>
+      <span><kbd>Shift</kbd><kbd>&crarr;</kbd> an album's photos</span>
+    </div>
+  </dialog>
+
+  <dialog class="dlg keys" id="keys" aria-labelledby="keys-title">
+    <header class="dlg__head"><h2 id="keys-title">Keyboard</h2>
+      <button type="button" class="btn btn--ghost btn--icon" data-close aria-label="Close"><i class="fa fa-xmark" aria-hidden="true"></i></button></header>
+    <div class="dlg__body" id="keys-body"></div>
+  </dialog>
+
+  <script src="{{ static_url('shell.js') }}"></script>
   <script src="{{ static_url('app.js') }}"></script>
 </body>
 </html>

@@ -340,7 +340,21 @@ def api_session_close(request: Request):
 
 
 # ----- page -------------------------------------------------------------
+# Every place the console has is an address of its own, so Back, a reload and
+# a bookmark land where they were. They are all the one page: the client
+# reads the path and draws the place. Listed rather than caught with a
+# wildcard, so an unknown path is still a 404 and /login, /api and /static
+# can never be shadowed by it. The door guards them like any other route.
 @app.get("/")
+@app.get("/library")
+@app.get("/library/{rest:path}")
+@app.get("/albums")
+@app.get("/albums/{rest:path}")
+@app.get("/tags")
+@app.get("/site")
+@app.get("/links")
+@app.get("/system")
+@app.get("/system/{rest:path}")
 def index(request: Request):
     return templates.TemplateResponse(request, "index.html", {
         "photos_dir": settings.photos_dir.as_posix(),

@@ -67,11 +67,24 @@ Every file also has a **Raw file** tab if you would rather just type.
 
 ### Getting around
 
-The tool has **four places**, and they are in the header: **Home**, the
-**Gallery**'s own file, **Links**, and **Operations**. Everything else is an album, and
-albums are the sidebar — which is why the sidebar holds nothing but albums. It
-used to open with a tool and a file above the list, drawn like two odd albums
-with the actual navigation below them.
+The console has **seven places**, and they are the **rail** down the left:
+**Overview**, **Library**, **Albums**, **Tags**, **Site** (`gallery.cfg`),
+**Links** and **System**. A place is a job, not a file. There is no album tree
+in a sidebar any more: albums are a place of their own, a table, and in the
+Library an album is simply where you are browsing.
+
+Every place is an **address** — `/library/japan_2026/kansai`,
+`/albums/berlin_dec_2025`, `/system/doctor` — so Back, a reload and a
+bookmark land where they were. The server lists each prefix explicitly and
+serves the one page for all of them; anything else is still a 404.
+
+The bar above holds the **command palette** (`Ctrl K`, or `/`): one field that
+reaches every place, every album (`Shift Enter` opens its photos instead),
+every setting of either file, every tag, and the actions — scan, pause, check,
+reload, sign out. `?` lists the keys; `g` then a letter jumps to a place
+(`g l` Library, `g a` Albums, `g y` System …). The bar also carries the
+indexer's lamp, and an amber mark while the page you are on has unsaved
+edits.
 
 **Home** is what it opens on, and it is a reading rather than a form:
 
@@ -88,26 +101,28 @@ Operations reads, the issues are the same check the tree's red dots come from,
 and the log is the one every save has written since the door went in. A
 dashboard with figures of its own would be a second opinion to keep in step.
 
-An album opens on its **photos**, not on twenty-one settings, and its header
-says what the album is: its cover, the name it calls itself, and whether
-anyone has written about it yet.
+**Albums** is every folder as a row: cover, name, photos (in the folder / with
+sub-albums), whether it has an `album.cfg` or issues, whether it has a text.
+Filter it, show only the unwritten ones or only those with issues, sort it by
+tree, name or size. A row opens the album's editor; its **Photos** button
+opens it in the Library.
 
-The album tree is a column on a desktop and a **drawer** on anything under
-900px — it slides in over the editor from the handle in the header and closes
-the moment you pick an album. As a 38vh band above the pane it cost a third of
-a phone screen on every page and still only listed four albums.
+An album's editor is its settings, description, files and raw file. Its
+header says what the album is — its cover, the name it calls itself, and
+whether anyone has written about it yet — and carries **Photos** into the
+Library.
+
+**System** is the machine and the reports, with its sections in a column
+beside them rather than eleven tabs across the top: *Machine* (Indexer,
+Derivatives, Doctor), *Reports* (Featured, GPS, Front page, Translations,
+Lookup) and *Data & access* (Export, Password, About — the release notes).
 
 The pane's own header — file path, title, status marks and the tab strip —
-**sticks** to the top while you scroll, and sheds the path and a few points of
-title size once you are past the first line. A settings page runs three
-screens deep; without this, scrolling into the middle of one left you with no
-album name and no tabs.
+**sticks** to the top while you scroll, and sheds the path once you are past
+the first line.
 
-The sidebar lists every album by its **cover**: whatever `album.cfg` pins, else
-the first photo in the folder, else the first photo of its first sub-album — so
-a folder that only holds sub-albums still shows a picture. The frame around it
-carries the status the old dot did: violet means the album has an `album.cfg`,
-red means that cfg has issues.
+Under 900px the rail keeps its glyphs and drops its words; on a phone it turns
+into a strip under the bar, the current place marked on its bottom edge.
 
 Settings are laid out as tiles rather than one full-width row per key. Simple
 controls (a toggle, a dropdown, a filename) sit two or three across; only the
@@ -371,9 +386,9 @@ aperture/console/
   security.py   the door: password, sessions, CSRF, throttle, audit log
   library.py    the photo tree and the .tags sidecars, off the filesystem
   imagemeta.py  read-only EXIF for the metadata panel
-  static/       style.css, app.js, bg/, logo/ (the fonts are the gallery's)
-                app.js draws five screens: home, an album, gallery.cfg,
-                Operations, and the login page's own script
+  static/       style.css, shell.js, app.js, bg/, logo/ (the fonts are the gallery's)
+                shell.js is the frame: the places, the addresses, the palette,
+                the keys and the Albums table; app.js draws what is in a place
   templates/    index.html
 ```
 

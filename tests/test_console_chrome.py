@@ -159,20 +159,35 @@ def test_the_reason_is_chosen_and_never_echoed(console):
 
 
 def test_the_door_has_no_redirect_parameter_left(console):
-    """`next` could only ever carry "/" — the console has no router, no
-    pushState, no hash — so it was an open-redirect sink standing open for no
-    benefit. What is genuinely lost across the door is the SCREEN you were
-    on, and that is remembered on the console's side."""
+    """`next` was an open-redirect sink standing open for no benefit. The
+    console has addresses of its own now, and what is lost across the door --
+    the place you were on -- is remembered on the console's side, as a
+    same-origin PATH that is checked before it is followed."""
     import inspect
     from aperture.console import app as console_app
     assert "next" not in inspect.signature(console_app.login_page).parameters
 
     js = console.get("/static/app.js").text
     assert "cfgtool.return" in js
-    assert "takeReturnNote() || { kind: 'home' }" in js
+    # only a path on this origin: "/x", never "//host" or "https://host"
+    assert "raw.startsWith('/') && !raw.startsWith('//')" in js
+    assert "selFromPath(back || location.pathname)" in js
     # a deliberate sign-out is a decision to stop, and leaves no note
     assert "if (reason === 'timeout' && state.sel)" in js
-    assert "toLogin('signout')" in js
+    assert "toLogin('signout')" in console.get("/static/shell.js").text
+
+
+def test_every_place_is_an_address(console):
+    """Back, a reload and a bookmark land where they were: every place the
+    console has is served as the one page, and anything else is still a 404
+    rather than a catch-all that could shadow /login or /api."""
+    for path in ("/", "/library", "/library/a/b", "/albums", "/albums/x",
+                 "/tags", "/site", "/links", "/system", "/system/doctor",
+                 "/system/about"):
+        res = console.get(path)
+        assert res.status_code == 200, path
+        assert 'id="rail"' in res.text
+    assert console.get("/nowhere").status_code == 404
 
 
 def test_the_door_helps_a_password_manager_file_it(console):

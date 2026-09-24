@@ -97,8 +97,14 @@ def test_no_console_route_is_reachable_on_the_public_app():
 
 
 def test_the_console_serves_no_gallery_page(client):
-    for path in ("/albums", "/stats", "/album/berlin", "/full/berlin/gate.jpg"):
+    for path in ("/stats", "/album/berlin", "/full/berlin/gate.jpg"):
         assert path not in _paths(console_app), path
+    # /albums is a path on both, and they are different pages: the console's
+    # is its own Albums place, the one index.html every console address is.
+    console_albums = next(r for r in console_app.routes if getattr(r, "path", None) == "/albums")
+    public_albums = next(r for r in public_app.routes if getattr(r, "path", None) == "/albums")
+    assert console_albums.endpoint is not public_albums.endpoint
+    assert console_albums.endpoint.__module__ == "aperture.console.app"
 
 
 def test_the_public_app_has_no_writing_route():
