@@ -652,16 +652,14 @@
      round (status dot, lightbox buttons) have to opt out on purpose. */
   --radius:     0;
   --hair:       1px;      /* the one border width in the system */
-  /* GLYPH HUES. Four hues for the icon that says what KIND of thing a
-     heading, a row or a place is about: albums and photos, tags, time,
-     the machine and the camera. Identity, never state (that is --acc and
-     the three statuses), and only ever on a glyph -- never text, never a
-     fill, never a border. Validated as a set on this ground, every pair,
-     under protan/deutan/tritan (dataviz validate_palette.js, --pairs all). */
-  --glyph-album:   #C867C6; /* albums, folders, photos, the site */
-  --glyph-tag:   #C31773; /* tags */
-  --glyph-time:    #009BF0; /* time: dates, history, activity */
-  --glyph-machine: #8443D3; /* the machine and the camera */
+  /* MIST -- Nebula's identity tint for the icon that says what KIND of
+     thing a label is about; one family for every kind (see the console
+     sheet and NEBULA.md). Only ever on a glyph, never state. */
+  --mist: #B4BCDF; /* Nebula's identity tint (title silver toward --acc) */
+  --glyph-album:   var(--mist); /* albums, folders, photos, the site */
+  --glyph-tag:   var(--mist); /* tags */
+  --glyph-time:    var(--mist); /* time: dates, history, activity */
+  --glyph-machine: var(--mist); /* the machine and the camera */
   --nav-h:      60px;
   /* The mono face, spelled once. Every label, readout and HUD string on the
      site reads this, and it is character-for-character the configurator's

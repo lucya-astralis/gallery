@@ -99,8 +99,8 @@ edits.
 | **Recent changes** | the audit log — every write this console has made |
 
 The cards form a **bento**: one pane, shared hairlines, no gaps. Every chart
-takes the colour of the kind of thing it counts — time sky, albums and formats
-orchid, tags magenta, cameras violet — a single family, never a
+and every kind-icon wears Nebula's **mist** — the silver of the headings
+leaning toward the accent — in four ranked steps, never a
 hue per part; the accent stays for state. They are plain HTML (`static/charts.js`),
 sized through the CSSOM because the CSP drops a style attribute.
 

@@ -105,11 +105,11 @@ root still land on the Overview.
 * **`tag:` and `album:` in the search grammar** — on /search, `/api/photos?q=`
   and the CLI alike. A tag is matched whole; an album is that folder and
   everything under it.
-* **Colour that means something**: four glyph hues from Nebula's lilac
-  family — orchid for albums and photos, magenta for tags, sky for time,
-  violet for the machine and the camera — on the rail, card titles, facts, tabs and the gallery's facets,
-  and on the charts that count that kind of thing. Nebula's rule 1 names
-  them; the accent stays for state.
+* **Colour that belongs to Nebula**: kind-icons and charts wear **mist**,
+  the silver of the heading gradient leaning toward the accent — on the
+  rail, card titles, facts, tabs and the gallery's facets, and in four
+  ranked steps on the charts. One family, so nothing competes with the
+  accent, which stays for state.
 * **The Overview is a bento**: one pane of glass, the cards sharing their
   hairlines with no gaps, on a six-column grid — the to-do strip and a slim
   photos-over-time strip across the top, then three cards to a row.

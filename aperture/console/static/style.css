@@ -369,25 +369,26 @@
   --bp-narrow:   760px;
   /* The one touch target, and the sign-in card's one readable column. A
      submit button on the door is 44px on a desktop too. */
-  /* GLYPH HUES. Four hues for the icon that says what KIND of thing a
-     heading, a row or a place is about: albums and photos, tags, time,
-     the machine and the camera. Identity, never state (that is --acc and
-     the three statuses), and only ever on a glyph -- never text, never a
-     fill, never a border. Validated as a set on this ground, every pair,
-     under protan/deutan/tritan (dataviz validate_palette.js, --pairs all). */
-  --glyph-album:   #C867C6;   /* albums, folders, photos, the site */
-  --glyph-tag:   #C31773;   /* tags */
-  --glyph-time:    #009BF0;   /* time: dates, history, activity */
-  --glyph-machine: #8443D3;   /* the machine and the camera */
-  /* CHART RAMPS. Each glyph hue as four steps, light to dark, for a chart
-     whose parts are RANKED (a ring's slices, largest first): one family
-     per chart, never a hue per slice. Everything past the fourth is one
-     neutral "other". Validated per ramp on this ground as ordinal: one hue,
-     monotone lightness, visible gaps, the dark end clear of the surface. */
-  --ramp-album-1:   #F5AFF2; --ramp-album-2:   #DC7ADA; --ramp-album-3:   #B454B3; --ramp-album-4:   #8D2F8D;
-  --ramp-tag-1:   #FFA0CE; --ramp-tag-2:   #FF5FA9; --ramp-tag-3:   #D83385; --ramp-tag-4:   #AE0062;
-  --ramp-time-1:    #87D3FF; --ramp-time-2:    #2BADFF; --ramp-time-3:    #0087DA; --ramp-time-4:    #0061B2;
-  --ramp-machine-1: #D9B3FF; --ramp-machine-2: #BB7EFF; --ramp-machine-3: #9657E8; --ramp-machine-4: #732EBF;
+  /* MIST. Nebula's identity tint: the silver of the title gradient
+     (--title-a -> --title-b) leaning a little toward --acc, so it reads as
+     part of the chrome, not as a second palette. It marks what KIND of
+     thing a heading, row or place is about -- on the glyph and on the marks
+     of a chart -- never text, a surface, a border or a control. The four
+     kind tokens below all point at it: one family, so nothing competes
+     with the accent. */
+  --mist:   #B4BCDF;   /* the one identity tint: the title silver leaning toward --acc */
+  --mist-1: #D8DDF3; --mist-2: #ADB6D8; --mist-3: #858FBE; --mist-4: #5F6AA3;
+  --glyph-album:   var(--mist);   /* albums, folders, photos, the site */
+  --glyph-tag:   var(--mist);   /* tags */
+  --glyph-time:    var(--mist);   /* time: dates, history, activity */
+  --glyph-machine: var(--mist);   /* the machine and the camera */
+  /* CHART RAMPS -- mist in four steps, light to dark, for a chart whose
+     parts are RANKED (a ring's slices, largest first); past four, one grey
+     other. Validated on the ground as ordinal: monotone L, clear gaps. */
+  --ramp-album-1:   var(--mist-1); --ramp-album-2:   var(--mist-2); --ramp-album-3:   var(--mist-3); --ramp-album-4:   var(--mist-4);
+  --ramp-tag-1:   var(--mist-1); --ramp-tag-2:   var(--mist-2); --ramp-tag-3:   var(--mist-3); --ramp-tag-4:   var(--mist-4);
+  --ramp-time-1:    var(--mist-1); --ramp-time-2:    var(--mist-2); --ramp-time-3:    var(--mist-3); --ramp-time-4:    var(--mist-4);
+  --ramp-machine-1: var(--mist-1); --ramp-machine-2: var(--mist-2); --ramp-machine-3: var(--mist-3); --ramp-machine-4: var(--mist-4);
   --ramp-other:    #4A4A55;
   --tap:         44px;
   --door-w:      420px;
@@ -3830,7 +3831,8 @@ button.colchart__col { cursor: pointer; }
   opacity: .72;
   transition: opacity var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
 }
-.colchart--time .colchart__bar { background: var(--glyph-time); }
+/* Mist columns fall like the title gradient: light at the top, deep at the base. */
+.colchart--time .colchart__bar { background: linear-gradient(180deg, var(--mist-1), var(--mist-4)); }
 .colchart__col.is-zero .colchart__bar { opacity: .18; }
 .colchart__col.is-on .colchart__bar,
 .colchart__col:focus-visible .colchart__bar { background: var(--chrome); opacity: 1; }
