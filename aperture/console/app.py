@@ -1193,6 +1193,89 @@ def api_audit(limit: int = 40):
     return {"entries": security.recent(max(1, min(limit, 200)))}
 
 
+# ----- history: the backups every save already keeps --------------------
+# Every overwrite drops the previous version into data/console/backups
+# (_backup). These routes make that visible: the versions of one file, one
+# version's text, and putting a version back -- which is itself an ordinary
+# write, backed up and audited, so a restore can be undone the same way.
+_HISTORY_ID = re.compile(r"\d{8}T\d{6}Z-[^/\\]+")
+
+
+def _history_file(file: str, album: str | None, lang: str | None) -> tuple[Path, str]:
+    """(the file on disk, its backup label) for the three kinds that keep
+    one: an album.cfg, gallery.cfg, and an album's description."""
+    if file == "gallery":
+        return _target(None, schema.GALLERY_CFG_NAME, scope="gallery"), "gallery"
+    album = _album_or_400(album or "")
+    if file == "album":
+        return _cfg_target(album), "album"
+    if file == "desc":
+        lang = str(lang or "").strip().lower()
+        if lang not in schema.LANGS:
+            raise HTTPException(400, "unknown language: %r" % lang)
+        return _desc_target(album, lang), "desc"
+    raise HTTPException(400, "expected file = album, gallery or desc")
+
+
+def _backup_folder(path: Path, label: str) -> Path:
+    # the same folder _backup writes into
+    slug = hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:10]
+    return settings.backup_dir / ("%s-%s" % (label, slug))
+
+
+def _version(folder: Path, version: str) -> Path:
+    if not _HISTORY_ID.fullmatch(version or ""):
+        raise HTTPException(400, "not a version id")
+    found = folder / version
+    if not found.is_file():
+        raise HTTPException(404, "no such version")
+    return found
+
+
+@app.get("/api/history")
+def api_history(file: str, album: str | None = None, lang: str | None = None):
+    path, label = _history_file(file, album, lang)
+    folder = _backup_folder(path, label)
+    versions = []
+    if folder.is_dir():
+        for entry in sorted(folder.iterdir(), reverse=True):
+            if not _HISTORY_ID.fullmatch(entry.name):
+                continue
+            stamp = entry.name[:16]
+            versions.append({
+                "id": entry.name,
+                "saved": datetime.strptime(stamp, "%Y%m%dT%H%M%SZ")
+                                 .replace(tzinfo=timezone.utc).isoformat(),
+                "size": entry.stat().st_size,
+            })
+    current = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+    return {"file": relative_to_photos(settings.photos_dir, path), "current": current,
+            "versions": versions}
+
+
+@app.get("/api/history/version")
+def api_history_version(file: str, version: str, album: str | None = None,
+                        lang: str | None = None):
+    path, label = _history_file(file, album, lang)
+    found = _version(_backup_folder(path, label), version)
+    return {"id": version, "text": found.read_text(encoding="utf-8", errors="replace")}
+
+
+@app.post("/api/history/restore")
+async def api_history_restore(request: Request):
+    _guard_write()
+    body = await _json_body(request)
+    path, label = _history_file(str(body.get("file", "")), body.get("album"), body.get("lang"))
+    found = _version(_backup_folder(path, label), str(body.get("version", "")))
+    text = found.read_bytes()
+    before = security.sha256_of(path)
+    _backup(path, label)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(text)
+    _writes(request, "%s restored" % path.name, path, before)
+    return {"ok": True, "text": text.decode("utf-8", errors="replace")}
+
+
 # ----- whole-gallery check ----------------------------------------------
 @app.get("/api/validate")
 def api_validate():

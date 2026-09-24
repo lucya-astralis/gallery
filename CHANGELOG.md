@@ -81,6 +81,16 @@ root still land on the Overview.
   (remove the unknown line, drop the missing photo from `featured`, use the
   lightened accent), on the file's page and on the Overview. A fix is staged
   like any edit, so it goes through the same review.
+* **History for every file the console writes**: the backups each save
+  already kept are listed per file, with a diff of what restoring one would
+  change and a Restore button. A restore is itself backed up, so it can be
+  undone the same way.
+* **Many albums at once**: tick albums in the Albums table and set (or
+  remove) one key on all of them, after previewing every file's diff.
+* **Saved views** in the Library: name the current filters and apply them
+  again with one click (kept in this browser).
+* **Activity** in System: every write this console has made, filterable,
+  each a click from the file it touched.
 * The bar shows the **indexer's lamp** on every screen.
 
 **Changed**

@@ -209,7 +209,7 @@ function syncDirtyMark() {
  * Every album as a row of facts, instead of a tree in a sidebar that the
  * whole console had to share its width with. What the Home screen calls
  * "unwritten" is a column here, so it can be sorted and filtered. */
-const albumsView = { filter: '', show: 'all', sort: 'tree' };
+const albumsView = { filter: '', show: 'all', sort: 'tree', sel: new Set() };
 
 function renderAlbums() {
   const pane = $('#pane');
@@ -247,9 +247,20 @@ function renderAlbums() {
           }))))));
 
   pane.append(el('div', { class: 'tabpanel' },
+    el('div', { class: 'albums__bulk', id: 'albums-bulk', hidden: true }),
     el('div', { class: 'tbl-wrap' },
       el('table', { class: 'tbl albums' },
         el('thead', {}, el('tr', {},
+          el('th', { class: 'albums__tickcol' }, el('input', {
+            type: 'checkbox', id: 'albums-all', 'aria-label': 'Tick every album shown',
+            onchange: (ev) => {
+              $$('#albums-rows .albums__tick').forEach((box) => {
+                box.checked = ev.target.checked;
+                if (ev.target.checked) albumsView.sel.add(box.value); else albumsView.sel.delete(box.value);
+              });
+              paintAlbumsBulk();
+            },
+          })),
           el('th', { text: 'Album' }),
           el('th', { class: 'r', text: 'Photos' }),
           el('th', { text: 'Config' }),
@@ -277,7 +288,7 @@ function paintAlbumRows() {
   const flat = albumsView.sort !== 'tree' || !!q;
 
   if (!rows.length) {
-    body.replaceChildren(el('tr', {}, el('td', { colspan: '5', class: 'albums__none',
+    body.replaceChildren(el('tr', {}, el('td', { colspan: '6', class: 'albums__none',
       text: q ? 'No album matches “' + albumsView.filter.trim() + '”.' : 'Nothing to show here.' })));
     return;
   }
@@ -285,9 +296,17 @@ function paintAlbumRows() {
     const issues = state.issuesByAlbum[node.path] || 0;
     const open = pathFor({ kind: 'album', album: node.path });
     return el('tr', { class: 'albums__row', onclick: (ev) => {
-      if (ev.target.closest('a, button')) return;
+      if (ev.target.closest('a, button, input, label')) return;
       go({ kind: 'album', album: node.path });
     } },
+      el('td', { class: 'albums__tickcol' }, el('input', {
+        type: 'checkbox', class: 'albums__tick', value: node.path, checked: albumsView.sel.has(node.path),
+        'aria-label': 'Tick ' + node.path,
+        onchange: (ev) => {
+          if (ev.target.checked) albumsView.sel.add(node.path); else albumsView.sel.delete(node.path);
+          paintAlbumsBulk();
+        },
+      })),
       el('td', {},
         el('a', {
           class: 'albums__name', href: open, 'data-go': true,
@@ -317,6 +336,23 @@ function paintAlbumRows() {
         el('a', { class: 'btn btn--ghost', href: pathFor({ kind: 'library', album: node.path }),
                   'data-go': true, icon: 'fa-images', text: 'Photos' })));
   }));
+  paintAlbumsBulk();
+}
+
+/* What is ticked, and the one thing to do with it: set a key on all of
+ * them (tools.js, openBulk). */
+function paintAlbumsBulk() {
+  const bar = $('#albums-bulk');
+  if (!bar) return;
+  const n = albumsView.sel.size;
+  bar.hidden = !n;
+  bar.replaceChildren(...(n ? [
+    el('span', { class: 'albums__bulkcount', text: n + (n === 1 ? ' album' : ' albums') + ' ticked' }),
+    el('button', { type: 'button', class: 'btn btn--primary', icon: 'fa-sliders', text: 'Set a key…',
+                   disabled: READ_ONLY, onclick: () => openBulk([...albumsView.sel]) }),
+    el('button', { type: 'button', class: 'btn btn--ghost', text: 'Untick all',
+                   onclick: () => { albumsView.sel.clear(); renderAlbums(); } }),
+  ] : []));
 }
 
 /* ----- the command palette -------------------------------------------------

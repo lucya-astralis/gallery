@@ -404,7 +404,7 @@ function paintFacets() {
                title: 'On disk, but no scan has read it yet — no date or camera to filter on' }),
   ]));
 
-  box.replaceChildren(...groups.filter(Boolean));
+  box.replaceChildren(viewsGroup(), ...groups.filter(Boolean));
 }
 
 /* What is narrowing the grid right now, each one a click from gone. */

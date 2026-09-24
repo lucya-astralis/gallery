@@ -115,7 +115,8 @@ Library.
 **System** is the machine and the reports, with its sections in a column
 beside them rather than eleven tabs across the top: *Machine* (Indexer,
 Derivatives, Doctor), *Reports* (Featured, GPS, Front page, Translations,
-Lookup) and *Data & access* (Export, Password, About — the release notes).
+Lookup) and *Data & access* (Activity — every write this console has made,
+filterable — Export, Password, About — the release notes).
 
 The pane's own header — file path, title, status marks and its buttons —
 **sticks** to the top while you scroll, and sheds the path once you are past
@@ -169,6 +170,26 @@ Underneath it says what the check would still find afterwards.
 keeps them: the bar's amber **unsaved** mark counts every file with something
 waiting and opens the tray, where each can be opened, reviewed and saved, or
 discarded. Leaving the page altogether still asks first.
+
+### History
+
+Every overwrite already left the previous version in `data/console/backups/`
+(20 per file by default). **History** — a button in an album's and the
+Site's header, and beside each description's Save — lists them: pick one and
+the diff says what putting it back would change, then **Restore this
+version**. A restore is an ordinary write through the same gate, backed up
+and audited, so the version it replaced is in the history too and a restore
+can be undone the same way. `GET /api/history`, `GET /api/history/version`,
+`POST /api/history/restore`; a version id is checked against the backup
+folder's own naming before anything is read.
+
+### Many albums at once
+
+Tick albums in the **Albums** table and **Set a key…** sets one key — or
+removes it — on all of them: `unlisted`, `showcase`, an accent, a sort, a
+reel, tags. **Preview the diffs** shows every file's change before anything
+is written; then each album.cfg is saved by the same route a single album
+uses, comments kept, backed up and audited.
 
 ### The Library
 
@@ -227,6 +248,11 @@ gallery's scanner already reads; because it folds the sidecar's mtime into the
 photo's, the next scan picks the change up on its own. The console never
 rewrites a photo file — this library is almost entirely PNG and BMP, where
 there is no dependable metadata container to write into.
+
+**Views.** Filters you come back to — "untagged, this year", "featured
+without a tag" — can be named at the top of the filter column and applied
+with one click later. They are kept in this browser: a way of working, not a
+property of the gallery.
 
 ### Tags
 

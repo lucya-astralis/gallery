@@ -101,7 +101,7 @@ def collect_names() -> dict:
     # The console wears the same sheet, so its markup and scripts are part of
     # what the subset has to cover.
     files += sorted((ROOT / "aperture" / "console" / "templates").glob("*.html"))
-    files += [ROOT / "aperture" / "console" / "static" / n for n in ("app.js", "shell.js", "library.js", "login.js")]
+    files += [ROOT / "aperture" / "console" / "static" / n for n in ("app.js", "shell.js", "library.js", "tools.js", "login.js")]
     files += sorted(p for p in (ROOT / "aperture").rglob("*.py") if "console" not in p.parts)
 
     # class attributes only — a bare fa-* search over the whole file also

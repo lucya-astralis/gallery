@@ -3093,8 +3093,8 @@ kbd + kbd { margin-left: var(--s-1); }
   .cmdk { flex: 1 1 auto; height: var(--tap); }
   .cmdk__hint { display: none; }
   .navlamp__word { display: none; }
-  .albums td:nth-child(4), .albums th:nth-child(4),
-  .albums td:nth-child(5), .albums th:nth-child(5) { display: none; }
+  .albums td:nth-child(5), .albums th:nth-child(5),
+  .albums td:nth-child(6), .albums th:nth-child(6) { display: none; }
   .tbl th, .tbl td { padding-left: var(--s-4); padding-right: var(--s-4); }
   .palette { margin-top: var(--s-4); }
 }
@@ -3647,6 +3647,133 @@ kbd + kbd { margin-left: var(--s-1); }
   .edtoc { display: none; }
   .field { grid-template-columns: minmax(0, 1fr); }
   .hrow:has(.hrow__fix) { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+/* ================================================================
+   THE TOOLS  —  history, many albums at once, views, activity
+   ------------------------------------------------------------------
+   static/tools.js. All of them live in the one .dlg the review uses, and
+   draw their diffs with the review's .diff: a restore and a batch write
+   are read the same way a single save is.
+   ================================================================ */
+.history {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: var(--s-5);
+  align-items: start;
+}
+.history__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 52vh;
+  overflow-y: auto;
+  border: var(--hair) solid var(--line);
+}
+.history__v {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-0);
+  width: 100%;
+  padding: var(--s-3) var(--s-4);
+  border: 0;
+  border-bottom: var(--hair) solid var(--line);
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.history__list li:last-child .history__v { border-bottom: 0; }
+.history__when { font-size: var(--fs-text-md); color: var(--text); }
+.history__stamp { font-family: var(--mono); font-size: var(--fs-chrome-xs); color: var(--text-ghost); }
+@media (hover: hover) {
+  .history__v:hover { background: rgba(255, 255, 255, .04); }
+}
+.history__v.is-on { background: rgba(var(--acc-rgb), .12); box-shadow: inset 2px 0 0 var(--acc); }
+.history__diff { min-width: 0; }
+.history__diff .review__count { display: block; margin: 0 0 var(--s-3); }
+
+/* ----- many albums ----------------------------------------------------- */
+.albums__tickcol { width: var(--s-7); padding-right: 0; }
+.albums__tickcol input { width: var(--s-5); height: var(--s-5); accent-color: var(--acc); cursor: pointer; }
+.albums__bulk {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3) var(--s-4);
+  margin-bottom: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border: var(--hair) solid rgba(var(--acc-rgb), .55);
+  background-color: var(--overlay);
+  backdrop-filter: var(--overlay-blur);
+  -webkit-backdrop-filter: var(--overlay-blur);
+}
+.albums__bulkcount { flex: 1 1 auto; font-weight: 600; color: var(--text); }
+.bulk__form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-4); margin: var(--s-4) 0; }
+.bulk__field { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; }
+.bulk__label {
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: var(--tr-chrome-xs);
+  text-transform: uppercase;
+  color: var(--label);
+}
+.bulk__control.is-off { opacity: .4; pointer-events: none; }
+.bulk__remove { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--s-3); color: var(--text-dim); font-size: var(--fs-text-md); }
+.bulk__diffs { margin-top: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); }
+.bulk__album > summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-4);
+  padding: var(--s-2) 0;
+  cursor: pointer;
+}
+.bulk__album > summary code { font-family: var(--mono); font-size: var(--fs-chrome-md); color: var(--text); }
+.bulk__album .diff { max-height: 24vh; }
+
+/* ----- views ------------------------------------------------------------ */
+.facet--view { padding: 0; }
+.facet__go {
+  appearance: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-1) var(--s-2);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.facet__go > .fa { width: 1.1em; text-align: center; color: var(--text-ghost); font-size: var(--icon-md); }
+.facet__x {
+  appearance: none;
+  padding: var(--s-1) var(--s-2);
+  border: 0;
+  background: none;
+  color: var(--text-ghost);
+  cursor: pointer;
+}
+.facet__x > .fa { margin: 0; font-size: 9px; }
+@media (hover: hover) {
+  .facet__x:hover { color: var(--red); }
+}
+.views__name { width: 100%; margin-top: var(--s-2); font-size: var(--fs-text-sm); padding: var(--s-2) var(--s-3); }
+.facets__hint { margin: 0; padding: 0 var(--s-2); font-size: var(--fs-text-sm); color: var(--text-ghost); }
+
+@media (max-width: 760px) {
+  .history { grid-template-columns: minmax(0, 1fr); }
+  .history__list { max-height: 24vh; }
+  .bulk__form { grid-template-columns: minmax(0, 1fr); }
 }
 
 

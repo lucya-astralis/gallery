@@ -474,6 +474,7 @@ const SYSTEM_GROUPS = [
     ['lookup', 'Lookup', 'fa-magnifying-glass'],
   ]],
   ['Data & access', [
+    ['activity', 'Activity', 'fa-clock-rotate-left'],
     ['export', 'Export', 'fa-box-archive'],
     ['access', 'Password', 'fa-key'],
     ['about', 'About', 'fa-scroll'],
@@ -1548,6 +1549,7 @@ const OPS_PAINT = {
   i18n: paintOpsI18n,
   export: paintOpsExport,
   access: paintOpsAccess,
+  activity: (grid) => paintActivity(grid),
 };
 
 /* ----- jobs ------------------------------------------------------------- */
@@ -2276,6 +2278,11 @@ function renderHead(isGallery) {
     meta.push(el('a', { class: 'btn', href: pathFor({ kind: 'library', album: state.sel.album }),
                         'data-go': true, icon: 'fa-images', text: 'Photos' }));
   }
+  meta.push(el('button', {
+    type: 'button', class: 'btn', icon: 'fa-clock-rotate-left', text: 'History',
+    title: 'Earlier versions of this file, and putting one back',
+    onclick: () => openHistory(isGallery ? { file: 'gallery' } : { file: 'album', album: state.sel.album }),
+  }));
   meta.push(el('button', {
     type: 'button', class: 'btn' + (state.tab === 'raw' ? ' is-on' : ''), icon: 'fa-file-code',
     text: state.tab === 'raw' ? 'Back to the form' : 'Raw file',
@@ -3453,6 +3460,10 @@ function renderDescriptions() {
     el('div', { class: 'savebar' },
       el('span', { class: 'savebar__note', text: descDrafts[dkey] != null
         ? 'album_' + state.descLang + '.md has unsaved text' : 'album_' + state.descLang + '.md' }),
+      el('button', {
+        class: 'btn btn--ghost', type: 'button', icon: 'fa-clock-rotate-left', text: 'History',
+        onclick: () => openHistory({ file: 'desc', album: state.sel.album, lang: state.descLang }),
+      }),
       el('button', {
         class: 'btn btn--primary', type: 'button', icon: 'fa-floppy-disk', text: 'Save description', disabled: READ_ONLY,
         onclick: async () => {
