@@ -2166,7 +2166,8 @@ function buildControl(key, spec) {
   switch (spec.type) {
     case 'bool': return boolControl(key);
     case 'bool_off': return statsControl(key);
-    case 'choice': return choiceControl(key, spec.choices || []);
+    case 'choice': return key === 'palette' ? paletteControl(key, spec.choices || [])
+                                           : choiceControl(key, spec.choices || []);
     case 'number': return numberControl(key, spec);
     case 'ratio': return ratioControl(key, spec);
     case 'color': return colorControl(key);
@@ -2216,6 +2217,41 @@ function choiceControl(key, choices) {
     node.append(el('option', { value: current, text: current + '  (unknown value)', selected: true }));
   }
   return node;
+}
+
+/* The palette is a look, so it is picked by looking: one card per palette,
+ * each wearing its own tint (data-palette-preview scopes the tokens to the
+ * card) -- the four kind-icons, a ring's four steps and a run of columns.
+ * Picking one also repaints the whole console at once (setValue). */
+const PALETTE_WORDS = {
+  mist: 'The heading silver, leaning toward the accent. One family.',
+  silver: 'The heading silver itself. No tint at all.',
+  stardust: 'Four silvers, each with a faint cast of its own.',
+};
+function paletteControl(key, choices) {
+  const current = value(key) || null;
+  const on = current && choices.includes(current) ? current : (current ? null : choices[0]);
+  const cards = choices.map((name) => el('button', {
+    type: 'button', class: 'palpick__card' + (on === name ? ' is-on' : ''),
+    'data-palette-preview': name, 'aria-pressed': on === name ? 'true' : 'false',
+    disabled: READ_ONLY, onclick: () => setValue(key, name),
+  },
+    el('span', { class: 'palpick__name', text: name + (name === choices[0] ? ' · default' : '') }),
+    el('span', { class: 'palpick__glyphs', 'aria-hidden': 'true' },
+      ['album:fa-folder', 'tag:fa-tag', 'time:fa-calendar-day', 'machine:fa-camera'].map((pair) => {
+        const [kind, icon] = pair.split(':');
+        return el('span', { class: 'palpick__g palpick__g--' + kind }, ico(icon));
+      })),
+    el('span', { class: 'palpick__ramp', 'aria-hidden': 'true' },
+      [1, 2, 3, 4].map((n) => el('i', { class: 'palpick__step palpick__step--' + n }))),
+    el('span', { class: 'palpick__cols', 'aria-hidden': 'true' },
+      [3, 5, 2, 6, 4, 8].map((h) => el('i', { class: 'palpick__col palpick__col--' + h }))),
+    el('span', { class: 'palpick__words', text: PALETTE_WORDS[name] || '' })));
+  const wrap = el('div', { class: 'palpick', role: 'group', 'aria-label': 'Palette' }, cards);
+  if (current && !choices.includes(current)) {
+    wrap.append(el('p', { class: 'field__help', text: '“' + current + '” is not a palette — the gallery shows mist until one is picked.' }));
+  }
+  return wrap;
 }
 
 function numberControl(key, spec) {

@@ -118,8 +118,9 @@ root still land on the Overview.
   accent, which stays for state. **gallery.cfg `palette`** picks between
   three tints from that silver — `mist` (the default), `silver` (neutral)
   and `stardust` (a faint cast per kind) — for the gallery and the console
-  alike, under Site → Look, where picking one repaints the console before
-  you save. Bars and columns fall like the headings, light to deep.
+  alike, under Site → Look, picked from three preview cards that each wear
+  their own palette (the kind-icons, a ring's steps, a run of columns);
+  picking one repaints the console before you save. Bars and columns fall like the headings, light to deep.
 * **The Overview is a bento**: one pane of glass, the cards sharing their
   hairlines with no gaps, on a six-column grid — the to-do strip and a slim
   photos-over-time strip across the top, then three cards to a row.

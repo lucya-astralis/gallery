@@ -413,11 +413,25 @@
    Three ways to tint the kind-icons and the charts, all from the title
    silver. mist is the :root default above; these only redefine tokens
    (rule 6), so every rule that reads --glyph-* / --ramp-* follows. */
-:root[data-palette="silver"] {
+/* A preview card (the palette picker) wears one palette whatever the page
+   wears: the kind tokens are re-resolved on it, so a --mist redefined there
+   reaches them, and each block below applies to the card as to the page. */
+[data-palette-preview] {
+  --glyph-album: var(--mist); --glyph-tag: var(--mist); --glyph-time: var(--mist); --glyph-machine: var(--mist);
+  --ramp-album-1:   var(--mist-1); --ramp-album-2:   var(--mist-2); --ramp-album-3:   var(--mist-3); --ramp-album-4:   var(--mist-4);
+  --ramp-tag-1:     var(--mist-1); --ramp-tag-2:     var(--mist-2); --ramp-tag-3:     var(--mist-3); --ramp-tag-4:     var(--mist-4);
+  --ramp-time-1:    var(--mist-1); --ramp-time-2:    var(--mist-2); --ramp-time-3:    var(--mist-3); --ramp-time-4:    var(--mist-4);
+  --ramp-machine-1: var(--mist-1); --ramp-machine-2: var(--mist-2); --ramp-machine-3: var(--mist-3); --ramp-machine-4: var(--mist-4);
+}
+[data-palette-preview="mist"] {
+  --mist:   #B4BCDF;
+  --mist-1: #D8DDF3; --mist-2: #ADB6D8; --mist-3: #858FBE; --mist-4: #5F6AA3;
+}
+:root[data-palette="silver"], [data-palette-preview="silver"] {
   --mist:   #BDBDC5;
   --mist-1: #E7E7F0; --mist-2: #BDBDC5; --mist-3: #94949D; --mist-4: #6E6E76;
 }
-:root[data-palette="stardust"] {
+:root[data-palette="stardust"], [data-palette-preview="stardust"] {
   --glyph-album: #BDAFD9; --glyph-tag: #D0A2B6; --glyph-time: #98BCDC; --glyph-machine: #BCBDC7;
   --ramp-album-1:   #E1D9F3; --ramp-album-2:   #BDAFD9; --ramp-album-3:   #988AB2; --ramp-album-4:   #74678D;
   --ramp-tag-1:     #F2D5E1; --ramp-tag-2:     #D6A8BD; --ramp-tag-3:     #AF8397; --ramp-tag-4:     #8A6074;
@@ -1908,6 +1922,54 @@ select option { background: var(--surface); color: var(--text); }
 
 .dropzone:hover { border-color: var(--line-strong); color: var(--text-dim); }
 .dropzone.is-over { border-color: var(--acc); color: var(--text); background: rgba(var(--acc-rgb), .06); }
+/* The palette picker: three cards, each in its own palette. A card is a
+   control, so it is glass with a hairline; the one in use carries the
+   accent edge every "on" thing carries -- state, never a tint. */
+.palpick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-3); width: 100%; }
+/* three abreast or one above the other -- never two and an orphan */
+.field__control:has(> .palpick) { container-type: inline-size; }
+@container (max-width: 520px) { .palpick { grid-template-columns: minmax(0, 1fr); } }
+.palpick__card {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  text-align: left;
+  color: var(--text-dim);
+  background: var(--glass);
+  border: var(--hair) solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
+}
+.palpick__card.is-on { border-color: var(--acc); box-shadow: inset 2px 0 0 var(--acc); color: var(--text); }
+.palpick__card:focus-visible { outline: none; box-shadow: var(--ring-acc); }
+.palpick__card:disabled { cursor: default; }
+@media (hover: hover) {
+  .palpick__card:not(.is-on):not(:disabled):hover { border-color: var(--line-strong); background: var(--glass-hi); }
+}
+.palpick__name {
+  font-family: var(--mono);
+  font-size: var(--fs-chrome-xs);
+  letter-spacing: var(--tr-chrome-xs);
+  text-transform: uppercase;
+  color: var(--chrome);
+}
+.palpick__glyphs { display: flex; gap: var(--s-4); font-size: var(--fs-text-lg); }
+.palpick__g--album   { color: var(--glyph-album); }
+.palpick__g--tag     { color: var(--glyph-tag); }
+.palpick__g--time    { color: var(--glyph-time); }
+.palpick__g--machine { color: var(--glyph-machine); }
+.palpick__ramp { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-0); height: var(--s-3); }
+.palpick__step--1 { background: var(--ramp-machine-1); }
+.palpick__step--2 { background: var(--ramp-machine-2); }
+.palpick__step--3 { background: var(--ramp-machine-3); }
+.palpick__step--4 { background: var(--ramp-machine-4); }
+.palpick__cols { display: flex; align-items: flex-end; gap: var(--s-0); height: var(--s-7); border-bottom: var(--hair) solid var(--line-strong); }
+.palpick__col { flex: 1; background: linear-gradient(180deg, var(--ramp-time-1), var(--ramp-time-4)); }
+.palpick__col--2 { height: 25%; } .palpick__col--3 { height: 37%; } .palpick__col--4 { height: 50%; }
+.palpick__col--5 { height: 62%; } .palpick__col--6 { height: 75%; } .palpick__col--8 { height: 100%; }
+.palpick__words { font-size: var(--fs-text-sm); line-height: 1.45; }
+
 /* The text section takes dropped .md files too, the whole section rather than
    a zone of its own; while a file hovers over it, it says so the way a
    dropzone does, with an outline that does not move anything. */
