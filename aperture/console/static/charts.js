@@ -125,3 +125,82 @@ function rankedBars(rows, { limit = 8, unit = 'photos', onRow, hue = null } = {}
   }
   return out;
 }
+
+/* A ring: parts of one whole, when there are few of them. The biggest four
+ * take the four steps of ONE hue family -- light to dark, largest first, so
+ * the order reads in the colour -- and everything else is one grey "Other".
+ * Never a hue per slice: that is the rainbow a ring invites. `parts` is
+ * [{label, value}], `hue` a glyph family (teal, rose, orange, violet). The
+ * legend beside it carries the names and figures, so identity is never the
+ * colour alone; hovering a slice or a row lights both and puts that part in
+ * the middle. */
+function donutChart(parts, { hue = 'violet', center = '', sub = '', unit = 'photos', onPart = null, keep = 4, ranked = true } = {}) {
+  // ranked: largest first; otherwise the order given (a share and its rest)
+  const kept = parts.filter((p) => p.value > 0);
+  const sorted = ranked ? kept.sort((a, b) => b.value - a.value) : kept;
+  let n = 0;
+  const top = sorted.slice(0, keep).map((p) => ({ ...p, step: p.other ? 'other' : String(++n) }));
+  const rest = sorted.slice(keep).reduce((n, p) => n + p.value, 0);
+  if (rest) top.push({ label: 'Other', value: rest, step: 'other', other: true });
+  const total = top.reduce((n, p) => n + p.value, 0) || 1;
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const R = 46;
+  const C = 2 * Math.PI * R;
+  const GAP = top.length > 1 ? 1.6 : 0;   // the 2px surface gap between slices
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 120 120');
+  svg.setAttribute('class', 'donut__svg');
+  svg.setAttribute('aria-hidden', 'true');
+  const track = document.createElementNS(NS, 'circle');
+  track.setAttribute('class', 'donut__track');
+  for (const [k, v] of [['cx', 60], ['cy', 60], ['r', R]]) track.setAttribute(k, v);
+  svg.append(track);
+
+  const mid = el('div', { class: 'donut__mid' },
+    el('span', { class: 'donut__center', text: center }),
+    el('span', { class: 'donut__sub', text: sub }));
+  const legend = el('ul', { class: 'donut__legend' });
+  const rows = [];
+  const segs = [];
+  const light = (i) => {
+    segs.forEach((s, j) => s.classList.toggle('is-dim', i !== null && i !== j));
+    rows.forEach((r, j) => r.classList.toggle('is-on', i === j));
+    const p = i === null ? null : top[i];
+    mid.firstChild.textContent = p ? Math.round(p.value / total * 100) + '%' : center;
+    mid.lastChild.textContent = p ? p.label : sub;
+  };
+
+  let at = 0;
+  top.forEach((p, i) => {
+    const len = Math.max(0, p.value / total * C - GAP);
+    const seg = document.createElementNS(NS, 'circle');
+    seg.setAttribute('class', 'donut__seg donut__seg--' + p.step);
+    for (const [k, v] of [['cx', 60], ['cy', 60], ['r', R]]) seg.setAttribute(k, v);
+    seg.setAttribute('stroke-dasharray', len + ' ' + (C - len));
+    seg.setAttribute('stroke-dashoffset', String(-at));
+    seg.addEventListener('pointerenter', () => light(i));
+    seg.addEventListener('pointerleave', () => light(null));
+    if (onPart && !p.other) seg.addEventListener('click', () => onPart(p));
+    svg.append(seg);
+    segs.push(seg);
+    at += p.value / total * C;
+
+    const row = el(onPart && !p.other ? 'button' : 'div', {
+      class: 'donut__row', type: onPart && !p.other ? 'button' : null,
+      onpointerenter: () => light(i), onpointerleave: () => light(null),
+      onfocus: () => light(i), onblur: () => light(null),
+      onclick: onPart && !p.other ? () => onPart(p) : null,
+    },
+      el('span', { class: 'donut__sw donut__sw--' + p.step }),
+      el('span', { class: 'donut__label', text: p.label }),
+      el('span', { class: 'donut__v', text: p.value + ' · ' + Math.round(p.value / total * 100) + '%' }));
+    rows.push(row);
+    legend.append(el('li', {}, row));
+  });
+
+  return el('div', { class: 'donut donut--' + hue, role: 'group',
+                     'aria-label': top.map((p) => p.label + ' ' + p.value + ' ' + unit).join(', ') },
+    el('div', { class: 'donut__ring' }, svg, mid),
+    legend);
+}

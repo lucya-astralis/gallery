@@ -379,6 +379,16 @@
   --glyph-rose:   #B04C80;   /* tags */
   --glyph-orange: #C87F3D;   /* time: dates, history, activity */
   --glyph-violet: #8E6FE0;   /* the machine and the camera */
+  /* CHART RAMPS. Each glyph hue as four steps, light to dark, for a chart
+     whose parts are RANKED (a ring's slices, largest first): one family
+     per chart, never a hue per slice. Everything past the fourth is one
+     neutral "other". Validated per ramp on this ground as ordinal: one hue,
+     monotone lightness, visible gaps, the dark end clear of the surface. */
+  --ramp-teal-1:   #8ADAE3; --ramp-teal-2:   #40B7C3; --ramp-teal-3:   #00929E; --ramp-teal-4:   #006D79;
+  --ramp-rose-1:   #FFAED4; --ramp-rose-2:   #E67CB1; --ramp-rose-3:   #BD588C; --ramp-rose-4:   #953368;
+  --ramp-orange-1: #F7BD8E; --ramp-orange-2: #DC9150; --ramp-orange-3: #B46D28; --ramp-orange-4: #8D4900;
+  --ramp-violet-1: #CEBBFF; --ramp-violet-2: #AB8DFF; --ramp-violet-3: #8768D8; --ramp-violet-4: #6543B0;
+  --ramp-other:    #4A4A55;
   --tap:         44px;
   --door-w:      420px;
   /* The rail: wide enough for "Overview" and a count beside it. */
@@ -3858,6 +3868,95 @@ button.colchart__col { cursor: pointer; }
 .coverage { display: flex; align-items: center; gap: var(--s-4); margin-bottom: var(--s-4); }
 .coverage .meter { flex: 1 1 auto; height: var(--s-3); }
 .coverage__v { font-family: var(--mono); font-size: var(--fs-chrome-lg); color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ----- rings ----------------------------------------------------------- */
+/* Parts of one whole, when there are few: the ring beside its legend. One
+   hue family per ring (the --ramp-* steps of its glyph hue), the largest
+   part lightest; past four, one grey "other". The legend names every part
+   with its figure, so no slice is told by colour alone. */
+.donut {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: var(--s-5);
+  align-items: center;
+}
+.donut__ring { position: relative; width: 132px; height: 132px; }
+.donut__svg { width: 100%; height: 100%; rotate: -90deg; overflow: visible; }
+.donut__track { fill: none; stroke: rgba(255, 255, 255, .04); stroke-width: 14; }
+.donut__seg {
+  fill: none;
+  stroke-width: 14;
+  transition: opacity var(--dur-1) var(--ease), stroke-width var(--dur-1) var(--ease);
+  cursor: default;
+}
+.donut__seg.is-dim { opacity: .28; }
+.donut__mid {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-0);
+  pointer-events: none;
+  text-align: center;
+}
+.donut__center { font-family: var(--mono); font-size: var(--fs-chrome-xl); color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
+.donut__sub {
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-text-sm);
+  color: var(--text-dim);
+}
+.donut__legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-0); min-width: 0; }
+.donut__row {
+  appearance: none;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: var(--s-1) var(--s-2);
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: var(--fs-text-md);
+  text-align: left;
+}
+button.donut__row { cursor: pointer; }
+.donut__row.is-on { background: rgba(255, 255, 255, .04); color: var(--text); }
+.donut__row:focus-visible { outline: var(--hair) solid var(--acc); outline-offset: -1px; }
+.formats__bytes { margin-top: var(--s-5); }
+.donut + .brows, .donut + div > .brows { margin-top: var(--s-5); }
+.donut__sw { width: var(--s-3); height: var(--s-3); }
+.donut__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.donut__v { font-family: var(--mono); font-size: var(--fs-chrome-sm); color: var(--label); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.donut--teal .donut__seg--1 { stroke: var(--ramp-teal-1); } .donut--teal .donut__sw--1 { background: var(--ramp-teal-1); }
+.donut--teal .donut__seg--2 { stroke: var(--ramp-teal-2); } .donut--teal .donut__sw--2 { background: var(--ramp-teal-2); }
+.donut--teal .donut__seg--3 { stroke: var(--ramp-teal-3); } .donut--teal .donut__sw--3 { background: var(--ramp-teal-3); }
+.donut--teal .donut__seg--4 { stroke: var(--ramp-teal-4); } .donut--teal .donut__sw--4 { background: var(--ramp-teal-4); }
+.donut--rose .donut__seg--1 { stroke: var(--ramp-rose-1); } .donut--rose .donut__sw--1 { background: var(--ramp-rose-1); }
+.donut--rose .donut__seg--2 { stroke: var(--ramp-rose-2); } .donut--rose .donut__sw--2 { background: var(--ramp-rose-2); }
+.donut--rose .donut__seg--3 { stroke: var(--ramp-rose-3); } .donut--rose .donut__sw--3 { background: var(--ramp-rose-3); }
+.donut--rose .donut__seg--4 { stroke: var(--ramp-rose-4); } .donut--rose .donut__sw--4 { background: var(--ramp-rose-4); }
+.donut--orange .donut__seg--1 { stroke: var(--ramp-orange-1); } .donut--orange .donut__sw--1 { background: var(--ramp-orange-1); }
+.donut--orange .donut__seg--2 { stroke: var(--ramp-orange-2); } .donut--orange .donut__sw--2 { background: var(--ramp-orange-2); }
+.donut--orange .donut__seg--3 { stroke: var(--ramp-orange-3); } .donut--orange .donut__sw--3 { background: var(--ramp-orange-3); }
+.donut--orange .donut__seg--4 { stroke: var(--ramp-orange-4); } .donut--orange .donut__sw--4 { background: var(--ramp-orange-4); }
+.donut--violet .donut__seg--1 { stroke: var(--ramp-violet-1); } .donut--violet .donut__sw--1 { background: var(--ramp-violet-1); }
+.donut--violet .donut__seg--2 { stroke: var(--ramp-violet-2); } .donut--violet .donut__sw--2 { background: var(--ramp-violet-2); }
+.donut--violet .donut__seg--3 { stroke: var(--ramp-violet-3); } .donut--violet .donut__sw--3 { background: var(--ramp-violet-3); }
+.donut--violet .donut__seg--4 { stroke: var(--ramp-violet-4); } .donut--violet .donut__sw--4 { background: var(--ramp-violet-4); }
+.donut__seg--other { stroke: var(--ramp-other); }
+.donut__sw--other { background: var(--ramp-other); }
+@media (max-width: 620px) {
+  .donut { grid-template-columns: 104px minmax(0, 1fr); gap: var(--s-4); }
+  .donut__ring { width: 104px; height: 104px; }
+  .donut__center { font-size: var(--fs-chrome-lg); }
+}
 
 /* ----- to do ------------------------------------------------------------ */
 .todo {

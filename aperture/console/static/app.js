@@ -1630,9 +1630,10 @@ function paintHome() {
     const tagged = photos.filter((p) => p.tags.length).length;
     const tagRows = (state.vocab || []).map((t) => ({ label: t.name, value: t.count }));
     grid.append(card('fa-tags', 'Tags', tagged + ' of ' + photos.length + ' photos tagged',
-      el('div', { class: 'coverage' },
-        meter(tagged, photos.length, 'acc'),
-        el('span', { class: 'coverage__v', text: Math.round(tagged / photos.length * 100) + '%' })),
+      donutChart([
+        { label: 'tagged', value: tagged },
+        { label: 'untagged', value: photos.length - tagged, other: true },
+      ], { hue: 'rose', ranked: false, center: Math.round(tagged / photos.length * 100) + '%', sub: 'tagged' }),
       tagRows.length
         ? rankedBars(tagRows, { limit: 6, hue: 'rose', onRow: (r) => openTag(r.label) })
         : quiet('No photo carries a tag yet.'),
@@ -1644,8 +1645,26 @@ function paintHome() {
     const cams = new Map();
     for (const p of photos) cams.set(p.camera || 'Unknown', (cams.get(p.camera || 'Unknown') || 0) + 1);
     grid.append(card('fa-camera', 'Cameras', cams.size + (cams.size === 1 ? ' camera' : ' cameras'),
-      ...rankedBars([...cams].map(([label, value]) => ({ label, value })).sort((x, y) => y.value - x.value),
-        { limit: 5, hue: 'violet', onRow: (r) => libraryWith({ cameras: [r.label] }) })));
+      donutChart([...cams].map(([label, value]) => ({ label, value })),
+        { hue: 'violet', center: String(cams.size), sub: cams.size === 1 ? 'camera' : 'cameras',
+          onPart: (part) => libraryWith({ cameras: [part.label] }) })));
+
+    /* What the originals are: a PNG archive is ten times the disk a JPEG
+     * one is, and this is where that shows. */
+    const formats = new Map();
+    const sizes = new Map();
+    for (const p of photos) {
+      const ext = (p.name.split('.').pop() || '?').toUpperCase();
+      formats.set(ext, (formats.get(ext) || 0) + 1);
+      sizes.set(ext, (sizes.get(ext) || 0) + (p.size || 0));
+    }
+    const totalBytes = [...sizes.values()].reduce((a, b) => a + b, 0);
+    grid.append(card('fa-images', 'Formats', bytes(totalBytes) + ' of originals',
+      donutChart([...formats].map(([label, value]) => ({ label, value })),
+        { hue: 'teal', center: String(photos.length), sub: 'photos',
+          onPart: (part) => libraryWith({ q: '.' + part.label.toLowerCase() }) }),
+      el('dl', { class: 'facts formats__bytes' }, [...sizes].sort((a, b) => b[1] - a[1]).slice(0, 4)
+        .map(([ext, n]) => fact(ext, bytes(n) + ' · ' + bytes(n / formats.get(ext)) + ' a photo')))));
   }
 
   /* ---- is the machine working ---- */

@@ -110,6 +110,12 @@ root still land on the Overview.
   camera — on the rail, card titles, facts, tabs and the gallery's facets,
   and on the charts that count that kind of thing. Nebula's rule 1 names
   them; the accent stays for state.
+* **Rings on the Overview** where the question is *what share*: how much of
+  the archive is tagged, which cameras, which file formats (with what each
+  costs on disk). Each ring is one colour family — the glyph hue of what it
+  counts, in four steps from light to dark, the largest part lightest, the
+  rest one grey — never a hue per slice. Hover a slice or its legend row to
+  read it in the middle; click a camera or a format for its photos.
 * The bar shows the **indexer's lamp** on every screen.
 
 **Changed**

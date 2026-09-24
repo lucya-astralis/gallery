@@ -92,14 +92,15 @@ edits.
 | --- | --- |
 | **To do** | a strip of counts, each a click from where it is done: photos without a tag (the Library, on *Untagged*), albums without a text or a cfg (the Albums table, on *Unwritten*), what the check found, photos not indexed yet, files with unsaved edits. A zero shows as done. |
 | **Photos over time** | a column per month they were taken (per quarter past six years), gaps kept as zeros, the earliest 2% — the camera that thinks it is 2001 — folded into one column so the axis starts where the photos do. Hover for the figure, click a month for its photos in the Library. |
-| **Albums**, **Tags**, **Cameras** | ranked bars, each row a click into the Library filtered to it; Tags leads with how much of the archive is tagged |
+| **Albums** | ranked bars, each row a click into the Library on that album |
+| **Tags**, **Cameras**, **Formats** | rings, where the question is *what share*: tagged against untagged (then the top tags as bars), the cameras, the file formats with what each costs on disk. Each ring is one colour family (`--ramp-<hue>-1..4`, the glyph hue of what it counts, largest part lightest, the rest one grey); hover a slice or a legend row to read it in the middle, click a camera or a format for its photos |
 | **Indexer** | the lamp, the last scan and what it did, with Scan and Pause right there |
 | **Needs attention** | what the config check found, each line a click from the key — and most with a Fix |
 | **Recent changes** | the audit log — every write this console has made |
 
-The charts show one series each, so they take one neutral ink and no palette;
-the accent is state in Nebula, and the only fill that wears it is the tag
-coverage meter, which is progress. They are plain HTML (`static/charts.js`),
+Every chart takes the colour of the kind of thing it counts — time orange,
+albums and formats teal, tags rose, cameras violet — a single family, never a
+hue per part; the accent stays for state. They are plain HTML (`static/charts.js`),
 sized through the CSSOM because the CSP drops a style attribute.
 
 None of the figures is a second opinion: the counts and charts come from the
