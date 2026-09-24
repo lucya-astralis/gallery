@@ -131,6 +131,11 @@ ALBUM_SORTS = ["latest_desc", "latest_asc", "name_asc", "name_desc",
 # Two pseudo sorts backed by a cfg list / EXIF rather than SQL.
 PHOTO_SORTS = ["curated", "days"] + IMAGE_SORTS
 GALLERY_ALBUM_SORTS = ["curated"] + ALBUM_SORTS
+# Nebula's identity tint -- the colour of the kind-icons and the charts, on
+# both surfaces. All three come from the silver of the title gradient: mist
+# leans it toward the accent, silver keeps it neutral, stardust gives each
+# kind its own faint cast. The first is the default.
+PALETTES = ["mist", "silver", "stardust"]
 
 # A welcome key holding one of these words is a feed rather than a list of
 # photos; the value is which feed. welcome.welcome_feed reads it, the
@@ -191,6 +196,7 @@ KEY_SPEC: dict[str, dict] = {
     "welcome_mobile": {"type": "welcome", "multiline": True},
     "album_order": {"type": "album_list", "multiline": True},
     "album_sort": {"type": "choice", "choices": GALLERY_ALBUM_SORTS},
+    "palette": {"type": "choice", "choices": PALETTES},
     # gallery.cfg — branding. Who the archive belongs to; the software's own
     # attribution is not configurable and stays in the gallery's footer line.
     # The text keys are prose, so they are joined the way `name` and `loc`
@@ -222,7 +228,7 @@ GALLERY_KEYS = ["welcome", "welcome_desktop", "welcome_mobile", "album_order",
                 "album_sort",
                 # the theme block, spelled exactly as album.cfg spells it —
                 # gallery.cfg dresses the site, an album overrides its pages
-                "accent", "font", "font_scale",
+                "accent", "palette", "font", "font_scale",
                 "wallpaper", "wallpaper_mobile",
                 "wallpaper_tint", "wallpaper_dim",
                 "site_name", "site_sub", "site_hero", "site_desc",
@@ -285,6 +291,7 @@ HELP: dict[str, str] = {
     "welcome_mobile": "Welcome hero images on phones (detected via User-Agent).",
     "album_order": "Curated album order. Adds “Curated” to the /albums sort menu and fixes the featured rails. A group header frames the albums under it.",
     "album_sort": "Preselect the sort option on /albums.",
+    "palette": "The tint of the icons that say what kind of thing something is, and of the charts -- on the gallery and in this console. All three come from the silver of the headings: mist leans it toward the accent, silver keeps it neutral, stardust gives albums, tags, time and the camera each a faint cast of their own. Empty means mist.",
     "site_name": "The archive's name — first line of the wordmark, and the site name on link previews. Empty leaves the gallery calling itself “Gallery”. Commas are fine here.",
     "site_sub": "Second line of the wordmark, under the name. Usually what the site is rather than who runs it (“gallery”, “archive”). Empty shows the name alone.",
     "site_hero": "The one big word on the welcome screen. Empty falls back to the sub-line, then to the name.",

@@ -11,7 +11,7 @@ from functools import partial
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from .. import brand, branding, i18n, scanner, templating, theme
+from .. import brand, branding, config, i18n, scanner, templating, theme
 from ..runtime import settings
 
 
@@ -80,6 +80,8 @@ def _i18n_context(request: Request) -> dict:
         # Per request rather than a template global because one of its values,
         # the meta description, is localized.
         "brand": branding.site_brand(lang),
+        # Nebula's identity tint (gallery.cfg `palette`), as <html data-palette>.
+        "palette": config.site_palette(),
     }
 
 

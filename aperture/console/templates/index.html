@@ -1,6 +1,6 @@
 {% import "_mark.html" as brandmark %}
 <!doctype html>
-<html lang="en" data-read-only="{{ 1 if read_only else 0 }}" data-auth="{{ auth_mode }}">
+<html lang="en" data-read-only="{{ 1 if read_only else 0 }}" data-auth="{{ auth_mode }}" data-palette="{{ palette }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -14,6 +14,16 @@
   <link rel="preload" href="/static/fonts/fa-solid-subset.woff2" as="font" type="font/woff2" crossorigin>
 </head>
 <body>
+  {# The meters' fills: each kind's ramp laid left (deep) to right (light),
+     the way a heading's silver falls. Stops are coloured by CSS (.mg-*), so
+     the palette in <html data-palette> repaints them with everything else. #}
+  <svg class="svg-defs" width="0" height="0" aria-hidden="true" focusable="false">
+    <defs>
+      {% for kind in ['album', 'tag', 'time', 'machine'] %}
+      <linearGradient id="mg-{{ kind }}" class="mg-{{ kind }}"><stop offset="0"/><stop offset="1"/></linearGradient>
+      {% endfor %}
+    </defs>
+  </svg>
   {# The backdrop. Same construction as the gallery's: a real element rather
      than a body pseudo-element, and a <picture> so the browser fetches
      exactly ONE of the two cuts — a display:none <img> would still be

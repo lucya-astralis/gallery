@@ -170,6 +170,31 @@ def test_a_curated_album_sort_without_its_list_is_a_warning(indexed, gallery_cfg
     assert issue["scope"] == "gallery" and issue["album"] is None
 
 
+def test_an_unknown_palette_is_an_error_with_a_fix(indexed, gallery_cfg):
+    gallery_cfg("palette = rainbow\n")
+    [issue] = keyed(checks.gallery(), "palette")
+    assert issue["level"] == "error" and issue["fix"]["key"] == "palette"
+
+
+def test_every_palette_is_accepted(indexed, gallery_cfg):
+    from aperture import schema
+    for name in schema.PALETTES:
+        gallery_cfg("palette = %s\n" % name)
+        assert not keyed(checks.gallery(), "palette")
+
+
+def test_both_surfaces_wear_the_palette_gallery_cfg_names(indexed, gallery_cfg, client, console):
+    """One key, two surfaces: the public pages and the console paint the
+    same tint, and anything unknown is mist."""
+    assert 'data-palette="mist"' in client.get("/").text
+    gallery_cfg("palette = stardust\n")
+    assert 'data-palette="stardust"' in client.get("/").text
+    assert 'data-palette="stardust"' in console.get("/").text
+    assert console.get("/api/meta").json()["palette"] == "stardust"
+    gallery_cfg("palette = rainbow\n")
+    assert 'data-palette="mist"' in client.get("/").text
+
+
 # ----- the index opens itself ----------------------------------------------
 def test_the_database_opens_on_first_use(tmp_path):
     """A console-only process never runs the indexer's startup, which is what

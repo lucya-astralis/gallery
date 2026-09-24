@@ -181,6 +181,13 @@ def cfg_tiered(album: str | None, key: str) -> str | None:
     return (cfgio.first(gallery_config(), key) or "").strip() or None
 
 
+def site_palette() -> str:
+    """gallery.cfg `palette`: which of Nebula's identity tints both surfaces
+    wear (schema.PALETTES). Anything unknown falls back to the first."""
+    raw = (cfgio.first(gallery_config(), "palette") or "").strip().lower()
+    return raw if raw in schema.PALETTES else schema.PALETTES[0]
+
+
 def gallery_meta_dir() -> Path | None:
     """photos/.gallery/, or None when the gallery keeps no assets of its own."""
     folder = settings.photos_dir / schema.GALLERY_META_DIR

@@ -109,7 +109,11 @@ root still land on the Overview.
   the silver of the heading gradient leaning toward the accent — on the
   rail, card titles, facts, tabs and the gallery's facets, and in four
   ranked steps on the charts. One family, so nothing competes with the
-  accent, which stays for state.
+  accent, which stays for state. **gallery.cfg `palette`** picks between
+  three tints from that silver — `mist` (the default), `silver` (neutral)
+  and `stardust` (a faint cast per kind) — for the gallery and the console
+  alike, under Site → Look, where picking one repaints the console before
+  you save. Bars and columns fall like the headings, light to deep.
 * **The Overview is a bento**: one pane of glass, the cards sharing their
   hairlines with no gaps, on a six-column grid — the to-do strip and a slim
   photos-over-time strip across the top, then three cards to a row.

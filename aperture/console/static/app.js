@@ -314,6 +314,7 @@ async function select(sel, keepTab = false, how = 'push') {
   stashDraft();
   state.sel = sel;
   state.edits = takeDraft(sel);
+  showPalette(sel.kind === 'gallery' ? state.edits.palette : undefined);
   state.browse = null;
   state.data = null;
   if (!keepTab) { state.tab = 'settings'; state.query = ''; }
@@ -379,7 +380,24 @@ function value(key) {
 
 function setValue(key, next) {
   state.edits[key] = next;
+  if (key === 'palette') showPalette(next);
   renderPane();
+}
+
+/* What gallery.cfg says after a save of it; `settled` when the edits on
+ * screen were the ones just written, so no draft palette is left to show. */
+function savedPalette(values, settled) {
+  const v = values && values.palette;
+  state.meta.palette = (Array.isArray(v) ? v[0] : v) || 'mist';
+  showPalette(settled || state.sel.kind !== 'gallery' ? undefined : state.edits.palette);
+}
+
+/* The palette is seen, not read: picking one repaints the console at once,
+ * before it is saved. Leaving without saving puts the saved one back. */
+function showPalette(name) {
+  const known = (state.meta && state.meta.spec.palette.choices) || [];
+  document.documentElement.dataset.palette =
+    known.includes(name) ? name : (state.meta && state.meta.palette) || 'mist';
 }
 
 /* Re-rendering the pane on every keystroke would drop the caret out of the
@@ -414,7 +432,7 @@ const GALLERY_GROUPS = [
     ['site_name', 'site_sub', 'site_hero', 'logo', 'favicon',
      'site_desc', 'site_desc_en', 'site_desc_de', 'site_desc_jp']],
   ['Look', 'The accent every page wears and the display face of the chrome — the wordmark, the welcome screen’s big word, the 404. Not an album’s hero title: that keeps its own `font`. An album that sets its own accent still wins for its pages.',
-    ['accent', 'font', 'font_scale']],
+    ['accent', 'palette', 'font', 'font_scale']],
   ['Backdrop', 'What sits behind every page, and how the gallery treats it — its own backdrop, and any an album brings. An album that sets these itself still wins for its pages.',
     ['wallpaper', 'wallpaper_mobile', 'wallpaper_tint', 'wallpaper_dim']],
   ['Operator & footer', 'The person behind the archive, the legal links, and the badge row. The footer’s operator card and the welcome screen’s “about me” button both need a URL to point at — without one, neither is rendered.',
@@ -2968,6 +2986,7 @@ async function writeDraft(draft) {
     return false;
   }
   drafts.delete(draft.key);
+  if (isGallery) savedPalette(payload.values, draftKey(state.sel) === draft.key);
   if (draftKey(state.sel) === draft.key) {
     state.edits = {};
     if (state.data) {
@@ -3009,6 +3028,7 @@ function openTray() {
 
 function discardDraft(draft) {
   drafts.delete(draft.key);
+  if (draft.sel.kind === 'gallery') showPalette();
   if (draftKey(state.sel) === draft.key) { state.edits = {}; renderPane(); }
   syncDirtyMark();
 }
@@ -3040,6 +3060,7 @@ function renderRaw() {
               values: payload.values, raw: payload.raw, issues: payload.issues, exists: true,
             });
             state.edits = {};
+            if (state.sel.kind === 'gallery') savedPalette(payload.values, true);
             renderPane();
             refreshIssueDots();
             toast('File written');

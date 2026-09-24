@@ -33,7 +33,7 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from .. import brand, checks, db, scanner, search, update_check
+from .. import brand, checks, config, db, scanner, search, update_check
 from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
@@ -365,6 +365,7 @@ def index(request: Request):
         # an unauthenticated console should never look like an authenticated
         # one (see security.assert_safe_binding).
         "auth_mode": "open" if security.open_access() else "password",
+        "palette": config.site_palette(),
     })
 
 
@@ -391,6 +392,8 @@ def api_meta():
         "reel_values": schema.REEL_VALUES,
         "photo_sorts": schema.PHOTO_SORTS,
         "gallery_album_sorts": schema.GALLERY_ALBUM_SORTS,
+        # the identity tint the console wears, the same one the gallery does
+        "palette": config.site_palette(),
         "welcome_keywords": list(schema.WELCOME_KEYWORDS),
         "icon_exts": sorted(schema.ICON_EXTS),
         "font_exts": sorted(schema.FONT_EXTS),

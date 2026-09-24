@@ -101,7 +101,8 @@ edits.
 The cards form a **bento**: one pane, shared hairlines, no gaps. Every chart
 and every kind-icon wears Nebula's **mist** — the silver of the headings
 leaning toward the accent — in four ranked steps, never a
-hue per part; the accent stays for state. They are plain HTML (`static/charts.js`),
+hue per part; the accent stays for state. gallery.cfg `palette` swaps the
+tint (`mist`, `silver`, `stardust`) on both surfaces. They are plain HTML (`static/charts.js`),
 sized through the CSSOM because the CSP drops a style attribute.
 
 None of the figures is a second opinion: the counts and charts come from the

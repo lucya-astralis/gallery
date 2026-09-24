@@ -686,6 +686,11 @@
   --tap:        44px;
 }
 
+/* The palettes (gallery.cfg `palette`, on <html data-palette>) -- the same
+   three the console and nebula.css define; only the glyph tints are read here. */
+:root[data-palette="silver"] { --mist: #BDBDC5; }
+:root[data-palette="stardust"] { --glyph-album: #BDAFD9; --glyph-tag: #D0A2B6; --glyph-time: #98BCDC; --glyph-machine: #BCBDC7; }
+
 /* ==================================================================
    RULE 6 - THE ENVIRONMENT CAN OVERRULE THE LOOK
    ------------------------------------------------------------------

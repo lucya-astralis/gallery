@@ -179,6 +179,12 @@ def gallery(cfg: dict[str, list[str]] | None = None) -> list[dict]:
     elif album_sort == "curated" and "album_order" not in cfg:
         add("warn", "album_sort", "curated preset without an `album_order` list")
 
+    palette = (cfgio.first(cfg, "palette") or "").strip().lower()
+    if palette and palette not in schema.PALETTES:
+        add("error", "palette", "%r is not one of %s"
+            % (palette, ", ".join(schema.PALETTES)),
+            _drop("palette", "Use mist"))
+
     _files(cfg, schema.GALLERY_ASSET_KEYS, config.gallery_meta_dir(), schema.GALLERY_META_DIR + "/", add)
     _theme(cfg, add)
 

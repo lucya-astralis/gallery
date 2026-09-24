@@ -409,6 +409,22 @@
   --jp-text: "Yu Gothic", "Hiragino Sans", "Noto Sans CJK JP", "MS Gothic", sans-serif;
 }
 
+/* ---- THE PALETTES (gallery.cfg `palette`, on <html data-palette>) ------
+   Three ways to tint the kind-icons and the charts, all from the title
+   silver. mist is the :root default above; these only redefine tokens
+   (rule 6), so every rule that reads --glyph-* / --ramp-* follows. */
+:root[data-palette="silver"] {
+  --mist:   #BDBDC5;
+  --mist-1: #E7E7F0; --mist-2: #BDBDC5; --mist-3: #94949D; --mist-4: #6E6E76;
+}
+:root[data-palette="stardust"] {
+  --glyph-album: #BDAFD9; --glyph-tag: #D0A2B6; --glyph-time: #98BCDC; --glyph-machine: #BCBDC7;
+  --ramp-album-1:   #E1D9F3; --ramp-album-2:   #BDAFD9; --ramp-album-3:   #988AB2; --ramp-album-4:   #74678D;
+  --ramp-tag-1:     #F2D5E1; --ramp-tag-2:     #D6A8BD; --ramp-tag-3:     #AF8397; --ramp-tag-4:     #8A6074;
+  --ramp-time-1:    #CBE1F5; --ramp-time-2:    #98BCDC; --ramp-time-3:    #7397B5; --ramp-time-4:    #517390;
+  --ramp-machine-1: #DDDDE4; --ramp-machine-2: #B6B6C1; --ramp-machine-3: #91919B; --ramp-machine-4: #6D6E77;
+}
+
 /* ==================================================================
    RULE 6 — THE ENVIRONMENT CAN OVERRULE THE LOOK
    ------------------------------------------------------------------
@@ -3832,7 +3848,7 @@ button.colchart__col { cursor: pointer; }
   transition: opacity var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
 }
 /* Mist columns fall like the title gradient: light at the top, deep at the base. */
-.colchart--time .colchart__bar { background: linear-gradient(180deg, var(--mist-1), var(--mist-4)); }
+.colchart--time .colchart__bar { background: linear-gradient(180deg, var(--ramp-time-1), var(--ramp-time-4)); }
 .colchart__col.is-zero .colchart__bar { opacity: .18; }
 .colchart__col.is-on .colchart__bar,
 .colchart__col:focus-visible .colchart__bar { background: var(--chrome); opacity: 1; }
@@ -4325,10 +4341,16 @@ button.donut__row { cursor: pointer; }
 .meter__fill  { fill: rgba(255, 255, 255, .34); }
 .meter.is-acc  .meter__fill { fill: var(--acc); }
 /* a chart about one kind of thing wears that kind's glyph hue */
-.meter.is-album   .meter__fill { fill: var(--glyph-album); }
-.meter.is-tag   .meter__fill { fill: var(--glyph-tag); }
-.meter.is-time .meter__fill { fill: var(--glyph-time); }
-.meter.is-machine .meter__fill { fill: var(--glyph-machine); }
+.meter.is-album   .meter__fill { fill: url(#mg-album); }
+.meter.is-tag     .meter__fill { fill: url(#mg-tag); }
+.meter.is-time    .meter__fill { fill: url(#mg-time); }
+.meter.is-machine .meter__fill { fill: url(#mg-machine); }
+/* the gradients those fills name (index.html): deep to light, like a title */
+.svg-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.mg-album   stop:first-child { stop-color: var(--ramp-album-4); }   .mg-album   stop:last-child { stop-color: var(--ramp-album-1); }
+.mg-tag     stop:first-child { stop-color: var(--ramp-tag-4); }     .mg-tag     stop:last-child { stop-color: var(--ramp-tag-1); }
+.mg-time    stop:first-child { stop-color: var(--ramp-time-4); }    .mg-time    stop:last-child { stop-color: var(--ramp-time-1); }
+.mg-machine stop:first-child { stop-color: var(--ramp-machine-4); } .mg-machine stop:last-child { stop-color: var(--ramp-machine-1); }
 .meter.is-warn .meter__fill { fill: var(--amb); }
 .meter.is-bad  .meter__fill { fill: var(--red); }
 
