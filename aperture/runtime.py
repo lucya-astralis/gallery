@@ -68,6 +68,9 @@ class Settings:
     hide_gps: bool
     strip_gps: bool
     public_base_url: str
+    # ----- vision (aperture/vision.py) -- off unless asked for ------------
+    vision: bool
+    vision_threads: int
 
     # ----- the console surface -----------------------------------------
     console_enabled: bool
@@ -152,6 +155,11 @@ def load() -> Settings:
         hide_gps=_flag("HIDE_GPS"),
         strip_gps=_flag("STRIP_GPS"),
         public_base_url=(os.environ.get("PUBLIC_BASE_URL") or "").rstrip("/"),
+        # A local image model for search by what is in a photo. OFF by
+        # default: on, it downloads ~225 MB of model into DATA_DIR/models once
+        # and reads every photo on the next scan. See aperture/vision.py.
+        vision=_flag("VISION", "0"),
+        vision_threads=_int("VISION_THREADS", 2),
 
         console_enabled=_flag("CONSOLE_ENABLED"),
         # Loopback by default. A different address is a deliberate act and

@@ -943,6 +943,8 @@ Inside the package:
 | `ENABLE_WATCHER`| `1`           | inotify watcher (on SMB/NFS, prefer `0` and use interval)  |
 | `HIDE_GPS`      | `1`           | Strip GPS from EXIF display                                |
 | `STRIP_GPS`     | `1`           | Strip GPS from the original file on import (in-place)      |
+| `VISION`        | `0`           | Search by what is in a photo: a local model (~217 MB, fetched once into `DATA_DIR/models`) reads every photo on the next scan. Off by default; every search can leave its matches out |
+| `VISION_THREADS`| `2`           | CPU threads the vision model may use                       |
 | `PUBLIC_BASE_URL`| (auto)       | Absolute base URL used in OG tags + `/api/showcase` URLs   |
 | `APERTURE_ROLE` | `all`         | `all` / `public` / `console` — which listeners open         |
 

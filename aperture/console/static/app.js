@@ -506,6 +506,7 @@ const SYSTEM_GROUPS = [
     ['overview', 'Indexer', 'fa-microchip'],
     ['storage', 'Storage', 'fa-hard-drive'],
     ['health', 'Health check', 'fa-stethoscope'],
+    ['vision', 'Vision', 'fa-eye'],
   ]],
   ['Data', [
     ['privacy', 'Privacy', 'fa-location-dot'],
@@ -728,6 +729,55 @@ async function loadDisk() {
   opsState.disk = await api('/api/ops/disk').catch((err) => ({ error: err.message }));
   opsState.loading.disk = false;
   if (onOps() && opsState.tab === 'storage') paintOps();
+}
+
+async function loadVision() {
+  if (opsState.loading.vision) return;
+  opsState.loading.vision = true;
+  opsState.vision = await api('/api/ops/vision').catch((err) => ({ error: err.message }));
+  opsState.loading.vision = false;
+  if (onOps() && opsState.tab === 'vision') paintOps();
+}
+
+/* Vision (aperture/vision.py): a local image model for search by what is
+ * in a photo. Switched in the environment, never here -- the switch is the
+ * machine's, and a second one in a file would be a second truth -- so this
+ * says where it stands and how to switch it. */
+function paintVision(grid) {
+  const v = opsState.vision;
+  if (!v) { loadVision(); grid.append(wide(card('fa-eye', 'Vision', null, quiet('Reading…')))); return; }
+  if (v.error && v.enabled === undefined) { grid.append(wide(card('fa-eye', 'Vision', null, quiet(v.error)))); return; }
+  const what = quiet('Search by what is in a photo — “sunset over the sea”, “Tempel”, “夕日” — in any language, ' +
+    'whether or not a tag or a file name says so. A local model (' + v.model + ', ~' + v.size_mb + ' MB): ' +
+    'no photo leaves this machine. Its matches show as a group of their own on /search, and every search can leave them out.');
+  if (!v.enabled) {
+    grid.append(wide(card('fa-eye', 'Vision', 'off', what,
+      el('dl', { class: 'facts' },
+        fact('State', 'off — nothing is loaded or downloaded'),
+        fact('To switch it on', 'VISION=1 in the environment (docker-compose), then restart')),
+      el('pre', { class: 'code-block', text: [
+        'environment:', '  - VISION=1', '  # optional: CPU threads it may use', '  - VISION_THREADS=2',
+      ].join('\n') }),
+      quiet('The next scan downloads the model once (~' + v.size_mb + ' MB into ' + v.folder + ') and reads every photo; ' +
+            'about 20 ms a photo on a desktop CPU.'))));
+    return;
+  }
+  const state = v.error ? ['failed — ' + v.error, 'bad']
+    : v.installing ? ['downloading the model — ' + v.downloaded_mb + ' of ' + v.size_mb + ' MB', 'warn']
+    : !v.installed ? ['waiting for the next scan to download the model', 'warn']
+    : v.read < v.total ? ['reading photos — ' + v.read + ' of ' + v.total, 'warn']
+    : ['ready', 'ok'];
+  grid.append(wide(card('fa-eye', 'Vision', 'on', what,
+    el('dl', { class: 'facts' },
+      fact('State', state[0], state[1]),
+      fact('Photos read', v.read + ' of ' + v.total),
+      fact('Model', v.model + ' · ' + v.size_mb + ' MB'),
+      fact('Folder', v.folder),
+      fact('Threads', String(v.threads))),
+    meter(v.read, v.total || 1, v.read < v.total ? 'acc' : null),
+    el('div', { class: 'card__actions' },
+      el('button', { type: 'button', class: 'btn', icon: 'fa-rotate', text: 'Refresh',
+                     onclick: () => { opsState.vision = null; paintOps(); } })))));
 }
 
 function paintIndexer(grid, st, ro) {
@@ -1135,6 +1185,7 @@ const OPS_PAINT = {
   export: paintOpsExport,
   access: paintOpsAccess,
   activity: (grid) => paintActivity(grid),
+  vision: paintVision,
 };
 
 /* ----- jobs ------------------------------------------------------------- */

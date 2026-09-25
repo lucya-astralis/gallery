@@ -37,7 +37,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from .. import control, i18n, ops, reports
+from .. import control, db, i18n, ops, reports, vision
 from ..ops import UnknownAlbum
 from ..runtime import settings
 from . import security
@@ -110,6 +110,13 @@ def api_disk():
     """What thumbnails, previews and conversions cost on disk. A walk of the
     generated trees, so a `def`: it runs in the threadpool."""
     return ops.disk_usage()
+
+
+@router.get("/vision")
+def api_vision():
+    """Whether vision (aperture/vision.py) is on, installed and how far the
+    scan has read the photos. Read-only: it is switched in the environment."""
+    return vision.status(db.conn())
 
 
 @router.get("/archive")

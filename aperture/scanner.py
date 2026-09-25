@@ -10,7 +10,7 @@ from pathlib import Path
 
 from PIL import Image, ExifTags, ImageOps
 
-from . import brand, capture, colors, db, marks
+from . import brand, capture, colors, db, marks, vision
 from . import schema
 from .runtime import settings
 
@@ -707,7 +707,7 @@ def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
                  camera=excluded.camera, lens=excluded.lens, focal=excluded.focal,
                  aperture=excluded.aperture, iso=excluded.iso,
                  content_hash=excluded.content_hash,
-                 colors=NULL, palette=NULL""",
+                 colors=NULL, palette=NULL, vision=NULL""",
             (album, filename, rel, effective_mtime, stat.st_size, width, height, json.dumps(exif), taken,
              fact["camera"], fact["lens"], fact["focal"], fact["aperture"], fact["iso"], digest),
         )
@@ -733,6 +733,29 @@ def read_colors(rel: str, thumb: Path) -> bool:
     with db.lock():
         c.execute("UPDATE images SET colors = ?, palette = ? WHERE id = ?",
                   (found[0], found[1], row["id"]))
+        c.commit()
+    return True
+
+
+def read_vision(rel: str, thumb: Path) -> bool:
+    """The photo's vision vector (vision.py), from its thumbnail, when vision
+    is on and the row has none yet -- the same fill-in-once rule as colours."""
+    model = vision.backend()
+    if model is None:
+        return False
+    c = db.conn()
+    row = c.execute("SELECT id FROM images WHERE rel_path = ? AND vision IS NULL",
+                    (rel,)).fetchone()
+    if row is None:
+        return False
+    try:
+        with Image.open(thumb) as img:
+            vec = model.embed_images([img])[0]
+    except Exception as e:
+        log.warning("vision failed for %s: %s: %s", rel, type(e).__name__, e)
+        return False
+    with db.lock():
+        c.execute("UPDATE images SET vision = ? WHERE id = ?", (vision.pack(vec), row["id"]))
         c.commit()
     return True
 
@@ -828,6 +851,7 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
                         broken = True
             if thumb_path.exists():
                 read_colors(rel, thumb_path)
+                read_vision(rel, thumb_path)
         except Exception as e:
             broken = True
             log.warning("skipped %s: %s: %s", rel, type(e).__name__, e)

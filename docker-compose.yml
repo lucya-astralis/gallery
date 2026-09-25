@@ -40,6 +40,13 @@ services:
       - ENABLE_WATCHER=${ENABLE_WATCHER:-1}
       - HIDE_GPS=${HIDE_GPS:-1}
       - STRIP_GPS=${STRIP_GPS:-1}
+      # Vision: search photos by what is in them ("sunset over the sea").
+      # Off by default. On, the next scan downloads a ~217 MB local model into
+      # DATA_DIR/models once and reads every photo (~40 ms each); nothing ever
+      # leaves the machine. Set it for the console too, so System > Vision
+      # reports it. See aperture/vision.py.
+      - VISION=${VISION:-0}
+      - VISION_THREADS=${VISION_THREADS:-2}
       # Public base URL used for OG / Twitter link previews. Set this when
       # behind a reverse proxy that terminates TLS.
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}

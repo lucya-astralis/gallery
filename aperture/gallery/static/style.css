@@ -1236,6 +1236,27 @@ section{
 }
 @media (hover:hover){ .search-filters__clear:hover{ color:var(--text); } }
 
+/* ---- vision: the switch, and the group it adds ----
+   The switch is a checkbox that is a link (the same search, switched the
+   other way), shaped like a facet row: the box fills with the accent when
+   the pictures are searched too. The group it adds says what it is in its
+   head and in a note, because a match by what a picture shows can be wrong. */
+.search-vision{ margin:var(--s-4) 0 0; }
+.search-vision__toggle{
+  display:inline-flex; align-items:center; gap:var(--s-2);
+  font-family:var(--mono); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs);
+  text-transform:uppercase; color:var(--text-dim);
+  transition:color var(--dur-1);
+}
+.search-vision__box{ width:var(--s-4); height:var(--s-4); border:var(--hair) solid var(--line-strong); transition:background-color var(--dur-1), border-color var(--dur-1); }
+.search-vision__toggle.is-on{ color:var(--label); }
+.search-vision__toggle.is-on .search-vision__box{ background:var(--acc); border-color:var(--acc); }
+.search-vision__toggle .fa{ font-size:var(--fs-chrome-sm); color:var(--glyph-album); }
+@media (hover:hover){ .search-vision__toggle:hover{ color:var(--text); } }
+.search-group--look{ margin-top:var(--s-7); }
+.search-group__note{ margin:0 0 var(--s-4); color:var(--text-dim); font-size:var(--fs-text-sm); }
+.search-group__note a{ color:var(--acc); }
+
 /* ---- the facets beside the results ----
    The console Library's filter column, for a visitor: album, tag, year and
    camera, each row counting the photos it would leave and linking to the
@@ -1320,6 +1341,9 @@ section{
    each with a box that fills with the accent when it is on. */
 @media (min-width:1000px){
   .search-layout{ grid-template-columns:220px minmax(0,1fr); gap:var(--s-7); align-items:start; }
+  /* no facets (nothing found by name -- only the picture search found
+     something): the results take the whole width, not the facet column */
+  .search-layout > .search-results:first-child{ grid-column:1 / -1; }
   .search-facets{ position:sticky; top:calc(var(--nav-h) + var(--s-5)); max-height:calc(100vh - var(--nav-h) - var(--s-7)); overflow-y:auto; }
   .facet-list{ flex-direction:column; gap:0; }
   .facet{ display:flex; width:100%; border:0; background:none; backdrop-filter:none; -webkit-backdrop-filter:none; padding:var(--s-1) var(--s-2); }

@@ -18,6 +18,39 @@ notes are never one commit apart.
 
 ---
 
+## 2.2.0 — 2026-09-25
+
+**Vision**: the search can look at what is in the pictures. Optional, and off
+unless you switch it on.
+
+**Before you upgrade:** nothing to do — vision stays off. To switch it on,
+set `VISION=1` (docker-compose: for the gallery and the console alike) and
+restart. The next scan downloads the model once (~217 MB into
+`DATA_DIR/models`, each file checked against a pinned SHA-256) and reads
+every photo, about 40 ms each on a small server; until it has, the search
+finds only what it found before. The image gains two small libraries
+(onnxruntime, tokenizers), not the model.
+
+* **Search by what is in a photo**: "sunset over the sea",
+  "Sonnenuntergang am Meer", "夕日", "red torii gate", "Tempel" find the
+  photos that show it, whether or not a name or a tag says so — one
+  multilingual model (CLIP ViT-B/32 with a multilingual text side), running
+  on this machine; no photo leaves it. A search reads in ~10 ms once the
+  model is loaded.
+* **Its own group, and one click to leave it out**: those matches show on
+  /search under *Looks like “…”*, apart from what the words found by name,
+  with a note that they can be wrong (an archive without a cat still has a
+  nearest animal). *Search the pictures too* above the results switches
+  them off for that search — `vision=off` in the address, kept by every
+  facet, chip and sort link on the page.
+* **The filters still hold**: a picture search inside `album:`, `date:`,
+  `color:` and the rest looks only inside what they allow, and never shows
+  a photo the words already found.
+* **System → Vision** in the console: on or off, the model, how far the
+  scan has read the photos, where the files are — and, when it is off, the
+  one line of docker-compose that switches it on. Switched in the
+  environment only, never in a file the photo share can write.
+
 ## 2.1.1 — 2026-09-25
 
 * **The search opens without a word typed**: the magnifier is the search

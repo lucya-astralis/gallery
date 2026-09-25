@@ -4170,7 +4170,7 @@ button.donut__row { cursor: pointer; }
 :is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-folder, .fa-folder-tree, .fa-folder-open, .fa-images, .fa-image, .fa-globe, .fa-link, .fa-id-card, .fa-house) { color: var(--glyph-album); }
 :is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-tag, .fa-tags) { color: var(--glyph-tag); }
 :is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-calendar-day, .fa-clock-rotate-left, .fa-chart-simple, .fa-scroll) { color: var(--glyph-time); }
-:is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-camera, .fa-microchip, .fa-server, .fa-hard-drive, .fa-stethoscope, .fa-gauge, .fa-location-dot, .fa-key, .fa-box-archive, .fa-palette) { color: var(--glyph-machine); }
+:is(.card__title, .rail__link, .subnav__link, .todo__what, .fact, .facets__title, .edsec__title, .insp__sub, .history__when, .palette__item, .group__title, .tab) > :is(.fa-camera, .fa-microchip, .fa-server, .fa-hard-drive, .fa-stethoscope, .fa-gauge, .fa-location-dot, .fa-key, .fa-box-archive, .fa-palette, .fa-eye) { color: var(--glyph-machine); }
 /* on a filled face -- the tab you are on -- the glyph takes the face's ink;
    a done to-do goes quiet */
 .tab.is-active > .fa { color: inherit; }
@@ -4927,6 +4927,13 @@ button.donut__row { cursor: pointer; }
 .maker__name .fa,
 .maker__repo .fa { color: var(--text-ghost); margin: 0 var(--s-2); }
 .maker__repo .fa:first-child { margin-left: 0; }
+/* A snippet to copy (Vision's switch): mono, on the lifted glass step. */
+.code-block {
+  margin: var(--s-4) 0; padding: var(--s-4);
+  background: var(--glass-hi); border: var(--hair) solid var(--line);
+  font-family: var(--mono); font-size: var(--fs-chrome-sm); color: var(--chrome);
+  white-space: pre; overflow-x: auto;
+}
 .maker__facts { margin-top: var(--s-5); padding-top: var(--s-4); border-top: var(--hair) solid var(--line); }
 .maker__facts a .fa { color: var(--text-ghost); margin-left: var(--s-2); }
 .maker__note { color: var(--text-dim); }

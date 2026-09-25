@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from .. import (
     albums, brand, branding, cfgio, colors, config, db, i18n, photos, scanner, schema, search, stats, theme,
-    trips, welcome,
+    trips, vision, welcome,
 )
 from ..runtime import settings
 from . import context, media
@@ -615,15 +615,25 @@ def _color_facet(c, base: str, args: list, q: str, query, lang: str, sort_q: str
 
 
 @router.get("/search", response_class=HTMLResponse)
-def search_page(request: Request, q: str = "", sort: str | None = None):
+def search_page(request: Request, q: str = "", sort: str | None = None,
+                vision: str | None = None):
     """The search, and -- with nothing typed -- a way to browse every photo
-    by the same facets. It used to send an empty search to /albums."""
+    by the same facets. It used to send an empty search to /albums.
+
+    With vision on (VISION=1), the words also find photos by what is IN them,
+    shown as a group of their own; `vision=off` leaves that group out for
+    this search, and every link on the page keeps saying so."""
     q = q.strip()
     c = db.conn()
     lang = context.request_lang(request)
     current_sort = photos.pick_sort(sort, photos.SORT_IMAGE_SQL, photos.SORT_IMAGE_DEFAULT)
     qualified_sql = photos.qualify_sort(photos.SORT_IMAGE_SQL[current_sort])
-    sort_q = "" if current_sort == photos.SORT_IMAGE_DEFAULT else "sort=" + current_sort
+    vision_off = vision == "off"
+    # what every link on the page carries along: the sort, and the vision
+    # switch when it is off (named sort_q from when the sort was all of it)
+    sort_q = "&".join(p for p in (
+        "" if current_sort == photos.SORT_IMAGE_DEFAULT else "sort=" + current_sort,
+        "vision=off" if vision_off else "") if p)
 
     # Albums the query names. The `album` column is the FOLDER path, so on its
     # own it could not find "Japan 2026" — the name the album is called
@@ -677,6 +687,8 @@ def search_page(request: Request, q: str = "", sort: str | None = None):
     album_cards = albums.sorted_album_cards(
         [albums.album_card(a) for a in matched_albums[:SEARCH_ALBUM_LIMIT]], "name_asc")
     sort_options = photos.image_sort_options_for_template(current_sort, lang=lang)
+    look, look_state = _looks_like(c, query, where, params, vision_off)
+    keep_sort = "" if current_sort == photos.SORT_IMAGE_DEFAULT else "sort=" + current_sort
     return context.templates.TemplateResponse(
         request, "search.html",
         {
@@ -696,5 +708,40 @@ def search_page(request: Request, q: str = "", sort: str | None = None):
             "default_sort": photos.SORT_IMAGE_DEFAULT,
             "sort_options": sort_options,
             "sort_label": photos.active_sort_label(sort_options),
+            # vision: the photos that look like the words, and the switch
+            # (None when vision is off on this server or nothing was typed)
+            "look": look,
+            "look_state": look_state,
+            "look_toggle": _search_href(q, "&".join(p for p in (
+                keep_sort, "" if vision_off else "vision=off") if p)) if look_state else None,
+            "vision_q": "&vision=off" if vision_off else "",
         },
     )
+
+
+def _looks_like(c, query, where: str, params: list, off: bool) -> tuple[list[dict], str | None]:
+    """The photos that LOOK like the words (vision.py), within whatever the
+    filters allow and apart from what the words found by name -- those are
+    already on the page. ([], None) when vision is not available or nothing
+    was typed; ([], "off") when this search switched it off."""
+    if not query.text or not vision.enabled():
+        return [], None
+    if off:
+        return [], "off"
+    listed, listed_params = albums.unlisted_clause("i.album")
+    only_filters = search.Query("", query.filters, query.tokens)
+    if any(f.ok for f in query.filters):
+        fw, fp = search.condition(only_filters, "i")
+    else:
+        fw, fp = "1", []
+    allowed = {r[0] for r in c.execute(
+        f"SELECT i.id FROM images i WHERE ({fw}) AND {listed}", (*fp, *listed_params))}
+    found = {r[0] for r in c.execute(
+        f"SELECT i.id FROM images i WHERE ({where}) AND {listed}", (*params, *listed_params))}
+    ranked = vision.rank(c, query.text, allowed=allowed, exclude=found)
+    if not ranked:
+        return [], "on"
+    ids = [i for i, _ in ranked]
+    rows = {r["id"]: dict(r) for r in c.execute(
+        "SELECT * FROM images WHERE id IN (%s)" % ",".join("?" * len(ids)), ids)}
+    return [rows[i] | {"score": round(s, 3)} for i, s in ranked if i in rows], "on"

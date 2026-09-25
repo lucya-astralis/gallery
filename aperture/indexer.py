@@ -12,7 +12,7 @@ import logging
 import threading
 import time
 
-from . import albums, control, db, scanner, watcher
+from . import albums, control, db, scanner, vision, watcher
 from .runtime import settings
 
 log = logging.getLogger("aperture.indexer")
@@ -92,6 +92,10 @@ def run_scan(trigger: str = "periodic", album: str | None = None,
         _scan_state.update(scanning=True, started_at=started, trigger=trigger)
     _publish_status()
     try:
+        # Vision's model arrives on the first scan after VISION=1, once; a
+        # failed download is logged and retried next scan, never fatal.
+        if settings.vision and not vision.installed():
+            vision.install()
         try:
             result = scanner.full_scan(
                 settings.photos_dir, settings.thumbs_dir, settings.thumb_size,
@@ -101,6 +105,9 @@ def run_scan(trigger: str = "periodic", album: str | None = None,
         except Exception as e:
             error = f"{type(e).__name__}: {e}"
             log.exception("scan failed: %s", e)
+        # The image half of the model is only needed while a scan reads photos.
+        vision.release_images()
+        vision.forget()
         # Re-derive featured flags from album.cfg.
         # Runs even when the walk blew up: the index is then partial, but
         # leaving is_showcase stale on top of it hides featured photos too.

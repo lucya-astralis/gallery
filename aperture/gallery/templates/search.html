@@ -35,6 +35,17 @@
         {% endif %}
       </ul>
     {% endif %}
+    {# vision: whether this search also looks at what is IN the pictures.
+       One link, the same search with it switched the other way. #}
+    {% if look_state %}
+      <p class="search-vision">
+        <a class="search-vision__toggle{% if look_state == 'on' %} is-on{% endif %}" href="{{ look_toggle }}"
+           aria-pressed="{{ 'true' if look_state == 'on' else 'false' }}"
+           title="{{ t('search.vision_leave_out') if look_state == 'on' else t('search.vision_add') }}">
+          <span class="search-vision__box" aria-hidden="true"></span>
+          <i class="fa fa-eye" aria-hidden="true"></i>{{ t('search.vision_label') }}</a>
+      </p>
+    {% endif %}
   </header>
 
   <div class="search-layout">
@@ -87,7 +98,7 @@
     {% endif %}
 
     <div class="search-results" data-live="body">
-    {% if not images and not albums %}
+    {% if not images and not albums and not look %}
       <div class="empty">
         {% if query %}<p>{{ t('search.no_match_prefix') }}<code>{{ query }}</code>{{ t('search.no_match_suffix') }}</p>{% endif %}
         <p class="note">{{ t('search.hint') }}</p>
@@ -125,7 +136,7 @@
             {% for opt in sort_options %}
               <a class="sort__option{% if opt.active %} is-active{% endif %}"
                  role="menuitem"
-                 href="/search?{% if query %}q={{ query | urlencode }}&{% endif %}sort={{ opt.key }}">
+                 href="/search?{% if query %}q={{ query | urlencode }}&{% endif %}sort={{ opt.key }}{{ vision_q }}">
                 {{ opt.label }}
               </a>
             {% endfor %}
@@ -144,6 +155,26 @@
         {% endfor %}
       </ul>
       {% if capped %}<p class="note search-group__capped">{{ t('search.capped', n=limit) }}</p>{% endif %}
+    </section>
+    {% endif %}
+
+    {# What the words find by what is IN the pictures (vision.py) -- its own
+       group, labelled for what it is, because it can be wrong: an archive
+       without a cat still has a nearest animal. #}
+    {% if look %}
+    <section class="search-group search-group--look">
+      <h2 class="search-group__label"><i class="fa fa-eye" aria-hidden="true"></i>{{ t('search.vision_head', q=words) }}<span class="search-group__n">{{ look | length }}</span></h2>
+      <p class="note search-group__note">{{ t('search.vision_note') }} <a href="{{ look_toggle }}">{{ t('search.vision_leave_out') }}</a></p>
+      <ul class="image-grid">
+        {% for img in look %}
+          <li class="image-tile">
+            <a href="/image/{{ img.rel_path }}" title="{{ img.album }} / {{ img.filename }}">
+              <img src="{{ media_url('thumb', img) }}" alt="{{ img.filename }}" loading="lazy">
+              <div class="image-tile__overlay"><span>{{ img.album }}</span></div>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
     </section>
     {% endif %}
     {% endif %}

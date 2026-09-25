@@ -117,6 +117,10 @@ def migrate(conn: sqlite3.Connection) -> None:
         # is the scan's job, not a startup's.
         conn.execute("ALTER TABLE images ADD COLUMN content_hash TEXT")
 
+    if "vision" not in existing_cols:
+        # vision.py: 512 float16s per photo, read by the scan when VISION=1.
+        conn.execute("ALTER TABLE images ADD COLUMN vision BLOB")
+
     for col in ("colors", "palette"):
         if col not in existing_cols:
             # colors.py: read from each photo's thumbnail. Left NULL here --

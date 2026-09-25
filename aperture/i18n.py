@@ -299,6 +299,16 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "search.facet_years": ("Year", "Jahr", "年"),
     "search.facet_cameras": ("Camera", "Kamera", "カメラ"),
     "search.facet_colors": ("Colour", "Farbe", "色"),
+    # vision (VISION=1): the photos found by what is in them, and the switch
+    "search.vision_head": ("Looks like “{q}”", "Sieht aus wie „{q}“", "「{q}」に見える写真"),
+    "search.vision_note": (
+        "Found by what is in the picture, not by a name or a tag — so it can be wrong.",
+        "Gefunden nach dem, was im Bild ist, nicht nach Name oder Tag – kann also danebenliegen.",
+        "名前やタグではなく、写っている内容で見つけた写真です。間違うこともあります。",
+    ),
+    "search.vision_label": ("Search the pictures too", "Auch im Bildinhalt suchen", "画像の内容も検索"),
+    "search.vision_leave_out": ("Leave these out", "Diese weglassen", "これらを除く"),
+    "search.vision_add": ("Also find photos by what is in them", "Auch Fotos nach ihrem Inhalt finden", "内容でも写真を探す"),
     # colours.py's names -- the colour facet and the photo page's palette
     "color.red": ("Red", "Rot", "赤"),
     "color.orange": ("Orange", "Orange", "オレンジ"),
