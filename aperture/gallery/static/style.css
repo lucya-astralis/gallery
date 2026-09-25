@@ -1038,8 +1038,8 @@ code{
   background:var(--glass);
   backdrop-filter:var(--glass-blur);
   -webkit-backdrop-filter:var(--glass-blur);
-  /* no right padding: the button segment runs flush to the edge */
-  padding:0 0 0 var(--s-4);
+  /* no left padding: the glass's button segment runs flush to the edge */
+  padding:0 var(--s-4) 0 0;
   transition: border-color var(--dur-1), background var(--dur-1), box-shadow var(--dur-1);
 }
 .nav__search:focus-within{
@@ -6543,32 +6543,25 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
 /* …but the CTA's arrow is the invitation, so it keeps the label's weight */
 .btn-link--primary .btn-link__go{ margin-left:.8em; font-size:.9em; }
 
-/* --- nav search: the field's own button -------------------------------
-   A segment at the right end of the field, split off by a hairline: glass
-   + word in the chrome voice, the way every button on the site speaks. It
-   is how the search is reached without typing (an empty submit browses),
-   so it has to read as a button, not as the field's decoration -- which the
-   magnifier on the LEFT did (user, 2026-09-25). */
+/* --- nav search: the glass is the field's own button --------------------
+   A square segment at the LEFT end of the field, where a search field keeps
+   its glass, split off by a hairline and lifted a step so it reads as a
+   button rather than as the field's decoration. It is how the search is
+   reached without typing (an empty submit browses). Tried on the right with
+   a word beside it first -- "lupe rechts, ich weiß nicht" (user, 2026-09-25). */
 .nav__search-go{
-  display:inline-flex; align-items:center; gap:var(--s-2); align-self:stretch; flex:none;
-  margin:0 0 0 var(--s-3); padding:0 var(--s-4);
-  border:0; border-left:var(--hair) solid var(--line);
-  background:rgba(255,255,255,.03); color:var(--label);
-  font-family:var(--mono); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs);
-  text-transform:uppercase; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; align-self:stretch; flex:none;
+  width:38px; margin:0 var(--s-3) 0 0; padding:0;
+  border:0; border-right:var(--hair) solid var(--line);
+  background:rgba(255,255,255,.04); color:var(--label);
+  cursor:pointer;
   transition:color var(--dur-1), background-color var(--dur-1), border-color var(--dur-1);
 }
 .nav__search-ico{ font-size:12px; color:inherit; }
-.nav__search:focus-within .nav__search-go{ border-left-color:rgba(var(--acc-rgb),.45); color:var(--text); }
-@media (hover:hover){ .nav__search-go:hover{ color:var(--text); background:rgba(255,255,255,.07); } }
-.nav__search-go:active{ background:rgba(var(--acc-rgb),.14); }
-.nav__search-go:focus-visible{ outline:none; box-shadow:inset 0 0 0 1px var(--acc); color:var(--text); }
-/* phones: the glass alone, the field needs the width */
-@media (max-width:760px){
-  .nav__search-word{ display:none; }
-  /* square with the field's 38px height: a thumb-sized target */
-  .nav__search-go{ padding:0; width:38px; justify-content:center; }
-}
+.nav__search:focus-within .nav__search-go{ border-right-color:rgba(var(--acc-rgb),.45); color:var(--acc); }
+@media (hover:hover){ .nav__search-go:hover{ color:var(--text); background:rgba(255,255,255,.09); } }
+.nav__search-go:active{ background:rgba(var(--acc-rgb),.16); }
+.nav__search-go:focus-visible{ outline:none; box-shadow:inset 0 0 0 1px var(--acc); color:var(--acc); }
 
 /* --- chevrons that replaced ‹ › ---------------------------------------- */
 /* these buttons were sized around a 13-22px punctuation glyph; a chevron

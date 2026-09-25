@@ -36,7 +36,7 @@ STRINGS: dict[str, tuple[str, str, str]] = {
         "個人写真アーカイブ。",
     ),
     "nav.search_open": ("Open the search", "Suche öffnen", "検索を開く"),
-    # the word on the field's own button; the hint beside it no longer says it
+    # the glass button's name, for screen readers (it shows no word)
     "nav.search_go": ("Search", "Suche", "検索"),
     "nav.search_ph": ("Albums, files, tags, cameras, colours", "Alben, Dateien, Tags, Kameras, Farben", "アルバム・ファイル・タグ・カメラ・色"),
     # short form swapped in on phones (app.js), where the full hint is too long
