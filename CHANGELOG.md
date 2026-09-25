@@ -20,10 +20,14 @@ notes are never one commit apart.
 
 ## 2.1.1 — 2026-09-25
 
-* **The search opens without a word typed**: the magnifier in the top bar
-  is a button now. Clicked with the field empty it opens /search browsing
+* **The search opens without a word typed**: the search field has a button
+  of its own now — a segment at its right end, split off by a hairline,
+  with the magnifier and the word *Search* (the glass alone on a phone, as a
+  38 px square). Clicked with the field empty it opens /search browsing
   every photo by its facets — colour swatches first — which used to be
   reachable only by pressing Enter in an empty field, which nobody guesses.
+  The field's hint lost its leading "Search" to the button and gained
+  colours: *Albums, files, tags, cameras, colours*.
 
 ## 2.1.0 — 2026-09-25
 

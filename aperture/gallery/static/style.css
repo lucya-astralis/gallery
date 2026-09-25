@@ -1038,7 +1038,8 @@ code{
   background:var(--glass);
   backdrop-filter:var(--glass-blur);
   -webkit-backdrop-filter:var(--glass-blur);
-  padding:0 var(--s-4);
+  /* no right padding: the button segment runs flush to the edge */
+  padding:0 0 0 var(--s-4);
   transition: border-color var(--dur-1), background var(--dur-1), box-shadow var(--dur-1);
 }
 .nav__search:focus-within{
@@ -3529,7 +3530,7 @@ details[open] > summary::before{ content:"▾ "; }
 }
 @media (max-width:480px){
   .nav__brand .brand-text{ display:none; }
-  .nav__search-ico{ margin-right:var(--s-2); font-size:11px; }
+  .nav__search-ico{ font-size:11px; }
   /* stay at 16px to prevent iOS focus-zoom (see 760px block); just tighten padding */
   .nav__search input{ padding:var(--s-3) 0; }
   .image-grid{ grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:var(--s-2); }
@@ -6542,24 +6543,32 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
 /* …but the CTA's arrow is the invitation, so it keeps the label's weight */
 .btn-link--primary .btn-link__go{ margin-left:.8em; font-size:.9em; }
 
-/* --- nav search: the magnifier is a flex sibling of the input ---------- */
-.nav__search-ico{
-  color:var(--text-ghost);
-  font-size:12px;
-  margin-right:var(--s-3);
-  flex:none;
-  transition:color var(--dur-1);
-}
-.nav__search:focus-within .nav__search-ico{ color:var(--acc); }
-/* the glass is a button: it opens the search, typed into or not */
+/* --- nav search: the field's own button -------------------------------
+   A segment at the right end of the field, split off by a hairline: glass
+   + word in the chrome voice, the way every button on the site speaks. It
+   is how the search is reached without typing (an empty submit browses),
+   so it has to read as a button, not as the field's decoration -- which the
+   magnifier on the LEFT did (user, 2026-09-25). */
 .nav__search-go{
-  display:inline-flex; align-items:center; align-self:stretch; flex:none;
-  margin:0; padding:0; border:0; background:none; color:inherit; font:inherit;
-  cursor:pointer;
+  display:inline-flex; align-items:center; gap:var(--s-2); align-self:stretch; flex:none;
+  margin:0 0 0 var(--s-3); padding:0 var(--s-4);
+  border:0; border-left:var(--hair) solid var(--line);
+  background:rgba(255,255,255,.03); color:var(--label);
+  font-family:var(--mono); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs);
+  text-transform:uppercase; cursor:pointer;
+  transition:color var(--dur-1), background-color var(--dur-1), border-color var(--dur-1);
 }
-@media (hover:hover){ .nav__search-go:hover .nav__search-ico{ color:var(--text); } }
-.nav__search-go:focus-visible{ outline:none; }
-.nav__search-go:focus-visible .nav__search-ico{ color:var(--acc); }
+.nav__search-ico{ font-size:12px; color:inherit; }
+.nav__search:focus-within .nav__search-go{ border-left-color:rgba(var(--acc-rgb),.45); color:var(--text); }
+@media (hover:hover){ .nav__search-go:hover{ color:var(--text); background:rgba(255,255,255,.07); } }
+.nav__search-go:active{ background:rgba(var(--acc-rgb),.14); }
+.nav__search-go:focus-visible{ outline:none; box-shadow:inset 0 0 0 1px var(--acc); color:var(--text); }
+/* phones: the glass alone, the field needs the width */
+@media (max-width:760px){
+  .nav__search-word{ display:none; }
+  /* square with the field's 38px height: a thumb-sized target */
+  .nav__search-go{ padding:0; width:38px; justify-content:center; }
+}
 
 /* --- chevrons that replaced ‹ › ---------------------------------------- */
 /* these buttons were sized around a 13-22px punctuation glyph; a chevron
