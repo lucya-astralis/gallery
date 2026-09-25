@@ -53,6 +53,9 @@ def _publish_status() -> None:
         "scanning": state["scanning"],
         "scan_started_at": state["started_at"],
         "scan_trigger": state["trigger"],
+        # how far the running scan is -- {phase, done, total, current} --
+        # what makes the console's live view more than "scanning"
+        "progress": state.get("progress"),
         "last_scan": state["last_scan"],
         "pending_request": control.pending_scan_request(),
         "job": state["job"],
@@ -77,6 +80,26 @@ def _publish_status() -> None:
     })
 
 
+# The live status is rewritten at most this often while a scan runs: often
+# enough for a progress bar to move, rarely enough to cost nothing.
+_PROGRESS_EVERY = 1.0
+_last_progress = 0.0
+
+
+def _progress(phase: str, done: int, total: int, current: str | None) -> None:
+    """The running scan says how far it is. Throttled; the last step of a
+    phase always gets through, so a bar never stops one short."""
+    global _last_progress
+    now = time.time()
+    if now - _last_progress < _PROGRESS_EVERY and done < total:
+        return
+    _last_progress = now
+    with _scan_state_lock:
+        _scan_state["progress"] = {"phase": phase, "done": done, "total": total,
+                                   "current": current}
+    _publish_status()
+
+
 def run_scan(trigger: str = "periodic", album: str | None = None,
               force: bool = False, request_id: str | None = None) -> dict | None:
     """One indexing pass, then a featured recompute. Returns the run summary,
@@ -89,18 +112,21 @@ def run_scan(trigger: str = "periodic", album: str | None = None,
     error = None
     result = None
     with _scan_state_lock:
-        _scan_state.update(scanning=True, started_at=started, trigger=trigger)
+        _scan_state.update(scanning=True, started_at=started, trigger=trigger, progress=None)
     _publish_status()
     try:
         # Vision's model arrives on the first scan after VISION=1, once; a
         # failed download is logged and retried next scan, never fatal.
         if settings.vision and not vision.installed():
-            vision.install()
+            vision.install(on_progress=lambda done, total: _progress(
+                "model", done >> 20, total >> 20, None))
         try:
             result = scanner.full_scan(
                 settings.photos_dir, settings.thumbs_dir, settings.thumb_size,
                 previews_dir=settings.previews_dir, preview_size=settings.preview_size,
                 root=album, force=force,
+                progress=lambda done, total, file: _progress(
+                    "photos", done, total, file.relative_to(settings.photos_dir).as_posix()),
             )
         except Exception as e:
             error = f"{type(e).__name__}: {e}"
@@ -137,7 +163,7 @@ def run_scan(trigger: str = "periodic", album: str | None = None,
         }
         with _scan_state_lock:
             _scan_state.update(scanning=False, started_at=None, trigger=None,
-                               last_scan=summary)
+                               last_scan=summary, progress=None)
         _scan_lock.release()
         _publish_status()
     return summary

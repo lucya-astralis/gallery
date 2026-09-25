@@ -18,6 +18,37 @@ notes are never one commit apart.
 
 ---
 
+## 2.3.0 — 2026-09-25
+
+The console shows the machine **live**.
+
+**Before you upgrade:** nothing to do. Behind a reverse proxy, the console's
+`/api/ops/live` is a long-lived response (server-sent events): nginx passes it
+as it is (the response says `X-Accel-Buffering: no`), a proxy that buffers
+anyway only slows it back down to the old 30-second poll, which stays as the
+fallback.
+
+* **Live status**: one stream from the console to the page carries every
+  change of the indexer's status the moment it happens — a scan starting,
+  how far it is, a pause, a queued job, the end of a scan — instead of a
+  poll every 30 seconds that knew nothing of a scan it had not started.
+  It follows the session: when that ends (idle, signed out, a new
+  password) the stream says so and the page goes to the door, and the
+  stream itself never counts as activity.
+* **A scan says how far it is**: the indexer publishes its progress about
+  once a second — photo 312 of 799, and which one — and, the first time
+  vision is switched on, the model download in MB. The lamp in the bar
+  reads *scanning 39%*, and both indexer cards (Overview and System) carry
+  a bar, the count and the file, while the dot breathes (not for reduced
+  motion).
+* **Only the moving part moves**: an update swaps the status block of a
+  card and nothing around it — an open *Scope, force, a reason*, a
+  half-typed album path, the focus all stay where they are.
+* **Scans you did not start**: when the periodic scan or the watcher ends
+  one that changed something, a line says what (*Scan: 3 indexed ·
+  3 thumbnails*), and the Overview recounts.
+* System → Vision follows the live status too.
+
 ## 2.2.0 — 2026-09-25
 
 **Vision**: the search can look at what is in the pictures. Optional, and off

@@ -780,37 +780,103 @@ function paintVision(grid) {
                      onclick: () => { opsState.vision = null; paintOps(); } })))));
 }
 
-function paintIndexer(grid, st, ro) {
+/* ----- live -------------------------------------------------------------- */
+/* The part of an indexer card that moves: the lamp, how far a running scan
+ * is, and what the last one did. Built from the status alone, so a live
+ * update (liveStatus, below) swaps exactly this block and nothing around it
+ * -- the buttons, an open "scope, force, a reason", a half-typed album path
+ * all stay as they are. Two cards draw it: System's (`ops`) and the
+ * Overview's (`home`), which says less. */
+function indexerLive(st, variant) {
   const paths = st.paths || {};
-  const scan = (st.server && st.server.last_scan) || null;
+  const server = st.server || {};
+  const scan = server.last_scan || null;
   const res = (scan && scan.result) || {};
   const live = !!st.live;
   const paused = !!st.paused;
-  const scanning = !!(st.server && st.server.scanning);
+  const scanning = !!server.scanning;
   const tone = paused ? 'warn' : live ? 'ok' : 'bad';
   const word = paused ? 'paused' : scanning ? 'scanning' : live ? 'running' : 'not running';
-  const pending = (st.server && st.server.pending_jobs) || [];
+  const pending = server.pending_jobs || [];
+  const note = scanning ? 'triggered by ' + (server.scan_trigger || '?')
+    : paused && st.pause && variant === 'home'
+      ? 'since ' + agoIso(new Date(st.pause.since * 1000).toISOString()) + (st.pause.reason ? ' — ' + st.pause.reason : '')
+      : live ? '' : 'no heartbeat — start the gallery to index';
+  const lastScan = scan
+    ? ago(scan.finished_at) + ' · ' + (scan.trigger || '?') + (scan.seconds != null ? ' · ' + scan.seconds + 's' : '')
+    : 'never';
+  const facts = variant === 'home'
+    ? [fact('Last scan', lastScan), fact('It did', scan ? scanSummary(res) : '—'),
+       fact('Every', paths.scan_interval ? paths.scan_interval + 's' : 'manual only'),
+       fact('Watcher', paths.watcher ? 'on' : 'off'), fact('Role', st.role || '—')]
+    : [paused && st.pause
+        ? fact('Paused', ago(st.pause.since) + (st.pause.reason ? ' — ' + st.pause.reason : ''), 'warn') : null,
+       fact('Last scan', lastScan),
+       fact('It did', scan ? scanSummary(res) : '—', res.failed || res.held ? 'warn' : null),
+       scan && scan.error ? fact('Last error', scan.error, 'bad') : null,
+       pending.length ? fact('Jobs queued', String(pending.length), 'warn') : null,
+       fact('Scans', (paths.scan_interval ? 'every ' + paths.scan_interval + 's' : 'on request only') +
+         ' · watcher ' + (paths.watcher ? 'on' : 'off'))];
+  return el('div', { class: 'indexer-live', 'data-variant': variant, 'aria-live': 'polite' },
+    el('div', { class: 'lamp' },
+      el('span', { class: 'lamp__dot is-' + tone + (scanning ? ' is-busy' : '') }),
+      el('span', { class: 'lamp__word is-' + tone, text: word }),
+      el('span', { class: 'lamp__note', text: note })),
+    scanProgress(st),
+    el('dl', { class: 'facts' }, facts));
+}
+
+/* How far a running scan is, as the indexer publishes it (about once a
+ * second): a bar, the count, and the photo it is on. */
+function scanProgress(st) {
+  const server = st.server || {};
+  const p = server.scanning && server.progress;
+  if (!p || !p.total) return null;
+  const pct = Math.floor((p.done * 100) / p.total);
+  const what = p.phase === 'model'
+    ? 'downloading the vision model — ' + p.done + ' of ' + p.total + ' MB'
+    : 'photo ' + p.done + ' of ' + p.total;
+  return el('div', { class: 'scan-progress' },
+    meter(p.done, p.total, 'acc'),
+    el('p', { class: 'scan-progress__line' },
+      el('span', { class: 'scan-progress__what', text: what + ' · ' + pct + '%' }),
+      p.current ? el('span', { class: 'scan-progress__file', text: p.current, title: p.current }) : null));
+}
+
+/* A new status from the live stream (shell.js startLive). Everything that
+ * shows the machine follows it: the lamp in the bar, every indexer card on
+ * screen, System > Vision -- and when a scan ends that this console did not
+ * start (the periodic one, the watcher's), a word about what it did. */
+function liveStatus(st) {
+  const before = opsState.status || {};
+  opsState.status = st;
+  syncLamp();
+  $$('.indexer-live').forEach((node) => node.replaceWith(indexerLive(st, node.dataset.variant)));
+  if (st.vision) {
+    opsState.vision = st.vision;
+    const typing = document.activeElement && $('#pane').contains(document.activeElement) &&
+      /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+    if (onOps() && opsState.tab === 'vision' && !typing) paintOps();
+  }
+  const was = !!(before.server && before.server.scanning);
+  const is = !!(st.server && st.server.scanning);
+  if (was && !is && !opsState.busy) {
+    const last = st.server.last_scan || {};
+    const r = last.result || {};
+    const changed = (r.indexed || 0) + (r.removed || 0);
+    if (last.error) toast('Scan finished with errors: ' + last.error, 'err');
+    else if (changed) toast('Scan: ' + scanSummary(r));
+    /* what the Overview counts may have moved */
+    if (changed && state.sel && state.sel.kind === 'home') renderHome();
+  }
+}
+
+function paintIndexer(grid, st, ro) {
+  const paths = st.paths || {};
+  const paused = !!st.paused;
 
   grid.append(wide(card('fa-microchip', 'Indexer', 'the one writer of the index, whoever asks',
-    el('div', { class: 'lamp' },
-      el('span', { class: 'lamp__dot is-' + tone }),
-      el('span', { class: 'lamp__word is-' + tone, text: word }),
-      el('span', { class: 'lamp__note', text: scanning
-        ? 'triggered by ' + ((st.server && st.server.scan_trigger) || '?')
-        : live ? '' : 'no heartbeat — start the gallery to index' })),
-    el('dl', { class: 'facts' },
-      paused && st.pause
-        ? fact('Paused', ago(st.pause.since) + (st.pause.reason ? ' — ' + st.pause.reason : ''), 'warn')
-        : null,
-      fact('Last scan', scan
-        ? ago(scan.finished_at) + ' · ' + (scan.trigger || '?') +
-          (scan.seconds != null ? ' · ' + scan.seconds + 's' : '')
-        : 'never'),
-      fact('It did', scan ? scanSummary(res) : '—', res.failed || res.held ? 'warn' : null),
-      scan && scan.error ? fact('Last error', scan.error, 'bad') : null,
-      pending.length ? fact('Jobs queued', String(pending.length), 'warn') : null,
-      fact('Scans', (paths.scan_interval ? 'every ' + paths.scan_interval + 's' : 'on request only') +
-        ' · watcher ' + (paths.watcher ? 'on' : 'off'))),
+    indexerLive(st, 'ops'),
     ro ? quiet('The console is mounted read-only. Nothing here can be started from the browser.') : null,
     el('div', { class: 'card__actions' },
       el('button', {
@@ -1677,11 +1743,7 @@ function paintHome() {
   const st = opsState.status || {};
   const idx = st.index || {};
   const paths = st.paths || {};
-  const scan = (st.server && st.server.last_scan) || null;
-  const res = (scan && scan.result) || {};
-  const live = !!st.live;
   const paused = !!st.paused;
-  const scanning = !!(st.server && st.server.scanning);
   const values = (home.gallery && home.gallery.values) || {};
   const title = (values.site_name || []).join(', ').trim() || 'This archive';
   const ro = !!st.read_only || READ_ONLY;
@@ -1774,25 +1836,8 @@ function paintHome() {
   }
 
   /* ---- is the machine working ---- */
-  const tone = paused ? 'warn' : live ? 'ok' : 'bad';
-  const word = paused ? 'paused' : scanning ? 'scanning' : live ? 'running' : 'not running';
   put(2, 6, card('fa-microchip', 'Indexer', st.control_dir ? 'via the control channel' : null,
-    el('div', { class: 'lamp' },
-      el('span', { class: 'lamp__dot is-' + tone }),
-      el('span', { class: 'lamp__word is-' + tone, text: word }),
-      el('span', { class: 'lamp__note', text: paused && st.pause
-        ? 'since ' + agoIso(new Date(st.pause.since * 1000).toISOString()) +
-          (st.pause.reason ? ' — ' + st.pause.reason : '')
-        : live ? '' : 'no heartbeat — start the gallery to index' })),
-    el('dl', { class: 'facts' },
-      fact('Last scan', scan
-        ? ago(scan.finished_at) + ' · ' + (scan.trigger || '?') +
-          (scan.seconds != null ? ' · ' + scan.seconds + 's' : '')
-        : 'never'),
-      fact('It did', scan ? scanSummary(res) : '—'),
-      fact('Every', paths.scan_interval ? paths.scan_interval + 's' : 'manual only'),
-      fact('Watcher', paths.watcher ? 'on' : 'off'),
-      fact('Role', st.role || '—')),
+    indexerLive(st, 'home'),
     el('div', { class: 'card__actions' },
       el('button', {
         type: 'button', class: 'btn btn--primary', icon: 'fa-arrows-rotate', text: 'Scan now',

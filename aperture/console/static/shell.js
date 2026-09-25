@@ -177,21 +177,41 @@ function syncLamp() {
   const scanning = !!(st.server && st.server.scanning);
   const tone = st.error ? 'bad' : st.paused ? 'warn' : st.live ? 'ok' : 'bad';
   dot.className = 'lamp__dot is-' + tone;
+  const p = scanning && st.server.progress;
+  const pct = p && p.total ? ' ' + Math.floor((p.done * 100) / p.total) + '%' : '';
   word.textContent = st.error ? 'offline' : st.paused ? 'paused'
-    : scanning ? 'scanning' : st.live ? 'indexer' : 'stopped';
+    : scanning ? 'scanning' + pct : st.live ? 'indexer' : 'stopped';
   $('#nav-lamp').title = st.error ? 'The indexer status could not be read'
     : st.paused ? 'The indexer is paused' : scanning ? 'A scan is running'
       : st.live ? 'The indexer is running' : 'The indexer has no heartbeat';
 }
 
+/* The status arrives live (server-sent events, /api/ops/live) whenever it
+ * changes. The 30-second poll stays as the fallback: it only asks while the
+ * stream is down -- a proxy that will not pass one, a browser without it. */
 let lampTimer = null;
+let liveSource = null;
 function watchLamp() {
   clearInterval(lampTimer);
+  startLive();
   lampTimer = setInterval(async () => {
     if (document.hidden) return;
+    if (liveSource && liveSource.readyState !== EventSource.CLOSED) return;
     await loadOpsStatus();
     syncLamp();
   }, 30000);
+}
+
+function startLive() {
+  if (!window.EventSource || (liveSource && liveSource.readyState !== EventSource.CLOSED)) return;
+  liveSource = new EventSource('/api/ops/live');
+  liveSource.addEventListener('status', (ev) => {
+    let st;
+    try { st = JSON.parse(ev.data); } catch (_) { return; }
+    liveStatus(st);
+  });
+  /* the session ended (idle, signed out, new password): the door */
+  liveSource.addEventListener('auth', () => { liveSource.close(); toLogin('timeout'); });
 }
 
 /* Unsaved edits on the page you are on, said in the bar so they are visible

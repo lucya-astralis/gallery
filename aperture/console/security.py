@@ -269,6 +269,21 @@ def current(request: Request) -> tuple[str, Session] | None:
     return sid, sess
 
 
+def still_signed_in(request: Request) -> bool:
+    """Whether the request's session still stands -- WITHOUT counting as
+    activity. current() refreshes `seen`; a live stream that called it every
+    second would keep an idle session alive forever, so the stream asks this
+    instead and ends when the idle timeout, a sign-out or a new password
+    has ended the session."""
+    if open_access():
+        return True
+    sid = request.cookies.get(COOKIE)
+    if not sid:
+        return False
+    _sweep(time.time())
+    return sid in _sessions
+
+
 def _retry_after(ip: str, now: float) -> float:
     record = _failures.get(ip)
     return max(0.0, record[1] - now) if record else 0.0

@@ -30,12 +30,16 @@ whole gallery; no request can name one file to be rewritten.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import tempfile
+import time
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from .. import control, db, i18n, ops, reports, vision
 from ..ops import UnknownAlbum
@@ -94,6 +98,10 @@ def _report(fn, *args, **kwargs):
 def api_status():
     """What the CLI's `status` opens with: is the indexer alive, is it paused,
     what did the last scan do, what does the index hold, and where."""
+    return _status()
+
+
+def _status() -> dict:
     report = ops.status()
     report["paths"] = ops.paths()
     report["read_only"] = settings.console_read_only
@@ -110,6 +118,67 @@ def api_disk():
     """What thumbnails, previews and conversions cost on disk. A walk of the
     generated trees, so a `def`: it runs in the threadpool."""
     return ops.disk_usage()
+
+
+# ----- live ------------------------------------------------------------------
+# The console used to ask for the status every 30 seconds (1.5 while a scan it
+# had started ran) and knew nothing of a scan it had not started. This is one
+# long-lived response instead -- server-sent events, which the CSP's
+# `connect-src 'self'` allows -- carrying a new status whenever it changes:
+# a scan starting, its progress (the indexer publishes it about once a
+# second), a pause, a job, the end of a scan. The indexer lives in another
+# process; what it publishes to the control directory is what is read here,
+# so this works whichever process owns the scan.
+LIVE_TICK = 1.0          # seconds between looks at the status
+LIVE_KEEPALIVE = 15.0    # a comment line, so proxies do not close an idle stream
+# A stream is recycled after this long: the browser reconnects on its own
+# (the `retry:` below), and nothing -- a proxy, a worker, a test client --
+# ever holds a response that never ends.
+LIVE_LIFETIME = 600.0
+
+
+def _live_snapshot() -> dict:
+    snap = _status()
+    if settings.vision:
+        snap["vision"] = vision.status(db.conn())
+    return snap
+
+
+@router.get("/live")
+async def api_live(request: Request):
+    async def events():
+        last = None
+        quiet_for = 0.0
+        ends_at = time.monotonic() + LIVE_LIFETIME
+        yield "retry: 3000\n\n"
+        while time.monotonic() < ends_at:
+            if await request.is_disconnected():
+                return
+            # ends with the session -- checked without counting as activity
+            if not security.still_signed_in(request):
+                yield "event: auth\ndata: {}\n\n"
+                return
+            try:
+                snap = await run_in_threadpool(_live_snapshot)
+                body = json.dumps(snap, sort_keys=True, default=str)
+            except Exception as e:           # a bad read is skipped, not fatal
+                log.warning("live status failed: %s", e)
+                body = None
+            if body is not None and body != last:
+                last = body
+                quiet_for = 0.0
+                yield "event: status\ndata: %s\n\n" % body
+            elif quiet_for >= LIVE_KEEPALIVE:
+                quiet_for = 0.0
+                yield ": keepalive\n\n"
+            await asyncio.sleep(LIVE_TICK)
+            quiet_for += LIVE_TICK
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-store",
+        # nginx and friends would otherwise hold the stream back in a buffer
+        "X-Accel-Buffering": "no",
+    })
 
 
 @router.get("/vision")

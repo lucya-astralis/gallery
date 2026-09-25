@@ -98,9 +98,10 @@ def installed() -> bool:
                for _, _, name, size, _ in FILES)
 
 
-def install() -> bool:
+def install(on_progress=None) -> bool:
     """Fetch whatever is missing, each file checked before it is kept. Safe
-    to call again after a failure: what arrived stays, the rest is retried."""
+    to call again after a failure: what arrived stays, the rest is retried.
+    `on_progress(done_bytes, total_bytes)` hears about every megabyte."""
     with _install_lock:
         if installed():
             return True
@@ -123,6 +124,8 @@ def install() -> bool:
                             break
                         out.write(chunk)
                         _state["done_bytes"] += len(chunk)
+                        if on_progress is not None:
+                            on_progress(_state["done_bytes"], sum(f[3] for f in FILES))
                 if part.stat().st_size != size or _sha256(part) != digest:
                     part.unlink(missing_ok=True)
                     raise RuntimeError("%s did not match its checksum" % name)

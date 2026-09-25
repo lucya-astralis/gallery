@@ -778,7 +778,7 @@ def _empty_scan(root: str | None = None) -> dict:
 
 def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
               previews_dir: Path | None = None, preview_size: int = 1600,
-              root: str | None = None, force: bool = False) -> dict:
+              root: str | None = None, force: bool = False, progress=None) -> dict:
     """Walk the photo tree, index what changed, build missing derivatives and
     drop rows whose file is gone.
 
@@ -813,7 +813,12 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
             return _empty_scan(root)
     # Walk the whole tree so albums can nest (photos/japan/tokyo/img.jpg).
     # Files sitting directly in photos_dir (no album folder) are skipped.
-    for file in walk_photo_tree(base):
+    # The walk is listed first, so `progress` (the indexer's live status) can
+    # say "312 of 799" rather than only "scanning".
+    files = [f for f in walk_photo_tree(base) if schema.is_image(f)]
+    for position, file in enumerate(files, 1):
+        if progress is not None:
+            progress(position, len(files), file)
         if not file.is_file() or not schema.is_image(file):
             continue
         relp = file.relative_to(photos_dir)

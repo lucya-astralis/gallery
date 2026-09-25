@@ -4646,6 +4646,26 @@ button.donut__row { cursor: pointer; }
 .lamp__dot.is-ok   { background: var(--ok);  box-shadow: 0 0 10px rgba(var(--ok-rgb), .5); }
 .lamp__dot.is-warn { background: var(--amb); box-shadow: 0 0 10px rgba(var(--amb-rgb), .5); }
 .lamp__dot.is-bad  { background: var(--red); box-shadow: 0 0 10px rgba(var(--red-rgb), .5); }
+/* a scan is running: the dot breathes -- opacity only, nothing moves, and
+   not at all for someone who asked for less motion */
+.lamp__dot.is-busy { animation: lamp-busy 1.6s var(--ease) infinite alternate; }
+@keyframes lamp-busy { from { opacity: 1; } to { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .lamp__dot.is-busy { animation: none; } }
+
+/* How far a running scan is (live, from the indexer): a bar under the lamp,
+   the count, and the photo it is on -- the path in mono, cut at the end. */
+.scan-progress { margin: calc(var(--s-3) * -1) 0 var(--s-5); display: grid; gap: var(--s-2); }
+.scan-progress .meter__fill { transition: width var(--dur-2) var(--ease); }
+.scan-progress__line { margin: 0; display: flex; gap: var(--s-3); min-width: 0; align-items: baseline; }
+.scan-progress__what {
+  flex: none; font-family: var(--mono); font-size: var(--fs-chrome-xs);
+  letter-spacing: var(--tr-chrome-xs); text-transform: uppercase; color: var(--label);
+  font-variant-numeric: tabular-nums;
+}
+.scan-progress__file {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--mono); font-size: var(--fs-chrome-xs); color: var(--text-ghost);
+}
 .lamp__word {
   font-family: var(--mono);
   font-size: var(--fs-chrome-lg);
