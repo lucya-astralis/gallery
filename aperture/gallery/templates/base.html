@@ -106,7 +106,9 @@
         </span>
       </a>
       <form action="/search" method="get" class="nav__search" role="search">
-        <i class="fa fa-magnifying-glass nav__search-ico" aria-hidden="true"></i>
+        {# The glass is the way in: it submits the form, so with nothing typed
+           it opens /search browsing every photo by its facets (colour first). #}
+        <button type="submit" class="nav__search-go" aria-label="{{ t('nav.search_open') }}" title="{{ t('nav.search_open') }}"><i class="fa fa-magnifying-glass nav__search-ico" aria-hidden="true"></i></button>
         {# full hint by default; app.js swaps to data-ph-short on phones #}
         <input type="search" name="q" placeholder="{{ t('nav.search_ph') }}" data-ph-short="{{ t('nav.search_ph_short') }}" value="{{ query or '' }}" autocomplete="off">
       </form>

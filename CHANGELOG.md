@@ -18,6 +18,13 @@ notes are never one commit apart.
 
 ---
 
+## 2.1.1 — 2026-09-25
+
+* **The search opens without a word typed**: the magnifier in the top bar
+  is a button now. Clicked with the field empty it opens /search browsing
+  every photo by its facets — colour swatches first — which used to be
+  reachable only by pressing Enter in an empty field, which nobody guesses.
+
 ## 2.1.0 — 2026-09-25
 
 Colour, in two senses: the photos can be searched by theirs, and the site's

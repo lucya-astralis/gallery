@@ -6551,6 +6551,15 @@ html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
   transition:color var(--dur-1);
 }
 .nav__search:focus-within .nav__search-ico{ color:var(--acc); }
+/* the glass is a button: it opens the search, typed into or not */
+.nav__search-go{
+  display:inline-flex; align-items:center; align-self:stretch; flex:none;
+  margin:0; padding:0; border:0; background:none; color:inherit; font:inherit;
+  cursor:pointer;
+}
+@media (hover:hover){ .nav__search-go:hover .nav__search-ico{ color:var(--text); } }
+.nav__search-go:focus-visible{ outline:none; }
+.nav__search-go:focus-visible .nav__search-ico{ color:var(--acc); }
 
 /* --- chevrons that replaced ‹ › ---------------------------------------- */
 /* these buttons were sized around a 13-22px punctuation glyph; a chevron

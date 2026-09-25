@@ -161,3 +161,12 @@ def test_a_facet_that_is_on_takes_itself_away(client, indexed):
     # the chip for the filter drops it
     import re
     assert re.search(r'class="tag search-filter"\s+href="/search"', body)
+
+
+def test_the_glass_opens_the_search_with_nothing_typed(client):
+    """The nav's magnifier is a submit button, and an empty submit lands on
+    /search browsing every photo -- the search is reachable without a word."""
+    page = client.get("/albums").text
+    assert 'class="nav__search-go"' in page and 'type="submit"' in page
+    res = client.get("/search", params={"q": ""})
+    assert res.status_code == 200 and "search-facets" in res.text

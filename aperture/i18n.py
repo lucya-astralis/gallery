@@ -35,6 +35,7 @@ STRINGS: dict[str, tuple[str, str, str]] = {
         "Persönliches Fotoarchiv.",
         "個人写真アーカイブ。",
     ),
+    "nav.search_open": ("Open the search", "Suche öffnen", "検索を開く"),
     "nav.search_ph": ("Search albums, files, tags, cameras", "Alben, Dateien, Tags, Kameras durchsuchen", "検索 / アルバム・ファイル・タグ・カメラ"),
     # short form swapped in on phones (app.js), where the full hint is too long
     # for the narrow field — see the data-ph-short attribute in base.html
