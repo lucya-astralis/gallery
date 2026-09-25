@@ -68,7 +68,9 @@ FREE_TRIES = 3
 MAX_BACKOFF = 300.0
 
 # Everything else needs a session.
-OPEN_PATHS = frozenset({"/login", "/api/session", "/api/health"})
+OPEN_PATHS = frozenset({"/login", "/api/session", "/api/health",
+                        # the look: the door wears the site's colour too
+                        "/theme.css", "/bg/nova-wide-16-9.svg", "/bg/nova-square.svg"})
 OPEN_PREFIXES = ("/static/",)
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 

@@ -314,7 +314,7 @@ async function select(sel, keepTab = false, how = 'push') {
   stashDraft();
   state.sel = sel;
   state.edits = takeDraft(sel);
-  showPalette(sel.kind === 'gallery' ? state.edits.palette : undefined);
+  showLook(sel.kind === 'gallery' ? state.edits : null);
   state.browse = null;
   state.data = null;
   if (!keepTab) { state.tab = 'settings'; state.query = ''; }
@@ -380,7 +380,7 @@ function value(key) {
 
 function setValue(key, next) {
   state.edits[key] = next;
-  if (key === 'palette') showPalette(next);
+  if ((key === 'palette' || key === 'accent') && state.sel.kind === 'gallery') showLook(state.edits);
   renderPane();
 }
 
@@ -389,15 +389,36 @@ function setValue(key, next) {
 function savedPalette(values, settled) {
   const v = values && values.palette;
   state.meta.palette = (Array.isArray(v) ? v[0] : v) || 'mist';
-  showPalette(settled || state.sel.kind !== 'gallery' ? undefined : state.edits.palette);
+  lookVersion = Date.now();   /* the saved accent may have changed too */
+  showLook(settled || state.sel.kind !== 'gallery' ? null : state.edits);
 }
 
-/* The palette is seen, not read: picking one repaints the console at once,
- * before it is saved. Leaving without saving puts the saved one back. */
-function showPalette(name) {
+/* The look is seen, not read: picking a palette or typing an accent on the
+ * site repaints the console at once, before it is saved -- the palette as
+ * <html data-palette>, the accent as the look sheet and the backdrop asked
+ * for with ?accent= (the server derives both, so the console never keeps a
+ * second copy of the colour maths). Leaving without saving puts the saved
+ * look back. `edits` are the site's unsaved edits, or null for the saved. */
+let lookVersion = null;
+function showLook(edits) {
   const known = (state.meta && state.meta.spec.palette.choices) || [];
+  const name = edits && edits.palette;
   document.documentElement.dataset.palette =
     known.includes(name) ? name : (state.meta && state.meta.palette) || 'mist';
+
+  const hex = edits && typeof edits.accent === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(edits.accent.trim())
+    ? edits.accent.trim() : null;
+  const cleared = edits && edits.accent === null;   /* removed, not yet saved */
+  const query = hex ? '?accent=' + encodeURIComponent(hex)
+    : cleared ? '?accent=none' : '?v=' + (lookVersion || 'saved');
+  const sheet = $('#look-sheet');
+  if (sheet && !sheet.href.endsWith(query) && (hex || cleared || lookVersion || sheet.href.includes('accent='))) {
+    sheet.href = '/theme.css' + query;
+    const img = $('.site-bg .bg-still');
+    const source = $('.site-bg source');
+    if (img) img.src = '/bg/nova-wide-16-9.svg' + query;
+    if (source) source.srcset = '/bg/nova-square.svg' + query;
+  }
 }
 
 /* Re-rendering the pane on every keystroke would drop the caret out of the
@@ -3064,7 +3085,7 @@ function openTray() {
 
 function discardDraft(draft) {
   drafts.delete(draft.key);
-  if (draft.sel.kind === 'gallery') showPalette();
+  if (draft.sel.kind === 'gallery') showLook(null);
   if (draftKey(state.sel) === draft.key) { state.edits = {}; renderPane(); }
   syncDirtyMark();
 }

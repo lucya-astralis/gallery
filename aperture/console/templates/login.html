@@ -8,6 +8,9 @@
   <title>Sign in — lucya.systems aperture</title>
   <link rel="icon" type="image/svg+xml" href="{{ static_url('logo/lucya_logo.svg') }}">
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
+  {# The site's accent and the palettes derived from it (see app.py, "the
+     console's look"), after style.css so its :root wins. #}
+  <link rel="stylesheet" id="look-sheet" href="/theme.css?v={{ look_version() }}">
   {# The gallery's icon sheet and its glyph subset, served from where
      tools/build_fa_subset.py writes them -- see app.py. #}
   <link rel="stylesheet" href="/static/fa-icons.css">
@@ -18,8 +21,8 @@
      not a lobby someone else built. #}
   <div class="site-bg" aria-hidden="true">
     <picture>
-      <source media="(max-width: 760px)" srcset="{{ static_url('bg/nova-square.svg') }}">
-      <img class="bg-still" src="{{ static_url('bg/nova-wide-16-9.svg') }}" alt="" decoding="async">
+      <source media="(max-width: 760px)" srcset="/bg/nova-square.svg?v={{ look_version() }}">
+      <img class="bg-still" src="/bg/nova-wide-16-9.svg?v={{ look_version() }}" alt="" decoding="async">
     </picture>
   </div>
 

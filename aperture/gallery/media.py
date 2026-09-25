@@ -51,11 +51,10 @@ def _theme_css_response(album: str | None):
     value is re-serialised from parsed numbers (three ints for a colour,
     floats for the filter), so nothing that came out of a cfg is ever printed
     into the CSS verbatim."""
-    decls = theme.theme_decls(album)
-    if not decls:
+    css = theme.theme_css(album)
+    if css is None:
         raise HTTPException(404, "not found")
-    return Response(":root{%s}" % ";".join(decls), media_type="text/css",
-                    headers=context.IMMUTABLE)
+    return Response(css, media_type="text/css", headers=context.IMMUTABLE)
 
 
 @router.get("/site-theme.css")

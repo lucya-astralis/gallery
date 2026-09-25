@@ -434,7 +434,7 @@
 :root[data-palette="stardust"], [data-palette-preview="stardust"] {
   --glyph-album: #BDAFD9; --glyph-tag: #D0A2B6; --glyph-time: #98BCDC; --glyph-machine: #BCBDC7;
   --ramp-album-1:   #E1D9F3; --ramp-album-2:   #BDAFD9; --ramp-album-3:   #988AB2; --ramp-album-4:   #74678D;
-  --ramp-tag-1:     #F2D5E1; --ramp-tag-2:     #D6A8BD; --ramp-tag-3:     #AF8397; --ramp-tag-4:     #8A6074;
+  --ramp-tag-1:     #F2D5E1; --ramp-tag-2:     #D6A8BD; --ramp-tag-3:     #AF8397; --ramp-tag-4:     #8A6073;
   --ramp-time-1:    #CBE1F5; --ramp-time-2:    #98BCDC; --ramp-time-3:    #7397B5; --ramp-time-4:    #517390;
   --ramp-machine-1: #DDDDE4; --ramp-machine-2: #B6B6C1; --ramp-machine-3: #91919B; --ramp-machine-4: #6D6E77;
 }

@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 
-from . import cfgio, config, schema, templating
+from . import cfgio, config, palette, schema, templating
 
 
 # ----- per-album title font (album.cfg `font = ...`) --------------------
@@ -223,12 +223,15 @@ def accent_shades(rgb: tuple[int, int, int]) -> dict:
            and _contrast(_hls_rgb(h, deep_l, deep_s), (255, 255, 255)) < ACCENT_MIN_CONTRAST):
         deep_l -= 0.02
     acc = _hls_rgb(h, acc_l, sat)
+    soft = _hls_rgb(h, acc_l + (1 - acc_l) * 0.42, sat)
     return {
         "acc": "#%02x%02x%02x" % acc,
         "rgb": "%d,%d,%d" % acc,
         "deep": "#%02x%02x%02x" % _hls_rgb(h, deep_l, deep_s),
-        "soft": "#%02x%02x%02x" % _hls_rgb(h, acc_l + (1 - acc_l) * 0.42, sat),
+        "soft": "#%02x%02x%02x" % soft,
+        "soft_rgb": "%d,%d,%d" % soft,
         "lifted": acc != tuple(rgb),
+        "_rgb": acc,
     }
 
 
@@ -316,17 +319,46 @@ def _theme_version(album: str | None) -> int:
     return max(stamps, default=0)
 
 
+def accent_decls(accent: dict) -> list[str]:
+    """The accent's four faces as the tokens both sheets read."""
+    return ["--acc:%s" % accent["acc"], "--acc-rgb:%s" % accent["rgb"],
+            "--acc-deep:%s" % accent["deep"], "--acc-soft:%s" % accent["soft"],
+            "--acc-soft-rgb:%s" % accent["soft_rgb"]]
+
+
 def theme_decls(album: str | None) -> list[str]:
-    """The custom-property declarations this page's theme sheet carries.
-    Every value is re-serialised from parsed numbers, never printed straight
-    out of a cfg."""
+    """The custom-property declarations this page's theme sheet carries on
+    :root. Every value is re-serialised from parsed numbers, never printed
+    straight out of a cfg."""
     decls = []
     accent = page_accent(album)
     if accent is not None:
-        decls += ["--acc:%s" % accent["acc"], "--acc-rgb:%s" % accent["rgb"],
-                  "--acc-deep:%s" % accent["deep"], "--acc-soft:%s" % accent["soft"]]
+        decls += accent_decls(accent)
     decls += wallpaper_decls(album)
     return decls
+
+
+def accent_sheet(accent: dict | None, root: list[str] | None = None) -> str:
+    """A theme stylesheet: the :root declarations, then -- when an accent is
+    set -- the palettes derived from it (palette.palette_blocks), so the
+    icons and the charts turn with the accent instead of staying lilac."""
+    decls = list(root or [])
+    blocks = []
+    if accent is not None:
+        for selector, more in palette.palette_blocks(accent["_rgb"]):
+            if selector == ":root":
+                decls += more
+            else:
+                blocks.append("%s{%s}" % (selector, ";".join(more)))
+    return "".join([":root{%s}" % ";".join(decls)] + blocks)
+
+
+def theme_css(album: str | None) -> str | None:
+    """The whole theme sheet for a page, or None when nothing is themed."""
+    decls = theme_decls(album)
+    if not decls:
+        return None
+    return accent_sheet(page_accent(album), decls)
 
 
 def theme_css_url(album: str | None = None) -> str | None:

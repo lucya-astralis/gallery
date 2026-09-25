@@ -30,10 +30,10 @@ from pathlib import Path
 
 import markdown
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from .. import brand, checks, config, db, scanner, search, update_check
+from .. import brand, checks, config, db, palette, scanner, search, theme, update_check
 from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
@@ -286,6 +286,57 @@ LOGIN_REASONS = {
     "password": "The console password was changed, which ends every session. "
                 "Sign in with the new one.",
 }
+
+
+# ----- the console's look ---------------------------------------------------
+# The console wears the SITE's accent (gallery.cfg `accent`, never an album's)
+# and the palettes derived from it -- the same sheet the gallery generates,
+# from the same function -- and its backdrop, the `nova` SVG, is turned to the
+# same hue. Both are open before sign-in, because the door is the same room.
+# `?accent=#hex` asks for a preview of an unsaved colour: nothing is read from
+# or written to a file for it, the hex is parsed to three ints like any cfg
+# value, and the answer is never cached.
+NOVA_CUTS = {"nova-wide-16-9.svg", "nova-square.svg"}
+NO_STORE = {"Cache-Control": "no-store"}
+LOOK_CACHE = {"Cache-Control": "no-cache"}
+
+
+def _look_accent(accent: str | None) -> dict | None:
+    if accent is not None:
+        rgb = theme.parse_hex_color(accent)
+        return None if rgb is None else theme.accent_shades(rgb)
+    return theme.page_accent(None)
+
+
+def look_version() -> int:
+    """Cache stamp for the console's look: gallery.cfg's mtime."""
+    try:
+        return int(config.GALLERY_CFG_PATH.stat().st_mtime)
+    except OSError:
+        return 0
+
+
+templates.env.globals["look_version"] = look_version
+
+
+@app.get("/theme.css")
+def console_theme_css(accent: str | None = None):
+    shades = _look_accent(accent)
+    css = theme.accent_sheet(shades, theme.accent_decls(shades) if shades else [])
+    return Response(css, media_type="text/css",
+                    headers=NO_STORE if accent is not None else LOOK_CACHE)
+
+
+@app.get("/bg/{name}")
+def console_backdrop(name: str, accent: str | None = None):
+    if name not in NOVA_CUTS:
+        raise HTTPException(404, "not found")
+    svg = (BASE_DIR / "static" / "bg" / name).read_text(encoding="utf-8")
+    shades = _look_accent(accent)
+    if shades is not None:
+        svg = palette.recolour_svg(svg, shades["_rgb"])
+    return Response(svg, media_type="image/svg+xml",
+                    headers=NO_STORE if accent is not None else LOOK_CACHE)
 
 
 @app.get("/login")
