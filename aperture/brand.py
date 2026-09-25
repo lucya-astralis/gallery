@@ -52,6 +52,9 @@ PRODUCT = f"{NAME} aperture"
 REPO_URL = "https://github.com/lucya-astralis/gallery"
 MAKER_NAME = "lucya.sh"
 MAKER_URL = "https://lucya.sh"
+# The design language both surfaces wear, and where it is kept on its own.
+DESIGN_NAME = "Nebula"
+DESIGN_URL = "https://github.com/lucya-astralis/nebula"
 
 # Where a running aperture asks whether there is a newer one: the maker's own
 # gallery, which always runs the newest release and says so at /api/version
@@ -76,7 +79,7 @@ UPDATE_URL = "https://images.lucya.sh/api/version"
 # the configurator were two programs, this is one, and a version is a promise
 # about a thing. Distinct from API_VERSION (gallery/api.py), which versions the
 # JSON API contract and did NOT reset — the endpoints kept their shape.
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 
 # One-line form, shared by <meta name="generator">, the X-Powered-By header
 # and the EXIF `Software` tag so all three can never drift apart.

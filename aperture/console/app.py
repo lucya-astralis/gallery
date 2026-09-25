@@ -508,6 +508,9 @@ def api_about():
             "url": brand.MAKER_URL,
             "pfp": "/static/maker.webp" if MAKER_PFP.is_file() else None,
         },
+        # the label it ships under, and the design language it wears
+        "vendor": {"name": brand.NAME, "url": brand.URL},
+        "design": {"name": brand.DESIGN_NAME, "url": brand.DESIGN_URL},
         "releases": _release_notes(text),
     }
 

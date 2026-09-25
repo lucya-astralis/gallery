@@ -18,6 +18,42 @@ notes are never one commit apart.
 
 ---
 
+## 2.1.0 — 2026-09-25
+
+Colour, in two senses: the photos can be searched by theirs, and the site's
+own accent now carries through everything — the palettes, the console and
+its backdrop.
+
+**Before you upgrade:** nothing to do. Two columns are added to the index on
+start (`colors`, `palette`); the next scan fills them in for every photo
+already there, about 10 ms a photo, and until it has, a colour search finds
+nothing.
+
+* **Search by colour**: every photo's main colours are read off its
+  thumbnail when it is indexed and named — red, orange, yellow, green,
+  teal, blue, purple, pink, brown, black, grey, white. `color:blue` (also
+  `colour:`, `farbe:blau`, `color:青`, or a hex) works on /search,
+  `/api/photos?q=`, the CLI and the console. /search gets a row of colour
+  swatches above its facets — so an empty search browses the archive by
+  colour — and the photo page a strip of the picture's colours at their
+  share of it, each band a link to more photos in that colour. The
+  console's Library has the same swatches as a facet and the strip in its
+  inspector.
+* **The palettes follow the accent**: mist and stardust are kept as
+  positions relative to the accent (a fixed lightness ladder, a small
+  chroma, the accent's hue plus an offset per kind, in OKLCH), so a green
+  site gets a sage mist and a red one a rosé, and an album with its own
+  accent turns its palette too. The built-in accent gives exactly the
+  colours 2.0.0 had; silver stays neutral.
+* **The console wears the site's accent**: gallery.cfg `accent` repaints
+  the console as well, door included, and its `nova` backdrop is turned to
+  the same hue (greys and blacks stay). Typing a colour under Site → Look
+  previews it on the whole console — backdrop and palette cards included —
+  before it is saved.
+* **About names who stands behind it**: next to the maker, the console's
+  About place names **lucya.systems** as the manufacturer and **Nebula**,
+  the design language both surfaces wear, with a link to where it is kept.
+
 ## 2.0.0 — 2026-09-24
 
 The console, rebuilt around what you came to do: a different shape, the same
@@ -119,24 +155,8 @@ root still land on the Overview.
   and `stardust` (a faint cast per kind) — for the gallery and the console
   alike, under Site → Look, picked from three preview cards that each wear
   their own palette (the kind-icons, a ring's steps, a run of columns);
-  picking one repaints the console before you save. The palettes follow
-  the **accent**: they are kept as positions relative to it (a fixed
-  lightness ladder, a small chroma, the accent's hue plus an offset per
-  kind, in OKLCH), so a green site gets a sage mist and a red one a rosé,
-  and an album with its own accent turns its palette too.
-* **Search by colour**: every photo's main colours are read off its
-  thumbnail when it is indexed (existing photos on the next scan, about
-  10 ms each) and named — red, orange, yellow, green, teal, blue, purple,
-  pink, brown, black, grey, white. `color:blue` (also `colour:`, `farbe:blau`,
-  `color:青`, or a hex) works on /search, `/api/photos?q=`, the CLI and the
-  console; /search gets a row of colour swatches above its facets, and the
-  photo page a strip of the picture's colours at their share of it, each
-  band a link to more photos in that colour. The console's Library has the
-  same swatches as a facet and the strip in its inspector.
-* **The console wears the site's accent**: gallery.cfg `accent` repaints
-  the console as well, door included, and its `nova` backdrop is turned to
-  the same hue (greys and blacks stay). Typing a colour under Site → Look
-  previews it on the whole console before it is saved. Bars and columns fall like the headings, light to deep.
+  picking one repaints the console before you save. Bars and columns fall
+  like the headings, light to deep.
 * **The Overview is a bento**: one pane of glass, the cards sharing their
   hairlines with no gaps, on a six-column grid — the to-do strip and a slim
   photos-over-time strip across the top, then three cards to a row.

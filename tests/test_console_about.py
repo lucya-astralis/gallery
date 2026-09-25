@@ -22,6 +22,8 @@ def test_about_names_the_build_the_repository_and_the_maker(console):
     assert body["repo"] == "https://github.com/lucya-astralis/gallery"
     assert body["maker"] == {"name": "lucya.sh", "url": "https://lucya.sh",
                              "pfp": "/static/maker.webp"}
+    assert body["vendor"] == {"name": "lucya.systems", "url": "https://lucya.systems"}
+    assert body["design"]["name"] == "Nebula" and body["design"]["url"].endswith("/nebula")
 
 
 def test_the_notes_are_every_release_newest_first(console):

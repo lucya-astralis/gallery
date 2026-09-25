@@ -1454,7 +1454,13 @@ async function renderChangelog() {
   grid.append(el('div', { class: 'home__wide' }, updateCard(info, true)));
 
   const maker = about.maker || {};
+  const vendor = about.vendor || {};
+  const design = about.design || {};
   const outward = { target: '_blank', rel: 'noopener' };
+  const link = (href, text) => el('a', { href, ...outward, text, iconEnd: 'fa-arrow-up-right-from-square' });
+  /* Who stands behind it, three ways: the label it ships under
+   * (lucya.systems), the person who builds it, and the design language
+   * both surfaces wear. */
   grid.append(el('div', { class: 'home__wide' }, card('fa-user-pen', 'Made by', 'who builds this software',
     el('div', { class: 'maker' },
       maker.pfp ? el('img', { class: 'maker__pfp', src: maker.pfp, alt: '', width: '64', height: '64' }) : null,
@@ -1462,7 +1468,12 @@ async function renderChangelog() {
         el('a', { class: 'maker__name', href: maker.url, ...outward, text: maker.name,
                   iconEnd: 'fa-arrow-up-right-from-square' }),
         el('a', { class: 'maker__repo', href: about.repo, ...outward, icon: 'fa-code-branch',
-                  text: about.repo.replace(/^https?:\/\//, '') }))))));
+                  text: about.repo.replace(/^https?:\/\//, '') }))),
+    el('dl', { class: 'facts maker__facts' },
+      vendor.name ? [el('dt', { text: 'Manufacturer' }), el('dd', {}, link(vendor.url, vendor.name))] : null,
+      design.name ? [el('dt', { text: 'Design' }),
+        el('dd', {}, link(design.url, design.name),
+          el('span', { class: 'maker__note', text: ' — the design language both surfaces wear: a black ground, one accent, square glass.' }))] : null))));
 
   const releases = about.releases || [];
   if (!releases.length) {
