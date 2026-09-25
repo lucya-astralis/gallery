@@ -124,6 +124,15 @@ root still land on the Overview.
   lightness ladder, a small chroma, the accent's hue plus an offset per
   kind, in OKLCH), so a green site gets a sage mist and a red one a rosé,
   and an album with its own accent turns its palette too.
+* **Search by colour**: every photo's main colours are read off its
+  thumbnail when it is indexed (existing photos on the next scan, about
+  10 ms each) and named — red, orange, yellow, green, teal, blue, purple,
+  pink, brown, black, grey, white. `color:blue` (also `colour:`, `farbe:blau`,
+  `color:青`, or a hex) works on /search, `/api/photos?q=`, the CLI and the
+  console; /search gets a row of colour swatches above its facets, and the
+  photo page a strip of the picture's colours at their share of it, each
+  band a link to more photos in that colour. The console's Library has the
+  same swatches as a facet and the strip in its inspector.
 * **The console wears the site's accent**: gallery.cfg `accent` repaints
   the console as well, door included, and its `nova` backdrop is turned to
   the same hue (greys and blacks stay). Typing a colour under Site → Look

@@ -13,6 +13,8 @@ means the same thing wherever it is typed:
     date:2026  date:2026-08   date:2026-08-15   date:2026-08-01..2026-08-20
     tag:night                 a tag the photo carries (exactly, any case)
     album:japan_2026          that album and every album under it
+    color:blue                a colour that covers enough of the picture
+                              (colour:, farbe:; names in EN/DE/JP, or #hex)
 
 The words match any of their fields; every filter narrows what they found. A
 filter whose value cannot be read is handed back marked as such and ignored,
@@ -29,6 +31,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from . import colors
+
 # the key as typed -> the fact it filters on. Short and long spellings both:
 # "f:" is what a photographer types, "aperture:" what anyone else guesses.
 KEYS = {
@@ -40,6 +44,7 @@ KEYS = {
     "date": "date",
     "tag": "tag",
     "album": "album",
+    "color": "color", "colour": "color", "farbe": "color",
 }
 
 # key:value (value optionally quoted) | "a phrase" | a word
@@ -122,6 +127,12 @@ def _compile(f: Filter) -> None:
         f.sql = ("EXISTS (SELECT 1 FROM image_tags ft JOIN tags fg ON fg.id = ft.tag_id "
                  "WHERE ft.image_id = {a}.id AND lower(fg.name) = ?)")
         f.params = [f.value.strip().lower()]
+        return
+    if f.fact == "color":
+        name = colors.parse_name(f.value)
+        if name:
+            f.sql = "instr(coalesce({a}.colors, ''), ?) > 0"
+            f.params = [",%s," % name]
         return
     if f.fact == "album":
         path = f.value.strip().strip("/").lower()

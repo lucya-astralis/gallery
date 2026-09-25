@@ -28,6 +28,7 @@ const L = {
   tags: new Set(),       // any of these (lower-cased)
   untagged: false,
   cameras: new Set(),
+  colors: new Set(),     // any of these named colours (colors.py)
   years: new Set(),
   featured: false,
   unindexed: false,
@@ -157,6 +158,7 @@ function passing(skip) {
       if (!hit) return false;
     }
     if (skip !== 'cameras' && L.cameras.size && !L.cameras.has(cameraOf(p))) return false;
+    if (skip !== 'colors' && L.colors.size && !(p.colors || []).some((c) => L.colors.has(c))) return false;
     if (skip !== 'years' && L.years.size && !L.years.has(yearOf(p))) return false;
     if (skip !== 'status') {
       if (L.featured && !p.featured) return false;
@@ -185,13 +187,14 @@ function computeShown() {
   L.anchor = Math.min(L.anchor, L.shown.length - 1);
 }
 
-const anyFilter = () => !!(L.q.trim() || L.tags.size || L.untagged || L.cameras.size ||
+const anyFilter = () => !!(L.q.trim() || L.tags.size || L.untagged || L.cameras.size || L.colors.size ||
   L.years.size || L.featured || L.unindexed);
 
 function clearFilters() {
   L.q = '';
   L.tags.clear();
   L.cameras.clear();
+  L.colors.clear();
   L.years.clear();
   L.untagged = L.featured = L.unindexed = false;
   const input = $('#lib-q');
@@ -307,6 +310,34 @@ function paintCount() {
 }
 
 /* ----- facets -------------------------------------------------------------- */
+/* The photo's main colours at their share of it -- the same strip the
+ * gallery's photo page draws. A band filters the grid to its colour. SVG,
+ * because a fill attribute survives the CSP and a style attribute does not. */
+function paletteStrip(p) {
+  if (!p.palette || !p.palette.length) return null;
+  const total = p.palette.reduce((n, s) => n + s.share, 0) || 1;
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'palette-strip');
+  svg.setAttribute('viewBox', '0 0 100 10');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  let x = 0;
+  for (const s of p.palette) {
+    const w = (s.share * 100) / total;
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    rect.setAttribute('x', String(x));
+    rect.setAttribute('width', String(w));
+    rect.setAttribute('height', '10');
+    rect.setAttribute('fill', s.hex);
+    const tip = document.createElementNS(SVG_NS, 'title');
+    tip.textContent = s.name + ' · ' + s.share + '% · ' + s.hex + ' — show every ' + s.name + ' photo';
+    rect.append(tip);
+    rect.addEventListener('click', () => { L.colors = new Set([s.name]); refilter(); });
+    svg.append(rect);
+    x += w;
+  }
+  return el('div', { class: 'insp__block' }, el('h3', { class: 'insp__sub', icon: 'fa-palette', text: 'Colours' }), svg);
+}
+
 function facetRow({ label, count, on, onclick, title, icon }) {
   return el('button', {
     type: 'button', class: 'facet' + (on ? ' is-on' : '') + (count ? '' : ' is-empty'),
@@ -380,6 +411,20 @@ function paintFacets() {
     onclick: () => { L.facetTagsAll = !showAll; paintFacets(); },
   }) : null));
 
+  // Colour: what a scan read off the thumbnail (colors.py) -- a swatch per
+  // named colour the photos carry, any of the ticked ones.
+  const inColors = passing('colors');
+  const colorCounts = counted(inColors, (p) => p.colors || []);
+  const swatches = (state.meta.color_names || [])
+    .filter((c) => colorCounts.get(c) || L.colors.has(c))
+    .map((c) => el('button', {
+      type: 'button', class: 'swatch swatch--' + c + (L.colors.has(c) ? ' is-on' : ''),
+      'aria-pressed': String(L.colors.has(c)), title: c + ' · ' + (colorCounts.get(c) || 0),
+      'aria-label': c + ', ' + (colorCounts.get(c) || 0),
+      onclick: () => { if (L.colors.has(c)) L.colors.delete(c); else L.colors.add(c); refilter(); },
+    }));
+  groups.push(swatches.length ? facetGroup('Colour', [el('div', { class: 'swatches' }, swatches)]) : null);
+
   // Year and camera: what a scan read out of the EXIF.
   const years = counted(passing('years'), yearOf);
   groups.push(facetGroup('Year', [...new Set([...years.keys(), ...L.years])]
@@ -419,6 +464,7 @@ function paintActive() {
   for (const t of L.tags) drop('tag: ' + t, () => L.tags.delete(t));
   for (const y of L.years) drop(y, () => L.years.delete(y));
   for (const c of L.cameras) drop(c, () => L.cameras.delete(c));
+  for (const c of L.colors) drop('colour: ' + c, () => L.colors.delete(c));
   if (L.featured) drop('featured', () => { L.featured = false; });
   if (L.unindexed) drop('not indexed', () => { L.unindexed = false; });
   const bad = L.server && splitQuery(L.q).server === L.server.q
@@ -645,6 +691,7 @@ function inspectOne(p) {
       p.camera ? fact('Camera', p.camera) : null,
       p.lens ? fact('Lens', p.lens) : null,
       exposure ? fact('Exposure', exposure) : null),
+    paletteStrip(p),
     tagEditor([p]),
     selectionActions([p]),
     el('details', {
@@ -692,6 +739,7 @@ async function showPhoto(rel) {
   L.q = '';
   L.tags.clear();
   L.cameras.clear();
+  L.colors.clear();
   L.years.clear();
   L.untagged = L.featured = L.unindexed = false;
   L.sel = new Set([rel]);

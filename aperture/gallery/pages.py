@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from .. import (
-    albums, brand, branding, cfgio, config, db, i18n, photos, scanner, schema, search, stats, theme,
+    albums, brand, branding, cfgio, colors, config, db, i18n, photos, scanner, schema, search, stats, theme,
     trips, welcome,
 )
 from ..runtime import settings
@@ -427,6 +427,8 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
             "prev_rel": prev_rel,
             "next_rel": next_rel,
             "description": description,
+            # the picture's main colours (colors.py), each a way into /search
+            "photo_palette": _palette_strip(row, context.request_lang(request)),
             "album_rels": rel_list,
             "album_stamps": stamps,
             "collection_root": col_root or None,
@@ -435,6 +437,23 @@ def image_view(request: Request, album: str, filename: str, sort: str | None = N
             "default_sort": default_sort,
         },
     )
+
+
+def _palette_strip(row, lang: str) -> list[dict]:
+    """The photo page's colour strip: each main colour with its share, laid
+    out as x/width on a 100-wide SVG (geometry attributes -- the CSP drops a
+    style attribute, not these), and the search for its named colour."""
+    raw = row["palette"] if "palette" in row.keys() else None
+    strip = colors.strip_of(raw)
+    total = sum(s["share"] for s in strip) or 1
+    x = 0.0
+    for s in strip:
+        s["x"] = round(x, 2)
+        s["w"] = round(s["share"] * 100 / total, 2)
+        x += s["w"]
+        s["label"] = i18n.t(lang, "color." + s["name"])
+        s["href"] = _search_href(search.term("color", s["name"]))
+    return strip
 
 
 @router.get("/humans.txt", response_class=Response)
@@ -508,7 +527,11 @@ def _facet_link(q: str, query, key: str, value: str, sort_q: str = "") -> tuple[
     """(the search with this facet toggled, whether it is on). On: the same
     search without that filter. Off: the search with it added."""
     for f in query.filters:
-        if f.fact == search.KEYS.get(key) and f.value.strip().lower() == value.strip().lower():
+        if f.fact != search.KEYS.get(key):
+            continue
+        same = (colors.parse_name(f.value) == value if key == "color"
+                else f.value.strip().lower() == value.strip().lower())
+        if same:
             return _search_href(query.without(f), sort_q), True
     return _search_href((q + " " + search.term(key, value)).strip(), sort_q), False
 
@@ -571,7 +594,24 @@ def _search_facets(c, where: str, params: list, q: str, query, lang: str, sort_q
         "cameras": rows("camera",
             f"SELECT i.camera, COUNT(*) {base} AND i.camera IS NOT NULL AND i.camera != '' "
             f"GROUP BY i.camera ORDER BY 2 DESC LIMIT {FACET_LIMIT}"),
+        "colors": _color_facet(c, base, args, q, query, lang, sort_q),
     }
+
+
+def _color_facet(c, base: str, args: list, q: str, query, lang: str, sort_q: str) -> list[dict]:
+    """The colour facet: every named colour (colors.NAMES, in wheel order)
+    that some of the results carry, as a swatch. One pass counts all twelve."""
+    sums = ", ".join("SUM(instr(coalesce(i.colors, ''), ?) > 0)" for _ in colors.NAMES)
+    row = c.execute(f"SELECT {sums} {base}",
+                    [",%s," % n for n in colors.NAMES] + list(args)).fetchone()
+    out = []
+    for name, n in zip(colors.NAMES, row or []):
+        if not n:
+            continue
+        href, on = _facet_link(q, query, "color", name, sort_q)
+        out.append({"value": name, "label": i18n.t(lang, "color." + name), "n": n,
+                    "href": href, "on": on})
+    return out
 
 
 @router.get("/search", response_class=HTMLResponse)

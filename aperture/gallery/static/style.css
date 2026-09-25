@@ -1278,6 +1278,43 @@ section{
 .facet.is-on .facet__n{ color:var(--text-dim); }
 .facet--up{ color:var(--label); }
 .facet--up .fa{ font-size:var(--fs-chrome-sm); }
+/* ---- colour: the search's colour facet and the photo page's palette ----
+   The one place the site shows colours that are not its own: they are the
+   PHOTOS' colours, content like a thumbnail, so rule 1 (grey furniture, one
+   accent) is about the frame around them, not them. A swatch per named colour
+   (colors.py NAMES / SWATCH -- keep in step), square like everything; the
+   one that is on carries the accent ring, which is state. */
+.swatches{ list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:var(--s-2); }
+.swatch{
+  display:block; width:var(--s-6); height:var(--s-6);
+  border:var(--hair) solid rgba(255,255,255,.14);
+  transition:outline-color var(--dur-1), translate var(--dur-1);
+  outline:var(--hair) solid transparent; outline-offset:var(--s-0);
+}
+.palette-name .swatch{ width:var(--s-3); height:var(--s-3); }
+.swatch--red{ background:#d8403a; }
+.swatch--orange{ background:#e8892c; }
+.swatch--yellow{ background:#e8cf3a; }
+.swatch--green{ background:#4fa85a; }
+.swatch--teal{ background:#2fa8a0; }
+.swatch--blue{ background:#3d6fd8; }
+.swatch--purple{ background:#8a5ad8; }
+.swatch--pink{ background:#e06aa6; }
+.swatch--brown{ background:#8a5a36; }
+.swatch--black{ background:#111114; }
+.swatch--grey{ background:#8b8b94; }
+.swatch--white{ background:#f2f2f5; }
+.swatch.is-on{ outline:2px solid var(--acc); outline-offset:var(--s-0); }
+@media (hover:hover){ a.swatch:hover{ outline-color:var(--line-strong); translate:0 -1px; } }
+.facet-group__label > .fa-palette{ color:var(--glyph-album); }
+
+.palette-strip{ display:block; width:100%; height:var(--s-6); }
+.palette-strip rect{ transition:opacity var(--dur-1); }
+@media (hover:hover){ .palette-strip a:hover rect{ opacity:.8; } }
+.palette-names{ display:flex; flex-wrap:wrap; gap:var(--s-2) var(--s-4); margin:var(--s-3) 0 0; }
+.palette-name{ display:inline-flex; align-items:center; gap:var(--s-2); color:var(--text-dim); font-size:var(--fs-text-sm); }
+@media (hover:hover){ .palette-name:hover{ color:var(--text); } }
+
 /* A column beside the results where there is room for one: rows, not chips,
    each with a box that fills with the accent when it is on. */
 @media (min-width:1000px){

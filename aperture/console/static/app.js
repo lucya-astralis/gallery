@@ -1825,12 +1825,13 @@ function todoCard() {
 }
 
 /* The Library, opened on a filter. */
-function libraryWith({ untagged = false, q = '', years = [], cameras = [], album = '' } = {}) {
+function libraryWith({ untagged = false, q = '', years = [], cameras = [], colors = [], album = '' } = {}) {
   clearFilters();
   L.untagged = untagged;
   L.q = q;
   L.years = new Set(years);
   L.cameras = new Set(cameras);
+  L.colors = new Set(colors);
   go({ kind: 'library', album });
 }
 

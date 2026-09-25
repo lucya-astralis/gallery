@@ -47,9 +47,23 @@
       ('years', t('search.facet_years'), 'fa-calendar-day', facets.years),
       ('cameras', t('search.facet_cameras'), 'fa-camera', facets.cameras),
     ] %}
-    {% if facets.albums or facets.tags or facets.years or facets.cameras %}
+    {% if facets.albums or facets.tags or facets.years or facets.cameras or facets.colors %}
     <aside class="search-facets" aria-label="{{ t('search.narrow') }}">
       <h2 class="search-facets__head">{{ t('search.narrow') }}</h2>
+      {# Colour first: it is the one facet you read at a glance. A swatch per
+         named colour the results carry, the count in its title. #}
+      {% if facets.colors %}
+      <div class="facet-group facet-group--colors">
+        <h3 class="facet-group__label"><i class="fa fa-palette" aria-hidden="true"></i>{{ t('search.facet_colors') }}</h3>
+        <ul class="swatches">
+          {% for r in facets.colors %}
+            <li><a class="swatch swatch--{{ r.value }}{% if r.on %} is-on{% endif %}" href="{{ r.href }}"
+                   title="{{ r.label }} · {{ r.n }}" aria-label="{{ r.label }}, {{ r.n }}"
+                   {% if r.on %}aria-current="true"{% endif %}></a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
       {% for key, label, icon, rows in groups %}
         {% if rows or (key == 'albums' and facets.album_up) %}
         <div class="facet-group">

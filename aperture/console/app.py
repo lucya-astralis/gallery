@@ -33,7 +33,7 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from .. import brand, checks, config, db, palette, scanner, search, theme, update_check
+from .. import brand, checks, colors, config, db, palette, scanner, search, theme, update_check
 from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
@@ -443,6 +443,8 @@ def api_meta():
         "reel_values": schema.REEL_VALUES,
         "photo_sorts": schema.PHOTO_SORTS,
         "gallery_album_sorts": schema.GALLERY_ALBUM_SORTS,
+        # the colour names the Library's facet offers, in wheel order
+        "color_names": colors.NAMES,
         # the identity tint the console wears, the same one the gallery does
         "palette": config.site_palette(),
         "welcome_keywords": list(schema.WELCOME_KEYWORDS),
@@ -927,7 +929,7 @@ def api_library():
     try:
         for row in db.conn().execute(
                 "SELECT rel_path, width, height, taken_at, camera, lens, iso, aperture, "
-                "focal, is_showcase FROM images"):
+                "focal, is_showcase, colors, palette FROM images"):
             facts[row["rel_path"]] = dict(row)
     except sqlite3.Error:
         facts = {}
@@ -944,6 +946,9 @@ def api_library():
             "iso": fact and fact["iso"], "f": fact and fact["aperture"],
             "mm": fact and fact["focal"],
             "featured": bool(fact and fact["is_showcase"]),
+            # colors.py: the named colours (the facet) and the strip
+            "colors": colors.names_of(fact["colors"]) if fact else [],
+            "palette": colors.strip_of(fact["palette"]) if fact else [],
         })
     return {"photos": out, "total": len(out), "indexed": len(facts)}
 

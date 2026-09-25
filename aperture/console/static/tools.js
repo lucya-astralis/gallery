@@ -231,7 +231,7 @@ function storeViews(list) {
 
 function currentView(name) {
   return { name, album: L.album, q: L.q, tags: [...L.tags], untagged: L.untagged,
-           cameras: [...L.cameras], years: [...L.years], featured: L.featured, unindexed: L.unindexed,
+           cameras: [...L.cameras], colors: [...L.colors], years: [...L.years], featured: L.featured, unindexed: L.unindexed,
            sort: L.sort };
 }
 
@@ -239,6 +239,7 @@ function applyView(view) {
   L.q = view.q || '';
   L.tags = new Set(view.tags || []);
   L.cameras = new Set(view.cameras || []);
+  L.colors = new Set(view.colors || []);
   L.years = new Set(view.years || []);
   L.untagged = !!view.untagged;
   L.featured = !!view.featured;

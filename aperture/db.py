@@ -117,6 +117,12 @@ def migrate(conn: sqlite3.Connection) -> None:
         # is the scan's job, not a startup's.
         conn.execute("ALTER TABLE images ADD COLUMN content_hash TEXT")
 
+    for col in ("colors", "palette"):
+        if col not in existing_cols:
+            # colors.py: read from each photo's thumbnail. Left NULL here --
+            # the next scan reads them, as it hashes a photo it never hashed.
+            conn.execute(f"ALTER TABLE images ADD COLUMN {col} TEXT")
+
     added = [col for col, kind in CAPTURE_COLUMNS if col not in existing_cols]
     for col, kind in CAPTURE_COLUMNS:
         if col in added:

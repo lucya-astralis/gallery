@@ -10,7 +10,7 @@ from pathlib import Path
 
 from PIL import Image, ExifTags, ImageOps
 
-from . import brand, capture, db, marks
+from . import brand, capture, colors, db, marks
 from . import schema
 from .runtime import settings
 
@@ -706,13 +706,34 @@ def index_image(photos_dir: Path, file: Path, force: bool = False) -> bool:
                  exif_json=excluded.exif_json, taken_at=excluded.taken_at,
                  camera=excluded.camera, lens=excluded.lens, focal=excluded.focal,
                  aperture=excluded.aperture, iso=excluded.iso,
-                 content_hash=excluded.content_hash""",
+                 content_hash=excluded.content_hash,
+                 colors=NULL, palette=NULL""",
             (album, filename, rel, effective_mtime, stat.st_size, width, height, json.dumps(exif), taken,
              fact["camera"], fact["lens"], fact["focal"], fact["aperture"], fact["iso"], digest),
         )
         image_id = c.execute("SELECT id FROM images WHERE rel_path = ?", (rel,)).fetchone()["id"]
         c.commit()
     _sync_tags(image_id, _read_sidecar_tags(file))
+    return True
+
+
+def read_colors(rel: str, thumb: Path) -> bool:
+    """Fill in a photo's colours (colors.py) from its thumbnail when the row
+    has none yet: new photos, changed ones (index_image clears them), and
+    every photo indexed before colours were read. Reading a 480 px WebP is
+    cheap; the check first keeps an unchanged photo at one SELECT."""
+    c = db.conn()
+    row = c.execute("SELECT id FROM images WHERE rel_path = ? AND colors IS NULL",
+                    (rel,)).fetchone()
+    if row is None:
+        return False
+    found = colors.read_file(thumb)
+    if found is None:
+        return False
+    with db.lock():
+        c.execute("UPDATE images SET colors = ?, palette = ? WHERE id = ?",
+                  (found[0], found[1], row["id"]))
+        c.commit()
     return True
 
 
@@ -805,6 +826,8 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
                         previewed += 1
                     else:
                         broken = True
+            if thumb_path.exists():
+                read_colors(rel, thumb_path)
         except Exception as e:
             broken = True
             log.warning("skipped %s: %s: %s", rel, type(e).__name__, e)

@@ -1922,6 +1922,37 @@ select option { background: var(--surface); color: var(--text); }
 
 .dropzone:hover { border-color: var(--line-strong); color: var(--text-dim); }
 .dropzone.is-over { border-color: var(--acc); color: var(--text); background: rgba(var(--acc-rgb), .06); }
+/* Colour search (colors.py): the Library's colour facet and the inspector's
+   strip. The one place the console shows colours that are not its own --
+   they are the PHOTOS' colours, content like a thumbnail. Swatch hexes are
+   colors.SWATCH (a test keeps both sheets in step); the ticked one wears
+   the accent ring, which is state. */
+.swatches { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.swatch {
+  display: block; width: var(--s-6); height: var(--s-6); padding: 0;
+  border: var(--hair) solid rgba(255, 255, 255, .14); border-radius: var(--radius);
+  cursor: pointer; outline: var(--hair) solid transparent; outline-offset: var(--s-0);
+  transition: outline-color var(--dur-1) var(--ease);
+}
+.swatch--red { background: #d8403a; }
+.swatch--orange { background: #e8892c; }
+.swatch--yellow { background: #e8cf3a; }
+.swatch--green { background: #4fa85a; }
+.swatch--teal { background: #2fa8a0; }
+.swatch--blue { background: #3d6fd8; }
+.swatch--purple { background: #8a5ad8; }
+.swatch--pink { background: #e06aa6; }
+.swatch--brown { background: #8a5a36; }
+.swatch--black { background: #111114; }
+.swatch--grey { background: #8b8b94; }
+.swatch--white { background: #f2f2f5; }
+.swatch.is-on { outline: 2px solid var(--acc); }
+.swatch:focus-visible { outline: 2px solid var(--acc); }
+@media (hover: hover) { .swatch:not(.is-on):hover { outline-color: var(--line-strong); } }
+.palette-strip { display: block; width: 100%; height: var(--s-5); margin-top: var(--s-2); }
+.palette-strip rect { cursor: pointer; transition: opacity var(--dur-1) var(--ease); }
+@media (hover: hover) { .palette-strip rect:hover { opacity: .8; } }
+
 /* The palette picker: three cards, each in its own palette. A card is a
    control, so it is glass with a hairline; the one in use carries the
    accent edge every "on" thing carries -- state, never a tint. */

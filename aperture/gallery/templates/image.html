@@ -107,6 +107,27 @@
       </section>
       {% endif %}
 
+      {% if photo_palette %}
+      <section class="panel">
+        <h2><i class="fa fa-palette" aria-hidden="true"></i>{{ t('photo.palette') }}</h2>
+        {# The picture's main colours at their share of it. Each band finds
+           more photos in its colour (search `color:`). #}
+        <svg class="palette-strip" viewBox="0 0 100 10" preserveAspectRatio="none" role="list">
+          {% for s in photo_palette %}
+          <a href="{{ s.href }}" role="listitem" aria-label="{{ t('photo.palette_find', c=s.label) }}">
+            <title>{{ s.label }} · {{ s.share }}% · {{ s.hex }}</title>
+            <rect x="{{ s.x }}" y="0" width="{{ s.w }}" height="10" fill="{{ s.hex }}"/>
+          </a>
+          {% endfor %}
+        </svg>
+        <p class="palette-names">
+          {% for s in photo_palette | unique(attribute='name') %}
+            <a href="{{ s.href }}" class="palette-name"><span class="swatch swatch--{{ s.name }}" aria-hidden="true"></span>{{ s.label }}</a>
+          {% endfor %}
+        </p>
+      </section>
+      {% endif %}
+
       <section class="panel">
         <h2><i class="fa fa-camera" aria-hidden="true"></i>EXIF</h2>
         {% if exif %}
