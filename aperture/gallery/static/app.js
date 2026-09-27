@@ -974,14 +974,41 @@ function scrollReveal(root = document) {
 // after the fade so the cards' own hover transitions take back over.
 // Synchronous like scrollReveal() — .img-fade hides the image, so a late
 // wiring would let one frame through with the images already visible.
+//
+// The skeleton shimmer over a card that is still loading (.img-shim, see the
+// shimmer rule in style.css) is a composited animation, i.e. one GPU layer
+// per card for as long as it runs. It used to run on every card whose image
+// had not arrived yet -- which on a slow link is everything the visitor has
+// scrolled past, dozens of layers at once. iOS Safari answers that by
+// dropping the backing store of layers it is not showing, and what it drops
+// first is what was already painted: scrolling back up found the welcome
+// hero and the album reel blank until they happened to repaint. So the
+// shimmer is lit only while its card is actually on screen, and not at all
+// on a slow link, where a static placeholder is the honest state anyway.
+let shimObserver;
+function shimmerWatch() {
+  if (shimObserver !== undefined) return shimObserver;
+  shimObserver = (hasFastLink() && 'IntersectionObserver' in window)
+    ? new IntersectionObserver((entries) => entries.forEach((en) => {
+        en.target.classList.toggle('img-shim',
+          en.isIntersecting && en.target.classList.contains('img-fade'));
+      }))
+    : null;
+  return shimObserver;
+}
+
 function thumbFadeIn(root = document) {
   if (!document.documentElement.classList.contains('fx-anim')) return;
+  const shim = shimmerWatch();
   root.querySelectorAll(
     '.album-card__img img, .image-tile img, .feat-card__img img'
   ).forEach((img) => {
     if (img.complete) return;
     img.classList.add('img-fade');
+    if (shim) shim.observe(img);
     const done = () => {
+      if (shim) shim.unobserve(img);
+      img.classList.remove('img-shim');
       img.classList.add('img-in');
       setTimeout(() => img.classList.remove('img-fade', 'img-in'), 600);
     };

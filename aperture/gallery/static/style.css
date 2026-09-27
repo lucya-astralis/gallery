@@ -6300,7 +6300,10 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease
 }
 
 /* ---- skeleton shimmer: a slow light sweep over a card whose thumbnail
-   is still on its way (app.js keeps img.img-fade on it until load).
+   is still on its way AND which is on screen right now (app.js sets
+   img.img-shim for exactly that, and never on a slow link: every sweep is
+   a GPU layer, and a pile of them is what made iOS Safari blank out the
+   already-painted hero on the way back up -- see thumbFadeIn()).
    A positioned overlay moved by transform, so the sweep composites; and
    only on cards the reveal observer has already brought on screen
    (.rv-in) — the first version animated background-position on EVERY
@@ -6311,9 +6314,9 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease
   from{ transform:translate3d(-100%, 0, 0); }
   to  { transform:translate3d(100%, 0, 0); }
 }
-html.fx-anim .album-card.rv-in .album-card__img:has(> img.img-fade)::before,
-html.fx-anim .feat-card.rv-in .feat-card__img:has(> img.img-fade)::before,
-html.fx-anim .image-tile.rv-in a:has(> img.img-fade)::before{
+html.fx-anim .album-card.rv-in .album-card__img:has(> img.img-shim)::before,
+html.fx-anim .feat-card.rv-in .feat-card__img:has(> img.img-shim)::before,
+html.fx-anim .image-tile.rv-in a:has(> img.img-shim)::before{
   content:"";
   position:absolute; inset:0; z-index:1;
   pointer-events:none;

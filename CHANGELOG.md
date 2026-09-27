@@ -18,6 +18,21 @@ notes are never one commit apart.
 
 ---
 
+## 2.4.1 — 2026-09-27
+
+**Before you upgrade:** nothing to do.
+
+* **Scrolling back up on a slow connection no longer finds the page blank.**
+  The skeleton shimmer over a card whose thumbnail is still loading is a GPU
+  layer each, and it ran on every card that had not got its image yet — on a
+  slow link that is everything scrolled past, 85 at once on a 150-photo
+  album and growing with every row. iOS Safari answers that many layers by
+  dropping the ones it is not showing, and what it drops first is what was
+  already painted: the welcome hero and the album reel came back empty.
+  The shimmer now runs only on cards that are on screen (about one
+  screenful, ~25), and on a slow link not at all — a plain placeholder
+  until the photo arrives.
+
 ## 2.4.0 — 2026-09-27
 
 Aperture **watches its own ground** — and when the storage goes away, it says
