@@ -4609,6 +4609,9 @@ button.donut__row { cursor: pointer; }
   padding-bottom: var(--s-2);
 }
 .card__sub-n { color: var(--text-ghost); font-variant-numeric: tabular-nums; }
+/* a card that opens on a subsection (the Self-watch card while all is well)
+   has nothing above it to keep a distance from */
+.card__body > .card__sub:first-child { margin-top: 0; }
 
 .facts dd.is-ok   { color: var(--ok); }
 .facts dd.is-warn { color: var(--amb); }

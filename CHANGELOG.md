@@ -18,6 +18,17 @@ notes are never one commit apart.
 
 ---
 
+## 2.4.2 — 2026-09-27
+
+**Before you upgrade:** nothing to do.
+
+* **Self-watch says what it counted**: the photos check read *15 entries*
+  next to a Library of 1195 photos. It lists only the top of the photo tree
+  — every round, over whatever share it is on, so it does not walk it — and
+  now says so: *reachable · 15 top-level folders*, without the folders a
+  NAS keeps for itself (`@eaDir`, `#recycle`) and without stray files.
+* The Self-watch card no longer opens on an empty gap while all is well.
+
 ## 2.4.1 — 2026-09-27
 
 **Before you upgrade:** nothing to do.

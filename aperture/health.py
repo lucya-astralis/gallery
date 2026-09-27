@@ -163,9 +163,17 @@ def _index_has_rows() -> bool:
 
 
 def _probe_photos() -> str:
+    from . import schema
     root = settings.photos_dir
     try:
-        entries = [e for e in os.listdir(root) if not e.startswith(".")]
+        # Only the top level: this runs every round, over whatever share the
+        # photos are on, so it lists one directory rather than walking the
+        # tree. Hidden entries and what a NAS keeps for itself (@eaDir,
+        # #recycle -- schema.SYSTEM_DIRS) are not the operator's, and scandir
+        # answers is_dir() from the listing, without a stat per entry.
+        with os.scandir(root) as it:
+            entries = [e for e in it if not e.name.startswith(".")
+                       and not schema.is_system_dir(e.name)]
     except FileNotFoundError:
         # a fresh install without a photo tree yet serves an empty gallery;
         # one whose index remembers photos has lost its share
@@ -176,7 +184,8 @@ def _probe_photos() -> str:
     # is only wrong because the index remembers photos under it.
     if not entries and _index_has_rows():
         raise _Empty("empty, but the index holds photos -- the share is not mounted")
-    return "%d entries" % len(entries)
+    folders = sum(1 for e in entries if e.is_dir())
+    return "reachable · %d top-level folder%s" % (folders, "" if folders == 1 else "s")
 
 
 def _probe_dir(path: Path):
