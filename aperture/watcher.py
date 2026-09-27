@@ -6,7 +6,7 @@ from pathlib import Path
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from . import control, scanner, schema
+from . import control, health, scanner, schema
 
 log = logging.getLogger("watcher")
 
@@ -76,6 +76,11 @@ class _Handler(FileSystemEventHandler):
             # filesystem change; it defers it to the resume.
             if control.is_paused():
                 continue
+            # Nor while the storage is gone (aperture/health.py): the events
+            # a vanishing share produces are not deletions, and whatever is
+            # queued is worth more after it is back than now.
+            if health.storage_down():
+                continue
             now = time.time()
             ready: list[str] = []
             with self._lock:
@@ -101,6 +106,12 @@ class _Handler(FileSystemEventHandler):
                     continue
                 if not fp.exists():
                     if schema.is_image(fp):
+                        # a file that "is gone" because its share is gone is
+                        # not deleted: look before dropping the row, and put
+                        # it back in the queue if the ground is not there
+                        if not health.storage_ok():
+                            self._enqueue(p)
+                            continue
                         self._forget(fp)
                     continue
                 if not schema.is_image(fp):

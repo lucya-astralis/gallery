@@ -720,6 +720,53 @@ function paintOps() {
   pane.scrollTop = scroll;
 }
 
+/* ----- self-watch ------------------------------------------------------- */
+/* What this process sees of its own ground (aperture/health.py): the storage
+ * checks that put the gallery into failsafe, the environment checks that only
+ * say something, and the last transitions. It arrives with every live status,
+ * so this card changes the moment the state does. */
+const HEALTH_TONE = { ok: 'ok', warn: 'warn', error: 'bad' };
+
+function healthCard(h) {
+  if (!h) return null;
+  const checks = h.checks || [];
+  const down = h.state === 'down';
+  const note = down ? (h.failsafe ? 'failsafe: the gallery answers 503 with a notice' : 'storage down (FAILSAFE=0)')
+    : h.state === 'warn' ? 'running, with something worth a look'
+      : checks.length ? 'everything answers' : 'first look pending';
+  const storage = checks.filter((c) => c.critical);
+  const rest = checks.filter((c) => !c.critical);
+  const row = (c) => fact(c.label, c.detail + (c.hint ? ' — ' + c.hint : ''), HEALTH_TONE[c.level]);
+  const body = [];
+  if (down) {
+    body.push(el('p', { class: 'card__quiet fact--err',
+      text: 'Since ' + ago(h.since) + ': ' + (h.reason || 'the storage is not answering') +
+            '. Scans and the watcher hold still and nothing is removed from the index. ' +
+            'It comes back by itself once the storage has answered a few rounds in a row.' }));
+  }
+  if (storage.length) body.push(sub('Storage'), el('dl', { class: 'facts' }, storage.map(row)));
+  if (rest.length) body.push(sub('Environment'), el('dl', { class: 'facts' }, rest.map(row)));
+  if (!h.monitor) body.push(quiet('The watch is not running in this process (HEALTH_INTERVAL=0).'));
+  const events = (h.events || []).slice().reverse();
+  if (events.length) {
+    body.push(sub('Recent', events.length),
+      ...foldedRows('health-events', events, 4, (ev) =>
+        homeRow(ago(ev.at), ev.from + ' → ' + ev.to, ev.detail || '')));
+  }
+  body.push(el('div', { class: 'card__actions' },
+    el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'Check now',
+      onclick: async (ev) => {
+        ev.target.disabled = true;
+        try {
+          const fresh = await api('/api/ops/health');
+          opsState.status = Object.assign({}, opsState.status, { health: fresh });
+          syncLamp();
+        } catch (err) { toast('The check failed: ' + err.message, 'err'); }
+        if (onOps()) paintOps();
+      } })));
+  return card('fa-gauge', 'Self-watch', note, ...body);
+}
+
 /* ----- indexer ---------------------------------------------------------- */
 /* The machine and the two things you do to it: scan, pause. The counts are
  * the Overview's; this is where the indexer itself is looked at. */
@@ -858,6 +905,18 @@ function liveStatus(st) {
       /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
     if (onOps() && opsState.tab === 'vision' && !typing) paintOps();
   }
+  /* the self-watch card is drawn from the status: redraw it when it moved */
+  if (onOps() && (opsState.tab || 'overview') === 'overview' &&
+      JSON.stringify(before.health || null) !== JSON.stringify(st.health || null)) {
+    const typing = document.activeElement && $('#pane').contains(document.activeElement) &&
+      /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+    if (!typing) paintOps();
+  }
+  if ((before.health || {}).state !== 'down' && (st.health || {}).state === 'down') {
+    toast('Storage unreachable — the gallery is in failsafe', 'err');
+  } else if ((before.health || {}).state === 'down' && st.health && st.health.state !== 'down') {
+    toast('Storage is back — failsafe lifted, a scan is queued');
+  }
   const was = !!(before.server && before.server.scanning);
   const is = !!(st.server && st.server.scanning);
   if (was && !is && !opsState.busy) {
@@ -874,6 +933,9 @@ function liveStatus(st) {
 function paintIndexer(grid, st, ro) {
   const paths = st.paths || {};
   const paused = !!st.paused;
+
+  const watch = healthCard(st.health);
+  if (watch) grid.append(wide(watch));
 
   grid.append(wide(card('fa-microchip', 'Indexer', 'the one writer of the index, whoever asks',
     indexerLive(st, 'ops'),

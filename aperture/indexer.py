@@ -12,7 +12,7 @@ import logging
 import threading
 import time
 
-from . import albums, control, db, scanner, vision, watcher
+from . import albums, control, db, health, scanner, vision, watcher
 from .runtime import settings
 
 log = logging.getLogger("aperture.indexer")
@@ -61,6 +61,8 @@ def _publish_status() -> None:
         "job": state["job"],
         "last_job": state["last_job"],
         "pending_jobs": control.pending_jobs(),
+        # this process's own view of its ground -- aperture/health.py
+        "health": health.snapshot(volatile=False),
         "watcher": {
             "enabled": settings.enable_watcher,
             "running": watcher.is_running(),
@@ -105,6 +107,20 @@ def run_scan(trigger: str = "periodic", album: str | None = None,
     """One indexing pass, then a featured recompute. Returns the run summary,
     or None when a scan was already in flight — the lock is never waited on,
     two overlapping scans would only fight over the same rows."""
+    if health.storage_down():
+        # Nothing to read, and a walk over a share that is gone is exactly
+        # what the index's guards exist for. A requested scan still gets an
+        # answer, so whoever asked is not left waiting.
+        log.info("scan (%s) skipped: the storage is not answering", trigger)
+        now = time.time()
+        summary = {"trigger": trigger, "request_id": request_id, "album": album,
+                   "force": force, "started_at": now, "finished_at": now, "seconds": 0.0,
+                   "error": "storage unavailable -- the scan was not run", "result": None}
+        if request_id is not None:
+            with _scan_state_lock:
+                _scan_state["last_scan"] = summary
+            _publish_status()
+        return summary
     if not _scan_lock.acquire(blocking=False):
         log.info("scan (%s) skipped: a scan is already running", trigger)
         return None
@@ -260,10 +276,19 @@ def _control_loop():
             log.warning("control tick failed: %s: %s", type(e).__name__, e)
 
 
+def _on_health(event: dict) -> None:
+    """The ground came back: look at what changed while it was gone, and let
+    status.json say so now rather than at the next heartbeat."""
+    if event["from"] == "down":
+        control.request_scan(by="health")
+    _publish_status()
+
+
 def startup():
     """Everything this process has to have running: the index, the featured
     flags, the watcher and the control loop. Driven by _lifespan (top of the
     file) — FastAPI's on_event hooks are deprecated."""
+    health.on_change(_on_health)
     db.init(settings.data_dir)
     albums.recompute_featured()
     log.info(

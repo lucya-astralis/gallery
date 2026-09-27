@@ -162,6 +162,7 @@ def _command_columns() -> None:
 # required, ("opt", "--flag", …) optional value, ("flag", "--flag", …) yes/no.
 MENU_ITEMS = [
     ("status", "server, indexer, last scan, watcher queue", []),
+    ("health", "is the storage there, and anything worth a look", []),
     ("scan", "index now (optionally one album, --force)",
      [("arg", "album", "album (blank = whole gallery)"),
       ("flag", "--force", "ignore mtimes and re-index everything? [y/N]")]),

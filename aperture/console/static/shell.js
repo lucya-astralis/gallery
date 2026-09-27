@@ -184,6 +184,26 @@ function syncLamp() {
   $('#nav-lamp').title = st.error ? 'The indexer status could not be read'
     : st.paused ? 'The indexer is paused' : scanning ? 'A scan is running'
       : st.live ? 'The indexer is running' : 'The indexer has no heartbeat';
+  syncHealthMark(st.health);
+}
+
+/* The self-watch (aperture/health.py), beside the lamp: nothing while all is
+ * well, amber for warnings, red while the storage is gone -- the one state in
+ * which the public gallery is not showing the photos. */
+function syncHealthMark(h) {
+  const mark = $('#health-mark');
+  const word = $('#health-word');
+  if (!mark || !word) return;
+  const bad = h ? (h.checks || []).filter((c) => c.level !== 'ok') : [];
+  const down = !!h && h.state === 'down';
+  mark.hidden = !h || (!down && !bad.length);
+  mark.classList.toggle('pill--err', down);
+  mark.classList.toggle('pill--warn', !down);
+  word.textContent = down ? (h.failsafe ? 'failsafe' : 'storage down')
+    : bad.length + ' warning' + (bad.length === 1 ? '' : 's');
+  mark.title = down ? 'Storage unreachable: ' + (h.reason || '') +
+    (h.failsafe ? ' — the gallery answers 503 with a notice' : '')
+    : bad.map((c) => c.label + ': ' + c.detail).join('\n');
 }
 
 /* The status arrives live (server-sent events, /api/ops/live) whenever it

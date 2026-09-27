@@ -18,6 +18,52 @@ notes are never one commit apart.
 
 ---
 
+## 2.4.0 — 2026-09-27
+
+Aperture **watches its own ground** — and when the storage goes away, it says
+so instead of falling over.
+
+**Before you upgrade:** nothing to do. The watch is on by default
+(`HEALTH_INTERVAL=10`) and so is the failsafe (`FAILSAFE=1`). If an uptime
+monitor or a load balancer looks at the gallery, point it at the new
+`/healthz`: 200 while it can serve, 503 while it cannot.
+
+* **Self-watch**: every serving process looks at the four directories it
+  stands on — photos, data, thumbnails, previews — every ten seconds, and a
+  minute apart at what an operator should hear about before a visitor does:
+  a volume under 5 % / 1 GiB free, a photo share on SMB/NFS with no periodic
+  rescan (it delivers no file events), a public instance that can write the
+  photo tree, a `-wal` file that is not being checkpointed, an indexer with
+  no heartbeat, a last scan that failed or was held. Every probe runs on a
+  thread of its own with a timeout, so a hard NFS mount that *hangs* rather
+  than fails does not take the watch down with it.
+* **Failsafe**: a NAS that switches itself off at night while the app keeps
+  running used to turn every page into a bare *Internal Server Error*. Now,
+  after two failed rounds, the gallery answers every request with **503 and
+  a page that says what is going on** — in the visitor's language, naming
+  the archive, refreshing itself every minute. It is built from memory: no
+  template, no font, no file on the way to it, because the disk may be what
+  is gone. The API answers 503 JSON, images a bare 503, and `Retry-After`
+  tells a CDN or a crawler that this is temporary. A request that trips over
+  the storage *between* two rounds (EHOSTDOWN, ESTALE, a disk I/O error from
+  sqlite…) gets the same page instead of the 500 and makes the watch look at
+  once. It comes back by itself after three good rounds in a row — a NAS
+  that is booting answers, stops, and answers again — and the indexer then
+  asks for a scan.
+* **Nothing is removed while the ground is gone**: scans do not run while
+  the storage is down; a scan whose walk could not list a folder (a share
+  that went away half-way through) keeps every row instead of reading the
+  missing half as deleted; the watcher holds its queue, and looks before it
+  forgets a file whose share may simply be gone.
+* **Console**: a mark beside the indexer lamp — red *failsafe*, amber *N
+  warnings*, nothing while all is well — and a **Self-watch** card on
+  System → Indexer with every check, the reason, the last transitions and
+  *Check now*. Both follow the live status; a toast says when the storage
+  goes and when it comes back.
+* **CLI**: `health` looks now, from the CLI's own process, and puts the
+  server's view beside it — exit 0 all well, 1 warnings, 2 storage down, so
+  a cron job or a script can ask too. `status` carries a *health* line.
+
 ## 2.3.0 — 2026-09-25
 
 The console shows the machine **live**.

@@ -357,6 +357,28 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "nf.home": ("home", "start", "ホーム"),
     "nf.albums": ("albums", "alben", "アルバム"),
 
+    # ---- failsafe (aperture/health.py): the storage is not answering ------
+    # System fonts only -- this page is built from memory, without the
+    # shipped woff2, so new glyphs here need no subset rebuild.
+    "failsafe.title": (
+        "The archive is asleep.",
+        "Das Archiv schläft gerade.",
+        "アーカイブは休止中です。",
+    ),
+    "failsafe.lead": (
+        "The storage these photos live on is not reachable right now — "
+        "most likely it is switched off for the night. Nothing is lost.",
+        "Der Speicher, auf dem die Fotos liegen, ist gerade nicht erreichbar — "
+        "vermutlich ist er über Nacht ausgeschaltet. Es ist nichts verloren.",
+        "写真を保存しているストレージに現在アクセスできません。"
+        "夜間は電源が切られている可能性があります。データは失われていません。",
+    ),
+    "failsafe.note": (
+        "This page checks again by itself every {seconds} seconds.",
+        "Diese Seite prüft alle {seconds} Sekunden von selbst, ob er wieder da ist.",
+        "このページは{seconds}秒ごとに自動で再確認します。",
+    ),
+
     # ---- image detail ------------------------------------------------------
     "image.og_desc": (
         "Photo from album “{album}” · {brand}",

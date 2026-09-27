@@ -47,6 +47,10 @@ services:
       # reports it. See aperture/vision.py.
       - VISION=${VISION:-0}
       - VISION_THREADS=${VISION_THREADS:-2}
+      # Self-watch (aperture/health.py): how often the storage is looked at,
+      # and whether an unreachable one gets visitors a 503 notice page.
+      - HEALTH_INTERVAL=${HEALTH_INTERVAL:-10}
+      - FAILSAFE=${FAILSAFE:-1}
       # Public base URL used for OG / Twitter link previews. Set this when
       # behind a reverse proxy that terminates TLS.
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}

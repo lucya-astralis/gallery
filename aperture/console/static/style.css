@@ -1195,6 +1195,9 @@ html.is-booting .openbar { opacity: 0; }
 .pill--ok   { color: var(--ok);  border-color: rgba(var(--ok-rgb), .4); }
 .pill--warn { color: var(--amb); border-color: rgba(var(--amb-rgb), .4); }
 .pill--err  { color: var(--red); border-color: rgba(var(--red-rgb), .4); }
+/* the self-watch's mark in the bar (shell.js syncHealthMark): a link, not text */
+.healthmark { text-decoration: none; }
+.healthmark:hover { border-color: currentColor; }
 
 /* ----- tabs ------------------------------------------------------------ */
 /* The gallery's language selector is the site's one segmented control, so

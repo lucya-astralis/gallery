@@ -102,6 +102,25 @@ def _render_system(st: dict | None, live: bool, pause: dict | None) -> None:
         kv("watcher", f"{'on' if w.get('enabled') else 'off'} · "
                       f"{ui.state('running') if w.get('running') else ui.state('not running', 'bad')} · "
                       f"{ui.state(f'{queued} event(s) queued', 'warn' if queued else 'idle')}")
+        h = st.get("health")
+        if h:
+            render_health_line(h)
         pend = st.get("pending_request")
         if pend:
             kv("queued", f"scan request {pend.get('id')} waiting ({ops.ago(pend.get('requested_at'))})")
+
+
+HEALTH_LEVEL = {"ok": "ok", "warn": "warn", "error": "bad"}
+
+
+def render_health_line(h: dict) -> None:
+    """The self-watch (aperture/health.py) in one row: what the server sees."""
+    bad = [c for c in h.get("checks") or [] if c.get("level") != "ok"]
+    if h.get("state") == "down":
+        mode = "FAILSAFE" if h.get("failsafe") else "STORAGE DOWN"
+        kv("health", f"{ui.state(mode, 'bad')} since {ops.stamp(h.get('since'))} · {h.get('reason')}")
+    elif bad:
+        kv("health", ui.state(f"{len(bad)} warning(s)", "warn") + " · " +
+           "; ".join(f"{c['label']}: {c['detail']}" for c in bad))
+    else:
+        kv("health", ui.state("all well"))

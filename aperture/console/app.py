@@ -1378,4 +1378,8 @@ def create_console_app() -> FastAPI:
     """
     security.assert_safe_binding()
     settings.backup_dir.mkdir(parents=True, exist_ok=True)
+    # the console watches its own ground too -- in a split deployment it
+    # stands on its own mounts (aperture/health.py; idempotent in role=all)
+    from .. import health
+    health.start()
     return app

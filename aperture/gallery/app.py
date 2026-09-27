@@ -9,18 +9,21 @@ from __future__ import annotations
 
 import logging
 import mimetypes
+import sqlite3
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .. import brand, compress, indexer, templating
-from ..runtime import ensure_dirs
+from .. import brand, compress, health, indexer, templating
+from ..runtime import ensure_dirs, settings
 from . import api, context, media, pages, shortlinks
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
+log = logging.getLogger("aperture.gallery")
 
 ensure_dirs()
 
@@ -28,7 +31,8 @@ ensure_dirs()
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
     """Process start / stop: the indexer runs for as long as this app is
-    served. See aperture/indexer.py."""
+    served. See aperture/indexer.py. The self-watch runs beside it."""
+    health.start()
     indexer.startup()
     yield
     indexer.shutdown()
@@ -64,6 +68,79 @@ CSP = (
     "frame-ancestors 'none'; "
     "upgrade-insecure-requests"
 )
+
+
+# ----- failsafe -----------------------------------------------------------
+# When the storage is gone (aperture/health.py), every request gets a 503 that
+# says so -- a page for people, JSON for the API, a bare status for images --
+# built from memory, because the disk may be what is missing. 503 with
+# Retry-After is also what tells a CDN and a crawler "come back later" rather
+# than "this site is broken": Cloudflare serves a cached copy where it has
+# one, and a search engine does not drop pages for it.
+#
+# Defined BEFORE security_headers on purpose: the later registration is the
+# outer one, so the failsafe answer still leaves with the CSP and the rest.
+FAILSAFE_OPEN = ("/healthz", "/_failsafe.css")
+
+
+def _failsafe_response(request: Request) -> Response:
+    path = request.url.path
+    headers = {"Retry-After": str(health.RETRY_AFTER), "Cache-Control": "no-store"}
+    if path == "/api" or path.startswith("/api/"):
+        resp = context.json_cors({"error": "storage unavailable", "status": 503,
+                                  "failsafe": True, "retry_after": health.RETRY_AFTER}, max_age=0)
+        resp.status_code = 503
+        resp.headers.update(headers)
+        return resp
+    if path.startswith(("/thumb/", "/preview/", "/full/", "/static/")):
+        return Response(status_code=503, headers=headers)
+    return HTMLResponse(health.failsafe_page(context.request_lang(request)),
+                        status_code=503, headers=headers)
+
+
+@app.middleware("http")
+async def failsafe(request: Request, call_next):
+    if health.is_down() and request.url.path not in FAILSAFE_OPEN:
+        return _failsafe_response(request)
+    try:
+        return await call_next(request)
+    except (OSError, sqlite3.DatabaseError) as exc:
+        # Found out between two probes: the visitor who noticed first gets
+        # the explanation too, and the monitor looks at once. Anything that
+        # is not the ground going away stays the 500 it always was.
+        await run_in_threadpool(health.suspect, exc)
+        if not settings.failsafe or not health.is_storage_error(exc):
+            raise
+        log.warning("%s %s: %s -- answered from failsafe",
+                    request.method, request.url.path, health.describe(exc))
+        return _failsafe_response(request)
+
+
+@app.get("/healthz", include_in_schema=False)
+def healthz():
+    """For an uptime monitor, a load balancer or a Docker healthcheck: 200
+    while the gallery can serve, 503 while it is in failsafe. Says which
+    check failed, never where anything lives."""
+    snap = health.snapshot()
+    body = {
+        "status": snap["state"],
+        "failsafe": snap["failsafe"],
+        "since": snap["since"],
+        "checked_at": snap["checked_at"],
+        "checks": {c["key"]: c["level"] for c in snap["checks"]},
+        "version": brand.VERSION,
+    }
+    resp = context.json_cors(body, max_age=0)
+    if snap["failsafe"]:
+        resp.status_code = 503
+        resp.headers["Retry-After"] = str(health.RETRY_AFTER)
+    return resp
+
+
+@app.get("/_failsafe.css", include_in_schema=False)
+def failsafe_css():
+    return Response(health.FAILSAFE_CSS, media_type="text/css",
+                    headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.middleware("http")

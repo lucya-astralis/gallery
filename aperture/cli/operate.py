@@ -10,10 +10,10 @@ trees; `passwd` sets the console's password.
 import sys
 import time
 
-from .. import albums, control, db, ops, scanner, termui as ui
+from .. import albums, control, db, health, ops, scanner, termui as ui
 from ..runtime import settings
 
-from .render import _render_system, _screen, dump, fail, head, kv, out
+from .render import HEALTH_LEVEL, _render_system, _screen, dump, fail, head, kv, out, render_health_line
 
 
 def cmd_status(args) -> int:
@@ -25,6 +25,39 @@ def cmd_status(args) -> int:
         _render_status_body(report["server"], report["live"],
                             report["pause"], report["index"])
     return 0
+
+
+def cmd_health(args) -> int:
+    """Look now, from this process -- it stands on the same mounts as the
+    server -- and put the server's own last view next to it."""
+    mine = health.check_now(force_env=True)
+    st = control.read_status()
+    server = (st or {}).get("health") if control.status_is_live(st) else None
+    # One look, no hysteresis: that is for a server deciding what visitors
+    # see, not for someone asking whether the share is there right now.
+    storage_down = any(c["critical"] and c["level"] != "ok" for c in mine["checks"])
+    code = 2 if storage_down else 1 if any(
+        c["level"] != "ok" for c in mine["checks"]) else 0
+    if args.json:
+        dump({"here": mine, "server": server, "exit": code})
+        return code
+    with _screen("health"):
+        head("looked at just now")
+        for c in mine["checks"]:
+            where = f" · {c['path']}" if c.get("path") else ""
+            kv(c["label"], ui.state(c["level"], HEALTH_LEVEL.get(c["level"], "idle")) +
+               f" · {c['detail']}{where}" + (f" → {c['hint']}" if c.get("hint") else ""))
+        if storage_down:
+            kv("verdict", ui.state("storage down", "bad") + " -- a server goes into failsafe "
+               f"after {health.DOWN_AFTER} rounds of this")
+        head("the server's view")
+        if server:
+            render_health_line(server)
+            for ev in (server.get("events") or [])[-5:]:
+                kv(ops.ago(ev["at"]), f"{ev['from']} → {ev['to']} · {ev.get('detail') or ''}")
+        else:
+            kv("server", ui.state("not running", "idle"))
+    return code
 
 
 def _render_status_body(st, live, pause, counts) -> None:

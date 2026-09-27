@@ -41,7 +41,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
-from .. import control, db, i18n, ops, reports, vision
+from .. import control, db, health, i18n, ops, reports, vision
 from ..ops import UnknownAlbum
 from ..runtime import settings
 from . import security
@@ -110,7 +110,17 @@ def _status() -> dict:
     report["auth"] = {"mode": "open" if security.open_access() else "password",
                       "may_run_open": security.may_run_open(),
                       "bind": settings.console_bind}
+    # what this process sees of its ground, without the per-round clock, so
+    # the live stream only sends when something actually changed
+    report["health"] = health.snapshot(volatile=False)
     return report
+
+
+@router.get("/health")
+def api_health():
+    """Look now rather than at the next round: the System place's "Check
+    again". Probes time out on their own; a `def`, so it waits in the pool."""
+    return health.check_now(force_env=True)
 
 
 @router.get("/disk")

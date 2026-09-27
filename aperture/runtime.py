@@ -71,6 +71,9 @@ class Settings:
     # ----- vision (aperture/vision.py) -- off unless asked for ------------
     vision: bool
     vision_threads: int
+    # ----- self-watch (aperture/health.py) --------------------------------
+    health_interval: int
+    failsafe: bool
 
     # ----- the console surface -----------------------------------------
     console_enabled: bool
@@ -160,6 +163,12 @@ def load() -> Settings:
         # and reads every photo on the next scan. See aperture/vision.py.
         vision=_flag("VISION", "0"),
         vision_threads=_int("VISION_THREADS", 2),
+        # How often every serving process looks at the directories it stands
+        # on. 0 switches the watch off. With FAILSAFE on (the default), a
+        # storage that stops answering puts the gallery into a 503 with a page
+        # that says so, instead of a stack of 500s -- see aperture/health.py.
+        health_interval=_int("HEALTH_INTERVAL", 10),
+        failsafe=_flag("FAILSAFE"),
 
         console_enabled=_flag("CONSOLE_ENABLED"),
         # Loopback by default. A different address is a deliberate act and

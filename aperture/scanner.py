@@ -10,7 +10,7 @@ from pathlib import Path
 
 from PIL import Image, ExifTags, ImageOps
 
-from . import brand, capture, colors, db, marks, vision
+from . import brand, capture, colors, db, health, marks, vision
 from . import schema
 from .runtime import settings
 
@@ -29,16 +29,22 @@ def is_meta_path(relp: Path) -> bool:
         any(schema.is_system_dir(part) for part in relp.parts)
 
 
-def walk_photo_tree(base: Path) -> list[Path]:
+def walk_photo_tree(base: Path, errors: list | None = None) -> list[Path]:
     """Every file under `base`, sorted, without ever descending into a folder
     in schema.SYSTEM_DIRS.
 
     Pruned rather than filtered afterwards: a Synology keeps several
     thumbnails of its own per photo in `@eaDir`, and over SMB every one of
     them is a round trip the scan has no use for. The metadata folders are
-    still walked — the callers skip their files with is_meta_path."""
+    still walked — the callers skip their files with is_meta_path.
+
+    A folder that cannot be listed is appended to `errors` (os.walk would
+    otherwise skip it without a word): a share that goes away half-way
+    through a walk leaves a list that is only PART of the tree, and a caller
+    that takes it for the whole one deletes the rest."""
     found: list[Path] = []
-    for dirpath, dirnames, filenames in os.walk(base):
+    onerror = errors.append if errors is not None else None
+    for dirpath, dirnames, filenames in os.walk(base, onerror=onerror):
         dirnames[:] = [d for d in dirnames if not schema.is_system_dir(d)]
         found.extend(Path(dirpath) / name for name in filenames)
     return sorted(found)
@@ -815,7 +821,10 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
     # Files sitting directly in photos_dir (no album folder) are skipped.
     # The walk is listed first, so `progress` (the indexer's live status) can
     # say "312 of 799" rather than only "scanning".
-    files = [f for f in walk_photo_tree(base) if schema.is_image(f)]
+    walk_errors: list[OSError] = []
+    files = [f for f in walk_photo_tree(base, walk_errors) if schema.is_image(f)]
+    for err in walk_errors[:5]:
+        log.warning("scan could not list %s: %s", getattr(err, "filename", "?"), err)
     for position, file in enumerate(files, 1):
         if progress is not None:
             progress(position, len(files), file)
@@ -885,16 +894,27 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         # folder already returns above — and `force` is how an operator says
         # the gallery really is empty now.
         held = not root and not seen and bool(existing) and not force
+        gone = [rel for rel in existing if rel not in seen]
         if held:
             log.warning("scan found no photos under %s but the index holds %d; "
                         "left the index as it is (share not mounted?) -- "
                         "`scan --force` clears it if the gallery really is empty",
                         photos_dir, len(existing))
+        elif gone and (walk_errors or health.storage_down() or not health.reachable(photos_dir)):
+            # Some folders did not list, or the share stopped answering while
+            # we walked it: what looks deleted may only be unread. Rows are
+            # dropped on certainty, never on a maybe -- the next clean scan
+            # does it. (`force` does not override this one: it says the
+            # gallery is empty, not that an unreadable folder is.)
+            held = True
+            log.warning("scan: %d photo(s) look removed, but %s -- kept them; the next "
+                        "scan that reads the whole tree drops what is really gone",
+                        len(gone), "%d folder(s) could not be listed" % len(walk_errors)
+                        if walk_errors else "the photo storage stopped answering")
         else:
-            for rel in existing:
-                if rel not in seen:
-                    c.execute("DELETE FROM images WHERE rel_path = ?", (rel,))
-                    removed += 1
+            for rel in gone:
+                c.execute("DELETE FROM images WHERE rel_path = ?", (rel,))
+                removed += 1
         c.commit()
     # once per scan, not once per photo — see prune_tags()
     prune_tags()
@@ -905,8 +925,10 @@ def full_scan(photos_dir: Path, thumbs_dir: Path, thumb_size: int,
         "removed": removed,
         "failed": failed,
         "total_seen": len(seen),
-        # True when the empty-walk guard above kept the index as it was
+        # True when a guard above kept the index as it was
         "held": held,
+        # folders the walk could not list -- nothing is removed while > 0
+        "walk_errors": len(walk_errors),
         "root": root,
     }
 

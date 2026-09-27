@@ -103,6 +103,9 @@
         {# Only the read-only case is worth a mark: it is the one that changes
            what the tool can do. #}
         {% if read_only %}<span class="pill pill--warn" title="the photo mount is read-only — every write is disabled"><i class="fa fa-lock" aria-hidden="true"></i>read-only</span>{% endif %}
+        {# aperture/health.py, live: red while the storage is gone and the
+           gallery answers from failsafe, amber while something is worth a look #}
+        <a class="pill healthmark" id="health-mark" href="/system" data-go hidden><i class="fa fa-triangle-exclamation" aria-hidden="true"></i><span id="health-word"></span></a>
         <a class="navlamp" id="nav-lamp" href="/system" data-go title="The indexer">
           <span class="lamp__dot" id="nav-lamp-dot"></span><span class="navlamp__word" id="nav-lamp-word">indexer</span>
         </a>

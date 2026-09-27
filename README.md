@@ -32,6 +32,7 @@ decided by `APERTURE_ROLE` — `all` for one container with both, or `public` an
 - **Read-only where it faces the public:** the gallery app has no route that is not a `GET` — no write endpoints, no uploads, no tag editing. The one write path in the product belongs to the console, on the other port, and reaches only the `.album/` and `.gallery/` metadata folders. See [Security / hosting](#security--hosting).
 - **Console:** the config editor *and the operations panel*, built in. Album and gallery `cfg` files, per-language descriptions, icons, title fonts, wallpapers and brand assets, with validation — plus the indexer's live state, scan / pause / resume, and `doctor`, on its own port, never on the public one. Its **Changelog** place shows the release notes the build ships with, the repository on GitHub, and who makes the software.
 - **Operations CLI:** `python -m aperture.cli` — run or pause the indexer, check index/config/derivative drift with `doctor`, audit tags and GPS, and inspect exactly how a photo, an album, the welcome hero or a trip resolves. See [Operations CLI](#operations-cli).
+- **Self-watch & failsafe:** every serving process keeps an eye on the storage it stands on and on what an operator should hear about first (disk space, a share without a rescan, the indexer). If the photo share goes away — a NAS that sleeps at night — the gallery answers 503 with a page that says so instead of a 500, keeps the index untouched, and comes back by itself. `/healthz` for monitors. See [Self-watch and failsafe](#self-watch-and-failsafe).
 - **Security headers:** CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy — all set by built-in middleware.
 - **Custom 404 page** with megacorp-terminal aesthetic.
 
@@ -946,6 +947,8 @@ Inside the package:
 | `VISION`        | `0`           | Search by what is in a photo: a local model (~217 MB, fetched once into `DATA_DIR/models`) reads every photo on the next scan. Off by default; every search can leave its matches out |
 | `VISION_THREADS`| `2`           | CPU threads the vision model may use                       |
 | `PUBLIC_BASE_URL`| (auto)       | Absolute base URL used in OG tags + `/api/showcase` URLs   |
+| `HEALTH_INTERVAL`| `10`         | Seconds between the self-watch's rounds (0 = off). See [Self-watch and failsafe](#self-watch-and-failsafe) |
+| `FAILSAFE`      | `1`           | While the storage is unreachable, answer 503 with a notice. `0` = requests fail as they fall; the index is protected either way |
 | `APERTURE_ROLE` | `all`         | `all` / `public` / `console` — which listeners open         |
 
 Console only:
@@ -1473,6 +1476,47 @@ WireGuard, Tailscale or an SSH tunnel rather than exposing it.
   another continent on the first page view — the case this matters in is
   exactly the one where it hurts (see [Performance](#performance))
 
+## Self-watch and failsafe
+
+`doctor` answers when it is asked; `aperture/health.py` does not wait. A
+thread in every serving process (gallery and console alike) looks every
+`HEALTH_INTERVAL` seconds at:
+
+| Check | Kind | What makes it fail |
+|---|---|---|
+| photos | storage | does not list, does not answer within 5 s, or is empty / gone while the index still holds photos (a `nofail` share that is not mounted) |
+| data | storage | does not list, or `gallery.db` does not read as a database |
+| thumbnails, previews | storage | do not list (public role only) |
+| disk space | environment | a volume under 5 % or 1 GiB free (warn), under 1 % or 200 MiB (error) |
+| photo share | environment | photos on SMB/NFS with `SCAN_INTERVAL=0` — such a share delivers no file events |
+| photo mount | environment | `APERTURE_ROLE=public` and the photo tree is writable |
+| index journal | environment | `gallery.db-wal` over 64 MiB |
+| indexer, last scan | environment | no heartbeat (console role), or the last scan failed, was held or could not list folders |
+
+Environment checks only *say* something: the console's bar gets an amber
+mark, System → Indexer a card, `python -m aperture.cli health` a line.
+Storage checks *act*. Two failed rounds in a row — or one, plus a request
+that already tripped over the storage — and the process goes **down**:
+
+* the gallery answers every request with **503** and `Retry-After`: a page
+  for people (their language, the archive's name, a refresh every minute),
+  JSON for `/api/…`, a bare status for images. The page is held in memory —
+  no template, no font, no file — because the disk may be what is missing;
+* no scan runs, the watcher holds its queue, and nothing is removed from
+  the index — a scan that could not list a folder keeps every row too;
+* it comes back after three good rounds in a row, and the indexer then asks
+  for a scan to pick up what changed while it was gone.
+
+A probe that hangs (a hard NFS mount whose server is gone never fails, it
+blocks in the kernel) counts as failed after 5 s, and no second probe is
+started for that directory while the first is stuck.
+
+For a monitor: `GET /healthz` (200 / 503). For a script:
+`python -m aperture.cli health` exits 0, 1 (warnings) or 2 (storage down).
+As a Docker healthcheck it marks the container *unhealthy* for as long as
+the NAS sleeps — which is true, but do not pair it with anything that
+restarts unhealthy containers: a restart cannot bring a share back.
+
 ## Endpoints
 
 All GET, all public:
@@ -1500,6 +1544,7 @@ All GET, all public:
 - `GET /lang/{en|de|jp}?next=…` — set the language cookie, 303 back to `next` (relative paths only)
 - `GET /api` + `/api/stats` + `/api/albums` + `/api/album/{album}` + `/api/photos` + `/api/photo/{rel_path}` + `/api/tags` + `/api/showcase` + `/api/shuffle` — the JSON API, CORS-enabled (see [API](#api))
 - `GET /api/trip-weather?trip=…` — current conditions per trip stop plus today's high/low, served as a same-origin proxy to [Open-Meteo](https://open-meteo.com/) (weather data CC BY 4.0). Server-side cache (15 min); the visitor's browser never contacts a third party, so no cookies and no consent banner are involved.
+- `GET /healthz` — the self-watch for a monitor: `{"status": "ok"|"warn"|"down", "failsafe", "checks": {name: level}, …}`, 200 while the gallery can serve and 503 in failsafe. Names checks, never paths
 - `GET /api/version` — the aperture release this gallery runs, with its changelog line; what other galleries' update check reads (see [Telling running copies](#telling-running-copies))
 
 ## Versions

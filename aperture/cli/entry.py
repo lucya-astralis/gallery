@@ -10,7 +10,7 @@ import sys
 from .. import brand, i18n, termui as ui
 from ..ops import UnknownAlbum
 
-from .operate import cmd_disk, cmd_doctor, cmd_featured, cmd_passwd, cmd_pause, cmd_resume, cmd_scan, cmd_status, cmd_thumbs
+from .operate import cmd_disk, cmd_doctor, cmd_featured, cmd_health, cmd_passwd, cmd_pause, cmd_resume, cmd_scan, cmd_status, cmd_thumbs
 from .render import fail
 from .reports import cmd_album, cmd_cfg, cmd_export, cmd_gps, cmd_i18n, cmd_photo, cmd_search, cmd_tags, cmd_trip, cmd_welcome
 from .screens import cmd_dash, cmd_help, cmd_home, cmd_menu, cmd_term
@@ -61,6 +61,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "on loopback or with CONSOLE_ALLOW_OPEN=1")
 
     add("status", cmd_status, "Live state: server, pause, last scan, watcher queue, index counters.")
+    add("health", cmd_health,
+        "The self-watch, looked at now: storage reachable, disk space, share, indexer. "
+        "Exit 0 all well, 1 warnings, 2 storage down.")
 
     sp = add("scan", cmd_scan, "Run an indexing pass now (writes the index and builds derivatives).")
     sp.add_argument("album", nargs="?", help="limit the scan to one album subtree")
