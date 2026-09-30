@@ -18,6 +18,27 @@ notes are never one commit apart.
 
 ---
 
+## 2.4.3 — 2026-09-30
+
+**Before you upgrade:** nothing to do.
+
+* **Cards and tiles no longer go missing on a slow connection** — not
+  even their placeholder. Every card on a page used to wait, invisible,
+  for the scroll observer to say "on screen" before it faded in; on a
+  phone that observer is late exactly when the page is busy with the
+  thumbnails a slow link trickles in, and a flick scrolled whole rows of
+  nothing into view. Only the screenful that is there when the page
+  arrives builds up now; every card further down is simply there.
+* **Photos already loaded stay there when you scroll back up.** A photo
+  tile is still not laid out until the visitor gets near it, which keeps a
+  big album's arrival light — but it used to be dropped again as soon as
+  it left the screen, and iOS Safari threw the painted photo away with it
+  and had to rebuild every tile on the way back. A tile that has once come
+  within two screens of the viewport now stays rendered.
+* 2.4.1 blamed the shimmer's GPU layers alone; the shimmer is still gone
+  from slow links, but it was not the whole story (the sakura petals
+  were not either).
+
 ## 2.4.2 — 2026-09-27
 
 **Before you upgrade:** nothing to do.

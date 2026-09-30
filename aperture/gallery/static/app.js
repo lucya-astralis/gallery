@@ -875,7 +875,9 @@ function scrollReveal(root = document) {
   // entirely and coming back later included — keeps the full entrance.
   if (document.documentElement.classList.contains('fx-return')) return;
 
-  const targets = root.querySelectorAll([
+  // One-off blocks: each has an entrance of its own, played by the
+  // observer below as it comes within reach.
+  const BLOCKS = [
     '.section__doc',
     '.section__head',
     // the trip module builds up part by part (bar, reel, countdown, legs)
@@ -892,62 +894,47 @@ function scrollReveal(root = document) {
     '.showcase__head',
     '.trip-map',
     '.album-desc',
+  ];
+  // The repeated things — cards, tiles, cells. These cascade in only as
+  // part of the screenful that is there when the content arrives; every
+  // one further down (or further along a rail) is never hidden at all.
+  //
+  // Hiding them until an observer said "on screen" made every card a hole
+  // whenever the observer was late, and on a phone it is late exactly when
+  // it matters: iOS scrolls on its own thread while the page's thread is
+  // busy decoding the thumbnails a slow link is trickling in, so a flick
+  // ran rows onto the screen that were still opacity 0 — no card, no
+  // placeholder, nothing — until the page caught up. A card nobody has to
+  // un-hide cannot be missing.
+  const ITEMS = [
     '.album-grid > li',
     '.feat__rail > li',
     '.image-grid > li',
     '.arc__cell',
     '.st-card',
-  ].join(','));
+  ];
+  const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+  const vw = window.innerWidth || document.documentElement.clientWidth || 0;
+  const onArrivalScreen = (el) => {
+    const b = el.getBoundingClientRect();
+    return b.top < vh && b.bottom > 0 && b.left < vw && b.right > 0;
+  };
+  const targets = [
+    ...root.querySelectorAll(BLOCKS.join(',')),
+    ...Array.from(root.querySelectorAll(ITEMS.join(','))).filter(onArrivalScreen),
+  ];
   if (!targets.length) return;
 
   const STEP_MS = 45;
   const MAX_DELAY_MS = 315;
-  // Does an element's entrance PLAY where the observer arms it, or only once
-  // the reader has scrolled to it?
-  //
-  // `content-visibility: auto` — the photo tiles carry it, see .image-tile
-  // in style.css — lets the browser skip an off-screen element's rendering
-  // entirely, and a skipped element runs no animations. Its entrance
-  // therefore begins at the moment it is scrolled INTO view, which is the
-  // one moment a staggered fade must not begin. Measured on a 439-photo
-  // album: every scroll stop left most of a screenful invisible for ~600 ms
-  // and then popped it in as a block.
-  //
-  // Asked of the computed style rather than of a list of selectors, so it
-  // stays true by construction when the stylesheet changes its mind about
-  // which elements are skipped. The same line answers a browser that has
-  // never heard of the property correctly: it skips nothing, so its
-  // animations do run off screen, so its elements cascade as before.
-  const playsWhereArmed = (el) => getComputedStyle(el).contentVisibility !== 'auto';
-  // The cascade belongs to the ARRIVAL of this content. Once the reader has
-  // started scrolling they are not watching an entrance any more, they are
-  // looking for photographs — and a tile they scroll onto must be there.
-  let entranceOver = false;
-  window.addEventListener('scroll', () => { entranceOver = true; }, { once: true, passive: true });
   const io = new IntersectionObserver((entries, obs) => {
     let batch = 0;
-    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
     entries.forEach((en) => {
       if (!en.isIntersecting) return;
       const el = en.target;
-      // Two ways to earn the cascade: the entrance runs off screen and is
-      // over before the reader gets there (section heads, the trip module,
-      // the description card), or the element is part of the screenful that
-      // was already there when the page arrived. Everything else — every
-      // tile scrolled onto from below — is simply THERE, with no delay and
-      // no fade of its own; its photograph still arrives on its own terms
-      // (.img-fade). An entrance that plays where somebody is already
-      // looking is not an entrance, it is a hole.
-      const box = en.boundingClientRect;
-      const onScreen = !!box && box.top < vh && box.bottom > 0;
-      if (playsWhereArmed(el) || (onScreen && !entranceOver)) {
-        // stagger within this batch; CSSOM assignment is CSP-safe
-        el.style.animationDelay = Math.min(batch * STEP_MS, MAX_DELAY_MS) + 'ms';
-        batch++;
-      } else {
-        el.style.animationDelay = '0ms';
-        el.classList.add('rv-now');
-      }
+      // stagger within this batch; CSSOM assignment is CSP-safe
+      el.style.animationDelay = Math.min(batch * STEP_MS, MAX_DELAY_MS) + 'ms';
+      batch++;
       el.classList.add('rv-in');
       obs.unobserve(el);
     });
@@ -965,6 +952,31 @@ function scrollReveal(root = document) {
     el.classList.add('rv');
     io.observe(el);
   });
+}
+
+// ---------- TILES STAY RENDERED ONCE SEEN ----------------------
+// The photo tiles carry `content-visibility: auto` (see .image-tile in
+// style.css): a tile nobody has reached yet costs no layout, which is what
+// keeps a 400-photo album's arrival light. But `auto` also skips a tile
+// again the moment it leaves the screen, and WebKit throws its rendering
+// away with it — scrolling back up, iOS Safari had to rebuild every tile
+// on the way and showed finished photographs as empty boxes until it
+// caught up, worst on a slow link where the page's thread is busy with
+// the thumbnails still arriving. So a tile that has come within two
+// screens of the viewport is rendered for good (.cv-seen): the grid pays
+// once for what the visitor actually reaches, and never twice.
+function keepTilesRendered(root = document) {
+  if (!('IntersectionObserver' in window)) return;
+  const tiles = root.querySelectorAll('.image-tile:not(.cv-seen)');
+  if (!tiles.length) return;
+  const io = new IntersectionObserver((entries, obs) => {
+    entries.forEach((en) => {
+      if (!en.isIntersecting) return;
+      en.target.classList.add('cv-seen');
+      obs.unobserve(en.target);
+    });
+  }, { rootMargin: '200% 0px 200% 0px', threshold: 0 });
+  tiles.forEach((t) => io.observe(t));
 }
 
 // ---------- THUMBNAIL FADE-IN ----------------------------------
@@ -1592,6 +1604,7 @@ window.__scrollMemory = scrollMemory;
 })();
 scrollReveal();
 thumbFadeIn();
+keepTilesRendered();
 // html.fx-return described THIS load — a step back out of one of the page's
 // own photos — and scrollReveal() has now acted on it. Clearing it keeps the
 // flag from also suppressing later replays: liveNav() swaps a fresh grid in
@@ -2741,6 +2754,7 @@ async function liveGo(url, { push = true } = {}) {
     // thumbFadeIn() wires the image load, so nothing flashes in between.
     scrollReveal(el);
     thumbFadeIn(el);
+    keepTilesRendered(el);
   });
   // The outgoing grid goes out of focus while the new one is fetched, which
   // reads as "refreshing" — but the class used to come off before the new
