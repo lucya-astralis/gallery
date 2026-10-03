@@ -45,6 +45,21 @@ TRIPS: dict[str, dict] = {
             {"city": "Hokkaido", "jp": "北海道", "album": "hokkaido", "start": "2026-08-16T14:30:00", "end": "2026-09-16T10:30:00", "lat": 43.0618, "lon": 141.3545},
             {"city": "Kanto",    "jp": "関東",   "album": "kanto",    "start": "2026-09-16T10:30:00", "end": "2027-01-02",          "lat": 35.6895, "lon": 139.6917},
         ],
+        # A side trip is NOT a leg: the trip keeps its base (`from`) and its
+        # countdown, and the timeline keeps its three cards. It gets its own
+        # album — filed under the region it actually lies in, not the base's —
+        # a dashed out-and-back on the route map, and a "↗ city" on the day
+        # headers it covers. `start` is leaving the base, `arrive` reaching
+        # the place, `end` heading back (JST wall-clock, like the stops);
+        # the day headers count from `arrive`, so a night-time departure
+        # doesn't tag the evening before as spent there. No lat/lon on
+        # purpose beyond the map dot — a day trip gets no weather chip.
+        "side_trips": [
+            {"city": "Sendai", "jp": "仙台", "region": "Tohoku", "region_jp": "東北",
+             "album": "tohoku/sendai", "from": "Kanto",
+             "start": "2026-10-02T23:00:00", "arrive": "2026-10-03T04:00:00",
+             "end": "2026-10-03T21:40:00", "lat": 38.2682, "lon": 140.8694},
+        ],
     },
 }
 
@@ -77,6 +92,24 @@ def trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
             "cover": card["cover"] if card else None,
             "count": count,
         })
+    side_trips = []
+    for s in cfg.get("side_trips") or []:
+        sub = f"{album}/{s['album']}" if s.get("album") else None
+        card = albums.album_card(sub) if sub else None
+        count = card["count"] if card else 0
+        side_trips.append({
+            "city": s["city"],
+            "jp": s.get("jp", ""),
+            "region": s.get("region", ""),
+            "region_jp": s.get("region_jp", ""),
+            "from": s.get("from", ""),
+            "start": s["start"],
+            "arrive": s.get("arrive") or s["start"],
+            "end": s["end"],
+            "arrive_h": i18n.fmt_date(lang, s.get("arrive") or s["start"]),
+            "href": f"/album/{sub}" if count else None,
+            "count": count,
+        })
     return {
         "key": key,  # TRIPS key, echoed as data-trip-key for /api/trip-weather
         "title": cfg["title"],
@@ -84,6 +117,7 @@ def trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
         "depart": cfg["depart"],
         "depart_h": i18n.fmt_date(lang, cfg["depart"]),
         "stops": stops,
+        "side_trips": side_trips,
     }
 
 
@@ -191,4 +225,12 @@ def trip_stop_on(trip: dict | None, day: str, lang: str) -> str | None:
             hit = s
     if not hit:
         return None
-    return (hit.get("jp") or hit["city"]) if lang == "jp" else hit["city"]
+    name = lambda s: (s.get("jp") or s["city"]) if lang == "jp" else s["city"]
+    # a side trip rides along on its base's chip ("KANTO · ↗ SENDAI") —
+    # the day still belongs to the leg, it just went somewhere
+    for side in trip.get("side_trips") or []:
+        start = (side.get("arrive") or side.get("start") or "")[:10]
+        end = (side.get("end") or "")[:10]
+        if side.get("from", hit["city"]) == hit["city"] and start and start <= day <= (end or start):
+            return f"{name(hit)} · ↗ {name(side)}"
+    return name(hit)

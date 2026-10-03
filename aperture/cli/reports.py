@@ -143,6 +143,11 @@ def cmd_trip(args) -> int:
         out(f"  {stop.get('city'):<12}{stop.get('start')} -> {stop.get('end')}")
         out(f"      {stop.get('count', 0)} photo(s) · link {stop.get('href') or 'none (empty folder)'} "
             f"· icon {stop.get('icon') or 'none'}")
+    if trip.get("side_trips"):
+        head("side trips")
+        for side in trip["side_trips"]:
+            out(f"  {side.get('city'):<12}{side.get('start')} -> {side.get('end')}  (from {side.get('from') or '?'})")
+            out(f"      {side.get('count', 0)} photo(s) · link {side.get('href') or 'none (empty folder)'}")
     hint("  the full structure, exactly as the template gets it: `trip <album> --json`")
     return 0
 

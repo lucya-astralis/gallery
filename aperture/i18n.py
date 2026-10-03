@@ -204,6 +204,8 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     # line where the trip's name used to be repeated
     "trip.leg": ("leg", "Etappe", "区間"),
     "trip.legs": ("legs", "Etappen", "区間"),
+    # an excursion away from a leg's base that is not a leg of its own
+    "trip.side_trip": ("Side trip", "Abstecher", "寄り道"),
 
     # ---- statistics page (/stats) ----------------------------------------
     # Everything here describes the archive itself. No visitor is measured,

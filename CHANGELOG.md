@@ -18,6 +18,32 @@ notes are never one commit apart.
 
 ---
 
+## 2.5.0 — 2026-10-03
+
+**Before you upgrade:** rebuild the JP subset on the server, where
+`photos/` is (`python tools/build_jp_subset.py`) — the side trip brings new
+kanji (仙台, 東北, 寄り道), and so do Sendai's and Tōhoku's `album_jp.md`.
+Until then they show as tofu on the Japanese pages.
+
+* **Side trips.** A trip can now carry excursions that are not legs of their
+  own — `side_trips` in `aperture/trips.py`, each with the leg it starts
+  from, when it left, arrived and headed back, and an album filed under the
+  region it actually lies in. The first one is a day in **Sendai** (Tōhoku)
+  from the Kanto base, in `japan_2026/tohoku/sendai`.
+* The trip dashboard lists a side trip as a slim row under the timeline,
+  linking into its album, with the same upcoming / here / done states as a
+  leg. While it runs the status stamp says where you are, and the countdown
+  keeps running to the leg's end.
+* The route map shows the side trip's region (Tōhoku) a size quieter than a
+  stop's, a thin dashed out-and-back from the base, and a small dot; the
+  base hands its "you are here" pulse over for as long as you are away.
+  Regenerated with `tools/generate_trip_map.py` — the three stops' shapes
+  are unchanged.
+* Day headers on the days a side trip covers name both:
+  `KANTO · ↗ SENDAI`. Counted from the arrival, so a night-time departure
+  doesn't file the evening before under it.
+* `python -m aperture.cli trip <album>` lists side trips too.
+
 ## 2.4.3 — 2026-09-30
 
 **Before you upgrade:** nothing to do.
