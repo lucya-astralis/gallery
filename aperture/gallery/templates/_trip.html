@@ -120,4 +120,23 @@
       {% endfor %}
     </ol>
   </div>
+
+  {# Side trips: excursions from a leg's base that are not legs of their own
+     (TRIPS[…]["side_trips"]). One slim row each under the timeline, linking
+     to its album; initTrip() gives it the same is-upcoming / is-active /
+     is-done states as a leg card, and points the map at it while it runs. #}
+  {% if trip.side_trips %}
+  <ul class="trip__sides">
+    {% for s in trip.side_trips %}
+    <li class="trip__side" data-side data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}" data-from="{{ s.from }}"{% if s.region %} data-region="{{ s.region }}"{% endif %}>
+      {% if s.href %}<a class="trip__side-link" href="{{ s.href }}">{% else %}<span class="trip__side-link">{% endif %}
+        <span class="trip__side-tag">↗ {{ t('trip.side_trip') }}</span>
+        <span class="trip__side-city">{{ s.city }}</span>
+        {% if s.jp %}<span class="trip__side-jp">{{ s.jp }}</span>{% endif %}
+        <span class="trip__side-date">{{ s.arrive_h }}</span>
+      {% if s.href %}</a>{% else %}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
 </section>

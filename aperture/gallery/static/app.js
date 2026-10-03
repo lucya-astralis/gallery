@@ -2411,6 +2411,22 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-map-pref]').forEach((p) => { mapPref[p.dataset.mapPref] = p; });
   const mapSegs = Array.from(document.querySelectorAll('[data-map-seg]'));
 
+  // side trips (_trip.html [data-side] + the map's *--side shapes): an
+  // excursion from a leg's base that is not a leg. Same three states as a
+  // leg, but the base stays the active leg and the countdown keeps running
+  // to it — the base's map dot only hands its pulse over (is-away) so the
+  // map never shows two "you are here"s.
+  const sides = Array.from(root.querySelectorAll('[data-side]')).map((el) => ({
+    el,
+    city: el.dataset.city || '',
+    from: el.dataset.from || '',
+    region: el.dataset.region || '',
+    start: parseLocal(el.dataset.start),
+    end: parseLocal(el.dataset.end),
+  })).filter((s) => s.start && s.end);
+  const mapSide = {};
+  document.querySelectorAll('[data-map-side]').forEach((p) => { mapSide[p.dataset.mapSide] = p; });
+
   // JST wall clock in the top bar (Japan has a single, DST-free zone). The
   // place label and the zone code are static markup — only the digits are
   // rewritten here; the whole readout hides when Intl can't do Asia/Tokyo.
@@ -2509,6 +2525,19 @@ document.addEventListener('DOMContentLoaded', () => {
       seg.classList.toggle('is-next', next);
     });
 
+    let away = null;
+    sides.forEach((s) => {
+      const state = now < s.start ? 'upcoming' : now >= s.end ? 'done' : 'active';
+      if (state === 'active') away = s;
+      setState(s.el, state);
+      setState(mapCity[s.city], state);
+      if (s.region) setState(mapPref[s.region], state);
+      if (mapSide[s.city]) mapSide[s.city].classList.toggle('is-done', state !== 'upcoming');
+    });
+    stops.forEach((s) => {
+      if (mapCity[s.city]) mapCity[s.city].classList.toggle('is-away', !!away && away.from === s.city);
+    });
+
     if (jstFmt && clockTimeEl) clockTimeEl.textContent = jstFmt.format(now);
 
     // phase + headline countdown (label is localized; the status stamp is
@@ -2522,7 +2551,8 @@ document.addEventListener('DOMContentLoaded', () => {
       label = TXT.arrivingIn(stops[0].cityLabel); status = 'IN TRANSIT';
     } else if (activeIdx >= 0) {
       phase = 'active'; target = stops[activeIdx].end;
-      label = TXT.leavingIn(stops[activeIdx].cityLabel); status = 'IN ' + stops[activeIdx].city.toUpperCase();
+      label = TXT.leavingIn(stops[activeIdx].cityLabel);
+      status = 'IN ' + ((away && away.from === stops[activeIdx].city) ? away.city : stops[activeIdx].city).toUpperCase();
     } else {
       phase = 'done'; target = null;
       label = TXT.tripComplete; status = 'COMPLETE';

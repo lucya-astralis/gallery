@@ -148,6 +148,17 @@ REGIONS = {
 }
 ORDER = list(REGIONS)
 
+# ---- side trips -----------------------------------------------------------
+# Mirrors TRIPS["japan_2026"]["side_trips"]: an excursion from a leg's base
+# (`from`) that is not a leg itself. Its `region` is highlighted a size
+# quieter than a stop's, the route is a thin out-and-back from the base's
+# dot, and the dot sits on the city itself. Tohoku is the 6 prefectures.
+SIDE_TRIPS = {
+    "Sendai": {"lat": 38.2682, "lon": 140.8694, "base": 4,   # Miyagi
+               "from": "Kanto", "region": "Tohoku",
+               "prefs": [2, 3, 4, 5, 6, 7]},                 # Aomori Iwate Miyagi Akita Yamagata Fukushima
+}
+
 # ---- projection check -----------------------------------------------------
 for name, c in REGIONS.items():
     x = geo_x(c["lon"])
@@ -247,11 +258,15 @@ def process(rings):
 
 pts_before = sum(len(r) for rings in prefs.values() for r in rings)
 visited_prefs = {code: name for name, c in REGIONS.items() for code in c["prefs"]}
-land_rings, visited = [], {n: [] for n in ORDER}
+side_prefs = {code: c["region"] for c in SIDE_TRIPS.values() for code in c["prefs"]}
+SIDE_REGIONS = list(dict.fromkeys(side_prefs.values()))
+land_rings, visited = [], {n: [] for n in ORDER + SIDE_REGIONS}
 for code, rings in prefs.items():
     slim = process(rings)
     if code in visited_prefs:
         visited[visited_prefs[code]].extend(slim)
+    elif code in side_prefs:
+        visited[side_prefs[code]].extend(slim)
     else:
         land_rings.extend(slim)
 pts_after = sum(len(r) for r in land_rings) + sum(len(r) for rings in visited.values() for r in rings)
@@ -260,6 +275,15 @@ print(f"points: {pts_before} -> {pts_after}")
 # ---- route + stop markup ---------------------------------------------------
 DOTS = {name: pt(c["lon"], c["lat"]) for name, c in REGIONS.items()}
 OSA, SPK, TYO = (DOTS[n] for n in ORDER)
+SIDE_DOTS = {name: pt(c["lon"], c["lat"]) for name, c in SIDE_TRIPS.items()}
+
+# every side-trip dot has to land inside its own prefecture, the same sanity
+# check the stops get above
+for name, c in SIDE_TRIPS.items():
+    x, y = SIDE_DOTS[name]
+    bx0, by0, bx1, by1 = bbox(prefs[c["base"]])
+    if not (bx0 <= x <= bx1 and by0 <= y <= by1):
+        sys.exit(f"side trip {name} dot {x:.1f},{y:.1f} outside JP-{c['base']:02d}")
 
 def q(a, b, bulge):
     """Quadratic arc a->b, control point offset perpendicular by `bulge`."""
@@ -276,22 +300,27 @@ segs = [
     ("trip-map__seg", 1, q(OSA, SPK, 42)),
     ("trip-map__seg", 2, q(SPK, TYO, 34)),
 ]
+# side-trip routes bow WEST of the base -> city line (positive bulge), away
+# from the Hokkaido -> Kanto leg, which bows east past the same stretch
+side_segs = [(name, q(DOTS[c["from"]], SIDE_DOTS[name], 9)) for name, c in SIDE_TRIPS.items()]
 
 # label placement: (dx, dy, text-anchor)
 LBL = {
     "Kansai":   (-8, 12, "end"),
     "Hokkaido": (-8, -8, "end"),
     "Kanto":    (10, 5, "start"),
+    "Sendai":   (-7, 3, "end"),
 }
 
-def city_group(name):
-    x, y = DOTS[name]
+def city_group(name, side=False):
+    x, y = (SIDE_DOTS if side else DOTS)[name]
     dx, dy, anch = LBL[name]
+    cls = "trip-map__city trip-map__city--side" if side else "trip-map__city"
     return (
-        f'    <g class="trip-map__city" data-map-city="{name}">\n'
+        f'    <g class="{cls}" data-map-city="{name}">\n'
         f'      <circle class="trip-map__pulse" cx="{fmt(x)}" cy="{fmt(y)}" r="4.5"/>\n'
         f'      <circle class="trip-map__ring" cx="{fmt(x)}" cy="{fmt(y)}" r="10"/>\n'
-        f'      <circle class="trip-map__dot" cx="{fmt(x)}" cy="{fmt(y)}" r="3.4"/>\n'
+        f'      <circle class="trip-map__dot" cx="{fmt(x)}" cy="{fmt(y)}" r="{2.4 if side else 3.4}"/>\n'
         f'      <text class="trip-map__lbl" x="{fmt(x + dx)}" y="{fmt(y + dy)}" text-anchor="{anch}">{name.upper()}</text>\n'
         f'    </g>'
     )
@@ -299,11 +328,19 @@ def city_group(name):
 pref_paths = "\n".join(
     f'    <path class="trip-map__pref" data-map-pref="{name}" d="{rings_to_d(visited[name])}"/>'
     for name in ORDER
+) + "".join(
+    f'\n    <path class="trip-map__pref trip-map__pref--side" data-map-pref="{name}" d="{rings_to_d(visited[name])}"/>'
+    for name in SIDE_REGIONS
 )
 seg_paths = "\n".join(
-    f'      <path class="{cls}" data-map-seg="{i}" d="{d}"/>' for cls, i, d in segs
+    [f'      <path class="{cls}" data-map-seg="{i}" d="{d}"/>' for cls, i, d in segs] +
+    # data-map-side, not data-map-seg: initTrip() numbers the legs by stop
+    [f'      <path class="trip-map__seg trip-map__seg--side" data-map-side="{n}" d="{d}"/>'
+     for n, d in side_segs]
 )
-city_groups = "\n".join(city_group(n) for n in ORDER)
+city_groups = "\n".join([city_group(n) for n in ORDER] +
+                         [city_group(n, side=True) for n in SIDE_TRIPS])
+aria_sides = "".join(f", side trip to {n}" for n in SIDE_TRIPS)
 
 html = f"""{{# Route map for the trip dashboard (generated — do not hand-edit paths).
    Source: tools/japan-prefectures.svg (MapSVG 47-prefecture map, Mercator),
@@ -313,10 +350,12 @@ html = f"""{{# Route map for the trip dashboard (generated — do not hand-edit 
    is-done / is-next on [data-map-seg]) is synced by initTrip() in app.js;
    both keys carry the STOP name — a region (Kansai / Hokkaido / Kanto),
    whose [data-map-pref] shape is the union of its prefectures — matching
-   each stop's data-city. #}}
+   each stop's data-city. Side trips (trip-map__*--side) work the same way,
+   keyed by the side trip's city / region; their route carries
+   data-map-side instead of data-map-seg. #}}
 <figure class="trip-map">
   <svg viewBox="{fmt(VB[0])} {fmt(VB[1])} {fmt(VB[2])} {fmt(VB[3])}" role="img"
-       aria-label="Route map: {', then '.join(ORDER)}"
+       aria-label="Route map: {', then '.join(ORDER)}{aria_sides}"
        preserveAspectRatio="xMidYMid meet">
     <path class="trip-map__land" d="{rings_to_d(land_rings)}"/>
 {pref_paths}
@@ -331,5 +370,5 @@ html = f"""{{# Route map for the trip dashboard (generated — do not hand-edit 
 """
 OUT.write_text(html, encoding="utf-8")
 print(f"wrote {OUT}  ({len(html.encode('utf-8')):,} bytes)")
-for n, (x, y) in DOTS.items():
+for n, (x, y) in {**DOTS, **SIDE_DOTS}.items():
     print(f"  {n}: {x:.1f},{y:.1f}")

@@ -5609,6 +5609,32 @@ body.page-welcome{ --page-max: 2400px; }
   100%{ box-shadow:0 0 0 0 rgba(var(--trip-live-rgb),0); }
 }
 
+/* ---- side trips: one slim row each under the timeline. A side trip is
+   not a leg, so it gets no card, no cover and no counter — just where and
+   when, in chrome type, with the same three states as a leg. ---- */
+.trip__sides{
+  list-style:none; margin:var(--s-3) 0 0; padding:0;
+  display:flex; flex-wrap:wrap; gap:var(--s-2);
+}
+.trip__side{ margin:0; min-width:0; border:var(--hair) dashed var(--line-strong); }
+.trip__side.is-active{ border-color:rgba(var(--trip-live-rgb),.55); border-style:solid; }
+.trip__side.is-done{ border-color:rgba(var(--trip-done-rgb),.35); }
+.trip__side-link{
+  display:flex; align-items:baseline; flex-wrap:wrap; gap:var(--s-2);
+  padding:var(--s-1) var(--s-3);
+  font-family:var(--mono); font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-sm);
+  text-decoration:none; color:var(--text-dim);
+}
+.trip__side-tag{ color:var(--text-ghost); text-transform:uppercase; }
+.trip__side-city{ color:var(--text); text-transform:uppercase; }
+.trip__side-jp{ font-family:"Noto Sans JP", var(--mono); color:var(--text-ghost); }
+.trip__side.is-active .trip__side-city{ color:var(--trip-live); }
+.trip__side.is-done .trip__side-city{ color:rgba(var(--trip-done-rgb),.85); }
+@media (hover: hover){
+  .trip__side:has(a.trip__side-link:hover){ border-color:rgba(var(--chrome-rgb),.45); }
+}
+
 /* ---- route map (generated inline SVG — see _trip_map.html) ----
    A framed panel with a faint blueprint grid behind the archipelago. The
    grid, the land and the resting dots are grey; only the stop states and
@@ -5681,6 +5707,16 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip-map__city.is-active .trip-map__lbl{ fill:var(--trip-live); }
 .trip-map__city.is-done   .trip-map__lbl{ fill:rgba(var(--trip-done-rgb),.7); }
+
+/* side trips: the region it lies in, the out-and-back and its dot are all a
+   size quieter than a leg's — dashed outline, thin route, smaller dot. While
+   one runs its base stays the active leg but hands it the pulse (is-away),
+   so the map never shows two "you are here"s. */
+.trip-map__pref--side{ fill:rgba(var(--trip-rgb),.04); stroke-dasharray:2 2.5; stroke-width:.6; }
+.trip-map__seg--side{ stroke-width:.9; stroke-dasharray:1.5 2.5; }
+.trip-map__seg--side.is-done{ stroke-dasharray:1.5 2.5; }
+.trip-map__city.is-away .trip-map__pulse,
+.trip-map__city.is-away .trip-map__ring{ animation:none; opacity:0; }
 
 @keyframes trip-map-pulse{
   0%{ r:4.5; opacity:.75; }
