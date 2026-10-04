@@ -40,25 +40,42 @@ TRIPS: dict[str, dict] = {
         "stops": [
             # A stop's end / the next stop's start is the domestic flight's
             # departure (JST wall-clock), so the countdown runs to the gate
-            # rather than to midnight of the travel day.
+            # rather than to midnight of the travel day. The last stop ends
+            # at the flight home (LH 715, HND 10:45).
             {"city": "Kansai",   "jp": "関西",   "album": "kansai",   "start": "2026-08-10",          "end": "2026-08-16T14:30:00", "lat": 34.6937, "lon": 135.5023},
             {"city": "Hokkaido", "jp": "北海道", "album": "hokkaido", "start": "2026-08-16T14:30:00", "end": "2026-09-16T10:30:00", "lat": 43.0618, "lon": 141.3545},
-            {"city": "Kanto",    "jp": "関東",   "album": "kanto",    "start": "2026-09-16T10:30:00", "end": "2027-01-02",          "lat": 35.6895, "lon": 139.6917},
+            {"city": "Kanto",    "jp": "関東",   "album": "kanto",    "start": "2026-09-16T10:30:00", "end": "2027-01-01T10:45:00", "lat": 35.6895, "lon": 139.6917},
         ],
         # A side trip is NOT a leg: the trip keeps its base (`from`) and its
-        # countdown, and the timeline keeps its three cards. It gets its own
-        # album — filed under the region it actually lies in, not the base's —
-        # a dashed out-and-back on the route map, and a "↗ city" on the day
+        # countdown, and the timeline keeps its three cards. Its album is
+        # filed under the region it actually lies in, not the base's; it gets
+        # a dotted out-and-back on the route map and a "↗ city" on the day
         # headers it covers. `start` is leaving the base, `arrive` reaching
-        # the place, `end` heading back (JST wall-clock, like the stops);
-        # the day headers count from `arrive`, so a night-time departure
-        # doesn't tag the evening before as spent there. No lat/lon on
-        # purpose beyond the map dot — a day trip gets no weather chip.
+        # the place, `end` heading back (JST wall-clock, like the stops; for
+        # a flight, the departures — same rule as the legs). The day headers
+        # count from `arrive`, so a night-time departure doesn't tag the
+        # evening before as spent there. lat/lon only place the map dot — a
+        # side trip gets no weather chip.
+        #
+        # `region` is where it lies. A region no leg covers (Tohoku) gets its
+        # own quieter shape and dot on the map; one that IS a leg (Hokkaido)
+        # makes it a revisit — the leg keeps its shape, dot and done state,
+        # and only the route back there is added. tools/generate_trip_map.py
+        # reads this list straight from here.
+        #
+        # `flights` is optional, one entry per leg of the journey, shown on
+        # the side trip's row: (flight no., from, dep, to, arr) — local time.
         "side_trips": [
             {"city": "Sendai", "jp": "仙台", "region": "Tohoku", "region_jp": "東北",
              "album": "tohoku/sendai", "from": "Kanto",
              "start": "2026-10-02T23:00:00", "arrive": "2026-10-03T04:00:00",
              "end": "2026-10-03T21:40:00", "lat": 38.2682, "lon": 140.8694},
+            {"city": "Sapporo", "jp": "札幌", "region": "Hokkaido", "region_jp": "北海道",
+             "album": "hokkaido/sapporo", "from": "Kanto",
+             "start": "2026-12-18T14:45:00", "arrive": "2026-12-18T16:35:00",
+             "end": "2026-12-20T20:30:00", "lat": 43.0618, "lon": 141.3545,
+             "flights": [("MM 571", "NRT", "14:45", "CTS", "16:35"),
+                         ("MM 590", "CTS", "20:30", "NRT", "22:20")]},
         ],
     },
 }
@@ -92,21 +109,29 @@ def trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
             "cover": card["cover"] if card else None,
             "count": count,
         })
+    leg_cities = {s["city"] for s in cfg["stops"]}
     side_trips = []
     for s in cfg.get("side_trips") or []:
         sub = f"{album}/{s['album']}" if s.get("album") else None
         card = albums.album_card(sub) if sub else None
         count = card["count"] if card else 0
+        arrive = s.get("arrive") or s["start"]
         side_trips.append({
             "city": s["city"],
             "jp": s.get("jp", ""),
             "region": s.get("region", ""),
             "region_jp": s.get("region_jp", ""),
             "from": s.get("from", ""),
+            # back to a region a leg already covers: the map adds only the route
+            "revisit": s.get("region") in leg_cities,
             "start": s["start"],
-            "arrive": s.get("arrive") or s["start"],
+            "arrive": arrive,
             "end": s["end"],
-            "arrive_h": i18n.fmt_date(lang, s.get("arrive") or s["start"]),
+            "arrive_h": i18n.fmt_date(lang, arrive),
+            # one date for a day trip, a span for anything longer
+            "end_h": i18n.fmt_date(lang, s["end"]) if s["end"][:10] != arrive[:10] else None,
+            "flights": [dict(zip(("no", "from", "dep", "to", "arr"), f))
+                        for f in s.get("flights") or []],
             "href": f"/album/{sub}" if count else None,
             "count": count,
         })

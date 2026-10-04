@@ -18,6 +18,29 @@ notes are never one commit apart.
 
 ---
 
+## 2.6.0 — 2026-10-04
+
+**Before you upgrade:** nothing to do. (Sapporo's December photos go into
+the existing `japan_2026/hokkaido/sapporo`; 札幌 is already in the JP subset.)
+
+* **Revisits.** A side trip can go back to a region a leg already covered —
+  the first one is **Sapporo, 18–20 Dec**, flown from Tokyo. That leg keeps
+  its shape, dot and done state on the route map; only the dotted route
+  back there is added, and the leg's dot takes the "you are here" pulse
+  while you are there. Its photos share the leg's Sapporo album; the day
+  headers tell the winter days apart (`KANTO · ↗ SAPPORO`).
+* **A side trip's row counts down** like a leg card does — "in 75 days",
+  "day 2 of 3", ✓ — and shows a date span when it lasts more than a day.
+* **Flights on a side trip** (`flights` in its config): number, airports and
+  times, on a line of their own under the row.
+* `tools/generate_trip_map.py` now reads the side trips straight from
+  `aperture/trips.py` instead of keeping its own copy, and places a new
+  side-trip label itself. A new side trip is one entry plus a re-run.
+* **Fix:** the Kanto leg — and with it the trip — ended at midnight on
+  2 January; it now ends at the flight home, 1 January 10:45 (LH 715, HND),
+  like every other leg ends at its departure.
+* `python -m aperture.cli trip <album>` shows revisits and flights.
+
 ## 2.5.0 — 2026-10-03
 
 **Before you upgrade:** rebuild the JP subset on the server, where
