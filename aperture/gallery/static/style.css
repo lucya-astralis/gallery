@@ -5629,6 +5629,14 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__side-tag{ color:var(--text-ghost); text-transform:uppercase; }
 .trip__side-city{ color:var(--text); text-transform:uppercase; }
 .trip__side-jp{ font-family:"Noto Sans JP", var(--mono); color:var(--text-ghost); }
+.trip__side-meta{ margin-left:auto; color:var(--text-ghost); }
+.trip__side-meta:empty{ display:none; }
+/* the flights drop to their own line under where/when */
+.trip__side-flights{
+  flex-basis:100%; display:flex; flex-wrap:wrap; gap:var(--s-1) var(--s-3);
+  color:var(--text-ghost);
+}
+.trip__side-flight b{ font-weight:400; color:var(--text-dim); }
 .trip__side.is-active .trip__side-city{ color:var(--trip-live); }
 .trip__side.is-done .trip__side-city{ color:rgba(var(--trip-done-rgb),.85); }
 @media (hover: hover){
@@ -5717,6 +5725,10 @@ body.page-welcome{ --page-max: 2400px; }
 .trip-map__seg--side.is-done{ stroke-dasharray:1.5 2.5; }
 .trip-map__city.is-away .trip-map__pulse,
 .trip-map__city.is-away .trip-map__ring{ animation:none; opacity:0; }
+/* back at a leg already done (a revisit): that leg's dot takes the pulse for
+   as long as you are there, without its done state changing */
+.trip-map__city.is-here .trip-map__pulse{ animation:trip-map-pulse 2.4s ease-out infinite; }
+.trip-map__city.is-here .trip-map__ring{ opacity:.75; animation:trip-map-spin 16s linear infinite; }
 
 @keyframes trip-map-pulse{
   0%{ r:4.5; opacity:.75; }

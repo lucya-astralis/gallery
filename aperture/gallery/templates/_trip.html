@@ -128,12 +128,19 @@
   {% if trip.side_trips %}
   <ul class="trip__sides">
     {% for s in trip.side_trips %}
-    <li class="trip__side" data-side data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}" data-from="{{ s.from }}"{% if s.region %} data-region="{{ s.region }}"{% endif %}>
+    <li class="trip__side" data-side data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}" data-from="{{ s.from }}"{% if s.region %} data-region="{{ s.region }}"{% endif %}{% if s.revisit %} data-revisit{% endif %}>
       {% if s.href %}<a class="trip__side-link" href="{{ s.href }}">{% else %}<span class="trip__side-link">{% endif %}
         <span class="trip__side-tag">↗ {{ t('trip.side_trip') }}</span>
         <span class="trip__side-city">{{ s.city }}</span>
         {% if s.jp %}<span class="trip__side-jp">{{ s.jp }}</span>{% endif %}
-        <span class="trip__side-date">{{ s.arrive_h }}</span>
+        <span class="trip__side-date">{{ s.arrive_h }}{% if s.end_h %} – {{ s.end_h }}{% endif %}</span>
+        {# "in 75 days" / "day 2 of 3" / ✓ — filled by initTrip(), like a leg's #}
+        <span class="trip__side-meta" data-side-meta></span>
+        {% if s.flights %}
+        <span class="trip__side-flights">
+          {% for f in s.flights %}<span class="trip__side-flight"><b>{{ f.no }}</b> {{ f['from'] }} {{ f.dep }} → {{ f.to }} {{ f.arr }}</span>{% endfor %}
+        </span>
+        {% endif %}
       {% if s.href %}</a>{% else %}</span>{% endif %}
     </li>
     {% endfor %}

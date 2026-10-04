@@ -13,6 +13,7 @@
 # Run from anywhere: `python tools/generate_trip_map.py` — paths are resolved
 # relative to this file. Tune REGIONS / segment bulges / LBL offsets below
 # when the itinerary changes, then re-run.
+import ast
 import math
 import re
 import sys
@@ -149,15 +150,35 @@ REGIONS = {
 ORDER = list(REGIONS)
 
 # ---- side trips -----------------------------------------------------------
-# Mirrors TRIPS["japan_2026"]["side_trips"]: an excursion from a leg's base
-# (`from`) that is not a leg itself. Its `region` is highlighted a size
-# quieter than a stop's, the route is a thin out-and-back from the base's
-# dot, and the dot sits on the city itself. Tohoku is the 6 prefectures.
-SIDE_TRIPS = {
-    "Sendai": {"lat": 38.2682, "lon": 140.8694, "base": 4,   # Miyagi
-               "from": "Kanto", "region": "Tohoku",
-               "prefs": [2, 3, 4, 5, 6, 7]},                 # Aomori Iwate Miyagi Akita Yamagata Fukushima
+# Read straight from TRIPS["japan_2026"]["side_trips"] in aperture/trips.py
+# (parsed, not imported — the app module needs a configured runtime), so a
+# new side trip is one entry there plus a re-run here. Each is an excursion
+# from a leg's base (`from`) that is not a leg itself; the route is a thin
+# out-and-back from the base's dot.
+#   * region no leg covers -> that region a size quieter than a stop's, and
+#     a small dot on the city (its prefectures come from SIDE_REGION_PREFS)
+#   * region that IS a leg  -> a revisit: the leg's shape and dot stay as
+#     they are, only the route back there is added
+def _trips_literal():
+    tree = ast.parse((REPO / "aperture" / "trips.py").read_text(encoding="utf-8"))
+    for node in tree.body:
+        target = getattr(node, "target", None) or (node.targets[0] if getattr(node, "targets", None) else None)
+        if isinstance(target, ast.Name) and target.id == "TRIPS":
+            return ast.literal_eval(node.value)
+    sys.exit("TRIPS not found in aperture/trips.py")
+
+SIDE_REGION_PREFS = {
+    "Tohoku": [2, 3, 4, 5, 6, 7],   # Aomori Iwate Miyagi Akita Yamagata Fukushima
 }
+SIDE_TRIPS = {}
+for s in _trips_literal()["japan_2026"].get("side_trips", []):
+    revisit = s["region"] in REGIONS
+    if not revisit and s["region"] not in SIDE_REGION_PREFS:
+        sys.exit(f"side trip {s['city']}: add {s['region']!r} to SIDE_REGION_PREFS")
+    SIDE_TRIPS[s["city"]] = {"lat": s["lat"], "lon": s["lon"], "from": s["from"],
+                             "region": s["region"], "revisit": revisit,
+                             "prefs": [] if revisit else SIDE_REGION_PREFS[s["region"]]}
+NEW_SIDES = [n for n, c in SIDE_TRIPS.items() if not c["revisit"]]
 
 # ---- projection check -----------------------------------------------------
 for name, c in REGIONS.items():
@@ -258,7 +279,7 @@ def process(rings):
 
 pts_before = sum(len(r) for rings in prefs.values() for r in rings)
 visited_prefs = {code: name for name, c in REGIONS.items() for code in c["prefs"]}
-side_prefs = {code: c["region"] for c in SIDE_TRIPS.values() for code in c["prefs"]}
+side_prefs = {code: c["region"] for c in SIDE_TRIPS.values() if not c["revisit"] for code in c["prefs"]}
 SIDE_REGIONS = list(dict.fromkeys(side_prefs.values()))
 land_rings, visited = [], {n: [] for n in ORDER + SIDE_REGIONS}
 for code, rings in prefs.items():
@@ -275,15 +296,17 @@ print(f"points: {pts_before} -> {pts_after}")
 # ---- route + stop markup ---------------------------------------------------
 DOTS = {name: pt(c["lon"], c["lat"]) for name, c in REGIONS.items()}
 OSA, SPK, TYO = (DOTS[n] for n in ORDER)
-SIDE_DOTS = {name: pt(c["lon"], c["lat"]) for name, c in SIDE_TRIPS.items()}
+# a revisit routes to the leg's own dot, so the two never sit a hair apart
+SIDE_DOTS = {name: DOTS[c["region"]] if c["revisit"] else pt(c["lon"], c["lat"])
+             for name, c in SIDE_TRIPS.items()}
 
 # every side-trip dot has to land inside its own prefecture, the same sanity
 # check the stops get above
-for name, c in SIDE_TRIPS.items():
+for name in NEW_SIDES:
     x, y = SIDE_DOTS[name]
-    bx0, by0, bx1, by1 = bbox(prefs[c["base"]])
-    if not (bx0 <= x <= bx1 and by0 <= y <= by1):
-        sys.exit(f"side trip {name} dot {x:.1f},{y:.1f} outside JP-{c['base']:02d}")
+    c = SIDE_TRIPS[name]
+    if not any(b[0] <= x <= b[2] and b[1] <= y <= b[3] for b in (bbox(prefs[k]) for k in c["prefs"])):
+        sys.exit(f"side trip {name} dot {x:.1f},{y:.1f} outside {c['region']}")
 
 def q(a, b, bulge):
     """Quadratic arc a->b, control point offset perpendicular by `bulge`."""
@@ -302,19 +325,24 @@ segs = [
 ]
 # side-trip routes bow WEST of the base -> city line (positive bulge), away
 # from the Hokkaido -> Kanto leg, which bows east past the same stretch
-side_segs = [(name, q(DOTS[c["from"]], SIDE_DOTS[name], 9)) for name, c in SIDE_TRIPS.items()]
+# (a revisit's route is long and gets a wider bow, so it clears the other
+# side trips' dots on the way)
+side_segs = [(name, q(DOTS[c["from"]], SIDE_DOTS[name], 24 if c["revisit"] else 9))
+             for name, c in SIDE_TRIPS.items()]
 
 # label placement: (dx, dy, text-anchor)
 LBL = {
     "Kansai":   (-8, 12, "end"),
     "Hokkaido": (-8, -8, "end"),
     "Kanto":    (10, 5, "start"),
-    "Sendai":   (-7, 3, "end"),
 }
+# a new side-trip dot without its own entry above: label to the west, which
+# keeps it off the legs' routes (they bow east up the Pacific side)
+LBL_SIDE = (-7, 3, "end")
 
 def city_group(name, side=False):
     x, y = (SIDE_DOTS if side else DOTS)[name]
-    dx, dy, anch = LBL[name]
+    dx, dy, anch = LBL.get(name, LBL_SIDE)
     cls = "trip-map__city trip-map__city--side" if side else "trip-map__city"
     return (
         f'    <g class="{cls}" data-map-city="{name}">\n'
@@ -339,7 +367,7 @@ seg_paths = "\n".join(
      for n, d in side_segs]
 )
 city_groups = "\n".join([city_group(n) for n in ORDER] +
-                         [city_group(n, side=True) for n in SIDE_TRIPS])
+                         [city_group(n, side=True) for n in NEW_SIDES])
 aria_sides = "".join(f", side trip to {n}" for n in SIDE_TRIPS)
 
 html = f"""{{# Route map for the trip dashboard (generated — do not hand-edit paths).
@@ -352,7 +380,8 @@ html = f"""{{# Route map for the trip dashboard (generated — do not hand-edit 
    whose [data-map-pref] shape is the union of its prefectures — matching
    each stop's data-city. Side trips (trip-map__*--side) work the same way,
    keyed by the side trip's city / region; their route carries
-   data-map-side instead of data-map-seg. #}}
+   data-map-side instead of data-map-seg. A side trip back to a leg's region
+   (a revisit) adds only its route and reuses that leg's dot (is-here). #}}
 <figure class="trip-map">
   <svg viewBox="{fmt(VB[0])} {fmt(VB[1])} {fmt(VB[2])} {fmt(VB[3])}" role="img"
        aria-label="Route map: {', then '.join(ORDER)}{aria_sides}"

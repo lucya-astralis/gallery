@@ -2421,8 +2421,12 @@ document.addEventListener('DOMContentLoaded', () => {
     city: el.dataset.city || '',
     from: el.dataset.from || '',
     region: el.dataset.region || '',
+    // back to a region a leg already covers: that leg keeps its own state on
+    // the map, its dot only takes the pulse while you are there (is-here)
+    revisit: 'revisit' in el.dataset,
     start: parseLocal(el.dataset.start),
     end: parseLocal(el.dataset.end),
+    meta: el.querySelector('[data-side-meta]'),
   })).filter((s) => s.start && s.end);
   const mapSide = {};
   document.querySelectorAll('[data-map-side]').forEach((p) => { mapSide[p.dataset.mapSide] = p; });
@@ -2530,9 +2534,24 @@ document.addEventListener('DOMContentLoaded', () => {
       const state = now < s.start ? 'upcoming' : now >= s.end ? 'done' : 'active';
       if (state === 'active') away = s;
       setState(s.el, state);
-      setState(mapCity[s.city], state);
-      if (s.region) setState(mapPref[s.region], state);
+      if (s.revisit) {
+        if (mapCity[s.region]) mapCity[s.region].classList.toggle('is-here', state === 'active');
+      } else {
+        setState(mapCity[s.city], state);
+        if (s.region) setState(mapPref[s.region], state);
+      }
       if (mapSide[s.city]) mapSide[s.city].classList.toggle('is-done', state !== 'upcoming');
+      if (s.meta) {
+        if (state === 'upcoming') {
+          const dleft = ceilDays(now, s.start);
+          s.meta.textContent = dleft <= 1 ? TXT.soon : TXT.inDays(dleft);
+        } else if (state === 'active') {
+          const total = Math.max(1, Math.ceil((s.end - s.start) / DAY));
+          s.meta.textContent = TXT.dayOf(Math.min(total, Math.floor((now - s.start) / DAY) + 1), total);
+        } else {
+          s.meta.textContent = '✓';
+        }
+      }
     });
     stops.forEach((s) => {
       if (mapCity[s.city]) mapCity[s.city].classList.toggle('is-away', !!away && away.from === s.city);
