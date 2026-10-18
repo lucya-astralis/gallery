@@ -13,6 +13,12 @@
     the animation is built on — and it is markup rather than a filter
     because a filter is the expensive way to get the same edge. The
     footer's mark does not move and does not pay for them.
+
+    `product` swaps the wing for the product's own mark, the aperture
+    closed down (brand kit, logo/products/gallery-mark-*.svg): the bar and
+    the door name the product, the boot screen and the footer keep the
+    house's eagle. It is a square, so it takes .mark--square, and it
+    splits on hover exactly as the wing does.
     ================================================================== -#}
 
 {%- macro pieces(cls) -%}
@@ -26,20 +32,31 @@
       <path class="{{ cls }}" data-piece="tail" d="M482,282L544.5,407L482,543L419.5,407L482,282Z"/>
 {%- endmacro -%}
 
-{%- macro mark(cls='', ghosts=false) -%}
-<span class="mark {{ cls }}" aria-hidden="true">
-  <svg class="mark__svg" viewBox="0 0 964 543" focusable="false">
-{{ pieces('piece') }}
+{%- macro blades(cls) -%}
+      <path class="{{ cls }}" data-piece="blade-1" d="M53.29,7.21L61.74,36.74L66.55,48.62L87.49,26.95Z"/>
+      <path class="{{ cls }}" data-piece="blade-2" d="M88.7,31.45L67.36,53.54L59.47,63.64L88.7,70.94Z"/>
+      <path class="{{ cls }}" data-piece="blade-3" d="M85.42,74.24L55.61,66.8L42.92,65.02L51.22,93.99Z"/>
+      <path class="{{ cls }}" data-piece="blade-4" d="M46.71,92.79L38.26,63.26L33.45,51.38L12.51,73.05Z"/>
+      <path class="{{ cls }}" data-piece="blade-5" d="M11.3,68.55L32.64,46.46L40.53,36.36L11.3,29.06Z"/>
+      <path class="{{ cls }}" data-piece="blade-6" d="M14.58,25.76L44.39,33.2L57.08,34.98L48.78,6.01Z"/>
+{%- endmacro -%}
+
+{%- macro mark(cls='', ghosts=false, product=false) -%}
+{%- set draw = blades if product else pieces -%}
+{%- set box = "0 0 100 100" if product else "0 0 964 543" -%}
+<span class="mark {{ cls }}{% if product %} mark--square{% endif %}" aria-hidden="true">
+  <svg class="mark__svg" viewBox="{{ box }}" focusable="false">
+{{ draw('piece') }}
   </svg>
   {%- if ghosts %}
   <div class="mark__ghost mark__ghost--r">
-    <svg class="mark__svg" viewBox="0 0 964 543" focusable="false">
-{{ pieces('piece piece--ghost') }}
+    <svg class="mark__svg" viewBox="{{ box }}" focusable="false">
+{{ draw('piece piece--ghost') }}
     </svg>
   </div>
   <div class="mark__ghost mark__ghost--b">
-    <svg class="mark__svg" viewBox="0 0 964 543" focusable="false">
-{{ pieces('piece piece--ghost') }}
+    <svg class="mark__svg" viewBox="{{ box }}" focusable="false">
+{{ draw('piece piece--ghost') }}
     </svg>
   </div>
   {%- endif %}

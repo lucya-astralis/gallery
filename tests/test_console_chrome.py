@@ -17,15 +17,17 @@ ROOT = Path(__file__).resolve().parent.parent
 def test_the_mark_is_markup_now_and_not_a_picture(console):
     """An <img> is a closed document: nothing outside it can reach a path, so
     it can be neither drawn in nor split into colour. The nav, the footer and
-    the boot screen all carry the wing as inline SVG."""
+    the boot screen all carry their mark as inline SVG."""
     page = console.get("/").text
     assert page.count('class="mark ') == 3          # nav, footer, boot
     assert 'mark--nav' in page and 'mark--foot' in page and 'mark--splash' in page
-    # the eight pieces, in each of the three, each addressable by name
-    assert page.count('data-piece="tail"') >= 3
-    # and the logo file is still the favicon -- a 16px tab icon wants the flat
-    # file, not eight paths
-    assert 'logo/lucya_logo.svg' in page
+    # the boot screen and the footer draw the house's eagle, piece by piece;
+    # the bar names the product with its own mark, the aperture
+    assert page.count('data-piece="tail"') >= 2
+    assert 'mark--nav mark--square' in page and page.count('data-piece="blade-1"') >= 1
+    # and the product's flat file is the favicon -- a 16px tab icon wants
+    # the file, not a handful of paths
+    assert 'logo/gallery.svg' in page
 
 
 def test_the_boot_screen_is_hidden_until_a_script_shows_it(console):

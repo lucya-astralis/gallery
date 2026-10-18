@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>Sign in — lucya.systems aperture</title>
-  <link rel="icon" type="image/svg+xml" href="{{ static_url('logo/lucya_logo.svg') }}">
+  <link rel="icon" type="image/svg+xml" href="{{ static_url('logo/gallery.svg') }}">
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
   {# The site's accent and the palettes derived from it (see app.py, "the
      console's look"), after style.css so its :root wins. #}
@@ -30,7 +30,7 @@
     <form class="login__card" id="login-form" method="post" action="/api/session"
           autocomplete="on" novalidate>
       <span class="login__mark">
-        {{ brandmark.mark('mark--door', ghosts=true) }}
+        {{ brandmark.mark('mark--door', ghosts=true, product=true) }}
         <span class="brand-text">
           <span class="brand-name">lucya.systems</span>
           {# The version belongs on the door as much as in the footer: it is

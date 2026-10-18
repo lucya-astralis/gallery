@@ -18,6 +18,19 @@ notes are never one commit apart.
 
 ---
 
+## 2.7.0 — 2026-10-18
+
+**Before you upgrade:** nothing to do.
+
+* **A mark of its own.** Aperture now has its own mark from the lucya.systems
+  brand kit: an aperture closed down, six straight blades in the grammar of
+  the lucya wing. It is the console's favicon and stands in its bar and on
+  its sign-in card, and it splits on hover as the wing did. The boot screen
+  and the footer keep the house's eagle.
+* **The unbranded default.** A gallery whose `gallery.cfg` names no `logo`
+  now shows that mark instead of the viewfinder brackets. A gallery that
+  names its own logo is untouched.
+
 ## 2.6.0 — 2026-10-04
 
 **Before you upgrade:** nothing to do. (Sapporo's December photos go into

@@ -620,6 +620,10 @@ body {
   flex: 0 0 auto;
 }
 
+/* The product's own mark (brand kit, logo/products/) is a square, and
+   behaves as the wing does in every other way. */
+.mark--square { aspect-ratio: 1; }
+
 .mark__svg {
   position: absolute;
   inset: 0;
