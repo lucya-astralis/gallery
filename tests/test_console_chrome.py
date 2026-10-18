@@ -27,7 +27,7 @@ def test_the_mark_is_markup_now_and_not_a_picture(console):
     assert 'mark--nav mark--square' in page and page.count('data-piece="blade-1"') >= 1
     # and the product's flat file is the favicon -- a 16px tab icon wants
     # the file, not a handful of paths
-    assert 'logo/gallery.svg' in page
+    assert 'logo/aperture.svg' in page
 
 
 def test_the_boot_screen_is_hidden_until_a_script_shows_it(console):

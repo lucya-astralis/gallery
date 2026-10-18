@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="64" height="64" role="img" aria-label="Gallery">
   <!-- The unbranded default mark, used when gallery.cfg names no `logo`.
        It is the software's own mark, the aperture closed down (brand kit,
-       logo/products/gallery-mark-white.svg): six straight blades in the
+       logo/products/aperture-mark-white.svg): six straight blades in the
        grammar of the lucya wing, so a gallery that has set no logo of its
        own looks like it belongs to this software rather than borrowing the
        vendor's eagle. White only: it has to survive being 18px tall in the
