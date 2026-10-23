@@ -18,6 +18,37 @@ notes are never one commit apart.
 
 ---
 
+## 2.7.1 — 2026-10-23
+
+**Before you upgrade:** nothing to do.
+
+* **Big albums no longer stall on a far or thin connection.** The photo
+  grid used to leave the loading to the browser, which asks only "is this
+  tile near the screen?" — so every tile a flick ran past started its
+  thumbnail, nothing ever called one off, and the screen you stopped on was
+  last in line for a link shared with a few hundred others. On a 980-photo
+  album behind a link like Japan → Germany, one flick left 190 thumbnails in
+  flight and the stop took 12 s to fill; p90 for a thumbnail was 30 s. That
+  was the "it appears, complete, after half a minute".
+  The page now decides itself: what is on screen first and at once, then
+  reading ahead a few at a time in the direction you scroll, nothing new
+  while you flick, and a request whose tile is two screens behind you is
+  dropped (and asked for again if you come back). Measured the same way:
+  ~1.8 s after a flick, p90 under 2 s, about half the requests. Safari,
+  which read ahead by next to nothing and left two to four tiles of every
+  screen empty on arrival, now has the next screen ready while you read
+  this one. Without script the grid is the plain lazy-loading one it was.
+* **Every tile still waiting shows the skeleton sweep, not just the first
+  screen's.** Since 2.4.3 only the tiles there on arrival had the class the
+  shimmer waited for; everything further down was a plain dark box with no
+  sign it was loading. (The shimmer still runs only on screen, and still
+  not at all on a slow link.)
+* A photo that arrives while its tile is off screen no longer fades in:
+  nobody sees it, and each fade is a GPU layer for half a second — a stream
+  of them under the finger is the kind of pressure under which iOS Safari
+  throws away tiles it had already painted, so scrolling back up found
+  photos you had seen as empty boxes.
+
 ## 2.7.0 — 2026-10-18
 
 **Before you upgrade:** nothing to do.

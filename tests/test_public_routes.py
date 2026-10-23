@@ -122,6 +122,22 @@ def test_album_page_is_german_under_the_lang_cookie(client):
     assert "überwiegend in der Kälte" in body
 
 
+def test_photo_tiles_load_without_script(client):
+    """Every photo tile ships a real src with loading="lazy". That is what a
+    visitor without script gets, and it is the markup app.js's tile loader
+    takes over (it adopts `.image-tile img[src]`, holds the address in
+    data-src and hands it back nearest-first). A tile rendered with data-src
+    alone would be a hole for the one and invisible to the other."""
+    import re
+    body = client.get("/album/berlin").text
+    tiles = re.findall(r'<li class="image-tile[^"]*">\s*<a [^>]*>\s*<img ([^>]*)>', body)
+    assert tiles
+    for attrs in tiles:
+        assert 'src="/thumb/' in attrs
+        assert 'loading="lazy"' in attrs
+        assert "data-src" not in attrs
+
+
 def test_albums_index_lists_the_top_level_only(client):
     body = client.get("/albums").text
     assert "Berlin" in body and "Tech" in body

@@ -979,6 +979,158 @@ function keepTilesRendered(root = document) {
   tiles.forEach((t) => io.observe(t));
 }
 
+// ---------- TILE LOADER ----------------------------------------
+// Who decides which photo tile is fetched when. loading="lazy" asks only
+// "is it near the viewport?", and that is the wrong question for a grid of
+// a thousand: every tile a flick runs past comes near the viewport for a
+// frame, its request starts, and nothing ever cancels it. Measured on a
+// 980-photo album behind a far, thin link (a phone in Japan, the server in
+// Germany): one flick over twenty screens left 190 thumbnails in flight,
+// the screen it stopped on was the last thing they shared the link with,
+// and it took 13 s to fill — p90 for a thumbnail was 33 s. That is the
+// "half a minute, then the photo is suddenly there".
+//
+// So, for the photo tiles, the page asks instead:
+//   * nearest first — the screen the visitor is looking at at once, then
+//     reading ahead at most MAX_INFLIGHT at a time, by distance from the
+//     screen, the way they are going counting double, so the next screen
+//     fills while they read this one (WebKit's own lazy loading reads ahead
+//     by next to nothing: two to four tiles of every screen were still empty
+//     on arrival, however long the visitor had lingered on the one before);
+//   * not during a flick — while the page moves faster than a few screens a
+//     second nothing new starts; it starts where it settles;
+//   * not what was left behind — a request whose tile has gone more than two
+//     screens away is called off (dropping the src aborts it) and asked for
+//     again if the visitor comes back.
+// The markup keeps its plain <img src loading=lazy>, which is still what a
+// visitor without script gets. adopt() takes the src off every tile that
+// has not arrived yet, synchronously before the first rendering
+// opportunity — the same window scrollReveal() relies on — when no lazy
+// image has been asked for. An image already complete (memory cache, a
+// return visit) is left alone.
+const tileLoader = (() => {
+  if (!('IntersectionObserver' in window)) return { adopt() {} };
+  // Enough to keep a distant link busy (a quarter second to the server and
+  // back is eight requests' worth of waiting), few enough that the screen
+  // the visitor is on never shares the pipe with more than a screenful.
+  const MAX_INFLIGHT = 8;
+  // screens per second above which the page is flying past, not being read
+  const FLING_SCREENS_PER_S = 3;
+  const SETTLE_MS = 140;
+
+  const near = new Set();          // tiles within reach whose photo is still to come
+  const inflight = new Set();      // imgs asked for and not yet arrived
+  let dir = 1;
+  let lastY = window.scrollY || 0;
+  let lastT = performance.now();
+  let flinging = false;
+  let settleTimer = null;
+  let pumpTimer = null;
+
+  const imgOf = (tile) => tile.querySelector('img');
+
+  const finish = (img) => {
+    if (!inflight.delete(img)) return;
+    const tile = img.closest('.image-tile');
+    if (tile) { near.delete(tile); io.unobserve(tile); }
+    schedule();
+  };
+  const onArrive = (e) => {
+    // a src taken back by callOff() fires nothing; one that did arrive does
+    if (e.target.getAttribute('src')) finish(e.target);
+  };
+
+  const start = (img) => {
+    inflight.add(img);
+    img.src = img.dataset.src;
+    img.removeAttribute('data-src');
+  };
+  const callOff = (img) => {
+    inflight.delete(img);
+    img.dataset.src = img.getAttribute('src');
+    img.removeAttribute('src');
+  };
+
+  function pump() {
+    pumpTimer = null;
+    // a grid liveNav() swapped out: its requests give their slots back, and
+    // a detached tile measures as a zero box, i.e. "on screen"
+    inflight.forEach((img) => { if (!img.isConnected) callOff(img); });
+    if (flinging || !near.size) return;
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    const queue = [];
+    near.forEach((tile) => {
+      if (!tile.isConnected) { near.delete(tile); io.unobserve(tile); return; }
+      const img = imgOf(tile);
+      if (!img || !img.dataset.src) return;
+      const b = tile.getBoundingClientRect();
+      const below = b.top >= vh;
+      let d = below ? b.top - vh : (b.bottom <= 0 ? -b.bottom : 0);
+      if (d && below === (dir > 0)) d /= 2;   // ahead of the scroll counts double
+      queue.push([d, b.top, b.left, img]);
+    });
+    queue.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    for (const q of queue) {
+      // what is on screen never waits for a slot — there is at most a
+      // screenful of it; the cap is for reading ahead
+      if (q[0] > 0 && inflight.size >= MAX_INFLIGHT) break;
+      start(q[3]);
+    }
+  }
+  function schedule() {
+    if (!pumpTimer) pumpTimer = setTimeout(pump, 0);
+  }
+
+  // Within two screens either way is "within reach": far enough ahead to
+  // fill the next screen while this one is read, and the line past which a
+  // request still on its way is no longer worth the link.
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((en) => {
+      const tile = en.target;
+      if (en.isIntersecting) { near.add(tile); return; }
+      near.delete(tile);
+      const img = imgOf(tile);
+      if (img && inflight.has(img)) callOff(img);
+    });
+    schedule();
+  }, { rootMargin: '200% 0px 200% 0px', threshold: 0 });
+
+  window.addEventListener('scroll', () => {
+    const now = performance.now();
+    const y = window.scrollY || 0;
+    const dy = y - lastY;
+    const dt = now - lastT;
+    if (dy) dir = dy > 0 ? 1 : -1;
+    if (dt > 0) {
+      const vh = window.innerHeight || 1;
+      flinging = Math.abs(dy) / dt > (vh * FLING_SCREENS_PER_S) / 1000;
+    }
+    lastY = y;
+    lastT = now;
+    if (settleTimer) clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => { flinging = false; schedule(); }, SETTLE_MS);
+    if (!flinging) schedule();
+  }, { passive: true });
+
+  function adopt(root = document) {
+    root.querySelectorAll('.image-tile img[src]').forEach((img) => {
+      if (img.complete && img.naturalWidth) return;
+      const tile = img.closest('.image-tile');
+      if (!tile) return;
+      img.dataset.src = img.getAttribute('src');
+      // src first: with the src still on, dropping loading=lazy would start
+      // the very request this is here to schedule
+      img.removeAttribute('src');
+      img.removeAttribute('loading');
+      img.addEventListener('load', onArrive);
+      img.addEventListener('error', onArrive);
+      io.observe(tile);
+    });
+  }
+
+  return { adopt };
+})();
+
 // ---------- THUMBNAIL FADE-IN ----------------------------------
 // Grid covers and tiles fade in when they finish loading instead of popping.
 // Images already complete at wiring time (warm cache, bfcache restore) skip
@@ -1009,6 +1161,11 @@ function shimmerWatch() {
   return shimObserver;
 }
 
+// A photo that arrives while its card is off screen — the tile loader reads
+// ahead of the visitor — is simply there when they get to it: a fade is a
+// composited layer for its whole half second, and a stream of them nobody
+// can see is exactly the kind of pressure under which iOS Safari throws away
+// tiles it had already painted.
 function thumbFadeIn(root = document) {
   if (!document.documentElement.classList.contains('fx-anim')) return;
   const shim = shimmerWatch();
@@ -1018,14 +1175,25 @@ function thumbFadeIn(root = document) {
     if (img.complete) return;
     img.classList.add('img-fade');
     if (shim) shim.observe(img);
-    const done = () => {
+    const done = (e) => {
+      // the tile loader calling a request off is not an arrival
+      if (!img.getAttribute('src')) return;
+      img.removeEventListener('load', done);
+      img.removeEventListener('error', done);
       if (shim) shim.unobserve(img);
       img.classList.remove('img-shim');
+      // measured on the card: inside a tile the content-visibility has not
+      // reached yet, the img itself has no box to measure
+      const b = (img.closest('.image-tile, .album-card, .feat-card') || img).getBoundingClientRect();
+      if (e.type === 'load' && (b.bottom <= 0 || b.top >= (window.innerHeight || 0))) {
+        img.classList.remove('img-fade');
+        return;
+      }
       img.classList.add('img-in');
       setTimeout(() => img.classList.remove('img-fade', 'img-in'), 600);
     };
-    img.addEventListener('load', done, { once: true });
-    img.addEventListener('error', done, { once: true });
+    img.addEventListener('load', done);
+    img.addEventListener('error', done);
   });
 }
 
@@ -1605,6 +1773,8 @@ window.__scrollMemory = scrollMemory;
 scrollReveal();
 thumbFadeIn();
 keepTilesRendered();
+// after thumbFadeIn(): an img whose src has been taken off reads as complete
+tileLoader.adopt();
 // html.fx-return described THIS load — a step back out of one of the page's
 // own photos — and scrollReveal() has now acted on it. Clearing it keeps the
 // flag from also suppressing later replays: liveNav() swaps a fresh grid in
@@ -1634,7 +1804,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // the tile's own thumb carries the photo's stamp; the preview shares it
     const tile = a.querySelector('img');
     let v = null;
-    try { if (tile) v = new URL(tile.currentSrc || tile.src, location.href).searchParams.get('v'); }
+    // (a tile the loader has not got to yet keeps its address in data-src)
+    try { if (tile) v = new URL(tile.currentSrc || tile.dataset.src || tile.src, location.href).searchParams.get('v'); }
     catch (e) {}
     const img = new Image();
     img.src = mediaUrl('preview', m[1], v);
@@ -2804,6 +2975,7 @@ async function liveGo(url, { push = true } = {}) {
     scrollReveal(el);
     thumbFadeIn(el);
     keepTilesRendered(el);
+    tileLoader.adopt(el);
   });
   // The outgoing grid goes out of focus while the new one is fetched, which
   // reads as "refreshing" — but the class used to come off before the new
