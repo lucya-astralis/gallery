@@ -2639,12 +2639,31 @@ document.addEventListener('DOMContentLoaded', () => {
     el.classList.toggle('is-done', state === 'done');
   };
 
+  // Every readout the tick writes goes through here. Text that has not
+  // changed is not touched at all (the tick used to rewrite ~30 nodes a
+  // second, mostly with what they already said), and text that has is
+  // changed IN its text node: replacing the node — which is what assigning
+  // textContent does — reaches through the layout boundary around the
+  // digits (.trip__cd-unit b / .trip__clock b in style.css) and WebKit lays
+  // the whole page out again, photo grid and all: ~100 ms every second on
+  // the Japan album once it had been scrolled through, which is what left it
+  // deaf to taps and showing painted tiles as empty boxes.
+  const setText = (el, v) => {
+    if (!el) return;
+    const node = el.firstChild;
+    if (node && node.nodeType === 3 && !node.nextSibling) {
+      if (node.data !== v) node.data = v;
+    } else if (el.textContent !== v) {
+      el.textContent = v;
+    }
+  };
+
   const setClock = (ms) => {
     const t = Math.max(0, ms);
-    if (cd.d) cd.d.textContent = String(Math.floor(t / DAY));
-    if (cd.h) cd.h.textContent = pad2(Math.floor((t % DAY) / 3600000));
-    if (cd.m) cd.m.textContent = pad2(Math.floor((t % 3600000) / 60000));
-    if (cd.s) cd.s.textContent = pad2(Math.floor((t % 60000) / 1000));
+    setText(cd.d, String(Math.floor(t / DAY)));
+    setText(cd.h, pad2(Math.floor((t % DAY) / 3600000)));
+    setText(cd.m, pad2(Math.floor((t % 3600000) / 60000)));
+    setText(cd.s, pad2(Math.floor((t % 60000) / 1000)));
   };
 
   function tick() {
@@ -2678,13 +2697,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (s.meta) {
         if (state === 'upcoming') {
           const dleft = ceilDays(now, s.start);
-          s.meta.textContent = dleft <= 1 ? TXT.soon : TXT.inDays(dleft);
+          setText(s.meta, dleft <= 1 ? TXT.soon : TXT.inDays(dleft));
         } else if (state === 'active') {
           const total = Math.max(1, Math.round(span / DAY));
           const dayNum = Math.min(total, Math.floor((now - s.start) / DAY) + 1);
-          s.meta.textContent = TXT.dayOf(dayNum, total);
+          setText(s.meta, TXT.dayOf(dayNum, total));
         } else {
-          s.meta.textContent = '✓';
+          setText(s.meta, '✓');
         }
       }
     });
@@ -2715,12 +2734,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (s.meta) {
         if (state === 'upcoming') {
           const dleft = ceilDays(now, s.start);
-          s.meta.textContent = dleft <= 1 ? TXT.soon : TXT.inDays(dleft);
+          setText(s.meta, dleft <= 1 ? TXT.soon : TXT.inDays(dleft));
         } else if (state === 'active') {
           const total = Math.max(1, Math.ceil((s.end - s.start) / DAY));
-          s.meta.textContent = TXT.dayOf(Math.min(total, Math.floor((now - s.start) / DAY) + 1), total);
+          setText(s.meta, TXT.dayOf(Math.min(total, Math.floor((now - s.start) / DAY) + 1), total));
         } else {
-          s.meta.textContent = '✓';
+          setText(s.meta, '✓');
         }
       }
     });
@@ -2728,7 +2747,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (mapCity[s.city]) mapCity[s.city].classList.toggle('is-away', !!away && away.from === s.city);
     });
 
-    if (jstFmt && clockTimeEl) clockTimeEl.textContent = jstFmt.format(now);
+    if (jstFmt && clockTimeEl) setText(clockTimeEl, jstFmt.format(now));
 
     // phase + headline countdown (label is localized; the status stamp is
     // HUD chrome and stays English in every language)
@@ -2750,9 +2769,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setPhase(phase);
     setClock(target ? target - now : 0);
-    if (labelEl) labelEl.textContent = label;
-    if (statusEl) statusEl.textContent = status;
-    if (targetEl) targetEl.textContent = fmtDate(target || lastEnd);
+    setText(labelEl, label);
+    setText(statusEl, status);
+    setText(targetEl, fmtDate(target || lastEnd));
   }
 
   tick();

@@ -3096,6 +3096,20 @@ section{
   content-visibility:auto;
   aspect-ratio:1/1;
   box-sizing:content-box;
+  /* ...and every tile is a layout boundary of its own, rendered or not:
+     what happens inside it (its photo arriving, the shimmer coming and
+     going, the content-visibility flip below) is laid out inside it and
+     nowhere else. Without it WebKit answered each of those by laying out
+     the whole page again — every tile the visitor had already scrolled
+     past included, since those stay rendered — and through body's flex
+     column, the album grid and the day groups, each of which lays its
+     children out twice. On a 980-photo album that was ~60-80 ms per photo
+     arriving: the main thread was full for as long as photos came in,
+     taps went unanswered and iOS showed painted tiles as empty boxes.
+     With it: 0.2 ms. Size containment costs nothing here — the ratio on
+     the tile already gives it its height (see above). Not `paint`: that
+     would clip the corner brackets, which sit on the border. */
+  contain:size layout style;
 }
 /* ...until the tile has once come within reach: from then on it stays
    rendered, so scrolling back never finds it to rebuild (keepTilesRendered()
@@ -5312,13 +5326,29 @@ body.page-welcome{ --page-max: 2400px; }
    Named place + zone code around the time, so the reading is unambiguous:
    "JAPAN TIME 16:20:16 JST". */
 .trip__clock{
-  display:inline-flex; align-items:baseline; gap:var(--s-3);
+  /* centre, not baseline: the digits below are size-contained, and a
+     contained box has no text baseline to offer (it would sit on its bottom
+     edge). Same face and size on all three, so centred IS baseline-aligned. */
+  display:inline-flex; align-items:center; gap:var(--s-3);
   color:var(--text-ghost);
   font-variant-numeric:tabular-nums; white-space:nowrap;
 }
 .trip__clock i{ font-style:normal; }
-/* the digits keep tabular figures so the seconds don't shuffle the line */
-.trip__clock b{ font-weight:400; color:var(--text); letter-spacing:.12em; }
+/* the digits keep tabular figures so the seconds don't shuffle the line.
+   They change every second, so they are a layout boundary of their own:
+   a fixed box (eight monospace cells and their tracking, one line high)
+   whose content is laid out inside it. Without one, WebKit laid out the
+   whole page for each tick — the entire photo grid on a trip album, some
+   100 ms a second on Japan's 980 photos. app.js changes the text node in
+   place (setText), which is what lets the boundary hold. */
+.trip__clock b{
+  font-weight:400; color:var(--text); letter-spacing:.12em;
+  display:block;
+  width:calc(8ch + 8 * .12em);
+  height:1.55em;   /* engines without the lh unit; the line-height is body's */
+  height:1lh;
+  contain:size layout style;
+}
 
 /* ---- body layout ---- */
 .trip__main{
@@ -5400,6 +5430,16 @@ body.page-welcome{ --page-max: 2400px; }
   background-clip:text;
   -webkit-text-fill-color:transparent;
   padding-bottom:.04em;
+  /* a layout boundary, like the clock's digits (see .trip__clock b), so the
+     second ticking over is laid out inside the box instead of across the
+     page. Not size containment here: on desktop the countdown column is as
+     wide as its content, and a size-contained box has none. A clipped box
+     of fixed height is the other kind of boundary, and a percentage width
+     still lets the digits count when the column is measured. The height is
+     the one line plus the padding above (border-box). */
+  width:100%; height:1.04em;
+  overflow:hidden;
+  text-align:center;
 }
 .trip__cd-unit b::selection{ -webkit-text-fill-color:var(--text); }
 .trip__cd-unit i{

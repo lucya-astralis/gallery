@@ -18,6 +18,29 @@ notes are never one commit apart.
 
 ---
 
+## 2.7.2 — 2026-10-23
+
+**Before you upgrade:** nothing to do.
+
+* **The Japan album no longer locks up in Safari once you have scrolled
+  it.** On a trip album the countdown ticks every second, and each tick
+  made WebKit lay out the entire page again — every photo tile you had
+  already scrolled past included, since 2.4.3 keeps those rendered, and
+  twice over for each flex or grid container between the page and the
+  tiles. On 980 photos that was ~100 ms of every second, and every photo
+  arriving cost another 60–80 ms. While it lasted, taps went unanswered
+  and painted tiles showed as empty boxes; the further down you had been,
+  the worse it got. A small album never had enough tiles to notice.
+* Every photo tile is now a layout boundary of its own (CSS containment),
+  so what happens inside one — its photo arriving, the shimmer, it being
+  brought back on screen — is laid out inside it: 0.2 ms instead of
+  60–80 ms in WebKit. Tile sizes and positions are unchanged.
+* The countdown digits and the JST clock are boundaries too, and the tick
+  changes their text in place and only when it has changed (it used to
+  rewrite some thirty readouts a second with what they already said):
+  0.1 ms a tick instead of ~100 ms. The trip module looks exactly as
+  before.
+
 ## 2.7.1 — 2026-10-23
 
 **Before you upgrade:** nothing to do.
