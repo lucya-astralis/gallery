@@ -72,6 +72,9 @@ services:
       # The console asks lucya.sh at most twice a day whether a newer aperture
       # exists and says so. Nothing is downloaded. 0 = never ask.
       - UPDATE_CHECK=${UPDATE_CHECK:-1}
+      # Nebula's own faces and icons instead of the stock set: the default for
+      # gallery.cfg `faces` (the console's Site > Look) when it is not set.
+      - NEBULA_FACES=${NEBULA_FACES:-0}
       - BACKUPS=${BACKUPS:-20}
       - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-8}
     # Nothing in here needs a privilege it isn't given. The user owns the four

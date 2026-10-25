@@ -68,6 +68,21 @@ def fa_icons():
                         media_type="text/css")
 
 
+# NEBULA_FACES=1 links these two instead (or as well, for the faces): the
+# Nebula twin of the icon sheet (tools/build_nebula_icons.py) and the font
+# sheet. The gallery's files, served from where they live like the one above.
+@app.get("/static/nebula-icons.css", include_in_schema=False)
+def nebula_icons():
+    return FileResponse(templating.WEB_DIR / "static" / "nebula-icons.css",
+                        media_type="text/css")
+
+
+@app.get("/static/nebula-faces.css", include_in_schema=False)
+def nebula_faces_css():
+    return FileResponse(templating.WEB_DIR / "static" / "nebula-faces.css",
+                        media_type="text/css")
+
+
 # The maker's picture on the Changelog place. It ships with the gallery's
 # static files; a route for the same reason as the icon sheet above, and
 # declared before /static for the same reason too.
@@ -447,6 +462,8 @@ def api_meta():
         "color_names": colors.NAMES,
         # the identity tint the console wears, the same one the gallery does
         "palette": config.site_palette(),
+        # what an unset `faces` falls back to: NEBULA_FACES
+        "faces_default": "nebula" if settings.nebula_faces else "stock",
         "welcome_keywords": list(schema.WELCOME_KEYWORDS),
         "icon_exts": sorted(schema.ICON_EXTS),
         "font_exts": sorted(schema.FONT_EXTS),

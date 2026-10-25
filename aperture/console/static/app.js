@@ -452,8 +452,8 @@ const GALLERY_GROUPS = [
   ['Identity', 'What this archive calls itself. All of it is yours to set; the “powered by” line in the gallery’s footer names the software instead and is not configurable. Leave it all empty and the gallery calls itself “Gallery” behind a neutral mark.',
     ['site_name', 'site_sub', 'site_hero', 'logo', 'favicon',
      'site_desc', 'site_desc_en', 'site_desc_de', 'site_desc_jp']],
-  ['Look', 'The accent every page wears and the display face of the chrome — the wordmark, the welcome screen’s big word, the 404. Not an album’s hero title: that keeps its own `font`. An album that sets its own accent still wins for its pages.',
-    ['accent', 'palette', 'font', 'font_scale']],
+  ['Look', 'The accent every page wears, the faces and icons of the chrome, and its display face — the wordmark, the welcome screen’s big word, the 404. Not an album’s hero title: that keeps its own `font`. An album that sets its own accent still wins for its pages.',
+    ['accent', 'palette', 'faces', 'font', 'font_scale']],
   ['Backdrop', 'What sits behind every page, and how the gallery treats it — its own backdrop, and any an album brings. An album that sets these itself still wins for its pages.',
     ['wallpaper', 'wallpaper_mobile', 'wallpaper_tint', 'wallpaper_dim']],
   ['Operator & footer', 'The person behind the archive, the legal links, and the badge row. The footer’s operator card and the welcome screen’s “about me” button both need a URL to point at — without one, neither is rendered.',
@@ -2358,7 +2358,8 @@ function buildControl(key, spec) {
     case 'bool': return boolControl(key);
     case 'bool_off': return statsControl(key);
     case 'choice': return key === 'palette' ? paletteControl(key, spec.choices || [])
-                                           : choiceControl(key, spec.choices || []);
+                        : key === 'faces' ? facesControl(key)
+                        : choiceControl(key, spec.choices || []);
     case 'number': return numberControl(key, spec);
     case 'ratio': return ratioControl(key, spec);
     case 'color': return colorControl(key);
@@ -2394,6 +2395,29 @@ function boolControl(key) {
 function statsControl(key) {
   return toggle([['', 'shown'], ['off', 'hidden']], value(key) === null ? '' : 'off',
     (val) => setValue(key, val === '' ? null : 'off'));
+}
+
+/* gallery.cfg `faces`: three positions, because "not set" is a real one --
+ * it follows the server's NEBULA_FACES, which the label names. Saving a
+ * change reloads this page (savedFaces), since the console wears it too. */
+function facesControl(key) {
+  const fallback = (state.meta && state.meta.faces_default) || 'stock';
+  const raw = value(key);
+  const current = raw === null ? '' : String(raw).toLowerCase();
+  return toggle([['', 'default · ' + fallback], ['stock', 'stock'], ['nebula', 'Nebula']],
+    current, (val) => setValue(key, val === '' ? null : val));
+}
+
+/* After a save of gallery.cfg: the faces this page was rendered in are on
+ * <html data-faces>; when the saved file now means the other set, the page
+ * reloads so the console's own sheets follow -- the gallery's next page
+ * already does. */
+function savedFaces(values) {
+  const v = values && values.faces;
+  const saved = String((Array.isArray(v) ? v[0] : v) || '').toLowerCase();
+  const fallback = (state.meta && state.meta.faces_default) || 'stock';
+  const now = saved === 'stock' || saved === 'nebula' ? saved : fallback;
+  if (now !== document.documentElement.dataset.faces) setTimeout(() => location.reload(), 400);
 }
 
 function choiceControl(key, choices) {
@@ -3214,6 +3238,7 @@ async function writeDraft(draft) {
   }
   drafts.delete(draft.key);
   if (isGallery) savedPalette(payload.values, draftKey(state.sel) === draft.key);
+  if (isGallery) savedFaces(payload.values);
   if (draftKey(state.sel) === draft.key) {
     state.edits = {};
     if (state.data) {
@@ -3287,7 +3312,7 @@ function renderRaw() {
               values: payload.values, raw: payload.raw, issues: payload.issues, exists: true,
             });
             state.edits = {};
-            if (state.sel.kind === 'gallery') savedPalette(payload.values, true);
+            if (state.sel.kind === 'gallery') { savedPalette(payload.values, true); savedFaces(payload.values); }
             renderPane();
             refreshIssueDots();
             toast('File written');

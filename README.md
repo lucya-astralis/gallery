@@ -431,6 +431,13 @@ its built-in colours, face and backdrop.
 # the active state, the featured mark, the hero button
 accent = #7ad1ff
 
+# the faces and icons of the chrome, gallery and console alike:
+#   stock  JetBrains Mono, Ethnocentric, Font Awesome
+#   nebula Nebula Mono, Nebula Wordmark, Nebula Icons
+# unset = the server's NEBULA_FACES (stock unless it says otherwise).
+# The console switches it under Site > Look; it takes on the next page.
+faces = nebula
+
 # the display face of the CHROME — the wordmark, the welcome screen's one
 # big word, the 404. Lives in photos/.gallery/ next to the logo.
 font = Display.otf          # .otf / .ttf / .woff2 / .woff
@@ -642,6 +649,35 @@ and this repo ignores it rather than keeping a second copy in step:
 ```bash
 git clone git@github.com:lucya-astralis/nebula.git nebula
 ```
+
+### Nebula's own faces (`NEBULA_FACES`)
+
+Nebula has its own faces now, drawn for the language in the nebula repo
+(`assets/fonts/build.py`): **Nebula Mono** for the chrome voice, **Nebula
+Wordmark** for the brand voice (the eagle's angles, Ethnocentric's stance),
+and **Nebula Icons**, line icons drawn with the same pen. They ship in this
+image and stay **off** until you switch them on:
+
+* **In the console:** Site → Look → `faces`, three positions — the server's
+  default, `stock`, `Nebula`. Saving writes `faces = …` into gallery.cfg; the
+  gallery's next page wears it, and the console reloads itself into it.
+* **For the whole server:** `NEBULA_FACES=1` makes `nebula` the default for
+  every gallery.cfg that does not say `faces` itself. Unset, it is `stock`.
+
+How it works:
+
+* `static/nebula-faces.css` is linked straight after `style.css` and moves two
+  tokens, `--mono` and `--display-font`; the stock faces stay behind the new
+  ones in each stack. A face `gallery.cfg` brings with `font = …` still wins.
+* `static/nebula-icons.css` is linked instead of `fa-icons.css`. It names the
+  same `fa-*` classes, so no template, script or Python changes with the
+  switch. It is generated: after `tools/build_fa_subset.py` picks up a new
+  icon, run `python tools/build_nebula_icons.py`, which refuses to write a
+  sheet with an icon that has no Nebula glyph. `tests/test_nebula_faces.py`
+  holds the two sheets to one list.
+* To update the faces, copy `NebulaMono-*.woff2`, `NebulaWordmark-400.woff2`,
+  `NebulaIcons.woff2` and `nebula-icons.json` from the nebula repo's
+  `assets/fonts/` (the JSON into `tools/`) and re-run the icon script.
 
 ## API
 
@@ -950,6 +986,7 @@ Inside the package:
 | `HEALTH_INTERVAL`| `10`         | Seconds between the self-watch's rounds (0 = off). See [Self-watch and failsafe](#self-watch-and-failsafe) |
 | `FAILSAFE`      | `1`           | While the storage is unreachable, answer 503 with a notice. `0` = requests fail as they fall; the index is protected either way |
 | `APERTURE_ROLE` | `all`         | `all` / `public` / `console` — which listeners open         |
+| `NEBULA_FACES`  | `0`           | The default for gallery.cfg `faces` while the file does not set it: `1` = both surfaces wear Nebula's own faces and icons (Nebula Mono, Nebula Wordmark, Nebula Icons) instead of JetBrains Mono, Ethnocentric and Font Awesome. See [Nebula's own faces](#nebulas-own-faces-nebula_faces) |
 
 Console only:
 

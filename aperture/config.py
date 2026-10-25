@@ -188,6 +188,17 @@ def site_palette() -> str:
     return raw if raw in schema.PALETTES else schema.PALETTES[0]
 
 
+def site_faces() -> bool:
+    """Whether both surfaces wear Nebula's own faces and icons: gallery.cfg
+    `faces` (schema.FACES) when it says stock or nebula, the NEBULA_FACES
+    default otherwise -- which is off unless it is set. Read per request, so
+    the console's switch takes effect on the next page without a restart."""
+    raw = (cfgio.first(gallery_config(), "faces") or "").strip().lower()
+    if raw in schema.FACES:
+        return raw == "nebula"
+    return settings.nebula_faces
+
+
 def gallery_meta_dir() -> Path | None:
     """photos/.gallery/, or None when the gallery keeps no assets of its own."""
     folder = settings.photos_dir / schema.GALLERY_META_DIR

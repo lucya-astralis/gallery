@@ -185,6 +185,12 @@ def gallery(cfg: dict[str, list[str]] | None = None) -> list[dict]:
             % (palette, ", ".join(schema.PALETTES)),
             _drop("palette", "Use mist"))
 
+    faces = (cfgio.first(cfg, "faces") or "").strip().lower()
+    if faces and faces not in schema.FACES:
+        add("error", "faces", "%r is not one of %s"
+            % (faces, ", ".join(schema.FACES)),
+            _drop("faces", "Use the server's default"))
+
     _files(cfg, schema.GALLERY_ASSET_KEYS, config.gallery_meta_dir(), schema.GALLERY_META_DIR + "/", add)
     _theme(cfg, add)
 

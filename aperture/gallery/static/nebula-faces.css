@@ -1,0 +1,93 @@
+/* ================================================================
+   NEBULA'S OWN FACES  —  linked only when NEBULA_FACES=1
+
+   Nebula Mono for every label and readout, Nebula Wordmark for the brand
+   voice. Drawn for the language in the nebula repo (assets/fonts/build.py)
+   and copied into static/fonts/; static per-weight instances, no local(),
+   the same weight ranges as the faces they stand in for.
+
+   This sheet loads straight after style.css (gallery) or the console's own
+   style.css, and changes the two tokens and nothing else -- the rule-6 way
+   to swap a voice. The stock faces stay declared and stay behind the new
+   ones in each stack, so a file that fails to load falls back to the voice
+   the site had before. A face gallery.cfg brings with `font = …` still wins:
+   /site-font.css is linked after this sheet and redefines --display-font.
+
+   The console serves this file from the gallery's static/ (console/app.py),
+   the same way it serves the icon sheets.
+   ================================================================ */
+@font-face {
+  font-family: 'Nebula Mono';
+  src: url('/static/fonts/NebulaMono-400.woff2') format('woff2');
+  font-weight: 100 450;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nebula Mono';
+  src: url('/static/fonts/NebulaMono-500.woff2') format('woff2');
+  font-weight: 451 550;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nebula Mono';
+  src: url('/static/fonts/NebulaMono-600.woff2') format('woff2');
+  font-weight: 551 650;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Nebula Mono';
+  src: url('/static/fonts/NebulaMono-700.woff2') format('woff2');
+  font-weight: 651 900;
+  font-style: normal;
+  font-display: swap;
+}
+/* Nebula Mono draws Latin only. Japanese in a label falls through to the
+   same Noto Sans JP subset JetBrains Mono borrows (style.css): one file,
+   one download, whichever name asked for it. */
+@font-face {
+  font-family: 'Nebula Mono';
+  src: url('/static/fonts/NotoSansJP-subset-400.woff2') format('woff2');
+  font-weight: 100 450;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Nebula Mono';
+  src: url('/static/fonts/NotoSansJP-subset-500.woff2') format('woff2');
+  font-weight: 451 550;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Nebula Mono';
+  src: url('/static/fonts/NotoSansJP-subset-600.woff2') format('woff2');
+  font-weight: 551 650;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Nebula Mono';
+  src: url('/static/fonts/NotoSansJP-subset-700.woff2') format('woff2');
+  font-weight: 651 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Nebula Wordmark';
+  src: url('/static/fonts/NebulaWordmark-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root{
+  --mono:         "Nebula Mono", "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --display-font: "Nebula Wordmark", "Ethnocentric", "Space Grotesk", sans-serif;
+}

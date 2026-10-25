@@ -20,7 +20,7 @@
      only the fallback behind it — fetching a whole face nothing paints would
      be spending the hero's own head start on it. #}
   {% if not site_font() %}
-  <link rel="preload" href="/static/fonts/Ethnocentric-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/{{ 'NebulaWordmark-400' if nebula_faces() else 'Ethnocentric-Regular' }}.woff2" as="font" type="font/woff2" crossorigin>
   {% endif %}
 {% endblock %}
 {% block meta %}
