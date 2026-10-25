@@ -90,6 +90,9 @@ class Settings:
     update_check: bool
     update_url: str
 
+    # ----- which voice the chrome speaks in ------------------------------
+    nebula_faces: bool
+
     # ----- the network in front of both --------------------------------
     # Which peers may set X-Forwarded-For / X-Forwarded-Proto. Only those
     # addresses are believed about the client behind them; everyone else's
@@ -186,6 +189,13 @@ def load() -> Settings:
 
         update_check=_flag("UPDATE_CHECK"),
         update_url=(os.environ.get("UPDATE_URL") or brand.UPDATE_URL).strip(),
+
+        # Nebula's own faces and icons (Nebula Mono, Nebula Wordmark, Nebula
+        # Icons) instead of JetBrains Mono, Ethnocentric and Font Awesome.
+        # OFF by default: the stock set stays what every page draws until
+        # this says otherwise. Switching is a choice of stylesheets, nothing
+        # in the markup changes -- see templates/base.html.
+        nebula_faces=_flag("NEBULA_FACES", "0"),
 
         # uvicorn's own default, made explicit and configurable. Set it to the
         # reverse proxy's address (or its network, comma-separated) — never

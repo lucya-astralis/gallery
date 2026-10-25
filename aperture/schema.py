@@ -137,6 +137,12 @@ GALLERY_ALBUM_SORTS = ["curated"] + ALBUM_SORTS
 # kind its own faint cast. The first is the default.
 PALETTES = ["mist", "silver", "stardust"]
 
+# gallery.cfg `faces`: which voice the chrome of both surfaces speaks in.
+# stock is JetBrains Mono, Ethnocentric and Font Awesome; nebula is Nebula
+# Mono, Nebula Wordmark and Nebula Icons. Unset, NEBULA_FACES decides, and
+# that is off unless it is set -- see config.site_faces.
+FACES = ["stock", "nebula"]
+
 # A welcome key holding one of these words is a feed rather than a list of
 # photos; the value is which feed. welcome.welcome_feed reads it, the
 # console offers the words, aperture/checks.py knows not to resolve them.
@@ -197,6 +203,7 @@ KEY_SPEC: dict[str, dict] = {
     "album_order": {"type": "album_list", "multiline": True},
     "album_sort": {"type": "choice", "choices": GALLERY_ALBUM_SORTS},
     "palette": {"type": "choice", "choices": PALETTES},
+    "faces": {"type": "choice", "choices": FACES},
     # gallery.cfg — branding. Who the archive belongs to; the software's own
     # attribution is not configurable and stays in the gallery's footer line.
     # The text keys are prose, so they are joined the way `name` and `loc`
@@ -228,7 +235,7 @@ GALLERY_KEYS = ["welcome", "welcome_desktop", "welcome_mobile", "album_order",
                 "album_sort",
                 # the theme block, spelled exactly as album.cfg spells it —
                 # gallery.cfg dresses the site, an album overrides its pages
-                "accent", "palette", "font", "font_scale",
+                "accent", "palette", "faces", "font", "font_scale",
                 "wallpaper", "wallpaper_mobile",
                 "wallpaper_tint", "wallpaper_dim",
                 "site_name", "site_sub", "site_hero", "site_desc",
@@ -291,6 +298,7 @@ HELP: dict[str, str] = {
     "welcome_mobile": "Welcome hero images on phones (detected via User-Agent).",
     "album_order": "Curated album order. Adds “Curated” to the /albums sort menu and fixes the featured rails. A group header frames the albums under it.",
     "album_sort": "Preselect the sort option on /albums.",
+    "faces": "The faces and icons of the chrome, on the gallery and in this console. stock: JetBrains Mono for labels, Ethnocentric for the wordmark, Font Awesome for icons. nebula: Nebula Mono, Nebula Wordmark and Nebula Icons, drawn for the language. Text a person reads stays Space Grotesk either way, and a `font` set below still wins for the wordmark. Empty means the server's default (NEBULA_FACES, stock unless set).",
     "palette": "The tint of the icons that say what kind of thing something is, and of the charts -- on the gallery and in this console. All three come from the silver of the headings: mist leans it toward the accent, silver keeps it neutral, stardust gives albums, tags, time and the camera each a faint cast of their own. Empty means mist.",
     "site_name": "The archive's name — first line of the wordmark, and the site name on link previews. Empty leaves the gallery calling itself “Gallery”. Commas are fine here.",
     "site_sub": "Second line of the wordmark, under the name. Usually what the site is rather than who runs it (“gallery”, “archive”). Empty shows the name alone.",

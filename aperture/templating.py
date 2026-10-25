@@ -37,4 +37,12 @@ def make_templates(base_dir: Path, context_processors=()) -> Jinja2Templates:
     templates = Jinja2Templates(directory=str(Path(base_dir) / "templates"),
                                 context_processors=list(context_processors))
     templates.env.globals["static_url"] = partial(static_url, base_dir)
+    # gallery.cfg `faces` (or NEBULA_FACES): both surfaces pick their font and
+    # icon sheets from it, asked per render so the console's switch is live
+    templates.env.globals["nebula_faces"] = _nebula_faces
     return templates
+
+
+def _nebula_faces() -> bool:
+    from . import config   # config imports the settings this module must not
+    return config.site_faces()

@@ -8,13 +8,22 @@
   <title>Sign in — lucya.systems aperture</title>
   <link rel="icon" type="image/svg+xml" href="{{ static_url('logo/aperture.svg') }}">
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
+  {# NEBULA_FACES=1: the gallery's own font sheet, served from where it
+     lives -- see app.py. gallery.cfg `faces`, NEBULA_FACES its default. #}
+  {% set nebula = nebula_faces() %}
+  {% if nebula %}<link rel="stylesheet" href="/static/nebula-faces.css">{% endif %}
   {# The site's accent and the palettes derived from it (see app.py, "the
      console's look"), after style.css so its :root wins. #}
   <link rel="stylesheet" id="look-sheet" href="/theme.css?v={{ look_version() }}">
   {# The gallery's icon sheet and its glyph subset, served from where
      tools/build_fa_subset.py writes them -- see app.py. #}
+  {% if nebula %}
+  <link rel="stylesheet" href="/static/nebula-icons.css">
+  <link rel="preload" href="/static/fonts/NebulaIcons.woff2" as="font" type="font/woff2" crossorigin>
+  {% else %}
   <link rel="stylesheet" href="/static/fa-icons.css">
   <link rel="preload" href="/static/fonts/fa-solid-subset.woff2" as="font" type="font/woff2" crossorigin>
+  {% endif %}
 </head>
 <body class="login-body">
   {# The same backdrop the console wears, so signing in is the same room and

@@ -1,0 +1,133 @@
+/* ==================================================================
+   NEBULA ICONS  —  GENERATED FILE, DO NOT EDIT BY HAND
+   ==================================================================
+   Rebuild with:  python tools/build_nebula_icons.py
+   Linked instead of fa-icons.css when NEBULA_FACES=1. The class names
+   are Font Awesome's, so the markup is the same under either set; each
+   one points at the Nebula Icons glyph drawn for the same job.
+
+   Nebula Icons: drawn for the lucya.systems design language (nebula,
+   assets/fonts/build.py) — line icons on an 8 x 8 grid, square ends,
+   corners cut, the stroke Nebula Mono is drawn with.
+   ================================================================== */
+@font-face{
+  font-family:'Nebula Icons';
+  src:url('/static/fonts/NebulaIcons.woff2') format('woff2');
+  font-weight:400;
+  font-style:normal;
+  /* block, not swap: there is no sensible fallback glyph for an icon font,
+     and swap would flash the raw private-use codepoint as tofu first */
+  font-display:block;
+}
+.fa{
+  font-family:'Nebula Icons';
+  font-weight:400;
+  font-style:normal;
+  font-variant:normal;
+  line-height:1;
+  display:inline-block;
+  text-rendering:auto;
+  -webkit-font-smoothing:antialiased;
+  /* icons sit beside mono labels that are tracked out; the glyph must not
+     inherit that letter-spacing or it drifts off its own box */
+  letter-spacing:0;
+}
+.fa::before{ content:var(--fa); }
+/* fixed-width variant: keeps icons in a column (kv lists, menus) aligned
+   however wide the individual glyph is */
+.fa-fw{ width:1.25em; text-align:center; }
+
+.fa-align-left{ --fa:"\e01c"; }
+.fa-angles-down{ --fa:"\e037"; }
+.fa-angles-up{ --fa:"\e038"; }
+.fa-arrow-down{ --fa:"\e009"; }
+.fa-arrow-down-wide-short{ --fa:"\e01d"; }
+.fa-arrow-right{ --fa:"\e006"; }
+.fa-arrow-turn-up{ --fa:"\e00a"; }
+.fa-arrow-up{ --fa:"\e008"; }
+.fa-arrow-up-right-from-square{ --fa:"\e00b"; }
+.fa-arrows-rotate{ --fa:"\e039"; }
+.fa-box-archive{ --fa:"\e03c"; }
+.fa-calendar-day{ --fa:"\e036"; }
+.fa-camera{ --fa:"\e018"; }
+.fa-chart-simple{ --fa:"\e014"; }
+.fa-check{ --fa:"\e00e"; }
+.fa-chevron-down{ --fa:"\e005"; }
+.fa-chevron-left{ --fa:"\e002"; }
+.fa-chevron-right{ --fa:"\e003"; }
+.fa-chevron-up{ --fa:"\e004"; }
+.fa-circle{ --fa:"\e03d"; }
+.fa-circle-check{ --fa:"\e03e"; }
+.fa-circle-exclamation{ --fa:"\e00d"; }
+.fa-circle-info{ --fa:"\e00c"; }
+.fa-circle-up{ --fa:"\e03f"; }
+.fa-clock-rotate-left{ --fa:"\e010"; }
+.fa-code-branch{ --fa:"\e040"; }
+.fa-code-merge{ --fa:"\e041"; }
+.fa-copy{ --fa:"\e032"; }
+.fa-database{ --fa:"\e023"; }
+.fa-download{ --fa:"\e024"; }
+.fa-eraser{ --fa:"\e042"; }
+.fa-expand{ --fa:"\e026"; }
+.fa-eye{ --fa:"\e027"; }
+.fa-eye-slash{ --fa:"\e028"; }
+.fa-file{ --fa:"\e043"; }
+.fa-file-code{ --fa:"\e044"; }
+.fa-film{ --fa:"\e045"; }
+.fa-filter{ --fa:"\e030"; }
+.fa-floppy-disk{ --fa:"\e046"; }
+.fa-folder{ --fa:"\e021"; }
+.fa-folder-open{ --fa:"\e022"; }
+.fa-folder-tree{ --fa:"\e020"; }
+.fa-gauge{ --fa:"\e047"; }
+.fa-globe{ --fa:"\e048"; }
+.fa-grip-vertical{ --fa:"\e049"; }
+.fa-hammer{ --fa:"\e04a"; }
+.fa-hard-drive{ --fa:"\e04b"; }
+.fa-heading{ --fa:"\e04c"; }
+.fa-house{ --fa:"\e000"; }
+.fa-id-card{ --fa:"\e04d"; }
+.fa-image{ --fa:"\e017"; }
+.fa-images{ --fa:"\e016"; }
+.fa-key{ --fa:"\e04e"; }
+.fa-keyboard{ --fa:"\e04f"; }
+.fa-layer-group{ --fa:"\e013"; }
+.fa-link{ --fa:"\e02b"; }
+.fa-link-slash{ --fa:"\e050"; }
+.fa-list{ --fa:"\e051"; }
+.fa-list-check{ --fa:"\e052"; }
+.fa-location-dot{ --fa:"\e053"; }
+.fa-lock{ --fa:"\e02c"; }
+.fa-lock-open{ --fa:"\e054"; }
+.fa-magnifying-glass{ --fa:"\e012"; }
+.fa-microchip{ --fa:"\e055"; }
+.fa-palette{ --fa:"\e056"; }
+.fa-pause{ --fa:"\e035"; }
+.fa-pen{ --fa:"\e033"; }
+.fa-play{ --fa:"\e034"; }
+.fa-plus{ --fa:"\e029"; }
+.fa-right-from-bracket{ --fa:"\e057"; }
+.fa-right-to-bracket{ --fa:"\e058"; }
+.fa-rotate{ --fa:"\e039"; }
+.fa-rotate-left{ --fa:"\e03a"; }
+.fa-rotate-right{ --fa:"\e03b"; }
+.fa-route{ --fa:"\e01f"; }
+.fa-scale-balanced{ --fa:"\e01a"; }
+.fa-screwdriver-wrench{ --fa:"\e02e"; }
+.fa-scroll{ --fa:"\e059"; }
+.fa-server{ --fa:"\e05a"; }
+.fa-shield-halved{ --fa:"\e019"; }
+.fa-shoe-prints{ --fa:"\e05b"; }
+.fa-shuffle{ --fa:"\e01b"; }
+.fa-sliders{ --fa:"\e05c"; }
+.fa-star{ --fa:"\e015"; }
+.fa-stethoscope{ --fa:"\e05d"; }
+.fa-table-cells{ --fa:"\e001"; }
+.fa-tag{ --fa:"\e05e"; }
+.fa-tags{ --fa:"\e01e"; }
+.fa-trash{ --fa:"\e02f"; }
+.fa-trash-can{ --fa:"\e02f"; }
+.fa-triangle-exclamation{ --fa:"\e05f"; }
+.fa-upload{ --fa:"\e025"; }
+.fa-user-pen{ --fa:"\e060"; }
+.fa-xmark{ --fa:"\e00f"; }
