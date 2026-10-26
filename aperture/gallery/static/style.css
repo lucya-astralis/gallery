@@ -383,12 +383,13 @@
      not repaint a timeline that reads as an instrument. This is the
      language's QUARANTINE CLAUSE, and this module is the only thing in the
      site that has it.
-     What the rebuild changed is not the palette but its REACH. These three
-     now paint the STATE MARKS only: the status stamp, the leg dots, the day
-     chip, the progress fill, the active leg's name, and the map's dots,
-     regions and route legs. Frames, grounds, countdown digits, labels,
-     hovers and the weather readout are grey furniture like everywhere else
-     on the site - the full rule is written out above .trip in this sheet.
+     What the Nebula rebuild changed is not the palette but its REACH.
+     These three paint the STATE MARKS only: the frame's top bezel, the
+     status stamp, the countdown's diamond, the leg dots, the day chip, the
+     progress fill, the active leg's name, and the map's dots, regions and
+     route legs - each with a word or a shape beside it. Frames, grounds,
+     countdown digits, labels and hovers are the neutral ramp; the full rule
+     is written out above .trip in this sheet.
      Nothing outside .trip* / .trip-map* may use these, and nothing inside
      them may use --acc / --chrome / --label. */
   --trip:          #5b8aff;   /* a leg still ahead */
@@ -397,12 +398,12 @@
   --trip-live-rgb: 165,148,255;
   --trip-done:     #3dffa5;
   --trip-done-rgb: 61,255,165;
-  /* The weather readout's own two, for the condition glyph only (sun/storm
-     warm, snow cool; rain borrows --trip, night --trip-live). The glyph is
-     four characters wide and it is the one place on the page where a colour
-     is read before the word next to it - worth keeping. */
+  /* The weather readout's own two, for the condition glyph only: sun and
+     storm warm, rain and snow cool, the rest neutral. Never a state colour -
+     a rainy day is not "a leg still ahead". The glyph's shape says the
+     weather; the tint lets it be read before the word under it. */
   --trip-warm:     #ffb547;   /* sun / storm */
-  --trip-cool:     #9fd8ff;   /* snow */
+  --trip-cool:     #9fd8ff;   /* rain / snow */
 
   --chrome:     #e8e8ee;   /* hovers, corner brackets, HUD strokes */
   --chrome-rgb: 232,232,238;
@@ -481,6 +482,10 @@
   --fs-chrome-md: 12px;    /* field labels, menu rows, search */
   --fs-chrome-lg: 14px;    /* a measured value with its own line */
   --fs-chrome-xl: 20px;    /* a headline number: a stat tile, a count */
+  /* a headline-SIZED measured value (the trip countdown): the language's
+     own mono display step, so a counter is never sized off the content
+     scale (NEBULA.md, "Editorial pages") */
+  --fs-chrome-display: clamp(32px, 4.5vw, 64px);
 
   /* Icons are not type, but they are sized like it: one step under the cap
      height of whatever label they lead, everywhere on the site. `.fa` reads
@@ -506,6 +511,7 @@
   --tr-chrome-md: .14em;
   --tr-chrome-lg: .10em;
   --tr-chrome-xl: .04em;
+  --tr-chrome-display: .02em;
   --tr-text:      .01em;
   --tr-title:     .03em;
   --tr-head:     -.005em;  /* a sans heading tightens, it never tracks */
@@ -2015,9 +2021,9 @@ section{
   }
 }
 /* reel embedded in the trip module (trip albums, every viewport): the trip
-   card carries the chrome — frame borders off, the shade runs out into the
-   trip surface color and the control bar sits flat on it, so the slideshow
-   dissolves straight into the countdown; the trip bar above the reel is
+   module carries the chrome — frame borders off, the shade runs out into
+   the module's own --surface and the control bar sits flat on it, so the
+   slideshow dissolves into the countdown; the trip bar above the reel is
    the module's title row. */
 .trip .fhero{ margin:0; }
 /* full-bleed inside the trip module (no width cap / centering): the module
@@ -2025,12 +2031,12 @@ section{
 .trip .fhero__frame{ border:0; max-width:none; margin-inline:0; }
 .trip .fhero__shade{
   background:linear-gradient(180deg,
-    rgba(0,0,0,.42) 0%, transparent 24%, transparent 42%,
-    rgba(16,16,18,.66) 74%, var(--surface) 100%);
+    var(--scrim) 0%, transparent 24%, transparent 42%,
+    var(--scrim-hi) 74%, var(--surface) 100%);
 }
 .trip .fhero__bar{
   border-top:0;
-  background:linear-gradient(180deg, rgba(16,16,18,.42), var(--surface));
+  background:var(--surface);
   backdrop-filter:none; -webkit-backdrop-filter:none;
 }
 @media (max-width:760px){
@@ -5229,240 +5235,183 @@ body.page-welcome{ --page-max: 2400px; }
    ----------------------------------------------------------------
    State classes are toggled by initTrip() in app.js:
      .trip       -> .trip--pre / --transit / --active / --done
-     .trip__stop -> .is-upcoming / .is-active / .is-done
+     .trip__stop -> .is-upcoming / .is-active / .is-done   (and .trip__side)
+     .trip-map__* -> the same three, plus is-next / is-away / is-here
 
-   COLOUR RULE, and it is the whole rebuild: this module keeps its own three
-   state colours — --trip (a leg still ahead), --trip-live (the leg you are
-   on), --trip-done (a leg behind you) — deliberately outside the site's
-   --acc system, because "upcoming / here / done" is a distinction one accent
-   cannot make and an album's own `accent =` must not repaint an instrument.
-   But it spends them on the STATE MARKS ONLY: the status stamp, the leg
-   dots, the day chip, the progress fill, the active leg's name, and the
-   route map's dots/regions/segments.
+   Rebuilt to NEBULA (nebula/NEBULA.md), rule by rule:
 
-   ...plus one exception it earns: the weather glyph, which is tinted per
-   condition (--trip-warm / --trip-cool and friends). A sun that is actually
-   amber is read before the word underneath it, and that readout is the one
-   thing on the card not talking about the itinerary.
-
-   What is grey is everything that used to be tinted for decoration rather
-   than for meaning: the countdown DIGITS (they take the page title's
-   white→grey fall, so the measurement stops shouting the state), the leg
-   grounds, the labels, the hairlines that carry no phase, and the hover
-   (--chrome, like every hover on the site). The phase still colours the
-   frame's top rule, a breath of wash beneath it, the module's own name, the
-   clock panel's hairline and every state mark — so the panel reads as
-   coloured, just not as one flat violet field with a violet badge lost
-   somewhere in it. Nothing outside .trip* / .trip-map* may use these
-   tokens.
+   1  Colour. The module is the language's one QUARANTINE: --trip (a leg
+      still ahead), --trip-live (the leg you are on), --trip-done (behind
+      you), and the weather glyph's --trip-warm / --trip-cool. They go on
+      STATE MARKS only — the frame's top rule, the stamp, the countdown
+      label's diamond, the leg dots, the day chip, the progress fill, the
+      active leg's name, the map's regions, dots and legs — and each of
+      those has a word or a shape beside it, so no state is told by hue
+      alone. Inside the module nothing wears --acc, --chrome or --label;
+      the furniture is the neutral ramp, and a hover is a grey edge. Text a
+      person reads bottoms out at --text-dim; --text-ghost is left to marks
+      that are not read (the route chevron, an empty track).
+   2  Square. Diamonds are squares turned with `rotate`, not circles. The
+      map's dots stay round: a position on a map is a genuinely round thing.
+   3  Depth. The module sits on --surface and the map on --bg, the same
+      opaque grounds as the album cards and image tiles next to them, with
+      one hairline. They were --glass for one pass and read as a lighter box
+      on the page, worst in lite mode, where glass turns into an opaque grey
+      ("die hintergründe sind auf jeden fall zu hell", user, 2026-10-26).
+      No wash under the top rule, no glow round the active card: the state
+      is in the border and the marks, not in a halo. Text over a leg's cover
+      sits on --scrim, the surface for chips on a photo.
+   4  Voices. Every measured value is mono — the countdown at the display
+      step (--fs-chrome-display), the clock, dates, temperatures, counters.
+      Names are sans. Data keeps its own case: the trip's title, a stop, a
+      side trip's city are never uppercased, only the fixed chrome is.
+   5  Measure. Every space, size, tracking and duration is a token.
+   6  Environment. Opaque grounds need no lite fallback; forced colours get
+      real edges below, and reduced motion stops the one live animation
+      (the map's "you are here").
    ================================================================ */
 .trip{
-  margin:0 0 22px;
-  /* override the generous page-section padding (36/44) — this is a compact
-     widget whose bar/body bring their own padding; the page rule would just
-     add dead height inside the box */
+  /* a compact instrument: bar and body bring their own padding, so the
+     page-section padding is dropped */
+  margin:0 0 var(--s-6);
   padding:0;
-  border:var(--hair) solid var(--line);
-  /* the one place the frame itself states the phase: a 2px rule along the
-     top edge, so the module announces its state before anything is read */
-  border-top:2px solid var(--line-strong);
-  /* a breath of the phase colour under the top rule — enough that the box
-     reads as tinted, far short of the full-height wash it used to carry */
   background:var(--surface);
+  border:var(--hair) solid var(--line);
+  /* the frame states the phase in one place: a bezel along its top edge,
+     before anything inside is read */
+  border-top:var(--s-0) solid var(--line-strong);
 }
-.trip--pre{
-  border-top-color:var(--trip);
-  background:linear-gradient(180deg, rgba(var(--trip-rgb),.07), transparent 34%), var(--surface);
-}
+.trip--pre{ border-top-color:var(--trip); }
 .trip--transit,
-.trip--active{
-  border-top-color:var(--trip-live);
-  background:linear-gradient(180deg, rgba(var(--trip-live-rgb),.07), transparent 34%), var(--surface);
-}
-.trip--done{
-  border-top-color:var(--trip-done);
-  background:linear-gradient(180deg, rgba(var(--trip-done-rgb),.06), transparent 34%), var(--surface);
-}
+.trip--active{ border-top-color:var(--trip-live); }
+.trip--done{ border-top-color:var(--trip-done); }
 
-/* ---- meta line ----
-   The module's own .section__doc: tracked mono, uppercase, dim, with the
-   facts in --text. It carries the trip's name (this box's title), its leg
-   count and date span; the identity in display type belongs to the hero
-   right underneath and is not repeated here. */
+/* ---- meta line: the module's own .section__doc ---- */
 .trip__bar{
-  display:flex; align-items:baseline; gap:var(--s-2) 18px; flex-wrap:wrap;
-  padding:var(--s-4) 14px;
+  display:flex; align-items:baseline; flex-wrap:wrap;
+  gap:var(--s-2) var(--s-5);
+  padding:var(--s-4) var(--s-5);
   border-bottom:var(--hair) solid var(--line);
   font-family:var(--mono);
   font-size:var(--fs-chrome-sm);
   letter-spacing:var(--tr-chrome-sm);
-  text-transform:uppercase;
   color:var(--text-dim);
 }
-/* the module's name, in the phase colour — it is the label of the thing
-   whose state this is, and it reads as the legend for the stamp opposite */
-.trip__tag{ color:var(--trip); }
-.trip--transit .trip__tag,
-.trip--active .trip__tag{ color:var(--trip-live); }
-.trip--done .trip__tag{ color:var(--trip-done); }
-.trip__name{ color:var(--text); letter-spacing:var(--tr-chrome-md); }
+/* two facts and a clock, on one line: the tag and the leg count on the
+   left, the clock on the right. The tag's glyph is the module's phase. */
+.trip__tag, .trip__legs, .trip__clock{ text-transform:uppercase; }
+.trip__tag > .fa{ margin-right:var(--s-2); color:var(--trip); }
+.trip--transit .trip__tag > .fa,
+.trip--active .trip__tag > .fa{ color:var(--trip-live); }
+.trip--done .trip__tag > .fa{ color:var(--trip-done); }
 .trip__legs b{ color:var(--text); font-weight:400; }
-.trip__span{ color:var(--text-ghost); letter-spacing:var(--tr-chrome-lg); font-variant-numeric:tabular-nums; }
-/* the state stamp — one of the four marks on this page allowed a colour.
-   A hairline outline, like .section__doc-mark, not a filled badge. */
-.trip__status{
-  margin-left:auto;
-  padding:var(--s-1) var(--s-3);
-  font-size:var(--fs-chrome-xs); letter-spacing:.2em;
-  white-space:nowrap;
-  color:var(--label);
-  border:var(--hair) solid rgba(var(--label-rgb),.35);
-}
-.trip--pre .trip__status{ color:var(--trip); border-color:rgba(var(--trip-rgb),.45); }
-.trip--transit .trip__status,
-.trip--active .trip__status{ color:var(--trip-live); border-color:rgba(var(--trip-live-rgb),.5); }
-.trip--done .trip__status{ color:var(--trip-done); border-color:rgba(var(--trip-done-rgb),.45); }
-/* live JST wall clock, right of the stamp (digits filled by initTrip).
-   Named place + zone code around the time, so the reading is unambiguous:
-   "JAPAN TIME 16:20:16 JST". */
+
+/* live JST wall clock: "JAPAN TIME 16:20:16 JST" */
 .trip__clock{
-  /* centre, not baseline: the digits below are size-contained, and a
-     contained box has no text baseline to offer (it would sit on its bottom
-     edge). Same face and size on all three, so centred IS baseline-aligned. */
+  /* centre, not baseline: the digits are size-contained, and a contained
+     box has no text baseline to offer. Same face and size on all three, so
+     centred IS baseline-aligned. */
   display:inline-flex; align-items:center; gap:var(--s-3);
-  color:var(--text-ghost);
+  margin-left:auto;
+  color:var(--text-dim);
   font-variant-numeric:tabular-nums; white-space:nowrap;
 }
 .trip__clock i{ font-style:normal; }
-/* the digits keep tabular figures so the seconds don't shuffle the line.
-   They change every second, so they are a layout boundary of their own:
-   a fixed box (eight monospace cells and their tracking, one line high)
+/* The digits change every second, so they are a layout boundary of their
+   own: a fixed box (eight monospace cells and their tracking, one line high)
    whose content is laid out inside it. Without one, WebKit laid out the
-   whole page for each tick — the entire photo grid on a trip album, some
-   100 ms a second on Japan's 980 photos. app.js changes the text node in
-   place (setText), which is what lets the boundary hold. */
+   whole page for each tick — some 100 ms a second on a 980-photo album.
+   app.js changes the text node in place (setText), which is what lets the
+   boundary hold. */
 .trip__clock b{
-  font-weight:400; color:var(--text); letter-spacing:.12em;
+  font-weight:400; color:var(--text); letter-spacing:var(--tr-num);
   display:block;
-  width:calc(8ch + 8 * .12em);
+  width:calc(8ch + 8 * var(--tr-num));
   height:1.55em;   /* engines without the lh unit; the line-height is body's */
   height:1lh;
   contain:size layout style;
 }
 
-/* ---- body layout ---- */
+/* ---- body ---- */
 .trip__main{
-  display:flex; flex-direction:column; gap:18px;
-  padding:18px var(--s-5) 20px;
+  display:flex; flex-direction:column; gap:var(--s-5);
+  padding:var(--s-5);
 }
-/* Desktop layout (countdown on the left + legs as a left→right row of compact
-   cards to its right) lives at the end of this section — it overrides the base
-   rules below, so it must come after them in source order. */
+/* The desktop layout (countdown left, legs as a row to its right) is at the
+   end of this section: it overrides the base rules, so it comes after them. */
 
 /* ---- countdown ---- */
-/* stacked layouts divide countdown and cards with a hairline; the desktop
-   grid swaps it for a right-hand divider (see ≥1100px below) */
 .trip__cd{
-  display:flex; flex-direction:column; gap:10px; min-width:0;
+  display:flex; flex-direction:column; gap:var(--s-3); min-width:0;
   padding-bottom:var(--s-5); border-bottom:var(--hair) solid var(--line);
 }
 .trip__cd-label{
   display:flex; align-items:center; gap:var(--s-3);
   font-family:var(--mono);
-  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
+  /* tracked like a value, not like a cap: the line is a sentence */
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-lg);
   color:var(--text-dim);
 }
-/* leading state marker — the module's phase, in four pixels */
+/* the phase, in one square turned on its corner. It leads a localized
+   sentence ("Leaving Hokkaido in"), which is why the label itself is not
+   cased: it carries a place name. */
 .trip__cd-label::before{
   content:""; flex:0 0 auto;
-  width:6px; height:6px;
-  background:var(--label);
-  transform:rotate(45deg);
+  width:var(--s-2); height:var(--s-2);
+  rotate:45deg;
+  border:var(--hair) solid var(--text-dim);
 }
-.trip--pre .trip__cd-label::before{ background:var(--trip); box-shadow:0 0 7px var(--trip); }
+.trip--pre .trip__cd-label::before{ background:var(--trip); border-color:var(--trip); }
 .trip--transit .trip__cd-label::before,
-.trip--active .trip__cd-label::before{ background:var(--trip-live); box-shadow:0 0 7px var(--trip-live); }
-.trip--done .trip__cd-label::before{ background:var(--trip-done); box-shadow:0 0 7px var(--trip-done); }
+.trip--active .trip__cd-label::before{ background:var(--trip-live); border-color:var(--trip-live); }
+.trip--done .trip__cd-label::before{ background:var(--trip-done); border-color:var(--trip-done); }
 
-/* one instrument panel, hairline-divided into four unit cells */
+/* four figures on equal columns, no cells: the space between them does
+   what the dividers did, and the figures line up with the label above */
 .trip__cd-clock{
-  position:relative;
-  display:flex; align-items:stretch;
-  border:var(--hair) solid var(--line);
-  background:var(--bg-2);
-}
-/* phase hairline riding the panel's top edge, fading out to the right. The
-   digits stay grey; this is what colours the instrument. */
-.trip__cd-clock::before{
-  content:"";
-  position:absolute; left:-1px; right:-1px; top:-1px; height:1px;
-  background:linear-gradient(90deg, var(--trip), rgba(var(--trip-rgb),.15) 70%, transparent);
-}
-.trip--transit .trip__cd-clock::before,
-.trip--active .trip__cd-clock::before{
-  background:linear-gradient(90deg, var(--trip-live), rgba(var(--trip-live-rgb),.15) 70%, transparent);
-}
-.trip--done .trip__cd-clock::before{
-  background:linear-gradient(90deg, var(--trip-done), rgba(var(--trip-done-rgb),.15) 70%, transparent);
+  display:flex; gap:var(--s-5);
 }
 .trip__cd-unit{
-  position:relative;
   flex:1 1 0; min-width:0;
-  display:flex; flex-direction:column; align-items:center; gap:var(--s-2);
-  padding:var(--s-4) var(--s-2) 10px;
-  border-right:var(--hair) solid var(--line);
+  display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-2);
 }
-.trip__cd-unit:last-child{ border-right:0; }
-/* the page title's fall, and the same face — a countdown is the biggest
-   number on the page, so it is set the way the page sets big numbers (see
-   .section__slug .name and .arc__val). It used to glow in the phase colour,
-   which made the measurement shout the state instead of the state marks
-   doing it. */
+/* the biggest measured value on the page: the mono voice at its display
+   step, in the page title's white→grey fall (the way .arc__val sets big
+   numbers). The phase is said by the marks around it, not by the digits. */
 .trip__cd-unit b{
-  font-family:"Space Grotesk", sans-serif;
-  font-weight:700; font-size:clamp(28px, 5.4vw, 42px); line-height:1;
-  letter-spacing:var(--tr-text);
+  font-family:var(--mono);
+  font-weight:500; font-size:var(--fs-chrome-display); line-height:1;
+  letter-spacing:var(--tr-chrome-display);
   font-variant-numeric:tabular-nums;
-  font-feature-settings:"tnum";
   color:var(--title-a);
   background:linear-gradient(175deg, var(--title-a) 14%, var(--title-b) 98%);
   -webkit-background-clip:text;
   background-clip:text;
   -webkit-text-fill-color:transparent;
-  padding-bottom:.04em;
-  /* a layout boundary, like the clock's digits (see .trip__clock b), so the
-     second ticking over is laid out inside the box instead of across the
-     page. Not size containment here: on desktop the countdown column is as
-     wide as its content, and a size-contained box has none. A clipped box
-     of fixed height is the other kind of boundary, and a percentage width
-     still lets the digits count when the column is measured. The height is
-     the one line plus the padding above (border-box). */
-  width:100%; height:1.04em;
+  /* a layout boundary, like the clock's digits: the second ticking over is
+     laid out inside the box instead of across the page. A clipped box of
+     fixed height, not size containment — on desktop the countdown column
+     is as wide as its content, and a size-contained box has none. */
+  width:100%; height:1.04em; padding-bottom:.04em;
   overflow:hidden;
-  text-align:center;
 }
 .trip__cd-unit b::selection{ -webkit-text-fill-color:var(--text); }
 .trip__cd-unit i{
-  font-family:var(--mono);
-  font-style:normal; font-size:var(--fs-chrome-xs); letter-spacing:.2em; text-transform:uppercase;
-  color:var(--text-ghost);
+  font-family:var(--mono); font-style:normal;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:uppercase;
+  color:var(--text-dim);
 }
 .trip__cd-sep{ display:none; }
 .trip__cd-target{
-  display:inline-flex; align-self:flex-start; align-items:center; gap:var(--s-3);
-  padding:var(--s-1) var(--s-3);
-  border:var(--hair) solid var(--line);
   font-family:var(--mono);
-  font-size:var(--fs-chrome-xs); letter-spacing:.2em; text-transform:uppercase;
-  color:var(--text-ghost);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:uppercase;
+  color:var(--text-dim);
 }
 .trip__cd-target b{ color:var(--text); font-weight:400; }
 
-/* ---- itinerary timeline (image-backed leg cards; each links into its
-   region sub-album). The cover fills the whole card behind a left-heavy
-   shade, so the text column reads over any photo; content is head row
-   (state dot / region / kanji), the date span, and a footer that
-   pairs the live weather block with the day counter. ---- */
+/* ---- itinerary: one card per leg, each a link into its region album.
+   The cover fills the card under a scrim, so the text reads over any
+   photo. ---- */
 .trip__line{
   list-style:none; margin:0; padding:0;
   display:flex; flex-direction:column; gap:var(--s-3);
@@ -5470,258 +5419,247 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__stop{
   position:relative; margin:0; min-width:0;
   border:var(--hair) solid var(--line);
-  background:var(--bg-2);
   isolation:isolate;
-  transition:border-color var(--dur-2) ease, box-shadow var(--dur-2) ease;
+  transition:border-color var(--dur-1) var(--ease);
 }
-.trip__stop.is-active{
-  border-color:rgba(var(--trip-live-rgb),.55);
-  box-shadow:0 0 0 1px rgba(var(--trip-live-rgb),.14), 0 0 30px -16px var(--trip-live);
-}
-.trip__stop.is-done{ border-color:rgba(var(--trip-done-rgb),.28); }
-/* route connector sitting in the gap between two legs — a downward chevron
-   while the cards stack, flipped to a rightward one in the desktop row
-   (see the ≥1100px block); the phone grid drops it entirely */
-.trip__stop + .trip__stop::before{
-  content:"▾";
-  position:absolute; z-index:4; pointer-events:none;
-  left:50%; top:-9px; margin-left:-7px;
-  width:14px; height:9px;
-  display:flex; align-items:center; justify-content:center;
-  font-family:var(--mono); font-size:var(--fs-chrome-xs); line-height:1;
-  color:var(--text-ghost);
-}
-/* Hover reads on the whole card, in --chrome like every other hover on the
-   site — a pointer landing on a card is not a state of the trip. Gated on a
-   real hovering pointer: re-styling an ANCESTOR of the tapped link is what
-   makes touch browsers spend the first tap on hover instead of following
-   the link. */
+.trip__stop.is-upcoming{ border-color:var(--line-strong); }
+.trip__stop.is-active{ border-color:var(--trip-live); }
+.trip__stop.is-done{ border-color:var(--line); }
+/* a hover is not a state of the trip: a grey edge, gated on a real hovering
+   pointer (re-styling an ANCESTOR of the tapped link is what spends the
+   first tap on hover on a touch screen) */
 @media (hover: hover){
-  .trip__stop:has(a.trip__stop-link:hover){ border-color:rgba(var(--chrome-rgb),.45); }
+  .trip__stop:has(a.trip__stop-link:hover){ border-color:var(--text-dim); }
 }
 
 .trip__stop-link{
   position:relative;
   display:flex; flex-direction:column;
-  min-height:96px; min-width:0;
-  padding:var(--s-4) var(--s-4) var(--s-4);
+  min-height:var(--s-10); min-width:0;
+  padding:var(--s-4);
   text-decoration:none; color:inherit;
 }
 
-/* card background: dimmed cover + readability shade (z-stack 0/1, body 2,
-   progress track 3 — isolation on .trip__stop keeps it self-contained) */
+/* z-stack: cover 0, scrim 1, body 2, track 3 (isolated on .trip__stop) */
 .trip__stop-media{ position:absolute; inset:0; z-index:0; overflow:hidden; }
 .trip__stop-media img{
   width:100%; height:100%; object-fit:cover; display:block;
   filter:saturate(.8) brightness(.7) contrast(1.05);
-  transition:filter var(--dur-2) ease, transform .6s ease;
+  /* `scale`, never `transform` (Nebula step 4.4) */
+  transition:filter var(--dur-2) var(--ease), scale var(--dur-3) var(--ease-out);
 }
 @media (hover: hover){
   a.trip__stop-link:hover .trip__stop-media img{
     filter:saturate(.95) brightness(.85) contrast(1.05);
-    transform:scale(1.04);
+    scale:1.04;
   }
 }
+/* the scrim runs heavy under the text column and lifts towards the open
+   side of the photo */
 .trip__stop-shade{
   position:absolute; inset:0; z-index:1;
-  background:
-    linear-gradient(90deg, rgba(0,0,0,.92) 0%, rgba(0,0,0,.7) 44%, rgba(0,0,0,.3) 100%),
-    linear-gradient(0deg, rgba(0,0,0,.5), transparent 60%);
+  background:linear-gradient(90deg, var(--scrim-hi) 0%, var(--scrim-hi) 40%, var(--scrim) 100%);
 }
 
 .trip__stop-body{
   position:relative; z-index:2;
   display:flex; flex-direction:column; gap:var(--s-3);
   flex:1 1 auto; min-width:0;
-  text-shadow:0 1px 6px rgba(0, 0, 0, .55);
 }
 .trip__stop-head{ display:flex; align-items:center; gap:var(--s-3); min-width:0; }
 .trip__stop-city{
-  font-family:"Space Grotesk", sans-serif; font-weight:600;
-  font-size:var(--fs-text-lg); letter-spacing:.02em; color:var(--text);
+  font-family:var(--sans); font-weight:600;
+  font-size:var(--fs-text-lg); letter-spacing:var(--tr-head); color:var(--text);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-/* "you are here", said in the name itself — the one leg whose label is
-   allowed a colour */
+/* "you are here", said in the name itself */
 .trip__stop.is-active .trip__stop-city{ color:var(--trip-live); }
 .trip__stop-jp{
-  font-family:"Noto Sans JP", sans-serif; font-size:var(--fs-text-sm); color:var(--text-ghost);
+  font-family:"Noto Sans JP", var(--sans); font-size:var(--fs-text-sm); color:var(--text-dim);
   white-space:nowrap; flex:0 0 auto;
 }
-/* state LED leading the head row */
+/* the state dot: outline ahead, filled behind, filled live while there */
 .trip__stop-dot{
-  align-self:center; flex:0 0 auto;
-  width:8px; height:8px;
-  border:var(--hair) solid var(--text-ghost); background:var(--bg);
-  transform:rotate(45deg);
+  flex:0 0 auto;
+  width:var(--s-3); height:var(--s-3);
+  rotate:45deg;
+  border:var(--hair) solid var(--text-dim);
 }
 .trip__stop.is-upcoming .trip__stop-dot{ border-color:var(--trip); }
 .trip__stop.is-done .trip__stop-dot{ background:var(--trip-done); border-color:var(--trip-done); }
-.trip__stop.is-active .trip__stop-dot{
-  background:var(--trip-live); border-color:var(--trip-live);
-  animation:trip-pulse 1.8s ease-out infinite;
-}
+.trip__stop.is-active .trip__stop-dot{ background:var(--trip-live); border-color:var(--trip-live); }
 .trip__stop-dates{
   font-family:var(--mono);
-  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-md); text-transform:uppercase;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-num);
   color:var(--text-dim);
   font-variant-numeric:tabular-nums;
 }
-/* each range half is an unbreakable block, so a narrow tile wraps exactly
-   at the dash (see the phone tile row below) — one line when it fits */
+/* each half of the range is unbreakable, so a narrow tile wraps exactly at
+   the dash */
 .trip__stop-dates > span{ display:inline-block; white-space:nowrap; }
 
-/* footer: weather (live) left, day counter right */
+/* footer: weather left, day counter right */
 .trip__stop-foot{
   margin-top:auto; padding-top:var(--s-3);
-  display:flex; align-items:flex-end; gap:10px; min-width:0;
+  display:flex; align-items:flex-end; gap:var(--s-3); min-width:0;
 }
-/* live weather: a small readout with its own left rule — glyph,
-   temperature, then the condition underneath. Entirely grey: the sky over
-   Sapporo is not a state of the itinerary, and a second palette here was
-   what made the panel unreadable. Its [hidden] no-JS / no-data state
-   is the base rule's. */
 .trip__stop-wx{
   display:flex; flex-direction:column; gap:var(--s-1); min-width:0;
-  padding-left:var(--s-3);
-  border-left:var(--hair) solid var(--line-strong);
 }
 .trip__stop-wx-now{
-  display:inline-flex; align-items:center; gap:var(--s-2);
+  display:inline-flex; align-items:baseline; gap:var(--s-2);
   font-family:var(--mono); font-weight:500;
-  font-size:var(--fs-chrome-lg); letter-spacing:.02em; color:var(--text);
+  font-size:var(--fs-chrome-lg); letter-spacing:var(--tr-chrome-xl); color:var(--text);
   font-variant-numeric:tabular-nums; white-space:nowrap;
 }
-.trip__stop-wx-ico{ font-style:normal; font-size:1.05em; color:var(--label); line-height:1; }
-/* condition tint (data-wx-kind is set by initTrip from the WMO bucket).
-   The one readout on the card whose colour is not about the itinerary — a
-   sun glyph that is actually amber is read before the word under it. */
-.trip__stop-wx[data-wx-kind="sun"]   .trip__stop-wx-ico{ color:var(--trip-warm); }
-.trip__stop-wx[data-wx-kind="night"] .trip__stop-wx-ico{ color:var(--trip-live); }
-.trip__stop-wx[data-wx-kind="cloud"] .trip__stop-wx-ico{ color:var(--text-dim); }
-.trip__stop-wx[data-wx-kind="fog"]   .trip__stop-wx-ico{ color:var(--text-ghost); }
-.trip__stop-wx[data-wx-kind="rain"]  .trip__stop-wx-ico{ color:var(--trip); }
-.trip__stop-wx[data-wx-kind="snow"]  .trip__stop-wx-ico{ color:var(--trip-cool); }
+.trip__stop-wx-ico{ font-style:normal; color:var(--text-dim); line-height:1; }
+/* the glyph's shape says the weather; the tint only lets it be read first.
+   Warm for sun and storm, cool for rain and snow, neutral for the rest —
+   never one of the three state colours, which mean something else here. */
+.trip__stop-wx[data-wx-kind="sun"]   .trip__stop-wx-ico,
 .trip__stop-wx[data-wx-kind="storm"] .trip__stop-wx-ico{ color:var(--trip-warm); }
+.trip__stop-wx[data-wx-kind="rain"]  .trip__stop-wx-ico,
+.trip__stop-wx[data-wx-kind="snow"]  .trip__stop-wx-ico{ color:var(--trip-cool); }
 /* today's envelope trails the current reading, one step quieter */
 .trip__stop-wx-range{
-  flex:0 0 auto;
-  font-size:.62em; font-weight:400; letter-spacing:var(--tr-chrome-xl);
-  color:var(--text-ghost); font-variant-numeric:tabular-nums;
+  font-size:var(--fs-chrome-xs); font-weight:400; letter-spacing:var(--tr-num);
+  color:var(--text-dim);
 }
-.trip__stop-wx-sub{
-  display:flex; align-items:baseline; min-width:0;
+.trip__stop-wx-cond{
   font-family:var(--mono);
-  font-size:var(--fs-chrome-xs); letter-spacing:.16em; text-transform:uppercase;
-  color:var(--text-ghost);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:uppercase;
+  color:var(--text-dim);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.trip__stop-wx-cond{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.trip__stop-side{
-  display:flex; align-items:center; gap:var(--s-3);
-  flex:0 0 auto; margin-left:auto; text-align:right;
-}
-/* day counter as a hairline chip — a state badge, so it takes the state
-   colour, in the same outlined form as .section__doc-mark */
+/* the day counter, as plain chrome type: its words ("in 12 days" / "day 3
+   of 37" / ✓) carry the state, the colour repeats it */
 .trip__stop-meta{
-  padding:var(--s-1) var(--s-3);
-  border:var(--hair) solid rgba(var(--label-rgb),.3);
+  flex:0 0 auto; margin-left:auto;
   font-family:var(--mono);
   font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
   color:var(--text-dim); white-space:nowrap;
 }
-.trip__stop.is-active .trip__stop-meta{ color:var(--trip-live); border-color:rgba(var(--trip-live-rgb),.45); }
-.trip__stop.is-done .trip__stop-meta{ color:var(--trip-done); border-color:rgba(var(--trip-done-rgb),.35); }
+.trip__stop-meta:empty{ display:none; }
+.trip__stop.is-active .trip__stop-meta{ color:var(--trip-live); }
+.trip__stop.is-done .trip__stop-meta{ color:var(--trip-done); }
 
-/* per-leg progress along the bottom edge of each card */
+/* the leg's progress along the card's foot: a meter (--p via the CSSOM) */
 .trip__stop-track{
-  position:absolute; left:0; right:0; bottom:0; height:2px; z-index:3;
-  background:rgba(255,255,255,.07); overflow:hidden;
+  position:absolute; left:0; right:0; bottom:0; z-index:3;
+  height:var(--s-0);
+  background:var(--line);
+  overflow:hidden;
 }
 .trip__stop-track i{
-  display:block; height:100%; width:0; background:var(--text-ghost);
-  transition:width .6s ease;
+  display:block; height:100%;
+  width:calc(var(--p, 0) * 1%);
+  background:var(--text-ghost);
+  transition:width var(--dur-3) var(--ease);
 }
 .trip__stop.is-done .trip__stop-track i{ background:var(--trip-done); }
-.trip__stop.is-active .trip__stop-track i{
-  background:linear-gradient(90deg, rgba(var(--trip-live-rgb),.45), var(--trip-live));
-  box-shadow:0 0 8px var(--trip-live);
-}
+.trip__stop.is-active .trip__stop-track i{ background:var(--trip-live); }
 
-@keyframes trip-pulse{
-  0%{ box-shadow:0 0 0 0 rgba(var(--trip-live-rgb),.45); }
-  70%{ box-shadow:0 0 0 6px rgba(var(--trip-live-rgb),0); }
-  100%{ box-shadow:0 0 0 0 rgba(var(--trip-live-rgb),0); }
+/* ---- side trips: a labelled list under the timeline. Not a leg, so no
+   card, no cover and no meter — but every row stands on the same columns
+   (dot · place · date · counter, the flights on a line below), so the block
+   reads as a table of excursions rather than a run of words. Rows are
+   divided by hairlines, the way .stack divides its rows; the state is the
+   dot, the counter's words and — while you are there — the name. ---- */
+.trip__sides{ padding:0 var(--s-5) var(--s-5); }
+.trip__sides-head{
+  display:flex; align-items:baseline; gap:var(--s-2);
+  margin:0; padding-bottom:var(--s-2);
+  border-bottom:var(--hair) solid var(--line);
+  font-family:var(--mono); font-weight:400;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:uppercase;
+  color:var(--text-dim);
 }
-
-/* ---- side trips: one slim row each under the timeline. A side trip is
-   not a leg, so it gets no card, no cover and no counter — just where and
-   when, in chrome type, with the same three states as a leg. ---- */
-.trip__sides{
-  list-style:none; margin:var(--s-3) 0 0; padding:0;
-  display:flex; flex-wrap:wrap; gap:var(--s-2);
-}
-.trip__side{ margin:0; min-width:0; border:var(--hair) dashed var(--line-strong); }
-.trip__side.is-active{ border-color:rgba(var(--trip-live-rgb),.55); border-style:solid; }
-.trip__side.is-done{ border-color:rgba(var(--trip-done-rgb),.35); }
+.trip__sides-head b{ font-weight:400; color:var(--text); }
+.trip__sides-list{ list-style:none; margin:0; padding:0; }
+.trip__side{ margin:0; min-width:0; }
+.trip__side + .trip__side{ border-top:var(--hair) solid var(--line); }
 .trip__side-link{
-  display:flex; align-items:baseline; flex-wrap:wrap; gap:var(--s-2);
-  padding:var(--s-1) var(--s-3);
+  display:grid;
+  grid-template-columns:var(--s-3) minmax(0,1fr) auto minmax(calc(var(--s-10) + var(--s-6)), auto);
+  align-items:baseline;
+  gap:var(--s-1) var(--s-4);
+  padding:var(--s-3) var(--s-2);
   font-family:var(--mono); font-size:var(--fs-chrome-sm);
-  letter-spacing:var(--tr-chrome-sm);
   text-decoration:none; color:var(--text-dim);
+  transition:background-color var(--dur-1) var(--ease);
 }
-.trip__side-tag{ color:var(--text-ghost); text-transform:uppercase; }
-.trip__side-city{ color:var(--text); text-transform:uppercase; }
-.trip__side-jp{ font-family:"Noto Sans JP", var(--mono); color:var(--text-ghost); }
-.trip__side-meta{ margin-left:auto; color:var(--text-ghost); }
-.trip__side-meta:empty{ display:none; }
-/* the flights drop to their own line under where/when */
-.trip__side-flights{
-  flex-basis:100%; display:flex; flex-wrap:wrap; gap:var(--s-1) var(--s-3);
-  color:var(--text-ghost);
-}
-.trip__side-flight b{ font-weight:400; color:var(--text-dim); }
-.trip__side.is-active .trip__side-city{ color:var(--trip-live); }
-.trip__side.is-done .trip__side-city{ color:rgba(var(--trip-done-rgb),.85); }
 @media (hover: hover){
-  .trip__side:has(a.trip__side-link:hover){ border-color:rgba(var(--chrome-rgb),.45); }
+  a.trip__side-link:hover{ background:var(--surface-2); }
+  a.trip__side-link:hover .trip__side-city{ text-decoration:underline; text-underline-offset:.2em; }
 }
+/* the same dot a leg card leads with, a step smaller */
+.trip__side-dot{
+  align-self:center;
+  width:var(--s-2); height:var(--s-2);
+  rotate:45deg;
+  border:var(--hair) solid var(--text-dim);
+}
+.trip__side.is-upcoming .trip__side-dot{ border-color:var(--trip); }
+.trip__side.is-done .trip__side-dot{ background:var(--trip-done); border-color:var(--trip-done); }
+.trip__side.is-active .trip__side-dot{ background:var(--trip-live); border-color:var(--trip-live); }
+.trip__side-place{ display:flex; align-items:baseline; gap:var(--s-2); min-width:0; }
+.trip__side-city{
+  font-family:var(--sans); font-weight:600;
+  font-size:var(--fs-text-md); letter-spacing:var(--tr-head); color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.trip__side.is-active .trip__side-city{ color:var(--trip-live); }
+.trip__side-jp{ font-family:"Noto Sans JP", var(--sans); font-size:var(--fs-text-sm); white-space:nowrap; }
+.trip__side-date{ letter-spacing:var(--tr-num); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.trip__side-meta{
+  justify-self:end;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
+  white-space:nowrap;
+}
+.trip__side.is-active .trip__side-meta{ color:var(--trip-live); }
+.trip__side.is-done .trip__side-meta{ color:var(--trip-done); }
+/* the flights: their own line under the place, one entry per flight —
+   number, from, arrow, to — set as values */
+.trip__side-flights{
+  grid-column:2 / -1;
+  display:flex; flex-wrap:wrap; gap:var(--s-1) var(--s-5);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-num);
+  font-variant-numeric:tabular-nums;
+}
+.trip__side-flight{ display:inline-flex; gap:var(--s-2); white-space:nowrap; }
+.trip__side-flight b{ font-weight:500; color:var(--text); }
 
 /* ---- route map (generated inline SVG — see _trip_map.html) ----
-   A framed panel with a faint blueprint grid behind the archipelago. The
-   grid, the land and the resting dots are grey; only the stop states and
-   the route legs carry the module's three colours, exactly as in the
-   timeline above. */
+   A framed panel on --bg, with a faint neutral grid behind the
+   archipelago. Land, grid and resting dots are grey; only the
+   stop states and the route legs carry the module's colours. */
 .trip-map{
-  /* fills its column (full-width panels on mobile, the sidebar on desktop),
-     capped so it never grows unwieldy on tablet widths */
-  margin:0 auto; width:100%; max-width:360px;
-  padding:10px 10px var(--s-4);
+  /* fills its column (the sidebar on desktop), capped on the stacked
+     layouts so a tablet does not get a poster */
+  margin:0 auto; width:100%; max-width:calc(var(--s-10) * 3.75);
+  padding:var(--s-3) var(--s-3) var(--s-4);
   border:var(--hair) solid var(--line);
-  position:relative;
-  /* solid panel (no see-through to the page bg) with a faint blueprint grid
-     over it — grid lines are the only translucent part, and they are
-     colourless now: a tinted graticule made the whole sidebar read blue */
   background:
-    repeating-linear-gradient(0deg,  rgba(var(--trip-rgb),.05) 0 1px, transparent 1px 27px),
-    repeating-linear-gradient(90deg, rgba(var(--trip-rgb),.05) 0 1px, transparent 1px 27px),
+    repeating-linear-gradient(0deg,  var(--wallpaper-grid) 0 var(--hair), transparent var(--hair) var(--s-6)),
+    repeating-linear-gradient(90deg, var(--wallpaper-grid) 0 var(--hair), transparent var(--hair) var(--s-6)),
     var(--bg);
 }
-.trip-map::after{
-  content:"日本 / ROUTE";
-  position:absolute; right:var(--s-3); bottom:var(--s-3);
-  font-family:"Noto Sans JP", var(--mono);
-  font-size:var(--fs-chrome-sm); letter-spacing:.12em; color:var(--text-ghost);
-  pointer-events:none;
-}
 .trip-map svg{ display:block; width:100%; height:auto; }
+.trip-map__cap{
+  display:flex; justify-content:flex-end; gap:var(--s-2);
+  margin-top:var(--s-2);
+  font-family:var(--mono);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:uppercase;
+  color:var(--text-dim);
+}
+.trip-map__cap [lang="ja"]{ font-family:"Noto Sans JP", var(--mono); letter-spacing:var(--tr-chrome-lg); }
+.trip-map__cap [lang="ja"]::after{ content:"/"; margin-left:var(--s-2); }
 
 .trip-map__land{
   fill:var(--surface-2); stroke:var(--line-strong); stroke-width:.7;
   stroke-linejoin:round;
 }
-/* the regions the itinerary visits — one path per stop, its prefectures
-   merged into a single shape */
+/* the regions the itinerary visits — one path per stop */
 .trip-map__pref{
   fill:rgba(var(--trip-rgb),.1); stroke:rgba(var(--trip-rgb),.55); stroke-width:.8;
   stroke-linejoin:round;
@@ -5729,10 +5667,10 @@ body.page-welcome{ --page-max: 2400px; }
 .trip-map__pref.is-active{ fill:rgba(var(--trip-live-rgb),.18); stroke:var(--trip-live); }
 .trip-map__pref.is-done{ fill:rgba(var(--trip-done-rgb),.08); stroke:rgba(var(--trip-done-rgb),.45); }
 
-/* route legs: ghost-dashed until flown; the upcoming leg marches */
+/* route legs: dashed until flown; the next one marches */
 .trip-map__seg{
   fill:none; stroke:var(--text-ghost); stroke-width:1.1;
-  stroke-dasharray:3 4; stroke-linecap:round; opacity:.5;
+  stroke-dasharray:3 4; stroke-linecap:square; opacity:.6;
 }
 .trip-map__seg.is-next{
   stroke:var(--trip); stroke-width:1.5; opacity:1;
@@ -5742,37 +5680,38 @@ body.page-welcome{ --page-max: 2400px; }
   stroke:rgba(var(--trip-done-rgb),.5); stroke-dasharray:none; stroke-width:1; opacity:.9;
 }
 
-.trip-map__dot{ fill:var(--bg); stroke:var(--text-ghost); stroke-width:1.1; }
+.trip-map__dot{ fill:var(--bg); stroke:var(--text-dim); stroke-width:1.1; }
 .trip-map__city.is-upcoming .trip-map__dot{ stroke:var(--trip); }
-.trip-map__city.is-done   .trip-map__dot{ fill:var(--trip-done);  stroke:var(--trip-done); }
+.trip-map__city.is-done   .trip-map__dot{ fill:var(--trip-done); stroke:var(--trip-done); }
 .trip-map__city.is-active .trip-map__dot{ fill:var(--trip-live); stroke:var(--trip-live); }
-/* "you are here": expanding echo + slowly rotating dashed target ring */
+/* "you are here": the module's one live thing — an expanding echo and a
+   slowly turning dashed ring */
 .trip-map__pulse, .trip-map__ring{ fill:none; stroke:var(--trip-live); opacity:0; }
 .trip-map__pulse{ stroke-width:1.2; }
 .trip-map__ring{ stroke-width:.8; stroke-dasharray:2.5 3.5; }
-.trip-map__city.is-active .trip-map__pulse{ animation:trip-map-pulse 2.4s ease-out infinite; }
-.trip-map__city.is-active .trip-map__ring{ opacity:.75; animation:trip-map-spin 16s linear infinite; }
+.trip-map__city.is-active .trip-map__pulse,
+.trip-map__city.is-here .trip-map__pulse{ animation:trip-map-pulse 2.4s var(--ease-out) infinite; }
+.trip-map__city.is-active .trip-map__ring,
+.trip-map__city.is-here .trip-map__ring{ opacity:.75; animation:trip-map-spin 16s linear infinite; }
 
+/* the labels are data — the stop names in their own case */
 .trip-map__lbl{
   font-family:var(--mono); font-size:var(--fs-chrome-sm);
-  letter-spacing:var(--tr-chrome-lg); fill:var(--text-dim);
+  letter-spacing:var(--tr-chrome-xl); fill:var(--text-dim);
 }
 .trip-map__city.is-active .trip-map__lbl{ fill:var(--trip-live); }
-.trip-map__city.is-done   .trip-map__lbl{ fill:rgba(var(--trip-done-rgb),.7); }
+.trip-map__city.is-done   .trip-map__lbl{ fill:var(--text-dim); }
 
-/* side trips: the region it lies in, the out-and-back and its dot are all a
-   size quieter than a leg's — dashed outline, thin route, smaller dot. While
-   one runs its base stays the active leg but hands it the pulse (is-away),
-   so the map never shows two "you are here"s. */
+/* side trips: the region it lies in, its out-and-back and its dot are a
+   size quieter than a leg's. While one runs its base stays the active leg
+   but hands it the pulse (is-away), so the map never shows two "you are
+   here"s; back at a leg already done (a revisit), that leg's dot takes the
+   pulse (is-here) without its done state changing. */
 .trip-map__pref--side{ fill:rgba(var(--trip-rgb),.04); stroke-dasharray:2 2.5; stroke-width:.6; }
 .trip-map__seg--side{ stroke-width:.9; stroke-dasharray:1.5 2.5; }
 .trip-map__seg--side.is-done{ stroke-dasharray:1.5 2.5; }
 .trip-map__city.is-away .trip-map__pulse,
 .trip-map__city.is-away .trip-map__ring{ animation:none; opacity:0; }
-/* back at a leg already done (a revisit): that leg's dot takes the pulse for
-   as long as you are there, without its done state changing */
-.trip-map__city.is-here .trip-map__pulse{ animation:trip-map-pulse 2.4s ease-out infinite; }
-.trip-map__city.is-here .trip-map__ring{ opacity:.75; animation:trip-map-spin 16s linear infinite; }
 
 @keyframes trip-map-pulse{
   0%{ r:4.5; opacity:.75; }
@@ -5781,84 +5720,74 @@ body.page-welcome{ --page-max: 2400px; }
 @keyframes trip-map-spin{ to{ stroke-dashoffset:-63; } }
 @keyframes trip-map-dash{ to{ stroke-dashoffset:-14; } }
 
+/* rule 6: less motion asked for — the marks stay, the movement goes. The
+   live dot keeps its fill and the ring its dashes, standing still. */
 @media (prefers-reduced-motion: reduce){
-  .trip__stop.is-active .trip__stop-dot{ animation:none; }
-  .trip__stop-track i{ transition:none; }
-  .trip__stop, .trip__stop-media img{ transition:none; }
-  .trip__stop-media img{ transform:none !important; }
+  .trip__stop, .trip__stop-media img, .trip__stop-track i{ transition:none; }
+  @media (hover: hover){ a.trip__stop-link:hover .trip__stop-media img{ scale:none; } }
   .trip-map__pulse, .trip-map__ring, .trip-map__seg.is-next{ animation:none; }
 }
+html.fx-lite .trip-map__pulse,
+html.fx-lite .trip-map__ring,
+html.fx-lite .trip-map__seg.is-next{ animation:none; }
+/* forced colours: the OS owns the palette, so the state marks need edges
+   the compositor keeps — the words beside them already carry the meaning */
+@media (forced-colors: active){
+  .trip, .trip__stop, .trip-map{ border-color:CanvasText; }
+  .trip__stop-dot, .trip__cd-label::before{ border-color:CanvasText; }
+  .trip__stop.is-active .trip__stop-dot,
+  .trip__stop.is-done .trip__stop-dot,
+  .trip__stop-track i{ background:Highlight; }
+  .trip__cd-unit b{ -webkit-text-fill-color:CanvasText; background:none; }
+}
 
-/* desktop: countdown on the left, the legs as a left→right row of banner
-   cards to its right. Needs real width for three cards plus the countdown,
-   so it only kicks in on wide screens; narrower screens keep the stacked
-   full-width cards (see defaults above). */
+/* desktop: the countdown on the left, the legs as a left→right row of
+   cards to its right. Needs real width for three cards plus the countdown;
+   narrower screens keep the stacked cards above. */
 @media (min-width:1100px){
   .trip__main{
     display:grid; grid-template-columns:auto minmax(0,1fr);
-    gap:26px; align-items:stretch; padding:var(--s-5) var(--s-5) 18px;
+    gap:var(--s-6); align-items:stretch;
   }
   .trip__cd{
-    gap:var(--s-3); justify-content:center;
-    padding:0 26px 0 var(--s-1); border-bottom:0;
+    justify-content:center;
+    padding:0 var(--s-6) 0 0; border-bottom:0;
     border-right:var(--hair) solid var(--line);
   }
-  .trip__cd-unit{ padding:10px 10px var(--s-3); }
-  .trip__cd-unit b{ font-size:32px; }
-  /* legs run side by side, sharing the column width equally; the gap is
-     wide enough to carry the route chevron between two cards */
-  .trip__line{ flex-direction:row; gap:14px; }
+  .trip__line{ flex-direction:row; gap:var(--s-4); }
   .trip__stop{ flex:1 1 0; }
-  .trip__stop-link{ min-height:126px; padding:var(--s-4) var(--s-5) var(--s-5); }
-  .trip__stop + .trip__stop::before{
-    content:"▸";
-    left:-14px; top:50%; margin:-7px 0 0;
-    width:14px; height:14px;
-  }
+  .trip__stop-link{ min-height:calc(var(--s-10) + var(--s-7)); padding:var(--s-4) var(--s-5) var(--s-5); }
 }
 
-/* phones: the route keeps its cover imagery but flips the layout logic —
-   the three stops sit SIDE BY SIDE as one row of compact portrait tiles
-   (whole route in a single glance, one row tall) instead of stacking
-   full-width banner cards. Tiles read bottom-up over a foot-heavy shade:
-   city / kanji / state dot, the date span in miniature, live temp in the
-   foot. */
+/* phones: the three stops sit SIDE BY SIDE as one row of portrait tiles —
+   the whole route in one glance — reading bottom-up over a foot-heavy
+   scrim: name, kanji and dot, the dates in miniature, the temperature. */
 @media (max-width:760px){
   .trip__bar{ padding:var(--s-3) var(--s-4); gap:var(--s-2) var(--s-4); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-md); }
-  /* three wrapped rows of meta above a countdown is too much preamble on a
-     phone; the leg cards carry the dates anyway */
-  .trip .doc-min-hide{ display:none; }
-  .trip__main{ gap:14px; }
+  .trip__main{ padding:var(--s-4); gap:var(--s-4); }
+  .trip__sides{ padding:0 var(--s-4) var(--s-4); }
+  /* a row on a phone: dot · place · counter, the date and the flights
+     under the place */
+  .trip__side-link{ grid-template-columns:var(--s-3) minmax(0,1fr) auto; padding-inline:0; }
+  .trip__side-date{ grid-column:2; grid-row:2; }
+  .trip__side-meta{ grid-column:3; grid-row:1; }
   .trip__line{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:var(--s-3); }
-  .trip__stop-link{ min-height:148px; padding:var(--s-3) 10px 10px; }
-  /* narrow portrait tile: swap the left-heavy readability shade for a
-     bottom-heavy one so the text block anchors to the foot of the tile */
+  .trip__stop-link{ min-height:calc(var(--s-10) + var(--s-8)); padding:var(--s-3); }
   .trip__stop-shade{
-    background:linear-gradient(0deg,
-      rgba(0,0,0,.94) 0%, rgba(0,0,0,.55) 46%, rgba(0,0,0,.2) 100%);
+    background:linear-gradient(0deg, var(--scrim-hi) 0%, var(--scrim-hi) 45%, var(--scrim) 100%);
   }
   .trip__stop-body{ gap:var(--s-1); justify-content:flex-end; }
-  .trip__stop-head{ flex-wrap:wrap; gap:var(--s-0) var(--s-2); align-items:center; }
-  .trip__stop + .trip__stop::before{ display:none; }
+  .trip__stop-head{ flex-wrap:wrap; gap:var(--s-0) var(--s-2); }
   .trip__stop-city{ font-size:var(--fs-text-md); }
-  .trip__stop-jp{ font-size:var(--fs-text-sm); }
-  .trip__stop-dates{ font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-num); line-height:1.5; white-space:normal; }
-  .trip__stop-foot{ padding-top:var(--s-2); gap:var(--s-3); }
-  /* the tile is too narrow for the readout's rule + sub-line: temperature
-     only, flush with the rest of the text column */
-  .trip__stop-wx{ padding-left:0; border-left:0; }
-  .trip__stop-wx-now{ font-size:var(--fs-chrome-md); gap:var(--s-2); }
-  .trip__stop-wx-sub, .trip__stop-wx-range{ display:none; }
-  .trip__stop-meta{ display:none; }
+  .trip__stop-dates{ font-size:var(--fs-chrome-xs); line-height:1.5; }
+  .trip__stop-foot{ padding-top:var(--s-2); }
+  /* too narrow for the readout's second line: the temperature only */
+  .trip__stop-wx-now{ font-size:var(--fs-chrome-md); }
+  .trip__stop-wx-cond, .trip__stop-wx-range, .trip__stop-meta{ display:none; }
 }
 
 @media (max-width:420px){
-  .trip__main{ padding:var(--s-4); gap:var(--s-4); }
-  .trip__bar{ padding:var(--s-3) var(--s-4); row-gap:var(--s-2); }
-  .trip__tag, .trip__name, .trip__legs{ white-space:nowrap; }
-  /* the stamp and the clock both want the right edge on a line that no
-     longer has one — let them take a row of their own */
-  .trip__status{ margin-left:0; }
+  .trip__tag, .trip__legs{ white-space:nowrap; }
 }
 
 /* ================================================================
@@ -6012,9 +5941,10 @@ html.fx-anim .trip__stop.rv.rv-in{ animation-duration:.6s; }
 }
 /* the leg's progress fill holds at zero until its card has landed, then
    sweeps to the live value — the one thing on the card that moves after
-   arrival, so it reads as the instrument taking its reading. The !important
-   is needed against the inline width initTrip() writes on every tick. */
-html.fx-anim .trip__stop.rv:not(.rv-in) .trip__stop-track i{ width:0 !important; }
+   arrival, so it reads as the instrument taking its reading. initTrip()
+   writes the value as --p, not as an inline width, so plain specificity
+   holds it here. */
+html.fx-anim .trip__stop.rv:not(.rv-in) .trip__stop-track i{ width:0; }
 html.fx-anim .trip__stop.rv-in .trip__stop-track i{
   transition: width .8s cubic-bezier(.19,.66,.28,.99) .45s;
 }
@@ -6497,7 +6427,7 @@ html.fx-anim .image-tile:is(:not(.rv), .rv-in) a:has(> img.img-shim)::before{
   .trip__stop-jp{ font-size:var(--fs-text-md); }
   .trip__stop-dates{ font-size:var(--fs-chrome-sm); }
   .trip__stop-wx-now{ font-size:var(--fs-chrome-lg); }
-  .trip__stop-wx-sub{ font-size:var(--fs-chrome-sm); }
+  .trip__stop-wx-cond{ font-size:var(--fs-chrome-sm); }
   .trip__stop-meta{ font-size:var(--fs-chrome-sm); }
   .trip__cd-unit i{ font-size:var(--fs-chrome-sm); }
   .trip__cd-target{ font-size:var(--fs-chrome-sm); }
@@ -6720,8 +6650,7 @@ html.fx-anim .image-tile:is(:not(.rv), .rv-in) a:has(> img.img-shim)::before{
 .image-tile__overlay .fa{ margin-left:.5em; font-size:.8em; }
 .album-desc__label > .fa,
 .sub-albums__label > .fa,
-.archive-head__label > .fa,
-.trip__tag > .fa{ margin-right:.65em; }
+.archive-head__label > .fa{ margin-right:.65em; }
 
 /* The label WORD is grey furniture like every other mono line on the page;
    its glyph is the one thing allowed to carry the accent. That keeps a
@@ -6736,9 +6665,9 @@ html.fx-anim .image-tile:is(:not(.rv), .rv-in) a:has(> img.img-shim)::before{
 .album-desc__label > .fa,
 .album-hero__kicker > .fa,
 .section__parent-ico > .fa{ color:var(--acc); }
-/* the trip tag's glyph is NOT in that list: it inherits the tag's own phase
-   colour (--trip / --trip-live / --trip-done), which is the whole point of
-   the trip palette being separate. */
+/* the trip tag's glyph is NOT in that list: it takes the module's phase
+   colour (--trip / --trip-live / --trip-done, set with the module), which
+   is the whole point of the trip palette being separate. */
 
 /* card call-to-action: the arrow trails the label and leans out on hover,
    which is where the old literal "→" in the translated string sat */

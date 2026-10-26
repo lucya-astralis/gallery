@@ -349,7 +349,7 @@ def city_group(name, side=False):
         f'      <circle class="trip-map__pulse" cx="{fmt(x)}" cy="{fmt(y)}" r="4.5"/>\n'
         f'      <circle class="trip-map__ring" cx="{fmt(x)}" cy="{fmt(y)}" r="10"/>\n'
         f'      <circle class="trip-map__dot" cx="{fmt(x)}" cy="{fmt(y)}" r="{2.4 if side else 3.4}"/>\n'
-        f'      <text class="trip-map__lbl" x="{fmt(x + dx)}" y="{fmt(y + dy)}" text-anchor="{anch}">{name.upper()}</text>\n'
+        f'      <text class="trip-map__lbl" x="{fmt(x + dx)}" y="{fmt(y + dy)}" text-anchor="{anch}">{name}</text>\n'
         f'    </g>'
     )
 
@@ -381,7 +381,10 @@ html = f"""{{# Route map for the trip dashboard (generated — do not hand-edit 
    each stop's data-city. Side trips (trip-map__*--side) work the same way,
    keyed by the side trip's city / region; their route carries
    data-map-side instead of data-map-seg. A side trip back to a leg's region
-   (a revisit) adds only its route and reuses that leg's dot (is-here). #}}
+   (a revisit) adds only its route and reuses that leg's dot (is-here).
+   The labels keep the stop names' own case: they are data (Nebula rule 4),
+   so no stylesheet uppercases them either. The caption is markup, not a
+   ::after string, so it is translated and read out like any other text. #}}
 <figure class="trip-map">
   <svg viewBox="{fmt(VB[0])} {fmt(VB[1])} {fmt(VB[2])} {fmt(VB[3])}" role="img"
        aria-label="Route map: {', then '.join(ORDER)}{aria_sides}"
@@ -395,6 +398,7 @@ html = f"""{{# Route map for the trip dashboard (generated — do not hand-edit 
 {city_groups}
     </g>
   </svg>
+  <figcaption class="trip-map__cap">{{% if trip.jp %}}<span lang="ja">{{{{ trip.jp }}}}</span> {{% endif %}}{{{{ t('trip.route') }}}}</figcaption>
 </figure>
 """
 OUT.write_text(html, encoding="utf-8")

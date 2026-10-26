@@ -18,6 +18,33 @@ notes are never one commit apart.
 
 ---
 
+## 2.8.1 — 2026-10-26
+
+**Before you upgrade:** nothing to do.
+
+* **The trip module, rebuilt to Nebula.** The countdown, the leg cards, the
+  side trips and the route map now follow the six rules like the rest of
+  the site. The module stays on the same dark ground as the album cards
+  beside it, and the map stays on black. The phase lives in the top edge and
+  the state marks only, with no colour wash and no glow, and every state
+  carries a word or a shape as well as its colour.
+* The countdown is set in the mono voice at Nebula's display step, as a
+  measured value. Names keep their own case everywhere in the module: the
+  stamp reads `IN Kanto`, the map labels `Kansai`, and a side trip's city is
+  no longer uppercased.
+* The module says each thing once. The top line keeps only the leg count
+  and the Japan clock, since the hero right below already shows the name and
+  dates and the countdown's sentence names the phase. The countdown, the flight
+  date and the day counters are plain type instead of boxed chips, and
+  the arrows between the leg cards are gone. On a trip album, the hero no
+  longer has its own "Trip" chip above the title.
+* Side trips are a labelled list under the timeline now, not a run of
+  dashed chips. Each row has the same columns: the leg cards' state dot, the
+  place, the date and the counter, with the flights on their own line.
+* The weather glyph is tinted warm or cool, never in a leg's state colour. The
+  map's caption is translated markup now, not a fixed CSS string, and the
+  progress bars carry their value as `--p`, so the module has no `!important`.
+
 ## 2.8.0 — 2026-10-25
 
 **Before you upgrade:** nothing to do. Nothing looks different until you

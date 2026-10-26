@@ -76,12 +76,15 @@
      the phone hero drops it, see .album-hero__jp--deco. #}
   {% set hero_jp = trip.jp if trip and trip.jp else None %}
   {% macro hero_info() %}
+    {# no kicker on a trip album: the trip module's own top line, right
+       above the hero, already says TRIP #}
+    {% if not trip %}
     <span class="album-hero__kicker">
-      {%- if trip %}<i class="fa fa-route" aria-hidden="true"></i>{{ t('trip.tag') }}
-      {%- elif breadcrumbs | length > 1 %}<i class="fa fa-folder-tree" aria-hidden="true"></i>{{ t('stamp.sub_album') }}
+      {%- if breadcrumbs | length > 1 %}<i class="fa fa-folder-tree" aria-hidden="true"></i>{{ t('stamp.sub_album') }}
       {%- elif album_is_showcase %}<i class="fa fa-star" aria-hidden="true"></i>{{ t('stamp.showcase_album') }}
       {%- else %}ALBUM{% endif -%}{# HUD token — stays English like FILE / #}
     </span>
+    {% endif %}
     {# the album's own mark (album.cfg `icon =`), leading its title — sized
        in em so it scales with the hero type (and with a custom face's
        font_scale) instead of drifting off it #}
