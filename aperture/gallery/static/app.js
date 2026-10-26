@@ -2539,8 +2539,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // Live flight countdown + itinerary "you are here" marker. Every date is
 // read as the viewer's LOCAL wall-clock, so the widget reads correctly both
 // from home before departure and on the ground once the trip is underway.
-// State is driven purely by class toggles + element.style (CSP-safe — no
-// inline <script>/<style>); all styling lives in style.css.
+// State is driven purely by class toggles + CSSOM custom properties
+// (CSP-safe — no inline <script>/<style>); all styling lives in style.css.
 document.addEventListener('DOMContentLoaded', () => {
   const root = document.querySelector('[data-trip]');
   if (!root) return;
@@ -2625,6 +2625,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const labelEl = root.querySelector('[data-trip-cd-label]');
   const targetEl = root.querySelector('[data-trip-cd-target]');
   const statusEl = root.querySelector('[data-trip-status]');
+  const statusPlaceEl = root.querySelector('[data-trip-status-place]');
 
   const firstStart = stops.length ? stops[0].start : null;
   const lastEnd = stops.length ? stops[stops.length - 1].end : null;
@@ -2692,7 +2693,13 @@ document.addEventListener('DOMContentLoaded', () => {
         : state === 'upcoming' ? 0
         : span > 0 ? ((now - s.start) / span) * 100 : 0;
       pct = Math.max(0, Math.min(100, pct));
-      if (s.fill) s.fill.style.width = pct + '%';
+      // a meter: the value rides --p (Nebula's .meter), the stylesheet
+      // turns it into a width — so a reveal can hold it at zero without
+      // fighting an inline width
+      if (s.fill) {
+        const p = pct.toFixed(2);
+        if (s.fill.style.getPropertyValue('--p') !== p) s.fill.style.setProperty('--p', p);
+      }
 
       if (s.meta) {
         if (state === 'upcoming') {
@@ -2750,8 +2757,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (jstFmt && clockTimeEl) setText(clockTimeEl, jstFmt.format(now));
 
     // phase + headline countdown (label is localized; the status stamp is
-    // HUD chrome and stays English in every language)
-    let phase, target, label, status;
+    // HUD chrome and stays English in every language). The stamp's word is
+    // fixed chrome; the place after it is data and keeps its own case.
+    let phase, target, label, status, place = '';
     if (depart && now < depart) {
       phase = 'pre'; target = depart;
       label = TXT.departsIn; status = 'T-' + Math.floor((depart - now) / DAY) + ' DAYS';
@@ -2761,7 +2769,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (activeIdx >= 0) {
       phase = 'active'; target = stops[activeIdx].end;
       label = TXT.leavingIn(stops[activeIdx].cityLabel);
-      status = 'IN ' + ((away && away.from === stops[activeIdx].city) ? away.city : stops[activeIdx].city).toUpperCase();
+      status = 'IN';
+      place = (away && away.from === stops[activeIdx].city) ? away.city : stops[activeIdx].city;
     } else {
       phase = 'done'; target = null;
       label = TXT.tripComplete; status = 'COMPLETE';
@@ -2771,6 +2780,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setClock(target ? target - now : 0);
     setText(labelEl, label);
     setText(statusEl, status);
+    if (statusPlaceEl) {
+      setText(statusPlaceEl, place);
+      statusPlaceEl.hidden = !place;
+    }
     setText(targetEl, fmtDate(target || lastEnd));
   }
 
@@ -2820,7 +2833,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const [glyph, label, kind] = wmo(w.code, w.is_day);
           ico.textContent = glyph;
           temp.textContent = Math.round(w.temp) + '°';
-          if (cond) cond.textContent = label.toUpperCase();
+          if (cond) cond.textContent = label;
           el.dataset.wxKind = kind;
           // today's envelope is a bonus — the row stays hidden when the
           // upstream payload carries no daily block
