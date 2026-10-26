@@ -169,6 +169,17 @@ def _trips_literal():
 
 SIDE_REGION_PREFS = {
     "Tohoku": [2, 3, 4, 5, 6, 7],   # Aomori Iwate Miyagi Akita Yamagata Fukushima
+    "Okinawa": [47],
+}
+# A region outside the crop below is drawn the way a map of Japan usually
+# draws Okinawa: as an INSET, a hairline frame in the empty Pacific corner
+# (bottom right) holding just that region's window of the map, a little
+# enlarged so the island reads. `clip` is that window (lon0, lon1, lat0,
+# lat1) — Okinawa Honto only; Kerama, Miyako and Yaeyama stay out —
+# `scale` the enlargement, `pad` the air inside the frame, `margin` the
+# distance from the viewBox's edges.
+INSETS = {
+    "Okinawa": {"clip": (127.6, 128.35, 26.05, 26.92), "scale": 2.4, "pad": 4, "margin": 8},
 }
 SIDE_TRIPS = {}
 for s in _trips_literal()["japan_2026"].get("side_trips", []):
@@ -277,6 +288,40 @@ def process(rings):
             out.append(s)
     return out
 
+# ---- insets ---------------------------------------------------------------
+VB_RIGHT, VB_BOTTOM = VB[0] + VB[2], VB[1] + VB[3]
+INSET_BOXES, INSET_TF = {}, {}
+for _name, _c in INSETS.items():
+    lon0, lon1, lat0, lat1 = _c["clip"]
+    nx0, ny0 = pt(lon0, lat1)
+    nx1, ny1 = pt(lon1, lat0)
+    sc, pad = _c["scale"], _c["pad"]
+    bw, bh = (nx1 - nx0) * sc + 2 * pad, (ny1 - ny0) * sc + 2 * pad
+    bx, by = VB_RIGHT - _c["margin"] - bw, VB_BOTTOM - _c["margin"] - bh
+    INSET_BOXES[_name] = (bx, by, bw, bh)
+    INSET_TF[_name] = (lambda p, bx=bx, by=by, nx0=nx0, ny0=ny0, sc=sc, pad=pad:
+                       (bx + pad + (p[0] - nx0) * sc, by + pad + (p[1] - ny0) * sc))
+    INSET_TF[_name].clip = (nx0, ny0, nx1, ny1)
+
+def inset_rings(region, rings):
+    """The rings of `region` that lie in its inset window, moved into the
+    frame and simplified like the rest of the map."""
+    tf = INSET_TF[region]
+    cx0, cy0, cx1, cy1 = tf.clip
+    out = []
+    for r in rings:
+        x0, y0, x1, y1 = ring_bbox(r)
+        if not (cx0 <= (x0 + x1) / 2 <= cx1 and cy0 <= (y0 + y1) / 2 <= cy1):
+            continue
+        moved = [tf(p) for p in r]
+        mx0, my0, mx1, my1 = ring_bbox(moved)
+        if math.hypot(mx1 - mx0, my1 - my0) < MIN_DIAG:
+            continue
+        slim = dp(moved, EPS)
+        if len(slim) >= 3:
+            out.append(slim)
+    return out
+
 pts_before = sum(len(r) for rings in prefs.values() for r in rings)
 visited_prefs = {code: name for name, c in REGIONS.items() for code in c["prefs"]}
 side_prefs = {code: c["region"] for c in SIDE_TRIPS.values() if not c["revisit"] for code in c["prefs"]}
@@ -286,6 +331,8 @@ for code, rings in prefs.items():
     slim = process(rings)
     if code in visited_prefs:
         visited[visited_prefs[code]].extend(slim)
+    elif code in side_prefs and side_prefs[code] in INSETS:
+        visited[side_prefs[code]].extend(inset_rings(side_prefs[code], rings))
     elif code in side_prefs:
         visited[side_prefs[code]].extend(slim)
     else:
@@ -297,14 +344,17 @@ print(f"points: {pts_before} -> {pts_after}")
 DOTS = {name: pt(c["lon"], c["lat"]) for name, c in REGIONS.items()}
 OSA, SPK, TYO = (DOTS[n] for n in ORDER)
 # a revisit routes to the leg's own dot, so the two never sit a hair apart
-SIDE_DOTS = {name: DOTS[c["region"]] if c["revisit"] else pt(c["lon"], c["lat"])
+SIDE_DOTS = {name: DOTS[c["region"]] if c["revisit"]
+             else INSET_TF[c["region"]](pt(c["lon"], c["lat"])) if c["region"] in INSETS
+             else pt(c["lon"], c["lat"])
              for name, c in SIDE_TRIPS.items()}
 
 # every side-trip dot has to land inside its own prefecture, the same sanity
-# check the stops get above
+# check the stops get above (on the map's own coordinates, before an inset
+# moves it)
 for name in NEW_SIDES:
-    x, y = SIDE_DOTS[name]
     c = SIDE_TRIPS[name]
+    x, y = pt(c["lon"], c["lat"])
     if not any(b[0] <= x <= b[2] and b[1] <= y <= b[3] for b in (bbox(prefs[k]) for k in c["prefs"])):
         sys.exit(f"side trip {name} dot {x:.1f},{y:.1f} outside {c['region']}")
 
@@ -339,6 +389,14 @@ LBL = {
 # a new side-trip dot without its own entry above: label to the west, which
 # keeps it off the legs' routes (they bow east up the Pacific side)
 LBL_SIDE = (-7, 3, "end")
+# an inset's dot is labelled above its frame, flush with the frame's right
+# edge (the frame sits in the corner, so the name runs inwards, not off the
+# map), and never crowds the island inside it
+for name, c in SIDE_TRIPS.items():
+    if c["region"] in INSET_BOXES and name not in LBL:
+        bx, by, bw, _ = INSET_BOXES[c["region"]]
+        x, y = SIDE_DOTS[name]
+        LBL[name] = (bx + bw - x, by - 4 - y, "end")
 
 def city_group(name, side=False):
     x, y = (SIDE_DOTS if side else DOTS)[name]
@@ -357,7 +415,7 @@ pref_paths = "\n".join(
     f'    <path class="trip-map__pref" data-map-pref="{name}" d="{rings_to_d(visited[name])}"/>'
     for name in ORDER
 ) + "".join(
-    f'\n    <path class="trip-map__pref trip-map__pref--side" data-map-pref="{name}" d="{rings_to_d(visited[name])}"/>'
+    f'\n    <path class="trip-map__pref trip-map__pref--side{" trip-map__pref--inset" if name in INSETS else ""}" data-map-pref="{name}" d="{rings_to_d(visited[name])}"/>'
     for name in SIDE_REGIONS
 )
 seg_paths = "\n".join(
@@ -368,6 +426,9 @@ seg_paths = "\n".join(
 )
 city_groups = "\n".join([city_group(n) for n in ORDER] +
                          [city_group(n, side=True) for n in NEW_SIDES])
+inset_frames = "".join(
+    f'    <rect class="trip-map__inset" x="{fmt(x)}" y="{fmt(y)}" width="{fmt(w)}" height="{fmt(h)}"/>\n'
+    for x, y, w, h in INSET_BOXES.values())
 aria_sides = "".join(f", side trip to {n}" for n in SIDE_TRIPS)
 
 html = f"""{{# Route map for the trip dashboard (generated — do not hand-edit paths).
@@ -382,6 +443,8 @@ html = f"""{{# Route map for the trip dashboard (generated — do not hand-edit 
    keyed by the side trip's city / region; their route carries
    data-map-side instead of data-map-seg. A side trip back to a leg's region
    (a revisit) adds only its route and reuses that leg's dot (is-here).
+   A region south of the crop (Okinawa) sits in an inset frame in the
+   bottom-right corner (trip-map__inset), enlarged; its route runs into it.
    The labels keep the stop names' own case: they are data (Nebula rule 4),
    so no stylesheet uppercases them either. The caption is markup, not a
    ::after string, so it is translated and read out like any other text. #}}
@@ -390,7 +453,7 @@ html = f"""{{# Route map for the trip dashboard (generated — do not hand-edit 
        aria-label="Route map: {', then '.join(ORDER)}{aria_sides}"
        preserveAspectRatio="xMidYMid meet">
     <path class="trip-map__land" d="{rings_to_d(land_rings)}"/>
-{pref_paths}
+{inset_frames}{pref_paths}
     <g class="trip-map__routes" aria-hidden="true">
 {seg_paths}
     </g>

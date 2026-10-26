@@ -70,6 +70,14 @@ TRIPS: dict[str, dict] = {
              "album": "tohoku/sendai", "from": "Kanto",
              "start": "2026-10-02T23:00:00", "arrive": "2026-10-03T04:00:00",
              "end": "2026-10-03T21:40:00", "lat": 38.2682, "lon": 140.8694},
+            # south of the map's crop: tools/generate_trip_map.py draws
+            # Okinawa as an inset in the empty Pacific corner (INSETS there)
+            {"city": "Okinawa", "jp": "沖縄", "region": "Okinawa", "region_jp": "沖縄",
+             "album": "okinawa", "from": "Kanto",
+             "start": "2026-11-06T16:25:00", "arrive": "2026-11-06T19:55:00",
+             "end": "2026-11-09T18:30:00", "lat": 26.2124, "lon": 127.6809,
+             "flights": [("MM 511", "NRT", "16:25", "OKA", "19:55"),
+                         ("MM 508", "OKA", "18:30", "NRT", "21:00")]},
             {"city": "Sapporo", "jp": "札幌", "region": "Hokkaido", "region_jp": "北海道",
              "album": "hokkaido/sapporo", "from": "Kanto",
              "start": "2026-12-18T14:45:00", "arrive": "2026-12-18T16:35:00",
