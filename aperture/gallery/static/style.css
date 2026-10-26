@@ -5659,6 +5659,9 @@ body.page-welcome{ --page-max: 2400px; }
   fill:var(--surface-2); stroke:var(--line-strong); stroke-width:.7;
   stroke-linejoin:round;
 }
+/* an inset (Okinawa): the frame a map of Japan draws round the islands it
+   moves into the empty corner — a hairline, like every other edge */
+.trip-map__inset{ fill:none; stroke:var(--line-strong); stroke-width:.7; }
 /* the regions the itinerary visits — one path per stop */
 .trip-map__pref{
   fill:rgba(var(--trip-rgb),.1); stroke:rgba(var(--trip-rgb),.55); stroke-width:.8;
@@ -5708,6 +5711,9 @@ body.page-welcome{ --page-max: 2400px; }
    here"s; back at a leg already done (a revisit), that leg's dot takes the
    pulse (is-here) without its done state changing. */
 .trip-map__pref--side{ fill:rgba(var(--trip-rgb),.04); stroke-dasharray:2 2.5; stroke-width:.6; }
+/* an island in an inset is too small for a dashed edge — it breaks into
+   specks — so it keeps the side trip's quiet fill on a solid hairline */
+.trip-map__pref--inset{ stroke-dasharray:none; }
 .trip-map__seg--side{ stroke-width:.9; stroke-dasharray:1.5 2.5; }
 .trip-map__seg--side.is-done{ stroke-dasharray:1.5 2.5; }
 .trip-map__city.is-away .trip-map__pulse,

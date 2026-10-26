@@ -26,6 +26,15 @@ def test_revisit_rides_on_the_base_leg_every_day_it_covers():
     assert trips.trip_stop_on(TRIP, "2026-12-21", "en") == "Kanto"
 
 
+def test_okinawa_rides_on_kanto_from_the_evening_it_lands():
+    # MM 511 lands at OKA 19:55 on the 6th, MM 508 leaves on the 9th
+    for day in ("2026-11-06", "2026-11-07", "2026-11-08", "2026-11-09"):
+        assert trips.trip_stop_on(TRIP, day, "en") == "Kanto · ↗ Okinawa"
+    assert trips.trip_stop_on(TRIP, "2026-11-09", "jp") == "関東 · ↗ 沖縄"
+    assert trips.trip_stop_on(TRIP, "2026-11-05", "en") == "Kanto"
+    assert trips.trip_stop_on(TRIP, "2026-11-10", "en") == "Kanto"
+
+
 def test_trip_ends_at_the_flight_home():
     assert TRIP["stops"][-1]["end"] == "2027-01-01T10:45:00"
     assert trips.trip_stop_on(TRIP, "2027-01-01", "en") == "Kanto"

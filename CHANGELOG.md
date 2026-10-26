@@ -18,6 +18,20 @@ notes are never one commit apart.
 
 ---
 
+## 2.9.0 — 2026-10-26
+
+**Before you upgrade:** nothing to do.
+
+* **A side trip to Okinawa**, 6–9 Nov 2026 from the Kanto base, with its
+  flights (MM 511 NRT 16:25 → OKA 19:55, MM 508 OKA 18:30 → NRT 21:00). Its
+  row counts down under the timeline, and the day headers of those four days
+  read `Kanto · ↗ Okinawa`. Photos go in `japan_2026/okinawa`.
+* **Insets on the route map.** Okinawa lies far south of the map's crop. It is
+  drawn the way a map of Japan usually draws it: in a hairline frame in the
+  empty Pacific corner, enlarged, and the side trip's dotted route runs into
+  it. `tools/generate_trip_map.py` takes a new such region as one `INSETS`
+  entry, and the rest of the map's geometry is unchanged.
+
 ## 2.8.1 — 2026-10-26
 
 **Before you upgrade:** nothing to do.
