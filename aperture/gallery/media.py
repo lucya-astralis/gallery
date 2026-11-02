@@ -160,6 +160,20 @@ def serve_site_wallpaper(variant: str):
                         headers=context.IMMUTABLE)
 
 
+@router.get("/bg/{name}")
+def serve_nova(name: str, accent: str | None = None):
+    """The shipped backdrop turned to a page's accent. The name is one of the
+    two cuts and the colour is parsed to three ints, so nothing from the URL
+    reaches a path or the SVG; the page's accent is what theme._nova_url asks
+    for, and the colour being in the URL is what makes this cacheable."""
+    if name not in theme.NOVA_CUTS.values():
+        raise HTTPException(404, "not found")
+    rgb = theme.parse_hex_color(accent) if accent else None
+    shades = theme.accent_shades(rgb) if rgb is not None else None
+    return Response(theme.nova_svg(name, shades), media_type="image/svg+xml",
+                    headers=context.IMMUTABLE)
+
+
 @router.get("/album-font/{album:path}")
 def serve_album_font(album: str):
     """The font file an album's cfg names in `font = …`. The filename never

@@ -33,7 +33,7 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from .. import brand, checks, colors, config, db, palette, scanner, search, theme, update_check
+from .. import brand, checks, colors, config, db, scanner, search, theme, update_check
 from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
@@ -311,7 +311,6 @@ LOGIN_REASONS = {
 # `?accent=#hex` asks for a preview of an unsaved colour: nothing is read from
 # or written to a file for it, the hex is parsed to three ints like any cfg
 # value, and the answer is never cached.
-NOVA_CUTS = {"nova-wide-16-9.svg", "nova-square.svg"}
 NO_STORE = {"Cache-Control": "no-store"}
 LOOK_CACHE = {"Cache-Control": "no-cache"}
 
@@ -344,12 +343,9 @@ def console_theme_css(accent: str | None = None):
 
 @app.get("/bg/{name}")
 def console_backdrop(name: str, accent: str | None = None):
-    if name not in NOVA_CUTS:
+    if name not in theme.NOVA_CUTS.values():
         raise HTTPException(404, "not found")
-    svg = (BASE_DIR / "static" / "bg" / name).read_text(encoding="utf-8")
-    shades = _look_accent(accent)
-    if shades is not None:
-        svg = palette.recolour_svg(svg, shades["_rgb"])
+    svg = theme.nova_svg(name, _look_accent(accent))
     return Response(svg, media_type="image/svg+xml",
                     headers=NO_STORE if accent is not None else LOOK_CACHE)
 

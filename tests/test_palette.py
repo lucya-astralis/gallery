@@ -101,6 +101,35 @@ def test_the_console_wears_the_site_accent_before_sign_in(gallery_cfg):
         security.reset()
 
 
+def test_the_gallery_wears_nova_by_default(client, gallery_cfg):
+    gallery_cfg("")
+    bg = theme.site_bg()
+    assert bg["video"] is None
+    assert "/static/bg/nova-wide-16-9.svg" in bg["still_desktop"]
+    assert "/static/bg/nova-square.svg" in bg["still_mobile"]
+    assert client.get(bg["still_desktop"]).status_code == 200
+    css = client.get(theme.theme_css_url(None)).text
+    assert "--wallpaper-filter:brightness(0.95) contrast(1.04)" in css
+    assert "--wallpaper-shade-bot:rgba(0,0,0,0.62)" in css
+    assert "--wallpaper-bloom" not in css        # nova keeps its wash
+
+
+def test_nova_is_turned_to_the_accent_in_the_gallery(client, gallery_cfg):
+    gallery_cfg("accent = #3fc27a\n")
+    res = client.get(theme.site_bg()["still_mobile"])
+    assert res.status_code == 200 and res.headers["content-type"].startswith("image/svg+xml")
+    assert "#4034c0" not in res.text and "#05050a" in res.text
+    assert client.get("/bg/other.svg").status_code == 404
+    assert "#4034c0" in client.get("/bg/nova-square.svg", params={"accent": "red"}).text
+
+
+def test_a_knob_still_wins_over_novas_treatment(client, gallery_cfg):
+    gallery_cfg("wallpaper_dim = .8\n")
+    assert "--wallpaper-filter:brightness(0.8) contrast(1.04)" in theme.theme_decls(None)
+    gallery_cfg("wallpaper_tint = off\n")
+    assert "--wallpaper-bloom:transparent" in theme.theme_decls(None)
+
+
 def test_an_accent_preview_writes_nothing_and_is_not_cached(console, gallery_cfg):
     gallery_cfg("accent = #616ef3\n")
     res = console.get("/theme.css", params={"accent": "#e0625f"})

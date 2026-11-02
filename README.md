@@ -339,10 +339,10 @@ Optional file in the album's **`.album/` folder** (see above):
 | `font`       | a filename in `.album/`         | Display face for the album's hero title — `.otf` / `.ttf` / `.woff2` / `.woff` (see above). |
 | `font_scale` | a number, `0.5`–`2.5`           | Size multiplier for that face, so a small-reading display face can be evened up. Only read when `font` is set; ignored when out of range. |
 | `accent`     | a hex colour, `#7ad1ff`         | The accent of this album's pages — links, focus, the active state, the featured mark, the hero button. Sub-albums inherit it. Unset falls through to `gallery.cfg`'s `accent`, then to the built-in colour. A colour too dark to read on the black page is lightened (`doctor` says when). |
-| `wallpaper`  | a filename in `.album/`         | This album's page backdrop on desktop — `.mp4` / `.webm` / `.jpg` / `.png` / `.webp` / `.avif`. Sub-albums inherit it. Unset falls through to `gallery.cfg`, then to the one shipped with the gallery. |
+| `wallpaper`  | a filename in `.album/`         | This album's page backdrop on desktop — `.mp4` / `.webm` / `.jpg` / `.png` / `.webp` / `.avif`. Sub-albums inherit it. Unset falls through to `gallery.cfg`, then to the one shipped with the gallery: **nova**, turned to the page's accent. |
 | `wallpaper_mobile` | a filename in `.album/`   | The same on phones. **Stills only** — the gallery never loads a backdrop video there. It also stands in as the poster frame behind a desktop clip while that buffers. |
-| `wallpaper_tint` | `off`, or `0`–`1`           | How much colour that backdrop keeps. Unset inherits (ancestor album → `gallery.cfg` → the built-in near-greyscale). `off` is full colour, and also drops the accent wash lying over the picture. |
-| `wallpaper_dim`  | `off`, or `0.25`–`1`        | How bright it is; `1` and `off` both leave it untouched. Unset inherits the same way, ending at the built-in `0.72`. |
+| `wallpaper_tint` | `off`, or `0`–`1`           | How much colour that backdrop keeps. Unset inherits (ancestor album → `gallery.cfg` → the built-in near-greyscale, or full colour on nova). `off` is full colour, and also drops the accent wash lying over the picture. |
+| `wallpaper_dim`  | `off`, or `0.25`–`1`        | How bright it is; `1` and `off` both leave it untouched. Unset inherits the same way, ending at the built-in `0.72` (`0.95` on nova). |
 
 ### Pretty links (`links.cfg`)
 
@@ -1571,10 +1571,11 @@ All GET, all public:
 - `GET /album-icon/{album}` — the album's `icon =` mark; only ever the file named in that album's `album.cfg`, 404 when it sets none
 - `GET /site-font.css` — the same thing one tier down for `gallery.cfg`'s `font =` (`@font-face` + `--display-font`, plus `--display-scale` for `font_scale =`); 404 when the gallery sets none
 - `GET /site-font` — that face's file; only ever the one named in `gallery.cfg`
-- `GET /site-theme.css` — the theme of every page that is not an album's: `--acc…` from `gallery.cfg`'s `accent =`, `--wallpaper-filter` from its backdrop knobs. 404 when nothing is themed and `style.css`'s own tokens stand
+- `GET /site-theme.css` — the theme of every page that is not an album's: `--acc…` from `gallery.cfg`'s `accent =`, `--wallpaper-filter` from its backdrop knobs, and nova's own treatment while the shipped backdrop shows. 404 when nothing is themed and `style.css`'s own tokens stand
 - `GET /album-theme.css/{album}` — the same for one album, resolved through its ancestors and then `gallery.cfg`
 - `GET /album-wallpaper/{desktop|mobile}/{album}` — the backdrop an `album.cfg` names; the album in the path is the one that *set* the key, so a sub-album never serves through its parent's URL
 - `GET /site-wallpaper/{desktop|mobile}` — the backdrop `gallery.cfg` names, for every page no album has dressed
+- `GET /bg/{nova-wide-16-9.svg|nova-square.svg}?accent=#hex` — the shipped backdrop turned to that accent; a page with no accent takes the plain file under `/static/bg/`
 - `GET /brand/{logo|favicon|pfp}` + `GET /brand/badge/{index}` — the operator's marks and footer badges from `photos/.gallery/`; the index is the position in the *rendered* row
 - `GET /search?q=…` — search with facets (`?sort=`); without `q` it browses every photo
 - `GET /s/{name}` — a pretty link from `photos/.gallery/links.cfg`: a 302 to the album or photo it names, 404 otherwise (see [Pretty links](#pretty-links-linkscfg)). `/s/` holds links and nothing else

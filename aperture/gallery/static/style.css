@@ -647,7 +647,7 @@
      real decision and the two apps disagree about it. This ramp is for a
      PHOTOGRAPH: it darkens towards the footer of a scrolling page, where the
      picture is still at full strength. Artwork that already falls off
-     downward (nova, which the configurator wears) wants both ends flat, or
+     downward (nova, the shipped default; theme.wallpaper_decls) wants both ends flat, or
      the ramp lands on the art's own falloff and the bottom half goes black. */
   --wallpaper-shade-top: rgba(0,0,0,0.62);
   --wallpaper-shade-bot: rgba(0,0,0,0.82);

@@ -142,6 +142,14 @@ _HEX_COLOR = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 WALLPAPER_TINT_DEFAULT = 0.92
 WALLPAPER_DIM_DEFAULT = 0.72
 WALLPAPER_CONTRAST = 1.04
+# ...and the shipped backdrop's. Those two are set for a PHOTOGRAPH; nova is
+# brand art in the accent's own colour and dark by construction, so draining
+# it would remove what it was made to say, and the footer ramp would land on
+# its own falloff and take the bottom half to black. A knob someone set still
+# wins, and the same figures dress it in the console (console/static/style.css).
+NOVA_TINT = 0.0
+NOVA_DIM = 0.95
+NOVA_SHADE_BOT = "rgba(0,0,0,0.62)"
 
 # Contrast floor both accent readings are held to: --acc is small text on a
 # PANEL and a face under black label text, so both want luminance.
@@ -271,17 +279,23 @@ def wallpaper_decls(album: str | None = None) -> list[str]:
     bloom on it was, correctly, reported as still tinted (user, 2026-09-01).
     What `tint = off` does NOT drop is the dimming: full colour, but still a
     backdrop you can put text on. Only turning BOTH knobs off yields
-    `filter: none`."""
+    `filter: none`.
+
+    The page that wears nova always has declarations, whatever the knobs say:
+    its treatment is not style.css's. It keeps the wash unless `tint = off`
+    was actually asked for, because nova IS the accent's own colour."""
     tint = _wallpaper_knob(album, "wallpaper_tint", WALLPAPER_TINT_DEFAULT,
                            (0.0, 1.0), off=0.0)
     dim = _wallpaper_knob(album, "wallpaper_dim", WALLPAPER_DIM_DEFAULT,
                           schema.WALLPAPER_DIM_RANGE, off=1.0)
-    if tint is None and dim is None:
+    nova = wears_nova(album)
+    if tint is None and dim is None and not nova:
         return []
+    bloom_off = tint is not None and tint <= 0
     if tint is None:
-        tint = WALLPAPER_TINT_DEFAULT
+        tint = NOVA_TINT if nova else WALLPAPER_TINT_DEFAULT
     if dim is None:
-        dim = WALLPAPER_DIM_DEFAULT
+        dim = NOVA_DIM if nova else WALLPAPER_DIM_DEFAULT
     if tint <= 0 and dim >= 1:
         filt = "none"
     else:
@@ -293,8 +307,10 @@ def wallpaper_decls(album: str | None = None) -> list[str]:
         parts.append("contrast(%g)" % WALLPAPER_CONTRAST)
         filt = " ".join(parts)
     decls = ["--wallpaper-filter:%s" % filt]
-    if tint <= 0:
+    if bloom_off or (tint <= 0 and not nova):
         decls.append("--wallpaper-bloom:transparent")
+    if nova:
+        decls.append("--wallpaper-shade-bot:%s" % NOVA_SHADE_BOT)
     return decls
 
 
@@ -439,7 +455,7 @@ def album_icon_url(album: str | None) -> str | None:
 # Two keys, because the two are genuinely different assets: desktop can carry
 # a video, phones must not (app.js never loads one there, and a 6 MB clip on
 # a phone plan is the reason it doesn't). Either key on its own is fine; the
-# missing side falls back to the site default (bg.mp4 / bg-poster.jpg).
+# missing side falls back to the site default (nova, see NOVA_CUTS).
 #
 # A sub-album with no wallpaper of its own inherits the nearest ancestor's,
 # so `japan_2026` dresses `japan_2026/kansai/osaka` too — otherwise every
@@ -449,6 +465,10 @@ ALBUM_WALLPAPER_IMAGE_TYPES = {e: schema.MIME[e] for e in sorted(schema.WALLPAPE
 ALBUM_WALLPAPER_TYPES = {**ALBUM_WALLPAPER_VIDEO_TYPES, **ALBUM_WALLPAPER_IMAGE_TYPES}
 
 # phones get a still frame, never a clip — see the note above
+# The shipped backdrop, one cut per slot. The wide one turns to mush cropped
+# into a portrait viewport, so phones get the square.
+NOVA_CUTS = {"desktop": "nova-wide-16-9.svg", "mobile": "nova-square.svg"}
+
 ALBUM_WALLPAPER_KEYS = {"desktop": ("wallpaper", ALBUM_WALLPAPER_TYPES),
                         "mobile": ("wallpaper_mobile", ALBUM_WALLPAPER_IMAGE_TYPES)}
 
@@ -564,7 +584,7 @@ def _site_wallpaper_url(variant: str) -> str | None:
 def _bg_layer(album: str | None, variant: str) -> tuple[str, Path] | None:
     """(url, file) for one backdrop slot, through the tiers a wallpaper has:
     the album and its ancestors, then gallery.cfg's own. None when neither
-    configures one and the shipped /static default is what shows."""
+    configures one and the shipped nova is what shows."""
     src = album_wallpaper_source(album, variant)
     if src is not None:
         return _album_wallpaper_url(album, variant), src[1]
@@ -572,6 +592,32 @@ def _bg_layer(album: str | None, variant: str) -> tuple[str, Path] | None:
     if path is not None:
         return _site_wallpaper_url(variant), path
     return None
+
+
+def wears_nova(album: str | None = None) -> bool:
+    """True when nothing configures either slot, so the whole backdrop is the
+    shipped one and takes its treatment. One slot configured keeps the
+    photograph's: the sheet has one filter for both."""
+    return (_bg_layer(album, "desktop") is None
+            and _bg_layer(album, "mobile") is None)
+
+
+def _nova_url(album: str | None, variant: str) -> str:
+    """The shipped backdrop for one slot. With an accent on the page it goes
+    through /bg/, turned to that hue; the colour travels in the URL, so a
+    change of accent is a different URL rather than a stale hit."""
+    url = templating.static_url(templating.WEB_DIR, f"bg/{NOVA_CUTS[variant]}")
+    accent = page_accent(album)
+    if accent is None:
+        return url
+    return (url.replace("/static/bg/", "/bg/", 1)
+            + "&accent=" + quote("#%02x%02x%02x" % tuple(accent["_rgb"])))
+
+
+def nova_svg(name: str, accent: dict | None) -> str:
+    """One cut of nova, turned to `accent` when there is one."""
+    svg = (templating.WEB_DIR / "static" / "bg" / name).read_text(encoding="utf-8")
+    return palette.recolour_svg(svg, accent["_rgb"]) if accent is not None else svg
 
 
 def site_bg(album: str | None = None) -> dict:
@@ -583,29 +629,24 @@ def site_bg(album: str | None = None) -> dict:
       video — desktop clip, or None when the desktop wallpaper is a still
         image and there is nothing to play
     Every slot goes through _bg_layer, so an album's own backdrop wins, then
-    gallery.cfg's, then the one shipped under /static — the same fall-through
-    the rest of the theme has.
+    gallery.cfg's, then nova, the one shipped — the same fall-through the rest
+    of the theme has.
 
     The poster behind a CONFIGURED clip is the configured mobile still rather
-    than the shipped bg-poster.jpg: the two are crops of one backdrop, and
-    flashing a stock photograph for the beat before the clip buffers had the
-    site briefly wearing someone else's picture. With nothing configured at
-    all it is the shipped clip that plays, and the shipped poster is the frame
-    that belongs to it."""
+    than the shipped artwork: the two are crops of one backdrop. Nova is a
+    still, so with nothing configured there is no clip at all."""
     desktop = _bg_layer(album, "desktop")
     mobile = _bg_layer(album, "mobile")
-    default_still = templating.static_url(templating.WEB_DIR, "bg-poster.jpg")
     desktop_is_video = (desktop is not None
                         and desktop[1].suffix.lower() in ALBUM_WALLPAPER_VIDEO_TYPES)
     if desktop is None:
-        still_desktop = default_still
+        still_desktop = _nova_url(album, "desktop")
     elif desktop_is_video:
-        still_desktop = mobile[0] if mobile else default_still
+        still_desktop = mobile[0] if mobile else _nova_url(album, "desktop")
     else:
         still_desktop = desktop[0]
     return {
-        "still_mobile": mobile[0] if mobile else default_still,
+        "still_mobile": mobile[0] if mobile else _nova_url(album, "mobile"),
         "still_desktop": still_desktop,
-        "video": (desktop[0] if desktop_is_video else
-                  (None if desktop else templating.static_url(templating.WEB_DIR, "bg.mp4"))),
+        "video": desktop[0] if desktop_is_video else None,
     }

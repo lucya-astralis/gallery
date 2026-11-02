@@ -368,20 +368,20 @@ duplicate of the gallery's.
 
 One deliberate departure:
 
-- **No ambient video.** Where the gallery plays `bg.mp4`, this plays nothing:
-  a config tool has no business decoding 1080p behind a form. It gets the
-  **nova** artwork as a still instead — vector, so a full-viewport backdrop
-  costs nothing to paint, which is the whole reason one is affordable here.
+- **Always nova.** The gallery shows **nova** until a cfg names something else;
+  this shows it whatever the cfg says, because a config tool has no business
+  decoding a 1080p clip behind a form. It is a still and a vector, so a
+  full-viewport backdrop costs nothing to paint.
   A `<picture>` hands phones the square cut (`nova-square.svg`) and everything
   else the 16:9 one, so exactly one of the two is fetched; the wide cut turns
   to mush cropped into a portrait viewport.
 
   It sits under the same four overlay layers as the gallery's backdrop —
-  grid, accent bloom, dim — but all three of the gallery's figures are
-  retuned, because those defaults are set for a **photograph** and this is
-  not one:
+  grid, accent bloom, dim — with the figures the gallery also gives nova
+  (`theme.wallpaper_decls`), because the stock ones are set for a
+  **photograph** and this is not one:
 
-  | | gallery | here | why |
+  | | photograph | nova | why |
   | --- | --- | --- | --- |
   | tint | `grayscale(.92)` | **off** | The drain exists because a photograph behind the page introduces a *foreign* hue that every blurred pane then picks up. Nova has none to introduce — it is brand art drawn in the accent's own colour, so draining it removes the one thing it was made to say. The gallery spells this `wallpaper_tint = off`: a supported setting, not a departure. The photo thumbnails are still the most saturated thing on screen, which is the rule that actually matters. |
   | brightness | `.72` | `.95` | A photograph arrives bright and full-range and needs holding back. Nova arrives dark by construction — its own gradient falls to `#07070d`. |
@@ -390,8 +390,8 @@ One deliberate departure:
   Nothing was ever cropped, incidentally: at any normal window the cover fit
   crops the **sides** and shows the full height.
 
-  The source lives in [`designs/nova/`](../../designs/nova/); what the app
-  serves is a copy under `static/bg/`, because `designs/` is where artwork is
+  The source lives in [`designs/nova/`](../../designs/nova/); what the apps
+  serve is a copy under the gallery's `static/bg/`, because `designs/` is where artwork is
   drawn and not a folder any listener serves from.
 
 The header carries the mark, the wordmark and the two actions and nothing

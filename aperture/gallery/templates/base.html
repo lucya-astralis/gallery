@@ -94,10 +94,10 @@
        `wallpaper_mobile`, see theme.site_bg in aperture/theme.py); everything else gets the
        site default. The still is a <picture> so the browser fetches exactly
        ONE of the two — a display:none <img> would still be downloaded — and it
-       doubles as the poster frame behind a loading video. No inline styles
+       doubles as the poster frame behind a configured clip. No inline styles
        anywhere: the CSP drops them (see the note at the top of style.css).
 
-       The ambient video is opt-in: app.js only loads/plays it on capable, large
+       A configured clip is opt-in: app.js only loads/plays it on capable, large
        screens; low-end / mobile / reduced-motion / data-saver users keep the
        still and never fetch the clip. #}
   {% set bg = site_bg(bg_album | default(none)) %}

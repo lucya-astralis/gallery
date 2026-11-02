@@ -17,7 +17,7 @@ as the same step of colour at any hue, which HLS does not promise. For the
 built-in accent this reproduces the hex values the sheets carry (a test
 holds them together), and silver has no hue to derive, so it is left alone.
 
-The same accent recolours the console's backdrop (`nova`, an SVG drawn in
+The same accent recolours the shipped backdrop (`nova`, an SVG drawn in
 the built-in violet): `recolour_svg` turns every chromatic stop around to
 the accent's hue and leaves the greys where they are.
 """

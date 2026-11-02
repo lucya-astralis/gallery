@@ -18,6 +18,22 @@ notes are never one commit apart.
 
 ---
 
+## 2.10.0 — 2026-11-02
+
+**Before you upgrade:** nothing to do, unless you relied on the shipped clip: a
+gallery with no `wallpaper =` now shows nova instead. Set `wallpaper =` to keep
+a clip of your own; `bg.mp4` and `bg-poster.jpg` no longer ship.
+
+* **The default wallpaper is nova**, the artwork the console wears: the wide
+  cut on desktop, the square on phones, turned to the page's accent (site or
+  album) through `GET /bg/{name}`. Any `wallpaper` or `wallpaper_mobile` in an
+  `album.cfg` or `gallery.cfg` still wins.
+* **It gets its own treatment**, because the stock one is set for a photograph:
+  full colour, brightness `.95`, a flat dim. `wallpaper_tint` and
+  `wallpaper_dim` still override it.
+* The two cuts moved to the gallery's `static/bg/`; the console reads them from
+  there.
+
 ## 2.9.0 — 2026-10-26
 
 **Before you upgrade:** nothing to do.
