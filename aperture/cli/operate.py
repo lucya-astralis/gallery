@@ -459,3 +459,62 @@ def cmd_passwd(args) -> int:
         out("Every open Aperture session was ended. Aperture now asks for this")
         out("password wherever it listens.")
     return 0
+
+
+def cmd_lucent(args) -> int:
+    """Pair this Aperture with Lucent, show the pairing, or end it (beta).
+
+        python -m aperture.cli lucent join https://lucent.example ABCD-EFGH-JKLM
+        python -m aperture.cli lucent status
+        python -m aperture.cli lucent leave
+
+    `join` takes the one-time code Lucent shows under Tools. Without a
+    pairing, Aperture behaves exactly as before; with one, the local password
+    keeps working beside "Sign in with Lucent".
+    """
+    from ..console import lucent   # aperture.console, not aperture.cli.console
+
+    if args.action == "join":
+        if not args.url or not args.code:
+            return fail("join needs the Lucent address and the pairing code")
+        try:
+            data = lucent.join(args.url, args.code, ui_url=args.ui_url, base_url=args.base_url)
+        except lucent.LucentError as exc:
+            return fail(str(exc))
+        if args.json:
+            dump({"ok": True, "issuer": data["issuer"], "client_id": data["client_id"],
+                  "ui_url": data["ui_url"], "base_url": data["base_url"]})
+            return 0
+        with _screen("Lucent"):
+            out(f"{ui.C.gn}Paired with {data['issuer']}.{ui.C.off}")
+            out("")
+            out(f"  client      {data['client_id']}")
+            out(f"  ui          {data['ui_url']}")
+            out(f"  reached at  {data['base_url']}")
+            out("")
+            out("The sign-in page now offers \"Sign in with Lucent\"; the operator")
+            out("password keeps working. A running Aperture picks this up at once.")
+        return 0
+
+    if args.action == "leave":
+        existed = lucent.leave()
+        if args.json:
+            dump({"ok": True, "left": existed})
+            return 0
+        with _screen("Lucent"):
+            out("Pairing removed. Remove the tool in Lucent too." if existed else "This Aperture was not paired.")
+        return 0
+
+    p = lucent.pairing()
+    if args.json:
+        dump({"paired": p is not None, **({k: p[k] for k in ("issuer", "client_id", "ui_url", "base_url", "paired_at")} if p else {})})
+        return 0
+    with _screen("Lucent"):
+        if p is None:
+            out("Not paired. Create a code in Lucent under Tools, then:")
+            out("  python -m aperture.cli lucent join <lucent-url> <code>")
+        else:
+            out(f"Paired with {p['issuer']} as {p['client_id']}.")
+            out(f"  ui          {p['ui_url']}")
+            out(f"  reached at  {p['base_url']}")
+    return 0

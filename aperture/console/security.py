@@ -69,9 +69,12 @@ MAX_BACKOFF = 300.0
 
 # Everything else needs a session.
 OPEN_PATHS = frozenset({"/login", "/api/session", "/api/health",
+                        # Lucent (console/lucent.py): the sign-in hand-off, and
+                        # the connector API, which checks its own bearer token
+                        "/auth/lucent", "/auth/lucent/callback",
                         # the look: the door wears the site's colour too
                         "/theme.css", "/bg/nova-wide-16-9.svg", "/bg/nova-square.svg"})
-OPEN_PREFIXES = ("/static/",)
+OPEN_PREFIXES = ("/static/", "/lucent/v1/")
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
@@ -230,6 +233,10 @@ class Session:
     created: float
     seen: float
     ip: str = ""
+    # what opened it: the local operator password, or a Lucent account
+    # (console/lucent.py). The two are kept apart, and the UI can say which.
+    via: str = "password"
+    who: str = ""
 
     def alive(self, now: float) -> bool:
         return (now - self.seen) < IDLE_TIMEOUT and (now - self.created) < ABSOLUTE_TIMEOUT
@@ -326,6 +333,19 @@ def login(request: Request, password: str) -> tuple[str, Session]:
     sess = Session(csrf=secrets.token_urlsafe(32), created=now, seen=now, ip=ip)
     _sessions[sid] = sess
     log.info("aperture: session opened from %s", ip)
+    return sid, sess
+
+
+def login_external(request: Request, *, via: str, who: str) -> tuple[str, Session]:
+    """A session opened by someone else's door: Lucent, after it has checked
+    the person and Aperture has checked Lucent's ID token. Same timeouts and
+    CSRF token as a password session."""
+    ip = _client_ip(request)
+    now = time.time()
+    sid = secrets.token_urlsafe(32)
+    sess = Session(csrf=secrets.token_urlsafe(32), created=now, seen=now, ip=ip, via=via, who=who)
+    _sessions[sid] = sess
+    log.info("aperture: session opened from %s via %s for %s", ip, via, who)
     return sid, sess
 
 
@@ -500,4 +520,7 @@ def state(request: Request) -> dict:
         "signed_in": bool(found) or open_access(),
         "csrf": found[1].csrf if found else "",
         "idle_timeout": IDLE_TIMEOUT,
+        # "password" or "lucent", and for Lucent the account's e-mail
+        "via": found[1].via if found else None,
+        "who": found[1].who if found else None,
     }

@@ -99,6 +99,14 @@
         <i class="fa fa-right-to-bracket" aria-hidden="true"></i><span class="login__submit-label">Sign in</span>
       </button>
 
+      {# Lucent (beta). A second door, not a replacement: the operator
+         password above keeps working, and the session says which one opened it. #}
+      {% if lucent %}
+      <a class="btn login__lucent" href="/auth/lucent">
+        <i class="fa fa-right-to-bracket" aria-hidden="true"></i><span>Sign in with Lucent</span>
+      </a>
+      {% endif %}
+
       <p class="login__foot">
         Lost the password? Set a new one on the host:
         <code>python -m aperture.cli passwd</code>

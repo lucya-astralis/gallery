@@ -1,0 +1,400 @@
+"""Aperture as a Lucent tool (beta): pairing, the connector API, and
+"Sign in with Lucent".
+
+Lucent is the lucya.systems platform that ties the tools together, the way
+vCenter ties ESXi hosts together. Aperture keeps working on its own: without a
+pairing this module does nothing, and with one the local password still
+opens the door. Lucent accounts and the local operator password are kept
+apart: a session says which one opened it.
+
+Three things live here:
+
+  * PAIRING. `python -m aperture.cli lucent join <lucent-url> <code>` sends the
+    one-time code from Lucent, together with a connector secret made here.
+    Lucent answers with an OIDC client id and secret. Both land in
+    DATA_DIR/console/lucent.json, mode 0600, next to the operator password.
+  * THE CONNECTOR API, /lucent/v1/*, on the console's own port. Lucent calls it
+    with the connector secret as a bearer token; only its SHA-256 is stored
+    here. Status and the actions go through exactly the functions the console
+    and the CLI use, and actions through the same control channel, so a scan
+    asked for in Lucent is the same flag file `python -m aperture.cli scan`
+    writes, with `by: lucent`.
+  * SIGN-IN, OpenID Connect authorization code with PKCE. Aperture asked for
+    HS256 ID tokens at pairing, signed with its own client secret, so checking
+    them needs `hmac` and nothing else: no new dependency.
+
+The contract both sides keep is CONNECTOR.md in the lucent repository.
+"""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import hmac
+import json
+import logging
+import os
+import secrets
+import stat
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+
+from .. import brand, health, ops
+from ..runtime import settings
+from . import security
+
+log = logging.getLogger("console.lucent")
+
+CONTRACT = 1
+BY = "lucent"
+STATE_COOKIE = "aperture_lucent"
+PENDING_TTL = 600.0
+CLOCK_SKEW = 60
+HTTP_TIMEOUT = 8.0
+
+router = APIRouter()
+
+# state -> {nonce, verifier, browser, at}: sign-ins on their way through Lucent
+_pending: dict[str, dict] = {}
+
+
+# ----- the pairing file --------------------------------------------------
+def _path() -> Path:
+    return settings.console_dir / "lucent.json"
+
+
+def pairing() -> dict | None:
+    try:
+        return json.loads(_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def is_paired() -> bool:
+    return pairing() is not None
+
+
+def _write(data: dict) -> None:
+    path = _path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    try:
+        os.chmod(tmp, stat.S_IRUSR | stat.S_IWUSR)
+    except OSError:
+        pass
+    os.replace(tmp, path)
+
+
+def default_ui_url() -> str:
+    host = settings.console_bind
+    if host in ("", "0.0.0.0", "::"):
+        host = "127.0.0.1"
+    return f"http://{host}:{settings.console_port}"
+
+
+class LucentError(RuntimeError):
+    pass
+
+
+def _post(url: str, *, json_body: dict | None = None, form: dict | None = None,
+          basic: tuple[str, str] | None = None) -> dict:
+    headers = {"Accept": "application/json", "User-Agent": brand.GENERATOR}
+    if json_body is not None:
+        data = json.dumps(json_body).encode()
+        headers["Content-Type"] = "application/json"
+    else:
+        data = urllib.parse.urlencode(form or {}).encode()
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+    if basic:
+        raw = "%s:%s" % (urllib.parse.quote(basic[0], safe=""), urllib.parse.quote(basic[1], safe=""))
+        headers["Authorization"] = "Basic " + base64.b64encode(raw.encode()).decode()
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        try:
+            body = json.loads(e.read().decode())
+            detail = body.get("detail") or body.get("error_description") or body.get("error")
+        except ValueError:
+            detail = e.reason
+        raise LucentError(f"Lucent answered {e.code}: {detail}") from None
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise LucentError(f"Lucent is not reachable at {url}: {getattr(e, 'reason', e)}") from None
+
+
+def join(lucent_url: str, code: str, *, ui_url: str | None = None,
+         base_url: str | None = None) -> dict:
+    """Pair this Aperture with a Lucent. `ui_url` is where a browser opens
+    Aperture; `base_url` is where Lucent reaches it (the same, unless Lucent
+    sits in another network than the browser)."""
+    lucent_url = lucent_url.rstrip("/")
+    ui_url = (ui_url or default_ui_url()).rstrip("/")
+    base_url = (base_url or ui_url).rstrip("/")
+    connector_secret = secrets.token_urlsafe(32)
+    answer = _post(f"{lucent_url}/api/connect/pair", json_body={
+        "code": code, "kind": "aperture", "name": "Aperture",
+        "base_url": base_url, "ui_url": ui_url, "version": brand.VERSION,
+        "redirect_uris": [f"{ui_url}/auth/lucent/callback"],
+        "connector_secret": connector_secret, "id_token_alg": "HS256"})
+    data = {"issuer": answer["issuer"].rstrip("/"), "tool_id": answer["tool_id"],
+            "client_id": answer["client_id"], "client_secret": answer["client_secret"],
+            "connector_secret_sha256": hashlib.sha256(connector_secret.encode()).hexdigest(),
+            "ui_url": ui_url, "base_url": base_url, "paired_at": int(time.time())}
+    _write(data)
+    log.info("aperture: paired with Lucent at %s as %s", data["issuer"], data["client_id"])
+    return data
+
+
+def leave() -> bool:
+    try:
+        _path().unlink()
+    except FileNotFoundError:
+        return False
+    return True
+
+
+# ----- the connector API ---------------------------------------------------
+def _require_lucent(request: Request) -> dict:
+    p = pairing()
+    if p is None:
+        raise HTTPException(404, "this Aperture is not paired with Lucent")
+    header = request.headers.get("authorization", "")
+    sent = header[7:] if header.lower().startswith("bearer ") else ""
+    digest = hashlib.sha256(sent.encode()).hexdigest()
+    if not sent or not hmac.compare_digest(digest, p["connector_secret_sha256"]):
+        raise HTTPException(401, "wrong connector secret")
+    return p
+
+
+ACTIONS = [
+    {"id": "scan", "label": "Scan starten",
+     "description": "Sucht neue und geänderte Fotos. Läuft im Indexer, nicht im Browser."},
+    {"id": "pause", "label": "Indexer pausieren",
+     "description": "Bleibt pausiert, auch über einen Neustart, bis du fortsetzt."},
+    {"id": "resume", "label": "Indexer fortsetzen", "description": "Hebt eine Pause auf."},
+]
+
+
+@router.get("/lucent/v1/manifest")
+def manifest(request: Request):
+    p = _require_lucent(request)
+    return {"contract": CONTRACT, "kind": "aperture", "name": "Aperture",
+            "version": brand.VERSION, "ui_url": p["ui_url"],
+            "description": "Galerie und Bildverwaltung",
+            "actions": [] if settings.console_read_only else ACTIONS}
+
+
+def _ago(ts) -> str:
+    if not ts:
+        return "noch nie"
+    s = max(0, int(time.time() - float(ts)))
+    if s < 90:
+        return "gerade eben"
+    if s < 5400:
+        return f"vor {round(s / 60)} min"
+    if s < 172800:
+        return f"vor {round(s / 3600)} h"
+    return f"vor {round(s / 86400)} Tagen"
+
+
+def _num(n) -> str:
+    return f"{int(n or 0):,}".replace(",", " ")
+
+
+def status_report() -> dict:
+    st = ops.status()
+    h = health.snapshot()
+    index = st["index"]
+    server = st.get("server") or {}
+    last = server.get("last_scan") or {}
+    if h["state"] == "down":
+        state, summary = "down", f"Speicher nicht erreichbar: {h.get('reason') or 'unbekannt'}"
+    elif not st["live"]:
+        state, summary = "warn", "Kein Indexer läuft. Scans bleiben in der Warteschlange."
+    elif st["paused"]:
+        state, summary = "warn", "Der Indexer ist pausiert."
+    else:
+        state = "warn" if h["state"] == "warn" else "ok"
+        summary = f"{_num(index['images'])} Fotos in {_num(index['albums'])} Alben"
+    if st["live"] and server.get("progress"):
+        indexer = ("Scannt", "ok")
+    elif st["live"]:
+        indexer = ("Pausiert", "warn") if st["paused"] else ("Bereit", "ok")
+    else:
+        indexer = ("Aus", "warn")
+    warn_checks = [c for c in h["checks"] if c.get("level") != "ok"]
+    return {
+        "state": state, "summary": summary, "checked_at": h.get("checked_at"),
+        "cards": [
+            {"label": "Fotos", "value": _num(index["images"]), "note": f"{_num(index['albums'])} Alben"},
+            {"label": "Archiv", "value": ops.bytes_h(index["bytes"])},
+            {"label": "Indexer", "value": indexer[0], "state": indexer[1],
+             "note": ("Letzter Scan " + _ago(last.get("finished_at") or last.get("started_at"))) if last else None},
+            {"label": "Speicher", "value": "Ok" if not warn_checks else f"{len(warn_checks)} Hinweis(e)",
+             "state": None if not warn_checks else "warn",
+             "note": "; ".join(c.get("detail", "") for c in warn_checks)[:120] or "erreichbar, genug Platz"},
+        ],
+        "facts": [
+            {"label": "Rolle", "value": settings.role},
+            {"label": "Fotoordner", "value": str(settings.photos_dir)},
+            {"label": "Scan-Intervall", "value": f"{settings.scan_interval} s"},
+            {"label": "Tags", "value": _num(index["tags"])},
+            {"label": "Hervorgehoben", "value": _num(index["featured"])},
+            {"label": "Index", "value": ops.bytes_h(index["db_bytes"])},
+        ],
+    }
+
+
+@router.get("/lucent/v1/status")
+def status(request: Request):
+    _require_lucent(request)
+    return status_report()
+
+
+@router.post("/lucent/v1/actions/{action}")
+async def action(request: Request, action: str):
+    _require_lucent(request)
+    if settings.console_read_only:
+        raise HTTPException(403, "Aperture is mounted read-only")
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    by = BY + (f" ({body['by']})" if isinstance(body, dict) and isinstance(body.get("by"), str) else "")
+    if action == "scan":
+        req = ops.request_scan(by=BY)
+        security.audit(request, "scan requested", "(whole gallery)",
+                       extra={"by": by[:120], "request_id": req["id"]})
+        live = ops.status()["live"]
+        return {"ok": True, "message": "Scan angefordert." if live else
+                "Scan angefordert. Es läuft gerade kein Indexer, er startet mit dem nächsten.",
+                "request_id": req["id"]}
+    if action == "pause":
+        ops.pause("paused from Lucent", by=BY)
+        security.audit(request, "indexer paused", "(indexer)", extra={"by": by[:120]})
+        return {"ok": True, "message": "Indexer pausiert."}
+    if action == "resume":
+        lifted = ops.resume()
+        security.audit(request, "indexer resumed", "(indexer)", extra={"by": by[:120]})
+        return {"ok": True, "message": "Indexer läuft weiter." if lifted else "Es gab keine Pause."}
+    raise HTTPException(404, f"no such action: {action!r}")
+
+
+# ----- sign in with Lucent -------------------------------------------------
+def _b64u(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def _unb64u(text: str) -> bytes:
+    return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+
+
+def verify_id_token(token: str, p: dict, nonce: str) -> dict:
+    """An HS256 ID token, checked the way OIDC Core 3.1.3.7 says: signature with
+    the client secret, then iss, aud, exp, iat and the nonce."""
+    try:
+        head_b64, body_b64, sig_b64 = token.split(".")
+        header = json.loads(_unb64u(head_b64))
+        claims = json.loads(_unb64u(body_b64))
+        sig = _unb64u(sig_b64)
+    except (ValueError, TypeError):
+        raise LucentError("the ID token is not a JWT") from None
+    if header.get("alg") != "HS256":
+        raise LucentError("unexpected ID token algorithm")
+    expected = hmac.new(p["client_secret"].encode(), f"{head_b64}.{body_b64}".encode(),
+                        hashlib.sha256).digest()
+    if not hmac.compare_digest(expected, sig):
+        raise LucentError("the ID token signature does not match")
+    now = time.time()
+    aud = claims.get("aud")
+    if claims.get("iss") != p["issuer"]:
+        raise LucentError("the ID token comes from another issuer")
+    if aud != p["client_id"] and not (isinstance(aud, list) and p["client_id"] in aud):
+        raise LucentError("the ID token is for another client")
+    if not isinstance(claims.get("exp"), (int, float)) or claims["exp"] < now - CLOCK_SKEW:
+        raise LucentError("the ID token has expired")
+    if not isinstance(claims.get("iat"), (int, float)) or claims["iat"] > now + CLOCK_SKEW:
+        raise LucentError("the ID token was issued in the future")
+    if not hmac.compare_digest(str(claims.get("nonce", "")), nonce):
+        raise LucentError("the ID token nonce does not match")
+    return claims
+
+
+def _sweep_pending(now: float) -> None:
+    for k in [k for k, v in _pending.items() if now - v["at"] > PENDING_TTL]:
+        _pending.pop(k, None)
+
+
+@router.get("/auth/lucent")
+def sign_in(request: Request):
+    p = pairing()
+    if p is None:
+        raise HTTPException(404, "this Aperture is not paired with Lucent")
+    now = time.time()
+    _sweep_pending(now)
+    state, nonce, verifier, browser = (secrets.token_urlsafe(24), secrets.token_urlsafe(24),
+                                       secrets.token_urlsafe(48), secrets.token_urlsafe(24))
+    _pending[state] = {"nonce": nonce, "verifier": verifier, "browser": browser, "at": now}
+    challenge = _b64u(hashlib.sha256(verifier.encode()).digest())
+    q = urllib.parse.urlencode({
+        "response_type": "code", "client_id": p["client_id"],
+        "redirect_uri": f"{p['ui_url']}/auth/lucent/callback", "scope": "openid email profile",
+        "state": state, "nonce": nonce, "code_challenge": challenge,
+        "code_challenge_method": "S256"})
+    r = RedirectResponse(f"{p['issuer']}/oidc/authorize?{q}", status_code=303)
+    # Lax, not Strict: it has to come back on the top-level GET from Lucent.
+    # It only ties the callback to this browser; the session cookie stays Strict.
+    r.set_cookie(STATE_COOKIE, browser, max_age=int(PENDING_TTL), httponly=True, samesite="lax",
+                 secure=request.url.scheme == "https", path="/auth/lucent")
+    return r
+
+
+_HOP = """<!doctype html><html lang="de"><head><meta charset="utf-8">
+<meta http-equiv="refresh" content="0;url=/"><title>Aperture</title></head>
+<body><p>Angemeldet. <a href="/">Weiter zu Aperture</a></p></body></html>"""
+
+
+@router.get("/auth/lucent/callback")
+def callback(request: Request, code: str = "", state: str = "", error: str = "", iss: str = ""):
+    p = pairing()
+    pending = _pending.pop(state, None) if state else None
+    fail = RedirectResponse("/login?reason=lucent", status_code=303)
+    fail.delete_cookie(STATE_COOKIE, path="/auth/lucent")
+    if p is None or pending is None or time.time() - pending["at"] > PENDING_TTL:
+        log.warning("aperture: Lucent sign-in with an unknown or stale state")
+        return fail
+    if not hmac.compare_digest(request.cookies.get(STATE_COOKIE, ""), pending["browser"]):
+        log.warning("aperture: Lucent sign-in finished in another browser than it began")
+        return fail
+    if error:
+        log.warning("aperture: Lucent refused the sign-in: %s", error)
+        return fail
+    if iss and iss.rstrip("/") != p["issuer"]:
+        log.warning("aperture: Lucent sign-in answered by another issuer: %s", iss)
+        return fail
+    try:
+        answer = _post(f"{p['issuer']}/oidc/token", form={
+            "grant_type": "authorization_code", "code": code, "code_verifier": pending["verifier"],
+            "redirect_uri": f"{p['ui_url']}/auth/lucent/callback"},
+            basic=(p["client_id"], p["client_secret"]))
+        claims = verify_id_token(answer.get("id_token", ""), p, pending["nonce"])
+    except LucentError as e:
+        log.warning("aperture: Lucent sign-in failed: %s", e)
+        return fail
+    who = claims.get("email") or f"lucent:{claims.get('sub')}"
+    sid, _sess = security.login_external(request, via="lucent", who=who)
+    security.audit(request, "signed in", "(console)", extra={"via": "lucent", "who": who})
+    # A page, not a redirect: the session cookie is SameSite=Strict, and a
+    # redirect chain that began on Lucent would arrive without it.
+    r = HTMLResponse(_HOP)
+    security.issue_cookie(r, request, sid)
+    r.delete_cookie(STATE_COOKIE, path="/auth/lucent")
+    return r

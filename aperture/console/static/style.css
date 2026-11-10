@@ -4371,6 +4371,8 @@ button.donut__row { cursor: pointer; }
 .login__error > .fa { flex: none; }
 
 .login__submit { margin-top: var(--s-3); min-height: var(--tap); }
+/* Lucent (beta): the second door, under the first, quieter than it */
+.login__lucent { min-height: var(--tap); justify-content: center; text-decoration: none; }
 
 .login__foot {
   color: var(--text-ghost);

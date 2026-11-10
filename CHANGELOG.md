@@ -18,6 +18,32 @@ notes are never one commit apart.
 
 ---
 
+## 3.1.0 — 2026-11-10
+
+**Beta, on the branch `beta/lucent` only.** Aperture can be paired with
+**Lucent**, the new lucya.systems platform that ties the tools together the
+way vCenter ties ESXi hosts together. Aperture keeps working on its own: an
+Aperture that is not paired behaves exactly as 3.0.0 did.
+
+- **Pairing:** `python -m aperture.cli lucent join <lucent-url> <code>` with
+  the one-time code from Lucent > Tools; `lucent status` and `lucent leave`
+  show and end it. The pairing lives in `DATA_DIR/console/lucent.json`
+  (mode 0600) and holds only a SHA-256 of the connector secret.
+- **Sign in with Lucent:** the sign-in page offers it once paired, beside the
+  operator password, which keeps working. OpenID Connect, authorization code
+  with PKCE; the ID token is HS256 with this Aperture's own client secret, so
+  checking it needs `hmac` and no new dependency. A session says which door
+  opened it: `/api/session` now carries `via` and `who`.
+- **Connector API** under `/lucent/v1/` on Aperture's port: `manifest`,
+  `status` (photos, archive, indexer, storage) and the actions `scan`,
+  `pause`, `resume`. Lucent calls it with the connector secret as a bearer
+  token. Actions go through the same control channel as the CLI and are
+  audited with `by: lucent`. The contract is CONNECTOR.md in the lucent
+  repository.
+
+**Before you upgrade:** nothing. Lucent needs to reach Aperture's port for
+status and actions; without a pairing nothing listens for it.
+
 ## 3.0.0 — 2026-11-10
 
 The console is called **Aperture** now, and both surfaces speak **Nebula

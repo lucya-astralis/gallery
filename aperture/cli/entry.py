@@ -10,7 +10,7 @@ import sys
 from .. import brand, i18n, termui as ui
 from ..ops import UnknownAlbum
 
-from .operate import cmd_disk, cmd_doctor, cmd_featured, cmd_health, cmd_passwd, cmd_pause, cmd_resume, cmd_scan, cmd_status, cmd_thumbs
+from .operate import cmd_disk, cmd_doctor, cmd_featured, cmd_health, cmd_lucent, cmd_passwd, cmd_pause, cmd_resume, cmd_scan, cmd_status, cmd_thumbs
 from .render import fail
 from .reports import cmd_album, cmd_cfg, cmd_export, cmd_gps, cmd_i18n, cmd_photo, cmd_search, cmd_tags, cmd_trip, cmd_welcome
 from .screens import cmd_dash, cmd_help, cmd_home, cmd_menu, cmd_term
@@ -59,6 +59,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--clear", action="store_true",
                     help="remove the password; Aperture then only starts "
                          "on loopback or with APERTURE_ALLOW_OPEN=1")
+
+    sp = add("lucent", cmd_lucent,
+             "Pair this Aperture with Lucent, show the pairing, or end it (beta).")
+    sp.add_argument("action", nargs="?", choices=("status", "join", "leave"), default="status")
+    sp.add_argument("url", nargs="?", help="join: the Lucent address, e.g. https://lucent.example")
+    sp.add_argument("code", nargs="?", help="join: the one-time code from Lucent > Tools")
+    sp.add_argument("--ui-url", help="where a browser opens this Aperture (default: its bind and port)")
+    sp.add_argument("--base-url", help="where Lucent reaches it, when that differs from --ui-url")
 
     add("status", cmd_status, "Live state: server, pause, last scan, watcher queue, index counters.")
     add("health", cmd_health,

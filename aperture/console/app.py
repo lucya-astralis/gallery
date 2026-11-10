@@ -38,7 +38,7 @@ from ..paths import (PathRefused, relative_to_photos, sidecar_target,
                      writable_target)
 from ..runtime import settings
 from .. import cfgio, links, schema, templating
-from . import imagemeta, opsapi, security
+from . import imagemeta, lucent, opsapi, security
 from .library import Library, asset_kinds
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -114,6 +114,9 @@ lib = Library(settings.photos_dir)
 # door in front of it — it reads the index and writes the control channel,
 # never the photo tree.
 app.include_router(opsapi.router)
+# Lucent (beta): the connector API and "Sign in with Lucent". Inert until
+# `python -m aperture.cli lucent join` has paired this Aperture.
+app.include_router(lucent.router)
 
 # Authentication and CSRF for every route on this app, in one place. Declared
 # here rather than per-route so a route added later is closed by default: the
@@ -300,6 +303,8 @@ LOGIN_REASONS = {
     "expired": "That session reached its twelve-hour limit and ended.",
     "password": "The Aperture password was changed, which ends every session. "
                 "Sign in with the new one.",
+    "lucent": "Signing in through Lucent did not work. The log says why; "
+              "the operator password still opens the door.",
 }
 
 
@@ -371,6 +376,7 @@ def login_page(request: Request, reason: str = ""):
         # password the footer is not reachable yet
         "app_version": brand.VERSION,
         "reason": LOGIN_REASONS.get(reason, ""),
+        "lucent": lucent.pairing(),
     })
 
 
