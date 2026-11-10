@@ -1,7 +1,7 @@
 /* ================================================================
    lucya.systems gallery  —  https://lucya.systems
 
-   NEBULA — the design language this sheet carries, and the one the
+   NEBULA 2.2.0 — the design language this sheet carries, and the one the
    console carries too (aperture/console/static/style.css). Named
    after the accent it rations: #5865F2, "Nebula Blue". SIX rules, and
    every decision in here is one of them. The language is written out in
@@ -22,8 +22,12 @@
         --blur-1..3 ladder. A pane that does not read gets more blur or
         the -hi step. A pane is a fill, a blur and a hairline: NO bevel,
         NO gloss gradient — that is Aero, and it argues with rule 2.
-     4. Mono, uppercase, tracked = the chrome AROUND a photo grid.
-        Space Grotesk, sentence case = everything a person reads. The
+     4. The chrome is quieter than the content. The furniture AROUND a
+        photo grid speaks the interface voice -- Space Grotesk 500, a step
+        smaller, --label, sentence case (--ui-font / --ui-case /
+        --ui-weight, --num-font for measured values); everything a person
+        reads is Space Grotesk at the reading sizes; mono is for code.
+        Until Nebula 2.0 the chrome was mono, uppercase and tracked. The
         token name carries the voice: --fs-chrome-* vs --fs-text-*.
      5. MEASURE IS RATIONED LIKE COLOUR. Every size, space, duration and
         blur comes off a named scale (--s-*, --fs-*, --tr-*, --dur-*,
@@ -276,6 +280,12 @@
 }
 
 :root{
+  /* Which Nebula this sheet speaks. It is a production instance of the
+     language, not a copy of nebula.css, but it follows a version all the
+     same: CHANGELOG.md in the nebula repo is what moved it, and
+     `nebula_lint.py --version` reads this line. */
+  --nebula-version: "2.2.0";
+
   /* ---- ground ---------------------------------------------------------
      Black is the floor and grey is the whole body of the page; NOTHING in
      this ramp carries a hue. The previous palette mixed every surface and
@@ -404,10 +414,14 @@
      weather; the tint lets it be read before the word under it. */
   --trip-warm:     #ffb547;   /* sun / storm */
   --trip-cool:     #9fd8ff;   /* rain / snow */
+  /* The route map's own graticule. It borrowed the wallpaper's grid until
+     Nebula 2.0 took that one away; a grid on a MAP is part of the
+     instrument, so it stays, as the module's own token. */
+  --trip-grid:     rgba(255,255,255,.03);
 
   --chrome:     #e8e8ee;   /* hovers, corner brackets, HUD strokes */
   --chrome-rgb: 232,232,238;
-  --label:      #b8b8c2;   /* the mono furniture voice: section labels,
+  --label:      #b8b8c2;   /* the interface voice's tone: section labels,
                               counts, badges, measured values */
   --label-rgb:  184,184,194;
 
@@ -426,6 +440,23 @@
   --red:        #e0625f;
   --red-rgb:    224,98,95;
   --red-deep:   #97201d;
+  /* The -rgb triplets above are kept for anything outside this sheet that
+     still writes rgba(var(--x-rgb), a). The sheet no longer reads them:
+     every tint is RELATIVE colour, oklch(from var(--acc) l c h / a), so an
+     album that sets --acc alone retints every ring, glow and wash with it. */
+
+  /* ---- the kind palette (Nebula 2.0) -----------------------------------
+     Colour for WHAT a thing is, never for its state, and only where telling
+     things apart at a glance is the point: an avatar, a mark, a tag. Never a
+     card, a heading, a number or a glyph before a label -- those are mist.
+     One lightness and one chroma, so no hue shouts over another. Defined so
+     the gallery speaks the whole vocabulary; nothing here wears one yet. */
+  --hue-teal:  oklch(0.80 0.10 190);
+  --hue-sky:   oklch(0.80 0.10 235);
+  --hue-lime:  oklch(0.80 0.10 128);
+  --hue-rose:  oklch(0.80 0.10 355);
+  --hue-peach: oklch(0.80 0.10 55);
+  --hue-sand:  oklch(0.80 0.10 95);
 
   /* ================================================================
      RULE 5 - MEASURE IS RATIONED LIKE COLOUR
@@ -467,21 +498,42 @@
   --s-8:  48px;
   --s-9:  64px;
   --s-10: 96px;
+  --s-11: 144px;   /* editorial page rhythm */
+
+  /* ---- the interface voice (Nebula 2.0) ----------------------------------
+     Rule 4 still splits the page in two -- the chrome AROUND the photographs,
+     and what a person reads -- but the chrome no longer speaks a terminal's
+     voice. It was JetBrains Mono, uppercase and tracked wide, and a page made
+     of readouts read as a console rather than as an application (user,
+     2026-11-09: "weniger Terminal, mehr einfaches aber Profi-GUI-Look"). Now
+     the chrome is the same sans, told apart the way a desktop interface tells
+     them apart: one step SMALLER, weight 500, and the --label tone. Mono is
+     left for what really is code: a hex, a path, a key, raw EXIF.
+
+     Four tokens carry the whole voice, and no rule names a face for its
+     chrome; it names these. Redefining exactly these four plus the chrome
+     scale below puts the old voice back, which is how complete the swap is. */
+  --ui-font:   var(--sans);
+  --ui-case:   none;
+  --ui-weight: 500;
+  --num-font:  var(--sans);   /* measured values: tabular figures align them */
 
   /* ---- type: two voices, and the token name carries the voice ---------
-     --fs-chrome-* is rule 4's mono voice - uppercase, tracked, the
-     furniture around the photographs. --fs-text-* is Space Grotesk in
-     sentence case, everything a person reads. Reaching for the wrong one
-     is then visible in the source and not only on screen.
+     --fs-chrome-* sizes the interface voice, the furniture around the
+     photographs. --fs-text-* is the reading voice, everything a person
+     reads. Reaching for the wrong one is then visible in the source and not
+     only on screen. The chrome steps sit above the old mono caps (9.5 / 10.5
+     / 12): sentence-case sans needs more size than capitals for the same
+     presence, and 11.5px is where a label is read rather than deciphered.
 
      The sheet used to hold ten sizes between 9px and 15px. 10px and 10.5px
      are not a hierarchy anyone perceives; they are noise that reads as
      inconsistency and lets two apps diverge invisibly. */
-  --fs-chrome-xs: 9.5px;   /* card index, badge, menu head */
-  --fs-chrome-sm: 10.5px;  /* the workhorse: buttons, tags, meta lines */
-  --fs-chrome-md: 12px;    /* field labels, menu rows, search */
+  --fs-chrome-xs: 11.5px;  /* card index, badge, menu head */
+  --fs-chrome-sm: 12.5px;  /* the workhorse: buttons, tags, meta lines */
+  --fs-chrome-md: 13px;    /* field labels, menu rows, search */
   --fs-chrome-lg: 14px;    /* a measured value with its own line */
-  --fs-chrome-xl: 20px;    /* a headline number: a stat tile, a count */
+  --fs-chrome-xl: 22px;    /* a headline number: a stat tile, a count */
   /* a headline-SIZED measured value (the trip countdown): the language's
      own mono display step, so a counter is never sized off the content
      scale (NEBULA.md, "Editorial pages") */
@@ -502,20 +554,19 @@
   --fs-title:     clamp(22px, 2.7vw, 33px);
 
   /* ---- tracking, bound to size ----------------------------------------
-     One formula, not fourteen opinions: tracking FALLS as size rises,
-     because the reason to track is optical and small caps need the air that
-     large caps do not. Every --fs-chrome-* has exactly one --tr-chrome-*
-     that goes with it, same suffix. */
-  --tr-chrome-xs: .24em;
-  --tr-chrome-sm: .18em;
-  --tr-chrome-md: .14em;
-  --tr-chrome-lg: .10em;
-  --tr-chrome-xl: .04em;
+     Still one value per chrome size, same suffix. Lower-case sans is not
+     tracked open -- that was something capitals needed -- so the small steps
+     get a breath of air and the large ones tighten. */
+  --tr-chrome-xs: .02em;
+  --tr-chrome-sm: .01em;
+  --tr-chrome-md: .005em;
+  --tr-chrome-lg: 0em;
+  --tr-chrome-xl: -.01em;
   --tr-chrome-display: .02em;
   --tr-text:      .01em;
   --tr-title:     .03em;
   --tr-head:     -.005em;  /* a sans heading tightens, it never tracks */
-  --tr-num:       .06em;   /* mono digits in a value column */
+  --tr-num:       .01em;   /* digits in a value column: tabular figures align them */
   --tr-display:   .14em;   /* the display face, which inks its own em */
 
   /* Icons are sized off the type scale but are not type: a glyph at the
@@ -600,15 +651,24 @@
   --pane-blur:    var(--blur-1);
   --overlay-blur: var(--blur-3);
 
-  /* ---- elevation -------------------------------------------------------
-     Two shadows and one glow, instead of nine hand-typed one-offs (this
-     sheet once spent three different values on what was meant to be the
-     same accent glow). Shadows are for things that genuinely float ABOVE
-     the page - a menu, the lightbox. A card does not float. */
-  --shadow-1: 0 2px 10px rgba(0,0,0,.35);
-  --shadow-2: 0 18px 44px rgba(0,0,0,.55);
-  --glow-acc: 0 0 20px -6px rgba(var(--acc-rgb),.70);
-  --ring-acc: 0 0 0 1px rgba(var(--acc-rgb),.22);
+  /* ---- elevation: a ladder, like blur (Nebula 2.0) ----------------------
+     Blur alone gave the page no depth: blurring a black ground gives black,
+     so every pane was the same black as the black under it. Height is now
+     read twice -- by how far out of focus the backdrop behind a pane is, and
+     by what the pane casts below it:
+       page      a card, a panel: --shadow-0, a soft contact shadow. It SITS.
+       raised    a hovered card: --shadow-1, the next blur, up --lift.
+       floating  menus, the lightbox: --shadow-2, --blur-3.
+     A shadow below a pane is not a darker fill, so rule 3 stands; and it is
+     never a bevel -- no light edge on top, no gloss, a shadow BELOW only. */
+  --shadow-0: 0 1px 0 rgba(0,0,0,.45), 0 14px 32px -18px rgba(0,0,0,.85);
+  --shadow-1: 0 2px 0 rgba(0,0,0,.35), 0 18px 40px -14px rgba(0,0,0,.80);
+  --shadow-2: 0 18px 44px rgba(0,0,0,.55), 0 4px 12px rgba(0,0,0,.35);
+  /* the bar, once there is page under it: content passes BENEATH the frame */
+  --shadow-bar: 0 10px 28px -14px rgba(0,0,0,.9);
+  --lift: 3px;   /* how far a raised pane rises */
+  --glow-acc: 0 0 20px -6px oklch(from var(--acc) l c h / .70);
+  --ring-acc: 0 0 0 1px oklch(from var(--acc) l c h / .22);
 
   /* The DISPLAY face: the brand voice of the chrome, and nothing else - the
      wordmark, the welcome screen's one big word, the 404. NEVER a heading.
@@ -642,7 +702,7 @@
      It belongs to the tint, not to the dimming: `wallpaper_tint = off` sets
      it transparent, because a backdrop asked for in full colour that still
      had an accent wash sitting on it was not actually untinted. */
-  --wallpaper-bloom: rgba(var(--acc-rgb),0.07);
+  --wallpaper-bloom: oklch(from var(--acc) l c h / 0.07);
   /* The dim laid over the picture, as a PAIR, because the two ends are a
      real decision and the two apps disagree about it. This ramp is for a
      PHOTOGRAPH: it darkens towards the footer of a scrolling page, where the
@@ -651,7 +711,21 @@
      the ramp lands on the art's own falloff and the bottom half goes black. */
   --wallpaper-shade-top: rgba(0,0,0,0.62);
   --wallpaper-shade-bot: rgba(0,0,0,0.82);
-  --wallpaper-grid: rgba(255,255,255,.03);
+  /* Depth in the ground (Nebula 2.0). There is no grid any more: a 32px
+     lattice repeated over the art on every screen made them all read as the
+     same technical sheet (user, 2026-11-09: "das grid im wallpaper weg").
+     The ground gets planes instead:
+       --wallpaper-light     a NEUTRAL key light, high on the left. White and
+                             never the accent: one more violet wash is what got
+                             the old palette thrown out.
+       --wallpaper-vignette  the corners fall away.
+       --depth-drift         parallax: the picture travels this far over the
+                             first --depth-range of scroll while the panes move
+                             with the page. Behind the motion gate. */
+  --wallpaper-light:    rgba(255,255,255,.055);
+  --wallpaper-vignette: rgba(0,0,0,.55);
+  --depth-drift: 6vh;
+  --depth-range: 200vh;
 
   /* square, everywhere: the one shape rule the whole surface language is
      built on. Kept as a token so the handful of pills that are genuinely
@@ -687,9 +761,16 @@
      column, the bar sheds its middle and touch targets grow. The sheet may
      add its own; it may not disagree about this one. */
   --bp-narrow:  760px;
+  /* The second step the language owns (Nebula 2.0): below it the bar keeps
+     only its mark and a rail becomes a strip. A custom property cannot be
+     read by a media query, so the number is written out where it is used. */
+  --bp-phone:   620px;
   /* The one touch target: 44px, on a desktop too -- a control a thumb has to
      find is that big wherever it is. */
   --tap:        44px;
+  /* `height: auto` becomes a value a transition can reach (a fold opening, a
+     pane growing to its content) without measuring it in script first. */
+  interpolate-size: allow-keywords;
 }
 
 /* The palettes (gallery.cfg `palette`, on <html data-palette>) -- the same
@@ -768,13 +849,13 @@ html.fx-lite{
 @media (forced-colors: active){
   :root{
     --line: CanvasText; --line-strong: CanvasText;
-    --glow-acc: none; --shadow-1: none; --shadow-2: none;
-  }
-  .nav, .sort__menu, .card, .panel, .field, .tag, .btn-link, .nav__search,
-  .lightbox__bar, .stage__loader, .vf__meta, .fhero__bar{
-    border:var(--hair) solid CanvasText;
+    --glow-acc: none; --shadow-0: none; --shadow-1: none; --shadow-2: none; --shadow-bar: none;
   }
 }
+/* The component half of this gate -- the system borders -- sits at the very
+   END of the sheet (FORCED COLOURS, LAST). Up here it lost to every
+   component written below it on source order alone, which is the bug
+   Nebula 2.0 fixed with layers; an unlayered sheet fixes it by position. */
 
 *{ box-sizing:border-box; }
 html,body{ margin:0; padding:0; }
@@ -839,18 +920,39 @@ body > .foot{ flex-shrink:0; }
      (`wallpaper_tint = off`); the token is what that overrides. */
   filter: var(--wallpaper-filter);
 }
-/* grid overlay + one accent bloom + darkening, over the video / poster */
+/* Two planes, back to front: the picture (still or clip), which travels,
+   and over it the key light, the one accent bloom, the vignette and the
+   dim. There is no grid any more (Nebula 2.0) -- the light and the vignette
+   carry the ground now. */
 .site-bg::after{
   content:"";
   position:absolute; inset:0;
+  z-index:1;
   background-image:
-    linear-gradient(to right, var(--wallpaper-grid) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--wallpaper-grid) 1px, transparent 1px),
+    radial-gradient(ellipse 60% 50% at 18% 8%, var(--wallpaper-light) 0%, transparent 70%),
     radial-gradient(ellipse at 78% 68%, var(--wallpaper-bloom) 0%, transparent 52%),
+    radial-gradient(ellipse 120% 90% at 50% 42%, transparent 55%, var(--wallpaper-vignette) 100%),
     linear-gradient(var(--wallpaper-shade-top), var(--wallpaper-shade-bot));
-  background-size: var(--s-7) var(--s-7), var(--s-7) var(--s-7), auto, auto;
-  background-repeat: repeat, repeat, no-repeat, no-repeat;
+  background-repeat:no-repeat;
 }
+
+/* Parallax, read off the scroll position with no listener: over the first
+   --depth-range of the page the picture travels --depth-drift while the
+   panes move with the page -- two planes at two rates. The wallpaper is made
+   taller than the window by exactly the distance it travels, so no edge
+   ever shows. This IS motion: off for reduced motion, under .fx-lite and in
+   any browser without scroll timelines. */
+@supports (animation-timeline: scroll()){
+  @media (prefers-reduced-motion: no-preference){
+    html:not(.fx-lite) .site-bg :is(.bg-still, .bg-video){
+      height:calc(100% + var(--depth-drift));
+      animation:depth-far linear both;
+      animation-timeline:scroll(root block);
+      animation-range:0 var(--depth-range);
+    }
+  }
+}
+@keyframes depth-far { to{ translate:0 calc(var(--depth-drift) * -1); } }
 
 /* Lite mode (JS-detected low-end / data-saver, set via html.fx-lite) and any
    reduced-motion preference: drop the ambient background video so weak devices
@@ -918,6 +1020,12 @@ html.fx-anim.is-live-loading [data-live]{
    means -- so no component needs its own `X[hidden]` line. */
 [hidden]{ display:none !important; }
 
+/* Headings balance their lines, so a two-line title does not end on one
+   orphaned word; running text avoids a last line of a single word (Nebula
+   2.0). Both are hints the browser may skip on a very long block. */
+h1, h2, h3, h4, .section__slug .name, .album-card__name, .feat-card__name{ text-wrap:balance; }
+p, li, dd, figcaption, blockquote{ text-wrap:pretty; }
+
 a{ color:inherit; text-decoration:none; }
 a:hover{ color:var(--acc); }
 
@@ -955,19 +1063,25 @@ code{
   -webkit-backdrop-filter:var(--pane-blur);
   border-bottom:var(--hair) solid var(--line);
 }
-/* accent hairline riding on the bottom border; brightens once scrolled
-   (.nav--scrolled) so the floating bar picks up a signature edge */
+/* The hairline riding on the bottom border; it brightens once scrolled
+   (.nav--scrolled) so the floating bar picks up an edge. --chrome, not the
+   accent (Nebula 2.0): an edge carries no state, and an accent line framing
+   every screen was one of the washes that tinted the whole page. */
 .nav::after{
   content:"";
   position:absolute; left:0; right:0; bottom:-1px; height:1px;
   pointer-events:none;
   background:linear-gradient(90deg,
-    transparent 2%, rgba(var(--acc-rgb),.5) 30%,
-    rgba(var(--acc-rgb),.45) 50%, rgba(var(--acc-rgb),.5) 70%, transparent 98%);
+    transparent 2%, oklch(from var(--chrome) l c h / .5) 30%,
+    oklch(from var(--chrome) l c h / .45) 50%, oklch(from var(--chrome) l c h / .5) 70%, transparent 98%);
   opacity:.35;
   transition:opacity var(--dur-2) ease;
 }
 .nav--scrolled::after{ opacity:.85; }
+/* The bar holds still across a page swap: it is the frame, and a frame that
+   crossfades with the picture inside it reads as a reload. One element per
+   page may carry the name. */
+.nav{ view-transition-name:nebula-bar; }
 .nav__inner{
   max-width:var(--page-max);
   margin:0 auto;
@@ -987,7 +1101,7 @@ code{
   height:28px;
   width:auto;
   display:block;
-  filter: drop-shadow(0 0 12px rgba(var(--acc-rgb),.35));
+  filter: drop-shadow(0 0 12px oklch(from var(--acc) l c h / .35));
 }
 .nav__brand .brand-text{
   display:flex; flex-direction:column;
@@ -1015,10 +1129,10 @@ code{
    of the soft face is mixed in to lift it. Same idiom the stat charts use,
    so an album accent still repaints it. */
 .nav__brand .brand-sub{
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-xs);
-  letter-spacing:.28em;
-  text-transform:uppercase;
+  letter-spacing:var(--tr-chrome-xs);
+  text-transform:var(--ui-case);
   color:color-mix(in srgb, var(--acc-soft) 30%, var(--acc));
 }
 .nav__brand .jp{
@@ -1050,8 +1164,8 @@ code{
 }
 .nav__search:focus-within{
   border-color:var(--acc);
-  background:rgba(var(--acc-rgb),.05);
-  box-shadow:0 0 0 1px rgba(var(--acc-rgb),.18), 0 0 18px -8px rgba(var(--acc-rgb),.5);
+  background:oklch(from var(--acc) l c h / .05);
+  box-shadow:0 0 0 1px oklch(from var(--acc) l c h / .18), 0 0 18px -8px oklch(from var(--acc) l c h / .5);
 }
 /* the "❯" prompt that used to sit here was replaced by the magnifying-glass
    icon in the markup — a prompt caret AND a search icon in the same box read
@@ -1061,12 +1175,12 @@ code{
   background:transparent;
   border:0; outline:0;
   color:var(--text);
-  font-family:var(--mono);
+  font-family:var(--sans);
   font-size:var(--fs-chrome-md);
-  letter-spacing:.08em;
+  letter-spacing:var(--tr-chrome-md);
   padding:var(--s-3) 0;
 }
-.nav__search input::placeholder{ color:var(--text-ghost); letter-spacing:var(--tr-chrome-md); text-transform:uppercase; font-size:var(--fs-chrome-sm); }
+.nav__search input::placeholder{ color:var(--text-ghost); letter-spacing:var(--tr-chrome-md); text-transform:var(--ui-case); font-size:var(--fs-chrome-sm); }
 
 /* language selector (top right; the only interactive chrome in the nav
    besides search, and the only one that stays on mobile).
@@ -1074,9 +1188,9 @@ code{
    instead of loose text links hanging off a divider. */
 .nav__lang{
   display:flex; align-items:center; gap:var(--s-0);
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
-  letter-spacing:.12em;
+  letter-spacing:var(--tr-chrome-sm);
   padding:var(--s-1);
   border:var(--hair) solid var(--line);
   border-radius:var(--radius);
@@ -1098,8 +1212,8 @@ code{
    and it was on the controls that say which state you are in. */
 .nav__lang-opt.is-active{
   color:var(--text);
-  background:rgba(var(--acc-rgb),.12);
-  box-shadow:inset 0 0 0 var(--hair) rgba(var(--acc-rgb),.35);
+  background:oklch(from var(--acc) l c h / .12);
+  box-shadow:inset 0 0 0 var(--hair) oklch(from var(--acc) l c h / .35);
 }
 
 /* ================================================================
@@ -1132,10 +1246,10 @@ section{
   align-items:baseline;
   gap:var(--s-2) 18px;
   margin:0 0 18px;
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
   letter-spacing:var(--tr-chrome-sm);
-  text-transform:uppercase;
+  text-transform:var(--ui-case);
   color:var(--text-dim);
 }
 .section__doc > span{
@@ -1149,12 +1263,12 @@ section{
    no dashed "sticker" border and no shouting */
 .section__doc-mark{
   color:var(--label);
-  border:var(--hair) solid rgba(var(--label-rgb),.35);
+  border:var(--hair) solid oklch(from var(--label) l c h / .35);
   padding:var(--s-1) var(--s-3);
   font-size:var(--fs-chrome-xs);
-  letter-spacing:.2em;
+  letter-spacing:var(--tr-chrome-xs);
 }
-.section__doc-mark.is-original{ color:var(--ok); border-color:rgba(var(--ok-rgb),.4); }
+.section__doc-mark.is-original{ color:var(--ok); border-color:oklch(from var(--ok) l c h / .4); }
 .section__doc-in{ color:var(--text-ghost); }
 
 .section__head{
@@ -1196,11 +1310,10 @@ section{
   padding-bottom:.04em;
 }
 .section__slug .name::selection{ -webkit-text-fill-color:var(--text); }
-/* Uppercase ONLY where the title is a fixed UI word ("Albums", "Search").
-   Album pages put the album's real folder name in this element, and casing
-   that would be restyling data — `Pride_MUC_26` is not `PRIDE_MUC_26`. */
-.page-albums .section__slug .name,
-.page-search .section__slug .name{ text-transform:uppercase; }
+/* "Albums" and "Search" used to be uppercased here, as fixed UI words.
+   Nebula 2.0 retired the caps: a page title is the reading voice and keeps
+   the case the markup gives it, like an album's own folder name in the same
+   element (`Pride_MUC_26` is not `PRIDE_MUC_26`). */
 
 /* ---- search result groups (albums, then photos) ----
    Same eyebrow as .sub-albums__head so a result group reads as the same kind
@@ -1212,9 +1325,9 @@ section{
   display:flex; align-items:baseline; gap:10px;
   margin:0 0 var(--s-4); padding-bottom:var(--s-3);
   border-bottom:var(--hair) solid var(--line);
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-sm); font-weight:400; letter-spacing:var(--tr-chrome-xs);
-  text-transform:uppercase;
+  font-family:var(--ui-font);
+  font-size:var(--fs-chrome-sm); font-weight:var(--ui-weight); letter-spacing:var(--tr-chrome-xs);
+  text-transform:var(--ui-case);
   color:var(--label);
 }
 .search-group__label i{ color:var(--text-ghost); }
@@ -1237,8 +1350,8 @@ section{
 .search-filters__clear{
   display:inline-flex; align-items:center; height:100%;
   padding:var(--s-2) var(--s-2);
-  font-family:var(--mono); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs);
-  text-transform:uppercase; color:var(--text-dim);
+  font-family:var(--ui-font); font-weight:var(--ui-weight); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs);
+  text-transform:var(--ui-case); color:var(--text-dim);
 }
 @media (hover:hover){ .search-filters__clear:hover{ color:var(--text); } }
 
@@ -1250,8 +1363,8 @@ section{
 .search-vision{ margin:var(--s-4) 0 0; }
 .search-vision__toggle{
   display:inline-flex; align-items:center; gap:var(--s-2);
-  font-family:var(--mono); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs);
-  text-transform:uppercase; color:var(--text-dim);
+  font-family:var(--ui-font); font-weight:var(--ui-weight); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs);
+  text-transform:var(--ui-case); color:var(--text-dim);
   transition:color var(--dur-1);
 }
 .search-vision__box{ width:var(--s-4); height:var(--s-4); border:var(--hair) solid var(--line-strong); transition:background-color var(--dur-1), border-color var(--dur-1); }
@@ -1273,13 +1386,13 @@ section{
 .search-results{ min-width:0; }
 .search-facets{ display:flex; flex-direction:column; gap:var(--s-5); min-width:0; }
 .search-facets__head{
-  margin:0; font-family:var(--mono); font-size:var(--fs-chrome-xs); font-weight:400;
-  letter-spacing:var(--tr-chrome-xs); text-transform:uppercase; color:var(--text-ghost);
+  margin:0; font-family:var(--ui-font); font-size:var(--fs-chrome-xs); font-weight:var(--ui-weight);
+  letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case); color:var(--text-ghost);
 }
 .facet-group__label{
   display:flex; align-items:center; gap:var(--s-2);
-  margin:0 0 var(--s-2); font-family:var(--mono); font-size:var(--fs-chrome-sm); font-weight:400;
-  letter-spacing:var(--tr-chrome-sm); text-transform:uppercase; color:var(--label);
+  margin:0 0 var(--s-2); font-family:var(--ui-font); font-size:var(--fs-chrome-sm); font-weight:var(--ui-weight);
+  letter-spacing:var(--tr-chrome-sm); text-transform:var(--ui-case); color:var(--label);
 }
 .facet-group__label .fa{ font-size:var(--fs-chrome-sm); }
 /* GLYPH HUES: which kind of thing a heading is about, keyed on the glyph --
@@ -1300,7 +1413,7 @@ section{
 }
 .facet__box{ display:none; }
 .facet__label{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.facet__n{ font-family:var(--mono); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-num); color:var(--text-ghost); font-variant-numeric:tabular-nums; }
+.facet__n{ font-family:var(--num-font); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-num); color:var(--text-ghost); font-variant-numeric:tabular-nums; }
 @media (hover:hover){ .facet:hover{ color:var(--text); border-color:var(--line-strong); } }
 .facet.is-on{ color:var(--text); border-color:var(--acc); box-shadow:inset 0 0 0 var(--hair) var(--acc); }
 .facet.is-on .facet__n{ color:var(--text-dim); }
@@ -1366,7 +1479,7 @@ section{
 .section__slug .section__parent{
   display:none; align-items:center; gap:var(--s-2);
   align-self:center;
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-lg);
   letter-spacing:var(--tr-chrome-xl);
   color:var(--text-dim);
@@ -1419,7 +1532,9 @@ section{
    already two boxes. */
 .crumb__seg--here{ color:var(--text); }
 .crumb__seg--here .crumb__lbl{ text-decoration:none; font-weight:500; }
-.crumb__seg--here .crumb__ico{ color:var(--acc); }
+/* the current step is --text, and its glyph says what kind of place it is:
+   mist, not the accent (Nebula 2.1's .crumbs) */
+.crumb__seg--here .crumb__ico{ color:var(--mist); }
 /* a colour hover REPAINTS, so it costs a phone the first tap — see the note
    at .pathbar__back:hover. Gated on a real pointer, like every other one. */
 @media (hover: hover){
@@ -1547,7 +1662,7 @@ section{
 @media (hover: hover){
   .pathbar__back:hover{
     color:var(--text);
-    border-color:rgba(var(--acc-rgb),.55);
+    border-color:oklch(from var(--acc) l c h / .55);
     background:var(--glass-hi);
   }
 }
@@ -1738,10 +1853,10 @@ section{
   margin-bottom:18px;
 }
 .tag{
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
-  letter-spacing:.16em;
-  text-transform:uppercase;
+  letter-spacing:var(--tr-chrome-sm);
+  text-transform:var(--ui-case);
   color:var(--text-dim);
   padding:var(--s-2) 10px;
   border:var(--hair) solid var(--line);
@@ -1838,7 +1953,7 @@ section{
   position:absolute; top:var(--s-4); z-index:4;
   font-family:inherit;
   font-size:var(--fs-chrome-md);
-  letter-spacing:.2em;
+  letter-spacing:var(--tr-chrome-md);
   color:var(--text);
   background:var(--scrim);
   backdrop-filter:var(--scrim-blur);
@@ -1851,7 +1966,7 @@ section{
   left:14px;
   color:var(--acc);
   border-color:var(--acc);
-  text-shadow:0 0 6px rgba(var(--acc-rgb),.5);
+  text-shadow:0 0 6px oklch(from var(--acc) l c h / .5);
 }
 .fhero__chip--frm{ right:14px; }
 .fhero__chip--frm b{ color:var(--label); font-weight:400; font-variant-numeric:tabular-nums; }
@@ -1911,7 +2026,7 @@ section{
 .fhero__nav:hover{
   color:var(--chrome);
   border-color:var(--chrome);
-  background:rgba(var(--chrome-rgb),.08);
+  background:oklch(from var(--chrome) l c h / .08);
 }
 .fhero__nav:focus-visible,
 .fhero__seg:focus-visible{
@@ -1943,7 +2058,7 @@ section{
   transform:translateY(-50%) scaleX(0);
   transform-origin:left center;
   background:var(--acc);
-  box-shadow:0 0 8px rgba(var(--acc-rgb),.55);
+  box-shadow:0 0 8px oklch(from var(--acc) l c h / .55);
 }
 .fhero__seg.is-done::after{
   transform:translateY(-50%) scaleX(1);
@@ -2050,10 +2165,10 @@ section{
   position:absolute;
   top:var(--s-3); right:var(--s-3);
   z-index:3;
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-xs);
-  letter-spacing:.22em;
-  text-transform:uppercase;
+  letter-spacing:var(--tr-chrome-xs);
+  text-transform:var(--ui-case);
   color:var(--label);
   background: var(--scrim);
   backdrop-filter:var(--scrim-blur);
@@ -2085,7 +2200,7 @@ section{
 .showcase__more{
   margin-left:auto;
   color:var(--text-dim);
-  letter-spacing:.2em;
+  letter-spacing:var(--tr-chrome-sm);
   border:var(--hair) solid var(--line);
   padding:var(--s-1) var(--s-3);
   transition: color var(--dur-1), border-color var(--dur-1), background var(--dur-1);
@@ -2093,7 +2208,7 @@ section{
 .showcase__more:hover{
   color:var(--chrome);
   border-color:var(--chrome);
-  background:rgba(var(--chrome-rgb),.06);
+  background:oklch(from var(--chrome) l c h / .06);
 }
 
 /* the cards themselves are the shared featured rail (.feat__rail /
@@ -2102,7 +2217,7 @@ section{
 
 /* showcase indicator on individual photo tiles */
 .image-tile--showcase a{
-  outline: var(--hair) solid rgba(var(--acc-rgb),.5);
+  outline: var(--hair) solid oklch(from var(--acc) l c h / .5);
   outline-offset: -2px;
 }
 .image-tile__star{
@@ -2120,7 +2235,7 @@ section{
   border:var(--hair) solid var(--acc);
   border-radius:var(--radius);
   pointer-events:none;
-  text-shadow: 0 0 6px rgba(var(--acc-rgb),.6);
+  text-shadow: 0 0 6px oklch(from var(--acc) l c h / .6);
 }
 
 /* ================================================================
@@ -2155,10 +2270,10 @@ section{
   -webkit-backdrop-filter:var(--glass-blur);
   border:var(--hair) solid var(--line);
   color:var(--text-dim);
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
   letter-spacing:var(--tr-chrome-sm);
-  text-transform:uppercase;
+  text-transform:var(--ui-case);
   padding:var(--s-3) var(--s-4);
   cursor:pointer;
   display:inline-flex; align-items:center; gap:var(--s-3);
@@ -2173,14 +2288,14 @@ section{
 .sort__btn > .fa,
 .sort__btn-label{ flex:0 0 auto; }
 .sort__btn b{
-  color:var(--text); font-weight:400; letter-spacing:.12em;
+  color:var(--text); font-weight:400; letter-spacing:var(--tr-chrome-sm);
   min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .sort__btn[aria-expanded="true"]{
   color:var(--text);
   border-color:var(--acc);
-  background:rgba(var(--acc-rgb),.06);
+  background:oklch(from var(--acc) l c h / .06);
 }
 .sort__btn:hover{ color:var(--text); border-color:var(--chrome); }
 .sort__btn-label{ color:var(--label); }
@@ -2204,10 +2319,10 @@ section{
 }
 .sort__head{
   padding:var(--s-3) 14px var(--s-2);
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-xs);
   letter-spacing:var(--tr-chrome-xs);
-  text-transform:uppercase;
+  text-transform:var(--ui-case);
   color:var(--text-ghost);
   border-bottom:var(--hair) solid var(--line);
   margin-bottom:var(--s-1);
@@ -2215,10 +2330,10 @@ section{
 .sort__option{
   display:flex; align-items:center; gap:var(--s-3);
   padding:var(--s-3) 14px;
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
   letter-spacing:var(--tr-chrome-md);
-  text-transform:uppercase;
+  text-transform:var(--ui-case);
   color:var(--text-dim);
   cursor:pointer;
   border-left:2px solid transparent;
@@ -2228,7 +2343,7 @@ section{
 }
 .sort__option:hover{
   color:var(--text);
-  background:rgba(var(--chrome-rgb),.06);
+  background:oklch(from var(--chrome) l c h / .06);
   border-left-color:var(--chrome);
 }
 /* The open row is marked on its LEADING EDGE and by the tint under it; the
@@ -2236,7 +2351,7 @@ section{
    rule 1 forbids outright. */
 .sort__option.is-active{
   color:var(--text);
-  background:rgba(var(--acc-rgb),.08);
+  background:oklch(from var(--acc) l c h / .08);
   border-left-color:var(--acc);
   font-weight:600;
 }
@@ -2286,7 +2401,7 @@ section{
   .sort__option{
     padding:14px 18px;
     font-size:var(--fs-chrome-md);
-    letter-spacing:.12em;
+    letter-spacing:var(--tr-chrome-md);
   }
   /* and back down the way it came — sortCloseMenu() holds the node for the
      length of this before hiding it */
@@ -2323,10 +2438,10 @@ section{
    hands off to the chrome instead of switching typeface halfway down. */
 .section__stat{
   margin:var(--s-3) 0 0;
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
-  letter-spacing:.2em;
-  text-transform:uppercase;
+  letter-spacing:var(--tr-chrome-sm);
+  text-transform:var(--ui-case);
   color:var(--text-ghost);
 }
 .section__stat b{ color:var(--label); font-weight:400; }
@@ -2350,10 +2465,10 @@ section{
   margin-bottom:var(--s-4);
   padding-bottom:var(--s-3);
   border-bottom:var(--hair) solid var(--line);
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
-  letter-spacing:.22em;
-  text-transform:uppercase;
+  letter-spacing:var(--tr-chrome-sm);
+  text-transform:var(--ui-case);
   color:var(--text-ghost);
 }
 .feat__label{
@@ -2378,10 +2493,12 @@ section{
   margin:0;
   background:var(--surface);
   border:var(--hair) solid var(--line);
-  /* scale: see the note on .album-card */
-  transition: border-color var(--dur-2), transform var(--dur-2) ease, scale var(--dur-2) ease;
+  /* scale: see the note on .album-card; the shadow and the lift likewise */
+  transition: border-color var(--dur-2), box-shadow var(--dur-2) ease,
+              transform var(--dur-2) ease, translate var(--dur-2) ease, scale var(--dur-2) ease;
+  box-shadow:var(--shadow-0);
 }
-.feat-card:hover{ border-color:var(--line-strong); transform:translateY(-2px); }
+.feat-card:hover{ border-color:var(--line-strong); translate:0 calc(var(--lift) * -1); box-shadow:var(--shadow-1); }
 /* corner brackets — same hover signature as .album-card */
 .feat-card::before,
 .feat-card::after{
@@ -2437,9 +2554,9 @@ section{
   position:absolute;
   top:10px; left:10px;
   z-index:3;
-  font-family:var(--mono);
+  font-family:var(--num-font); font-variant-numeric:tabular-nums;
   font-size:var(--fs-chrome-xs);
-  letter-spacing:.2em;
+  letter-spacing:var(--tr-num);
   color:var(--text);
   background:var(--scrim);
   backdrop-filter:var(--scrim-blur);
@@ -2465,18 +2582,18 @@ section{
   text-shadow:0 1px 10px rgba(0,0,0,.6);
 }
 .feat-card__meta{
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
   letter-spacing:var(--tr-chrome-sm);
-  text-transform:uppercase;
+  text-transform:var(--ui-case);
   color:var(--label);
   text-shadow:0 1px 6px rgba(0,0,0,.7);
 }
 .feat-card__cta{
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-xs);
-  letter-spacing:.22em;
-  text-transform:uppercase;
+  letter-spacing:var(--tr-chrome-xs);
+  text-transform:var(--ui-case);
   color:var(--text);
   opacity:0;
   max-height:0;
@@ -2510,7 +2627,7 @@ section{
   }
   .feat__rail::-webkit-scrollbar{ display:none; }
   .feat-card{ scroll-snap-align:start; }
-  .feat-card:hover{ transform:none; }
+  .feat-card:hover{ translate:none; }
   .feat-card__img{ aspect-ratio:3/2; max-height:none; }
   .feat-card__cap{ padding:var(--s-4); gap:var(--s-1); }
   .feat-card__name{ font-size:var(--fs-text-lg); }
@@ -2525,10 +2642,10 @@ section{
   margin-bottom:var(--s-4);
   padding-bottom:var(--s-3);
   border-bottom:var(--hair) solid var(--line);
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
-  letter-spacing:.22em;
-  text-transform:uppercase;
+  letter-spacing:var(--tr-chrome-sm);
+  text-transform:var(--ui-case);
   color:var(--text-ghost);
 }
 .archive-head__label{
@@ -2561,7 +2678,13 @@ section{
      listed here does not transition at all. Without it the card jumped to
      its pressed size in one frame while the ENTER overlay over it faded in
      over .2s — one gesture, two speeds, and the jump is the one you feel. */
-  transition: background var(--dur-2), border-color var(--dur-2), transform var(--dur-2) ease, scale var(--dur-2) ease;
+  transition: background var(--dur-2), border-color var(--dur-2), box-shadow var(--dur-2) ease,
+              transform var(--dur-2) ease, translate var(--dur-2) ease, scale var(--dur-2) ease;
+  /* Nebula 2.0's page plane: a soft contact shadow, so the card SITS on the
+     ground instead of being the same black as the black under it. The fill
+     stays opaque --surface: a grid of hundreds of cards each blurring its
+     backdrop is the cost the phone layout cannot pay. */
+  box-shadow:var(--shadow-0);
 }
 .album-card::before,
 .album-card::after{
@@ -2576,10 +2699,14 @@ section{
 }
 .album-card::before{ top:-1px; left:-1px; border-right:0; border-bottom:0; }
 .album-card::after{ bottom:-1px; right:-1px; border-left:0; border-top:0; }
+/* up one plane: the next fill, the next shadow, up --lift. The independent
+   `translate`, never `transform`, so a press cue or an entrance can carry a
+   transform of its own at the same time. */
 .album-card:hover{
   background:var(--surface-2);
   border-color:var(--line-strong);
-  transform:translateY(-2px);
+  translate:0 calc(var(--lift) * -1);
+  box-shadow:var(--shadow-1);
 }
 .album-card:hover::before,
 .album-card:hover::after,
@@ -2621,7 +2748,7 @@ section{
   position:absolute;
   top:var(--s-3); left:var(--s-3);
   z-index:3;
-  font-family:var(--mono);
+  font-family:var(--num-font); font-variant-numeric:tabular-nums;
   font-size:var(--fs-chrome-xs);
   letter-spacing:var(--tr-chrome-sm);
   color:var(--text-dim);
@@ -2643,10 +2770,10 @@ section{
   pointer-events:none;
 }
 .album-card__hover span{
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
-  letter-spacing:.28em;
-  text-transform:uppercase;
+  letter-spacing:var(--tr-chrome-sm);
+  text-transform:var(--ui-case);
   color:var(--chrome);
   border:var(--hair) solid var(--chrome);
   background: var(--scrim);
@@ -2669,10 +2796,10 @@ section{
     var(--bg-2);
   display:flex; align-items:center; justify-content:center;
   color:var(--text-ghost);
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
-  letter-spacing:.22em;
-  text-transform:uppercase;
+  letter-spacing:var(--tr-chrome-sm);
+  text-transform:var(--ui-case);
 }
 .album-card__cap{
   padding:var(--s-4) var(--s-4) var(--s-4);
@@ -2690,11 +2817,11 @@ section{
 .album-card__meta{
   display:flex; align-items:baseline; gap:10px;
   justify-content:space-between;
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
-  letter-spacing:.16em;
+  letter-spacing:var(--tr-chrome-sm);
   color:var(--text-dim);
-  text-transform:uppercase;
+  text-transform:var(--ui-case);
 }
 .album-card__meta > span:first-child{ min-width:0; }
 .album-card__date{
@@ -2707,7 +2834,7 @@ section{
 .album-card__badge--folder{
   color:var(--text-dim);
   border-color:var(--line);
-  letter-spacing:.16em;
+  letter-spacing:var(--tr-chrome-xs);
   background:var(--scrim);
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
@@ -2723,8 +2850,8 @@ section{
   display:flex; align-items:baseline; gap:var(--s-4);
   margin-bottom:var(--s-4); padding-bottom:var(--s-3);
   border-bottom:var(--hair) solid var(--line);
-  font-family:var(--mono);
-  text-transform:uppercase;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  text-transform:var(--ui-case);
 }
 .sub-albums__head--photos{ margin-top:30px; }
 .sub-albums__label{
@@ -2772,8 +2899,8 @@ section{
   margin-bottom:var(--s-4);
   padding-bottom:var(--s-3);
   border-bottom:var(--hair) solid var(--line);
-  font-family:var(--mono);
-  text-transform:uppercase;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  text-transform:var(--ui-case);
 }
 .album-group__name{
   font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-xs);
@@ -2810,7 +2937,7 @@ section{
   .day-group__date{ font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-md); }
   .day-group__wd,
   .day-group__stop,
-  .day-group__count{ font-size:var(--fs-chrome-xs); letter-spacing:.12em; }
+  .day-group__count{ font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); }
 }
 
 /* ================================================================
@@ -2894,7 +3021,7 @@ section{
   border:var(--hair) solid var(--line);
   border-top:2px solid var(--acc);
   background:
-    linear-gradient(180deg, rgba(var(--acc-rgb),.05), transparent 38%),
+    linear-gradient(180deg, oklch(from var(--acc) l c h / .05), transparent 38%),
     var(--surface);
 }
 .album-desc__head{
@@ -2943,7 +3070,7 @@ section{
 .album-desc__body p{ margin:.6em 0; }
 .album-desc__body a{
   color:var(--acc);
-  border-bottom:var(--hair) solid rgba(var(--acc-rgb),.35);
+  border-bottom:var(--hair) solid oklch(from var(--acc) l c h / .35);
 }
 .album-desc__body a:hover{ border-bottom-color:var(--acc); }
 .album-desc__body strong{ color:var(--text); font-weight:600; }
@@ -2951,8 +3078,8 @@ section{
 .album-desc__body ul,
 .album-desc__body ol{ margin:.6em 0; padding-left:1.35em; }
 .album-desc__body li{ margin:.28em 0; }
-.album-desc__body ul li::marker{ color:var(--acc); }
-.album-desc__body ol li::marker{ color:var(--acc); font-family:var(--mono); }
+.album-desc__body ul li::marker{ color:var(--label); }
+.album-desc__body ol li::marker{ color:var(--label); font-family:var(--num-font); font-variant-numeric:tabular-nums; }
 .album-desc__body code{
   font-family:var(--mono);
   font-size:.86em;
@@ -2974,7 +3101,7 @@ section{
   padding:var(--s-1) 0 var(--s-1) var(--s-4);
   border-left:2px solid var(--acc);
   color:var(--text);
-  background:linear-gradient(90deg, rgba(var(--acc-rgb),.05), transparent 60%);
+  background:linear-gradient(90deg, oklch(from var(--acc) l c h / .05), transparent 60%);
 }
 .album-desc__body hr{ border:0; border-top:var(--hair) dashed var(--line); margin:1.1em 0; }
 .album-desc__body img{ max-width:100%; height:auto; border:var(--hair) solid var(--line); }
@@ -3055,10 +3182,12 @@ section{
   font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm);
   color:var(--text-ghost);
 }
-/* the leg this day belongs to on a trip album (Kansai / Hokkaido / …) */
+/* the leg this day belongs to on a trip album (Kansai / Hokkaido / …).
+   A static label, so --label, not the accent: it names which leg, it does
+   not say that anything is current or selected (Nebula 2.0, rule 1). */
 .day-group__stop{
   font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm);
-  color:var(--acc);
+  color:var(--label);
   border:var(--hair) solid var(--line-strong);
   padding:var(--s-0) var(--s-2);
 }
@@ -3174,10 +3303,10 @@ section{
   pointer-events:none;
 }
 .image-tile__overlay span{
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-xs);
   letter-spacing:var(--tr-chrome-sm);
-  text-transform:uppercase;
+  text-transform:var(--ui-case);
   color:var(--chrome);
 }
 .image-tile a:hover .image-tile__overlay{ opacity:1; }
@@ -3389,7 +3518,7 @@ details[open] > summary::before{ content:"▾ "; }
   word-break:break-word;
   border-left:2px solid var(--acc);
   padding:var(--s-1) 0 var(--s-1) var(--s-4);
-  background:linear-gradient(90deg, rgba(var(--acc-rgb),.05), transparent 60%);
+  background:linear-gradient(90deg, oklch(from var(--acc) l c h / .05), transparent 60%);
 }
 
 /* ================================================================
@@ -3411,7 +3540,7 @@ details[open] > summary::before{ content:"▾ "; }
   font-size:var(--fs-text-sm);
   letter-spacing:var(--tr-text);
   color:var(--amb);
-  border:var(--hair) dashed rgba(var(--amb-rgb),.5);
+  border:var(--hair) dashed oklch(from var(--amb) l c h / .5);
   padding:var(--s-1) 10px;
   margin-bottom:14px;
 }
@@ -3481,7 +3610,7 @@ details[open] > summary::before{ content:"▾ "; }
   .section__doc{
     gap:var(--s-1) var(--s-4);
     font-size:var(--fs-chrome-xs);
-    letter-spacing:.13em;
+    letter-spacing:var(--tr-chrome-xs);
   }
   .section__doc b{
     overflow:hidden;
@@ -3587,7 +3716,7 @@ details[open] > summary::before{ content:"▾ "; }
   .nav__search input{ padding:var(--s-3) 0; }
   .image-grid{ grid-template-columns:repeat(auto-fill, minmax(118px, 1fr)); gap:var(--s-2); }
   .nav-arrow{ width:34px; height:48px; font-size:18px; }
-  .section__doc{ font-size:var(--fs-chrome-xs); gap:var(--s-1) var(--s-4); letter-spacing:.11em; }
+  .section__doc{ font-size:var(--fs-chrome-xs); gap:var(--s-1) var(--s-4); letter-spacing:var(--tr-chrome-xs); }
   .stage{ min-height:200px; }
   .stage img{ max-height:55vh; }
   .panel{ padding:var(--s-4) var(--s-4); }
@@ -3637,7 +3766,7 @@ details[open] > summary::before{ content:"▾ "; }
 .stage__loader button:hover,
 .stage__loader .loader-link:hover{
   color:var(--chrome);
-  background:rgba(var(--chrome-rgb),.08);
+  background:oklch(from var(--chrome) l c h / .08);
 }
 .stage__loader .sep{
   width:1px; align-self:stretch;
@@ -3899,7 +4028,7 @@ body.lightbox-open{ overflow:hidden; }
   transition: color var(--dur-1), background var(--dur-1), scale var(--dur-1) ease;
 }
 .lightbox__btn:last-child{ border-right:0; }
-.lightbox__btn:hover{ color:var(--chrome); background:rgba(var(--chrome-rgb),.08); }
+.lightbox__btn:hover{ color:var(--chrome); background:oklch(from var(--chrome) l c h / .08); }
 .lightbox__bar.is-loading-full .lightbox__btn#lb-full{ color:var(--amb); pointer-events:none; }
 .lightbox__bar.is-full .lightbox__btn#lb-full{ display:none; }
 
@@ -4001,7 +4130,7 @@ body.lightbox-open{ overflow:hidden; }
   -webkit-backdrop-filter:var(--glass-blur);
   transition: border-color var(--dur-1), background var(--dur-1);
 }
-.foot__op:hover{ border-color:var(--chrome); background:rgba(var(--chrome-rgb),.06); }
+.foot__op:hover{ border-color:var(--chrome); background:oklch(from var(--chrome) l c h / .06); }
 .foot__op-pfp{
   display:block;
   width:34px; height:34px;
@@ -4189,7 +4318,7 @@ body.page-welcome{ --page-max: 2400px; }
 .vf__corner{
   position:absolute;
   width:26px; height:26px;
-  border:var(--hair) solid rgba(var(--chrome-rgb),.75);
+  border:var(--hair) solid oklch(from var(--chrome) l c h / .75);
   opacity:.9;
 }
 .vf__corner--tl{ top:14px; left:14px; border-right:0; border-bottom:0; }
@@ -4227,7 +4356,7 @@ body.page-welcome{ --page-max: 2400px; }
 .vf.is-switching .vf__reticle{
   border-color: var(--acc);
   opacity:1;
-  box-shadow: 0 0 18px rgba(var(--acc-rgb),.35), inset 0 0 12px rgba(var(--acc-rgb),.15);
+  box-shadow: 0 0 18px oklch(from var(--acc) l c h / .35), inset 0 0 12px oklch(from var(--acc) l c h / .15);
 }
 
 /* ---- HUD top row (REC · LIVE VIEW · FRM) ---- */
@@ -4238,17 +4367,17 @@ body.page-welcome{ --page-max: 2400px; }
   margin:0 auto;
   padding:20px var(--page-pad) 0;
   display:flex; align-items:center; gap:var(--s-5);
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
-  letter-spacing:.2em;
-  text-transform:uppercase;
+  letter-spacing:var(--tr-chrome-sm);
+  text-transform:var(--ui-case);
   color:var(--text-dim);
   pointer-events:none;
 }
 .vf__rec{
   display:inline-flex; align-items:center; gap:var(--s-3);
   color:#e8908e;
-  text-shadow:0 0 10px rgba(var(--red-rgb),.4);
+  text-shadow:0 0 10px oklch(from var(--red) l c h / .4);
 }
 .vf__rec i{
   width:8px; height:8px; border-radius:50%;
@@ -4345,15 +4474,22 @@ body.page-welcome{ --page-max: 2400px; }
   backdrop-filter:var(--scrim-blur);
   -webkit-backdrop-filter:var(--scrim-blur);
 }
+/* The committing button is a SOLID face, as in any desktop application
+   (Nebula 2.0): --acc-deep, the one accent face derived to carry white text.
+   It used to be the bright --acc under a black label, which next to the
+   outlined buttons read as "a slightly different outline". Exactly one per
+   row. */
 .btn-link--primary{
-  color:var(--on-acc);
-  background:var(--acc);
-  border-color:var(--acc);
+  color:#fff; /* nebula-allow: hex - white on --acc-deep, which is derived for it */
+  background:var(--acc-deep);
+  border-color:var(--acc-deep);
+  backdrop-filter:none; -webkit-backdrop-filter:none;
 }
 .btn-link--primary:hover{
-  color:var(--on-acc);
-  background:var(--acc-soft);
-  border-color:var(--acc-soft);
+  color:#fff; /* nebula-allow: hex - white on the lifted deep face */
+  background:oklch(from var(--acc-deep) calc(l + .04) c h);
+  border-color:oklch(from var(--acc-deep) calc(l + .04) c h);
+  box-shadow:var(--glow-acc);
 }
 /* ---- the hero's primary call to action ----------------------------------
    The flat purple face and soft bloom, as before — but stated in full from
@@ -4368,21 +4504,22 @@ body.page-welcome{ --page-max: 2400px; }
 
    Both states now set colour, background, border and shadow explicitly at
    0-3-0, so nothing downstream can take one property and leave the rest.
-   Rest is --acc-deep under a WHITE label; hover flips to the bright --acc
-   face and takes the label to black with it. Both readings are guaranteed
-   legible by the shade derivation, which matters here more than anywhere
-   else on the page: an album.cfg `accent = …` repaints this button. */
+   Rest is --acc-deep under a WHITE label; hover lifts the deep face one step
+   and keeps the label white (Nebula 2.0 -- it used to flip to the bright
+   --acc under black, which read as a different button). Both readings are
+   guaranteed legible by the shade derivation, which matters here more than
+   anywhere else on the page: an album.cfg `accent = …` repaints this button. */
 .vf .btn-link--primary{
-  color:var(--text);
+  color:#fff; /* nebula-allow: hex - white on --acc-deep, which is derived for it */
   background:var(--acc-deep);
   border-color:var(--acc-deep);
-  box-shadow:0 0 24px rgba(var(--acc-rgb),.35);
+  box-shadow:0 0 24px oklch(from var(--acc) l c h / .35);
 }
 .vf .btn-link--primary:hover{
-  color:var(--on-acc);
-  background:var(--acc);
-  border-color:var(--acc);
-  box-shadow:0 0 30px rgba(var(--acc-rgb),.5);
+  color:#fff; /* nebula-allow: hex - white on the lifted deep face */
+  background:oklch(from var(--acc-deep) calc(l + .04) c h);
+  border-color:oklch(from var(--acc-deep) calc(l + .04) c h);
+  box-shadow:0 0 30px oklch(from var(--acc) l c h / .5);
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference){
   .vf .btn-link--primary{ transition:background var(--dur-1), border-color var(--dur-1), box-shadow var(--dur-1), transform var(--dur-1) ease; }
@@ -4407,14 +4544,14 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .vf__meta:hover{
   color:inherit;
-  border-color:rgba(var(--chrome-rgb),.55);
+  border-color:oklch(from var(--chrome) l c h / .55);
   background:var(--glass-hi);
 }
 .vf__meta-key{
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-xs);
-  letter-spacing:.3em;
-  text-transform:uppercase;
+  letter-spacing:var(--tr-chrome-xs);
+  text-transform:var(--ui-case);
   color:var(--text-ghost);
 }
 .vf__meta-file{
@@ -4452,7 +4589,7 @@ body.page-welcome{ --page-max: 2400px; }
 .vf__tune:hover{
   color:var(--chrome);
   border-color:var(--chrome);
-  background:rgba(var(--chrome-rgb),.08);
+  background:oklch(from var(--chrome) l c h / .08);
 }
 .vf__nav:focus-visible,
 .vf__tune:focus-visible,
@@ -4490,7 +4627,7 @@ body.page-welcome{ --page-max: 2400px; }
   transform:translateY(-50%) scaleX(0);
   transform-origin:left center;
   background:var(--acc);
-  box-shadow:0 0 8px rgba(var(--acc-rgb),.55);
+  box-shadow:0 0 8px oklch(from var(--acc) l c h / .55);
 }
 .vf__seg.is-done::after{
   transform:translateY(-50%) scaleX(1);
@@ -4510,8 +4647,8 @@ body.page-welcome{ --page-max: 2400px; }
 .vf__auto{
   font-family:inherit;
   font-size:var(--fs-chrome-md);
-  letter-spacing:.2em;
-  text-transform:uppercase;
+  letter-spacing:var(--tr-chrome-md);
+  text-transform:var(--ui-case);
   color:var(--text-ghost);
   white-space:nowrap;
 }
@@ -4523,7 +4660,7 @@ body.page-welcome{ --page-max: 2400px; }
   display:grid;
   place-items:center;
   background:
-    radial-gradient(ellipse at 50% 40%, rgba(var(--acc-rgb),.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 40%, oklch(from var(--acc) l c h / .10) 0%, transparent 55%),
     #050505;
 }
 .vf__empty{
@@ -4569,17 +4706,17 @@ body.page-welcome{ --page-max: 2400px; }
    competing with the hero title above */
 .arc__label{
   margin:0;
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-sm); font-weight:400;
-  letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
+  font-family:var(--ui-font);
+  font-size:var(--fs-chrome-sm); font-weight:var(--ui-weight);
+  letter-spacing:var(--tr-chrome-sm); text-transform:var(--ui-case);
   color:var(--text-dim);
 }
 .arc__more{
   display:inline-flex; align-items:center;
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-sm); text-transform:var(--ui-case);
   color:var(--acc);
-  border-bottom:var(--hair) solid rgba(var(--acc-rgb),.35);
+  border-bottom:var(--hair) solid oklch(from var(--acc) l c h / .35);
   padding-bottom:var(--s-1);
   transition:color var(--dur-1), border-color var(--dur-1);
 }
@@ -4617,8 +4754,8 @@ body.page-welcome{ --page-max: 2400px; }
   background:var(--bg-2);
 }
 .arc__key{
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-sm); text-transform:var(--ui-case);
   color:var(--text-dim);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
@@ -4678,7 +4815,7 @@ body.page-welcome{ --page-max: 2400px; }
   .vf__corner--tr{ top:10px; right:10px; }
   .vf__corner--bl{ bottom:10px; left:10px; }
   .vf__corner--br{ bottom:10px; right:10px; }
-  .vf__hudtop{ padding-top:14px; gap:10px; font-size:var(--fs-chrome-xs); letter-spacing:.16em; }
+  .vf__hudtop{ padding-top:14px; gap:10px; font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); }
   .vf__auto{ display:none; }
   .vf .doc-min-hide,
   .arc .doc-min-hide{ display:none; }
@@ -4780,9 +4917,9 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .st-card__title{
   margin:0;
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-sm); font-weight:400;
-  letter-spacing:var(--tr-chrome-xs); text-transform:uppercase;
+  font-family:var(--ui-font);
+  font-size:var(--fs-chrome-sm); font-weight:var(--ui-weight);
+  letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
   color:var(--label);
 }
 /* The qualifier that keeps a chart honest — a rolling window, a unit, how
@@ -4813,8 +4950,8 @@ body.page-welcome{ --page-max: 2400px; }
 .st-card__body > *{ width:100%; }
 .st-foot{
   margin:20px 0 0;
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-md); text-transform:uppercase;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-md); text-transform:var(--ui-case);
   color:var(--text-dim);
 }
 
@@ -4845,7 +4982,7 @@ body.page-welcome{ --page-max: 2400px; }
 .ch-bar__meter{
   display:block; min-width:0;
   height:9px;
-  background:rgba(var(--label-rgb),.13);
+  background:oklch(from var(--label) l c h / .13);
 }
 .ch-bar__meter svg{ display:block; width:100%; height:100%; }
 /* the series high gets its label lifted too, so the row reads as the answer
@@ -4861,7 +4998,7 @@ body.page-welcome{ --page-max: 2400px; }
   display:inline-flex; align-items:center; gap:var(--s-2);
   list-style:none;
   cursor:pointer;
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
   color:var(--text-dim);
 }
@@ -4873,7 +5010,7 @@ body.page-welcome{ --page-max: 2400px; }
   .ch-more__toggle:hover{ color:var(--acc); }
 }
 .ch-bar__val{
-  font-family:var(--mono);
+  font-family:var(--num-font);
   font-size:var(--fs-chrome-md); letter-spacing:var(--tr-num);
   color:var(--text);
   font-variant-numeric:tabular-nums;
@@ -4895,7 +5032,7 @@ body.page-welcome{ --page-max: 2400px; }
   display:flex; flex-direction:column; align-items:stretch; gap:var(--s-2);
 }
 .ch-col__n{
-  font-family:var(--mono);
+  font-family:var(--num-font);
   font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xl);
   color:var(--text-dim);
   font-variant-numeric:tabular-nums;
@@ -4909,7 +5046,7 @@ body.page-welcome{ --page-max: 2400px; }
 .ch-col__bar{
   display:block;
   height:104px;
-  background:rgba(var(--label-rgb),.07);
+  background:oklch(from var(--label) l c h / .07);
 }
 .ch-col__bar svg{ display:block; width:100%; height:100%; }
 .ch-col.is-peak .ch-col__n{ color:var(--text); }
@@ -4918,8 +5055,8 @@ body.page-welcome{ --page-max: 2400px; }
 .ch-col.is-zero .ch-col__n{ color:var(--text-ghost); }
 .ch-col__label,
 .ch-col__tick{
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-xs); letter-spacing:.08em; text-transform:uppercase;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
   text-align:center;
   white-space:nowrap;
   overflow:hidden;
@@ -4965,7 +5102,7 @@ body.page-welcome{ --page-max: 2400px; }
    (album.cfg `accent =`) still repaints them. The color-mix step declares a
    plain fallback first for engines without it. */
 .ch-bar__fill,
-.ch-col__fill{ fill:rgba(var(--acc-rgb),.85); }        /* 3.4:1 */
+.ch-col__fill{ fill:oklch(from var(--acc) l c h / .85); }        /* 3.4:1 */
 .is-b2 .ch-bar__fill,
 .is-b2 .ch-col__fill{ fill:var(--acc); }               /* 4.3:1 */
 .is-b3 .ch-bar__fill,
@@ -4991,9 +5128,9 @@ body.page-welcome{ --page-max: 2400px; }
 .ch-dial__hub{ fill:none; stroke:var(--line); stroke-width:1; }
 /* the 100%-of-peak circle is the only reference the dial needs; the hub
    ring closes the readout in the middle */
-.ch-dial__ring{ stroke:rgba(var(--label-rgb),.34); }
+.ch-dial__ring{ stroke:oklch(from var(--label) l c h / .34); }
 .ch-dial__spoke{
-  stroke:rgba(var(--acc-rgb),.85);
+  stroke:oklch(from var(--acc) l c h / .85);
   stroke-width:7.5;
   stroke-linecap:butt;
 }
@@ -5004,8 +5141,8 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .ch-dial__spoke.is-peak{ stroke:var(--acc-soft); }
 .ch-dial__tick{
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-sm); letter-spacing:.08em;
+  font-family:var(--num-font); font-variant-numeric:tabular-nums;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-num);
   fill:var(--text-dim);
 }
 /* the reading the shape alone cannot give: which hour wins, and by how much */
@@ -5015,8 +5152,8 @@ body.page-welcome{ --page-max: 2400px; }
   fill:var(--text);
 }
 .ch-dial__peak-n{
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-sm); letter-spacing:.16em;
+  font-family:var(--num-font); font-variant-numeric:tabular-nums;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-num);
   fill:var(--label);
 }
 
@@ -5028,7 +5165,7 @@ body.page-welcome{ --page-max: 2400px; }
 .ch-stack__bar{
   display:block;
   height:22px;
-  background:rgba(var(--label-rgb),.13);
+  background:oklch(from var(--label) l c h / .13);
 }
 .ch-stack__bar svg{ display:block; width:100%; height:100%; }
 /* largest-first, so here the ramp step IS the rank — and it runs the same
@@ -5041,7 +5178,7 @@ body.page-welcome{ --page-max: 2400px; }
   fill:color-mix(in srgb, var(--acc-soft) 50%, var(--acc));
 }
 .ch-stack__seg.is-s3{ fill:var(--acc); }
-.ch-stack__seg.is-s4{ fill:rgba(var(--acc-rgb),.85); }
+.ch-stack__seg.is-s4{ fill:oklch(from var(--acc) l c h / .85); }
 .ch-stack__legend{
   list-style:none; margin:0; padding:0;
   display:flex; flex-direction:column; gap:var(--s-3);
@@ -5054,7 +5191,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .ch-stack__swatch{
   width:10px; height:10px;
-  background:rgba(var(--acc-rgb),.85);
+  background:oklch(from var(--acc) l c h / .85);
 }
 .ch-stack__swatch.is-s1{ background:var(--acc-soft); }
 .ch-stack__swatch.is-s2{
@@ -5062,7 +5199,7 @@ body.page-welcome{ --page-max: 2400px; }
   background:color-mix(in srgb, var(--acc-soft) 50%, var(--acc));
 }
 .ch-stack__swatch.is-s3{ background:var(--acc); }
-.ch-stack__swatch.is-s4{ background:rgba(var(--acc-rgb),.85); }
+.ch-stack__swatch.is-s4{ background:oklch(from var(--acc) l c h / .85); }
 .ch-stack__name{
   min-width:0;
   font-size:var(--fs-text-md); color:var(--text-dim);
@@ -5070,7 +5207,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .ch-stack__share,
 .ch-stack__n{
-  font-family:var(--mono);
+  font-family:var(--num-font);
   font-size:var(--fs-chrome-md); letter-spacing:var(--tr-num);
   font-variant-numeric:tabular-nums;
   font-feature-settings:"tnum";
@@ -5101,7 +5238,7 @@ body.page-welcome{ --page-max: 2400px; }
   padding:var(--s-3) var(--s-5);
   background:var(--acc);
   color:var(--on-acc);
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-md);
   text-decoration:none;
   translate:0 calc(-100% - var(--s-5));
@@ -5160,7 +5297,7 @@ body.page-welcome{ --page-max: 2400px; }
   border:var(--hair) solid var(--line-strong);
   background:
     repeating-linear-gradient(45deg,
-      rgba(var(--red-rgb),.05) 0 8px,
+      oklch(from var(--red) l c h / .05) 0 8px,
       transparent 8px 16px),
     var(--surface);
   position:relative;
@@ -5179,7 +5316,7 @@ body.page-welcome{ --page-max: 2400px; }
   letter-spacing:var(--tr-num);
   line-height:1;
   color:var(--red);
-  text-shadow: 0 0 28px rgba(var(--red-rgb),.4);
+  text-shadow: 0 0 28px oklch(from var(--red) l c h / .4);
 }
 .notfound__jp{
   font-family:"Noto Sans JP", sans-serif;
@@ -5203,12 +5340,18 @@ body.page-welcome{ --page-max: 2400px; }
   word-break:break-all;
 }
 .notfound__actions{ margin-top:22px; }
+/* The gallery's button, on Nebula 2.0's .btn: the interface voice, a label
+   in full --text (a control's label is read before it is pressed), one
+   hairline of --line-strong, and ONE row height whatever the content, so an
+   icon-only button and a labelled one sit on the same line. */
 .btn-link{
-  display:inline-block;
-  font-family:inherit;
-  font-size:var(--fs-text-sm);
-  letter-spacing:var(--tr-text);
-  padding:var(--s-3) var(--s-5);
+  display:inline-flex; align-items:center; justify-content:center;
+  min-height:calc(var(--s-7) + var(--s-0));
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-sm);
+  text-transform:var(--ui-case);
+  padding:var(--s-2) var(--s-4);
   border:var(--hair) solid var(--line-strong);
   color:var(--text);
   background:var(--glass);
@@ -5217,9 +5360,9 @@ body.page-welcome{ --page-max: 2400px; }
   transition: border-color var(--dur-1), color var(--dur-1), background var(--dur-1);
 }
 .btn-link:hover{
-  color:var(--chrome);
-  border-color:var(--chrome);
-  background:rgba(var(--chrome-rgb),.06);
+  color:var(--text);
+  border-color:oklch(from var(--chrome) l c h / .45);
+  background:oklch(from var(--chrome) l c h / .08);
 }
 /* about-me action: btn-link carrying the tiny operator pfp */
 .btn-link--about{ gap:var(--s-3); }
@@ -5292,14 +5435,14 @@ body.page-welcome{ --page-max: 2400px; }
   gap:var(--s-2) var(--s-5);
   padding:var(--s-4) var(--s-5);
   border-bottom:var(--hair) solid var(--line);
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   font-size:var(--fs-chrome-sm);
   letter-spacing:var(--tr-chrome-sm);
   color:var(--text-dim);
 }
 /* two facts and a clock, on one line: the tag and the leg count on the
    left, the clock on the right. The tag's glyph is the module's phase. */
-.trip__tag, .trip__legs, .trip__clock{ text-transform:uppercase; }
+.trip__tag, .trip__legs, .trip__clock{ text-transform:var(--ui-case); }
 .trip__tag > .fa{ margin-right:var(--s-2); color:var(--trip); }
 .trip--transit .trip__tag > .fa,
 .trip--active .trip__tag > .fa{ color:var(--trip-live); }
@@ -5347,7 +5490,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip__cd-label{
   display:flex; align-items:center; gap:var(--s-3);
-  font-family:var(--mono);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
   /* tracked like a value, not like a cap: the line is a sentence */
   font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-lg);
   color:var(--text-dim);
@@ -5379,7 +5522,7 @@ body.page-welcome{ --page-max: 2400px; }
    step, in the page title's white→grey fall (the way .arc__val sets big
    numbers). The phase is said by the marks around it, not by the digits. */
 .trip__cd-unit b{
-  font-family:var(--mono);
+  font-family:var(--num-font);
   font-weight:500; font-size:var(--fs-chrome-display); line-height:1;
   letter-spacing:var(--tr-chrome-display);
   font-variant-numeric:tabular-nums;
@@ -5397,14 +5540,14 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip__cd-unit b::selection{ -webkit-text-fill-color:var(--text); }
 .trip__cd-unit i{
-  font-family:var(--mono); font-style:normal;
-  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:uppercase;
+  font-family:var(--ui-font); font-weight:var(--ui-weight); font-style:normal;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
   color:var(--text-dim);
 }
 .trip__cd-sep{ display:none; }
 .trip__cd-target{
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:uppercase;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
   color:var(--text-dim);
 }
 .trip__cd-target b{ color:var(--text); font-weight:400; }
@@ -5489,7 +5632,7 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__stop.is-done .trip__stop-dot{ background:var(--trip-done); border-color:var(--trip-done); }
 .trip__stop.is-active .trip__stop-dot{ background:var(--trip-live); border-color:var(--trip-live); }
 .trip__stop-dates{
-  font-family:var(--mono);
+  font-family:var(--num-font);
   font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-num);
   color:var(--text-dim);
   font-variant-numeric:tabular-nums;
@@ -5508,7 +5651,7 @@ body.page-welcome{ --page-max: 2400px; }
 }
 .trip__stop-wx-now{
   display:inline-flex; align-items:baseline; gap:var(--s-2);
-  font-family:var(--mono); font-weight:500;
+  font-family:var(--num-font); font-weight:500;
   font-size:var(--fs-chrome-lg); letter-spacing:var(--tr-chrome-xl); color:var(--text);
   font-variant-numeric:tabular-nums; white-space:nowrap;
 }
@@ -5526,8 +5669,8 @@ body.page-welcome{ --page-max: 2400px; }
   color:var(--text-dim);
 }
 .trip__stop-wx-cond{
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:uppercase;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
   color:var(--text-dim);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
@@ -5535,8 +5678,8 @@ body.page-welcome{ --page-max: 2400px; }
    of 37" / ✓) carry the state, the colour repeats it */
 .trip__stop-meta{
   flex:0 0 auto; margin-left:auto;
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm); text-transform:var(--ui-case);
   color:var(--text-dim); white-space:nowrap;
 }
 .trip__stop-meta:empty{ display:none; }
@@ -5570,8 +5713,8 @@ body.page-welcome{ --page-max: 2400px; }
   display:flex; align-items:baseline; gap:var(--s-2);
   margin:0; padding-bottom:var(--s-2);
   border-bottom:var(--hair) solid var(--line);
-  font-family:var(--mono); font-weight:400;
-  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:uppercase;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
   color:var(--text-dim);
 }
 .trip__sides-head b{ font-weight:400; color:var(--text); }
@@ -5584,7 +5727,7 @@ body.page-welcome{ --page-max: 2400px; }
   align-items:baseline;
   gap:var(--s-1) var(--s-4);
   padding:var(--s-3) var(--s-2);
-  font-family:var(--mono); font-size:var(--fs-chrome-sm);
+  font-family:var(--ui-font); font-weight:var(--ui-weight); font-size:var(--fs-chrome-sm);
   text-decoration:none; color:var(--text-dim);
   transition:background-color var(--dur-1) var(--ease);
 }
@@ -5613,7 +5756,7 @@ body.page-welcome{ --page-max: 2400px; }
 .trip__side-date{ letter-spacing:var(--tr-num); font-variant-numeric:tabular-nums; white-space:nowrap; }
 .trip__side-meta{
   justify-self:end;
-  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm); text-transform:uppercase;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm); text-transform:var(--ui-case);
   white-space:nowrap;
 }
 .trip__side.is-active .trip__side-meta{ color:var(--trip-live); }
@@ -5640,16 +5783,16 @@ body.page-welcome{ --page-max: 2400px; }
   padding:var(--s-3) var(--s-3) var(--s-4);
   border:var(--hair) solid var(--line);
   background:
-    repeating-linear-gradient(0deg,  var(--wallpaper-grid) 0 var(--hair), transparent var(--hair) var(--s-6)),
-    repeating-linear-gradient(90deg, var(--wallpaper-grid) 0 var(--hair), transparent var(--hair) var(--s-6)),
+    repeating-linear-gradient(0deg,  var(--trip-grid) 0 var(--hair), transparent var(--hair) var(--s-6)),
+    repeating-linear-gradient(90deg, var(--trip-grid) 0 var(--hair), transparent var(--hair) var(--s-6)),
     var(--bg);
 }
 .trip-map svg{ display:block; width:100%; height:auto; }
 .trip-map__cap{
   display:flex; justify-content:flex-end; gap:var(--s-2);
   margin-top:var(--s-2);
-  font-family:var(--mono);
-  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:uppercase;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
   color:var(--text-dim);
 }
 .trip-map__cap [lang="ja"]{ font-family:"Noto Sans JP", var(--mono); letter-spacing:var(--tr-chrome-lg); }
@@ -5664,11 +5807,11 @@ body.page-welcome{ --page-max: 2400px; }
 .trip-map__inset{ fill:none; stroke:var(--line-strong); stroke-width:.7; }
 /* the regions the itinerary visits — one path per stop */
 .trip-map__pref{
-  fill:rgba(var(--trip-rgb),.1); stroke:rgba(var(--trip-rgb),.55); stroke-width:.8;
+  fill:oklch(from var(--trip) l c h / .1); stroke:oklch(from var(--trip) l c h / .55); stroke-width:.8;
   stroke-linejoin:round;
 }
-.trip-map__pref.is-active{ fill:rgba(var(--trip-live-rgb),.18); stroke:var(--trip-live); }
-.trip-map__pref.is-done{ fill:rgba(var(--trip-done-rgb),.08); stroke:rgba(var(--trip-done-rgb),.45); }
+.trip-map__pref.is-active{ fill:oklch(from var(--trip-live) l c h / .18); stroke:var(--trip-live); }
+.trip-map__pref.is-done{ fill:oklch(from var(--trip-done) l c h / .08); stroke:oklch(from var(--trip-done) l c h / .45); }
 
 /* route legs: dashed until flown; the next one marches */
 .trip-map__seg{
@@ -5680,7 +5823,7 @@ body.page-welcome{ --page-max: 2400px; }
   animation:trip-map-dash 1.4s linear infinite;
 }
 .trip-map__seg.is-done{
-  stroke:rgba(var(--trip-done-rgb),.5); stroke-dasharray:none; stroke-width:1; opacity:.9;
+  stroke:oklch(from var(--trip-done) l c h / .5); stroke-dasharray:none; stroke-width:1; opacity:.9;
 }
 
 .trip-map__dot{ fill:var(--bg); stroke:var(--text-dim); stroke-width:1.1; }
@@ -5699,7 +5842,7 @@ body.page-welcome{ --page-max: 2400px; }
 
 /* the labels are data — the stop names in their own case */
 .trip-map__lbl{
-  font-family:var(--mono); font-size:var(--fs-chrome-sm);
+  font-family:var(--ui-font); font-weight:var(--ui-weight); font-size:var(--fs-chrome-sm);
   letter-spacing:var(--tr-chrome-xl); fill:var(--text-dim);
 }
 .trip-map__city.is-active .trip-map__lbl{ fill:var(--trip-live); }
@@ -5710,7 +5853,7 @@ body.page-welcome{ --page-max: 2400px; }
    but hands it the pulse (is-away), so the map never shows two "you are
    here"s; back at a leg already done (a revisit), that leg's dot takes the
    pulse (is-here) without its done state changing. */
-.trip-map__pref--side{ fill:rgba(var(--trip-rgb),.04); stroke-dasharray:2 2.5; stroke-width:.6; }
+.trip-map__pref--side{ fill:oklch(from var(--trip) l c h / .04); stroke-dasharray:2 2.5; stroke-width:.6; }
 /* an island in an inset is too small for a dashed edge — it breaks into
    specks — so it keeps the side trip's quiet fill on a solid hairline */
 .trip-map__pref--inset{ stroke-dasharray:none; }
@@ -5962,8 +6105,8 @@ html.fx-anim .section__head::after{
   position:absolute; left:0; right:0; bottom:-1px;
   height:1px;
   background:linear-gradient(90deg,
-    var(--acc) 0%, rgba(var(--acc-rgb),.4) 55%, transparent 100%);
-  box-shadow:0 0 8px rgba(var(--acc-rgb),.35);
+    var(--acc) 0%, oklch(from var(--acc) l c h / .4) 55%, transparent 100%);
+  box-shadow:0 0 8px oklch(from var(--acc) l c h / .35);
   transform:scaleX(0);
   transform-origin:left center;
   opacity:0;
@@ -6111,11 +6254,11 @@ html.fx-anim:not(.spa-swap) .sidebar > .panel:nth-child(n+5){ animation-delay:.3
 /* AF: opens wide and dim, snaps to size on the accent flash, relaxes to rest */
 @keyframes vf-af{
   0%  { opacity:0; transform:translate(-50%,-50%) scale(2.2);
-        border-color:rgba(var(--chrome-rgb),.9); box-shadow:0 0 26px rgba(var(--chrome-rgb),.45); }
+        border-color:oklch(from var(--chrome) l c h / .9); box-shadow:0 0 26px oklch(from var(--chrome) l c h / .45); }
   58% { opacity:1; transform:translate(-50%,-50%) scale(1);
-        border-color:var(--chrome); box-shadow:0 0 18px rgba(var(--chrome-rgb),.35); }
+        border-color:var(--chrome); box-shadow:0 0 18px oklch(from var(--chrome) l c h / .35); }
   100%{ opacity:.55; transform:translate(-50%,-50%) scale(1);
-        border-color:rgba(255,255,255,.22); box-shadow:0 0 0 rgba(var(--chrome-rgb),0); }
+        border-color:rgba(255,255,255,.22); box-shadow:0 0 0 oklch(from var(--chrome) l c h / 0); }
 }
 /* the title is uncovered left to right, the way a name is set rather than
    dropped in — the -12% end inset keeps the drop shadow out of the clip */
@@ -6203,8 +6346,31 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease
 .nav{ transition: background-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease); }
 .nav--scrolled{
   background-color:var(--pane-scrolled);
-  box-shadow:0 12px 32px -18px rgba(0,0,0,.85);
+  box-shadow:var(--shadow-bar);
 }
+/* The same state read off the scroll position by the browser (Nebula 2.0):
+   the first --s-3 of scroll runs the bar from --pane to --pane-scrolled, with
+   nothing to bind and correct on the first frame of a page that opens
+   scrolled. app.js only listens for scroll where this is not supported, and
+   .nav--scrolled above is that fallback. `animation-timeline` comes after the
+   shorthand on purpose: the shorthand resets it. */
+@supports (animation-timeline: scroll()){
+  .nav{
+    animation:nav-under linear both;
+    animation-timeline:scroll(root block);
+    animation-range:0 var(--s-3);
+  }
+  .nav::after{
+    animation:nav-under-line linear both;
+    animation-timeline:scroll(root block);
+    animation-range:0 var(--s-3);
+  }
+}
+@keyframes nav-under{
+  from{ background-color:var(--pane); box-shadow:none; }
+  to  { background-color:var(--pane-scrolled); box-shadow:var(--shadow-bar); }
+}
+@keyframes nav-under-line{ from{ opacity:.35; } to{ opacity:.85; } }
 
 /* ---- micro-interactions (CSS-only, so gated on the OS preference
    rather than the JS fx-anim class) ---- */
@@ -6247,9 +6413,18 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease
    its tile via scroll restore + bracket blink. ---- */
 @media (prefers-reduced-motion: no-preference){
   @view-transition{ navigation:auto; }
-  ::view-transition-old(root){ animation-duration:.14s; }
-  ::view-transition-new(root){ animation-duration:.14s; }
+  /* --dur-1, the scale's shortest step: a page swap here is a crossfade
+     between two grids and wants to stay snappy, where Nebula's own default
+     is --dur-3. The bar (nebula-bar) holds still across it. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*){ animation-duration:var(--dur-1); animation-timing-function:var(--ease-out); }
 }
+/* fx-lite is set by script, so it cannot stop a navigation that has already
+   started; it can still stop the next one from animating. */
+.fx-lite::view-transition-group(*),
+.fx-lite::view-transition-old(*),
+.fx-lite::view-transition-new(*){ animation:none; }
 
 /* ---- "you are here" return flash: coming back out of a photo, app.js
    scrolls the album to its tile and blinks the corner brackets once ---- */
@@ -6293,7 +6468,7 @@ html.fx-anim .lightbox:not([hidden]) .lightbox__nav{ animation: rv-fade .3s ease
   transform:scaleX(0);
   transform-origin:left center;
   background:linear-gradient(90deg, var(--acc) 0%, var(--acc-soft) 100%);
-  box-shadow:0 0 10px rgba(var(--acc-rgb),.55);
+  box-shadow:0 0 10px oklch(from var(--acc) l c h / .55);
 }
 
 /* ---- album departure / return cues — what replaced the cover→hero
@@ -6498,9 +6673,9 @@ html.fx-anim .image-tile:is(:not(.rv), .rv-in) a:has(> img.img-shim)::before{
      the card renders, and re-styling the card re-styles an ANCESTOR of the
      link inside it — the worst case. Leaving the border out is what made
      tapping an album card take two goes. */
-  .feat-card:hover,
   .image-tile:hover{ transform:none; border-color:var(--line); }
-  .album-card:hover{ background:var(--surface); transform:none; border-color:var(--line); }
+  .feat-card:hover{ translate:none; box-shadow:var(--shadow-0); border-color:var(--line); }
+  .album-card:hover{ background:var(--surface); translate:none; box-shadow:var(--shadow-0); border-color:var(--line); }
 
   .feat-card:hover::before,
   .feat-card:hover::after,
@@ -6559,8 +6734,8 @@ html.fx-anim .image-tile:is(:not(.rv), .rv-in) a:has(> img.img-shim)::before{
 
    Every icon here is decorative: it rides alongside a real text label or
    an aria-label and carries aria-hidden, so nothing is lost with the font
-   blocked. Sizing is in `em` throughout — an icon inherits the tracked-out
-   mono type around it and must scale with it, never fight it. */
+   blocked. Sizing is in `em` throughout — an icon inherits the type
+   around it and must scale with it, never fight it. */
 
 /* leading icon: sized a touch under the cap height of the label so it
    reads as a marker, not a second word */
@@ -6577,7 +6752,7 @@ html.fx-anim .image-tile:is(:not(.rv), .rv-in) a:has(> img.img-shim)::before{
 .kv dd a > .fa,
 .album-card__badge--folder > .fa{ margin-right:.6em; }
 
-/* the mono labels are tracked out hard; a leading icon needs a little more
+/* the chrome labels used to be tracked out hard; a leading icon needs a little more
    air or it collides with the first letter's side bearing */
 .panel h2 > .fa,
 .arc__label > .fa,
@@ -6609,9 +6784,9 @@ html.fx-anim .image-tile:is(:not(.rv), .rv-in) a:has(> img.img-shim)::before{
   transition:color var(--dur-1), background-color var(--dur-1), border-color var(--dur-1);
 }
 .nav__search-ico{ font-size:12px; color:inherit; }
-.nav__search:focus-within .nav__search-go{ border-right-color:rgba(var(--acc-rgb),.45); color:var(--acc); }
+.nav__search:focus-within .nav__search-go{ border-right-color:oklch(from var(--acc) l c h / .45); color:var(--acc); }
 @media (hover:hover){ .nav__search-go:hover{ color:var(--text); background:rgba(255,255,255,.09); } }
-.nav__search-go:active{ background:rgba(var(--acc-rgb),.16); }
+.nav__search-go:active{ background:oklch(from var(--acc) l c h / .16); }
 .nav__search-go:focus-visible{ outline:none; box-shadow:inset 0 0 0 1px var(--acc); color:var(--acc); }
 
 /* --- chevrons that replaced ‹ › ---------------------------------------- */
@@ -6658,19 +6833,20 @@ html.fx-anim .image-tile:is(:not(.rv), .rv-in) a:has(> img.img-shim)::before{
 .sub-albums__label > .fa,
 .archive-head__label > .fa{ margin-right:.65em; }
 
-/* The label WORD is grey furniture like every other mono line on the page;
-   its glyph is the one thing allowed to carry the accent. That keeps a
-   section head readable as a head (colour marks where a section starts)
-   without colouring a whole strip of uppercase text — which is what made
-   the old sheet read as violet from top to bottom. One mark per section is
-   the entire colour budget of a screen. */
+/* The label WORD is grey furniture like every other chrome line on the
+   page, and its glyph says what KIND of section this is, so it is mist
+   (Nebula 2.0). It used to be the accent -- "the one thing allowed to carry
+   it" -- but a section head carries no state, and one accent glyph per
+   section on a full page was a wash of its own: "noch sehr in die
+   Akzentfarbe gewaschen" (user, 2026-11-09). The accent is left for what is
+   current, selected, open or live. */
 .feat__label > .fa,
 .showcase__label > .fa,
 .archive-head__label > .fa,
 .sub-albums__label > .fa,
 .album-desc__label > .fa,
 .album-hero__kicker > .fa,
-.section__parent-ico > .fa{ color:var(--acc); }
+.section__parent-ico > .fa{ color:var(--mist); }
 /* the trip tag's glyph is NOT in that list: it takes the module's phase
    colour (--trip / --trip-live / --trip-done, set with the module), which
    is the whole point of the trip palette being separate. */
@@ -6682,4 +6858,27 @@ html.fx-anim .image-tile:is(:not(.rv), .rv-in) a:has(> img.img-shim)::before{
 @media (hover: hover) and (prefers-reduced-motion: no-preference){
   .album-card__hover span > .fa{ transition:transform var(--dur-2) ease; }
   .album-card:hover .album-card__hover span > .fa{ transform:translateX(3px); }
+}
+
+/* ================================================================
+   FORCED COLOURS, LAST
+   ================================================================
+   The component half of the forced-colours gate (the tokens are redefined
+   up with the other rule-6 gates). Last in the sheet on purpose: Nebula 2.0
+   puts its gates in a layer above the components so a gate wins by POSITION
+   IN THE ORDER; this sheet is unlayered, so position in the file is the
+   order. Up top it lost to every component below it. Translucency and
+   hairlines are both discarded by the OS compositor, so every surface gets a
+   real border in a system colour, and the controls that carry state take
+   Highlight. */
+@media (forced-colors: active){
+  .nav, .sort__menu, .album-card, .feat-card, .panel, .field, .tag, .btn-link, .nav__search,
+  .lightbox__bar, .stage__loader, .vf__meta, .fhero__bar{
+    border:var(--hair) solid CanvasText;
+  }
+  .album-card::before, .album-card::after, .feat-card::before, .feat-card::after{ forced-color-adjust:none; }
+  .btn-link--primary, .tag.active, .nav__lang-opt.is-active, .sort__option.is-active, .facet.is-on{
+    forced-color-adjust:none;
+    background:Highlight; color:HighlightText; border-color:Highlight;
+  }
 }

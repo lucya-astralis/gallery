@@ -1,4 +1,4 @@
-/* lucya.systems aperture — the console's charts.
+/* lucya.systems aperture — Aperture's charts.
  *
  * Plain HTML, no library: every chart here shows ONE series, so it takes one
  * neutral ink (--label, --chrome under the pointer) and no categorical

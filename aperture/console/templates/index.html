@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <title>Console — lucya.systems aperture</title>
+  <title>Aperture — lucya.systems</title>
   <link rel="icon" type="image/svg+xml" href="{{ static_url('logo/aperture.svg') }}">
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
   {# NEBULA_FACES=1: the gallery's own font sheet, served from where it
@@ -68,7 +68,7 @@
       {{ brandmark.mark('mark--splash', ghosts=true) }}
       <p class="boot__label" id="boot-label">
         <span class="boot__name" id="boot-name">lucya.systems</span>
-        <span class="boot__sub">aperture console <b>{{ app_version }}</b></span>
+        <span class="boot__sub">aperture <b>{{ app_version }}</b></span>
       </p>
     </div>
   </div>
@@ -76,7 +76,7 @@
 
   {% if auth_mode == "open" %}
   {# No password is configured. Aperture only allows this on a loopback bind
-     or with CONSOLE_ALLOW_OPEN=1 (see console/security.py), and where it is
+     or with APERTURE_ALLOW_OPEN=1 (see console/security.py), and where it is
      allowed it is still worth saying out loud on every page. #}
   <div class="openbar" role="status">
     {# The bar has to stay one line on a phone: three wrapped lines of warning
@@ -95,7 +95,7 @@
         {{ brandmark.mark('mark--nav', ghosts=true, product=true) }}
         <span class="brand-text">
           <span class="brand-name">lucya.systems</span>
-          <span class="brand-sub">console</span>
+          <span class="brand-sub">aperture</span>
         </span>
       </a>
 
@@ -145,9 +145,8 @@
       <span class="foot__wordmark">lucya.systems</span>
     </div>
     <div class="foot__meta">
-      <span class="foot__bit"><b>SIG</b> / LUCYA.APERTURE</span>
-      <span class="foot__bit foot__bit--keep"><b>VER</b> / {{ app_version }}</span>
-      <span class="foot__bit"><b>TARGET</b> / {{ photos_dir }}</span>
+      <span class="foot__bit foot__bit--keep"><b>Version</b> {{ app_version }}</span>
+      <span class="foot__bit"><b>Photos</b> {{ photos_dir }}</span>
     </div>
   </footer>
 
@@ -197,6 +196,11 @@
   {# Every tag in use, for every tag field to complete against. #}
   <datalist id="vocab-list"></datalist>
 
+  {# Nebula 2.2's keyboard, copied verbatim from the nebula repo (same
+     version as the language this sheet speaks): a roving tabindex and the
+     arrow keys for every tablist and radiogroup. Before the app's own
+     scripts, so window.NebulaKeys is there when they render. #}
+  <script src="{{ static_url('nebula.js') }}"></script>
   <script src="{{ static_url('shell.js') }}"></script>
   <script src="{{ static_url('library.js') }}"></script>
   <script src="{{ static_url('tools.js') }}"></script>

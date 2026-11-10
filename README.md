@@ -6,13 +6,15 @@ One app, two surfaces, two ports.
 folder-based albums, EXIF display, sidecar-file tags and automatic
 thumbnail/preview generation. Safe for public hosting behind Cloudflare.
 
-**Console** (`:8090`) is the operator half: the editor for the config files the
+**Aperture** (`:8090`) is the operator half: the editor for the config files the
 gallery reads, on its own listener, reachable only where you publish its port.
-It was a separate program (the *Configurator*) until 1.0.
+It was a separate program (the *Configurator*) until 1.0, and was called the
+console until 3.0 — it is the part of aperture an operator works in, so it
+carries the product's name.
 
 They ship as one package and one image. Which listeners a process opens is
 decided by `APERTURE_ROLE` — `all` for one container with both, or `public` and
-`console` for two containers with separate blast radii. See
+`aperture` for two containers with separate blast radii. See
 [One app, two surfaces](#one-app-two-surfaces).
 
 ## Features
@@ -26,11 +28,11 @@ decided by `APERTURE_ROLE` — `all` for one container with both, or `public` an
 - **Showcase:** flag photos (`featured = …`) or a whole album (`showcase = true`) in the album's `album.cfg` to surface them on the welcome screen, on the album overview, and via `/api/showcase` JSON for embedding on other sites.
 - **Public statistics (`/stats`):** what the archive holds, charted — a monthly timeline, the largest albums (each bar links into its album), cameras, focal lengths, apertures, ISO, tags, a 24-hour **polar dial** for time of day (the hours are cyclical, so they are drawn round), a weekday column chart, and a **stacked proportion bar** for orientation (the one series whose parts add up to every photo). Everything is measured from the photos' own capture dates and EXIF; no visitor is counted and nothing is logged, so the page is safe to share. Server-rendered SVG geometry — no JavaScript, no chart library. Linked from the archive readout under the welcome hero and from the footer.
 - **Search & sort:** top bar searches album, file and tag names, cameras and lenses, and narrows with filters — `camera:x100v`, `lens:"35mm f/2"`, `iso:1600-`, `f/2.8`, `mm:24-70`, `date:2026-08`, `tag:night`, `album:japan_2026`, `color:blue` (one grammar for the page, `/api/photos?q=` and the CLI, in `aperture/search.py`). `/search` shows the results beside a column of **facets** — colour swatches, album (drilling into sub-albums), tag, year, camera — each counting the photos it would leave and linking to the search with it added; with nothing typed it browses every photo that way. Every EXIF value on a photo page and every bar of the capture charts on `/stats` opens the search for the photos that share it. Sort by date, name or size on every list view — plus a "Curated" order defined in `album.cfg` / `gallery.cfg`, which can also preselect the default sort.
-- **By day:** an album whose photos span more than one day also offers a **By day** sort — newest day first, with the grid split into a framed section per capture day (day counter, weekday, photo count). On an album with a trip configured (`TRIPS` in `aperture/trips.py`) the counter is the trip day, counted from the outbound flight, and each day carries a chip naming the leg it falls into — sub-albums of that trip inherit both. A **side trip** (`side_trips` in the same config — an excursion from a leg's base that is not a leg of its own, like a day in Sendai from Tokyo) keeps the leg on the chip and adds itself (`KANTO · ↗ SENDAI`), gets a slim row under the timeline linking to its album (with its own countdown, and its flights if it has any), and a quieter dotted out-and-back on the route map. A side trip back to a region a leg already covered (Sapporo in December, from Tokyo) is a *revisit*: that leg keeps its shape, dot and done state on the map, and only the route back there is added. A side trip to a region south of the map's crop (Okinawa, from Tokyo) gets an *inset*, a framed and enlarged window in the map's empty bottom-right corner that its route runs into. A new such region is one entry in `INSETS` in the generator. `tools/generate_trip_map.py` reads the side trips straight from `aperture/trips.py`, so adding one is an entry there plus a re-run.
+- **By day:** an album whose photos span more than one day also offers a **By day** sort — newest day first, with the grid split into a framed section per capture day (day counter, weekday, photo count). On an album with a trip configured (`TRIPS` in `aperture/trips.py`) the counter is the trip day, counted from the outbound flight, and each day carries a chip naming the leg it falls into — sub-albums of that trip inherit both. A **side trip** (`side_trips` in the same config — an excursion from a leg's base that is not a leg of its own, like a day in Sendai from Tokyo) keeps the leg on the chip and adds itself (`Kanto · ↗ Sendai`), gets a slim row under the timeline linking to its album (with its own countdown, and its flights if it has any), and a quieter dotted out-and-back on the route map. A side trip back to a region a leg already covered (Sapporo in December, from Tokyo) is a *revisit*: that leg keeps its shape, dot and done state on the map, and only the route back there is added. A side trip to a region south of the map's crop (Okinawa, from Tokyo) gets an *inset*, a framed and enlarged window in the map's empty bottom-right corner that its route runs into. A new such region is one entry in `INSETS` in the generator. `tools/generate_trip_map.py` reads the side trips straight from `aperture/trips.py`, so adding one is an entry there plus a re-run.
 - **Three languages (EN / DE / JP):** selector in the top-right corner, cookie-backed with an `Accept-Language` fallback. Album descriptions are per-language markdown files (`album_en.md` / `album_de.md` / `album_jp.md`); UI strings live in `aperture/i18n.py`. See [Languages](#languages--i18n).
 - **Mobile-friendly:** responsive grid, large touch targets, keyboard navigation (← → ESC) on desktop.
-- **Read-only where it faces the public:** the gallery app has no route that is not a `GET` — no write endpoints, no uploads, no tag editing. The one write path in the product belongs to the console, on the other port, and reaches only the `.album/` and `.gallery/` metadata folders. See [Security / hosting](#security--hosting).
-- **Console:** the config editor *and the operations panel*, built in. Album and gallery `cfg` files, per-language descriptions, icons, title fonts, wallpapers and brand assets, with validation — plus the indexer's live state, scan / pause / resume, and `doctor`, on its own port, never on the public one. Its **Changelog** place shows the release notes the build ships with, the repository on GitHub, and who makes the software.
+- **Read-only where it faces the public:** the gallery app has no route that is not a `GET` — no write endpoints, no uploads, no tag editing. The one write path in the product belongs to Aperture, on the other port, and reaches only the `.album/` and `.gallery/` metadata folders. See [Security / hosting](#security--hosting).
+- **Aperture:** the config editor *and the operations panel*, built in. Album and gallery `cfg` files, per-language descriptions, icons, title fonts, wallpapers and brand assets, with validation — plus the indexer's live state, scan / pause / resume, and `doctor`, on its own port, never on the public one. Its **Changelog** place shows the release notes the build ships with, the repository on GitHub, and who makes the software.
 - **Operations CLI:** `python -m aperture.cli` — run or pause the indexer, check index/config/derivative drift with `doctor`, audit tags and GPS, and inspect exactly how a photo, an album, the welcome hero or a trip resolves. See [Operations CLI](#operations-cli).
 - **Self-watch & failsafe:** every serving process keeps an eye on the storage it stands on and on what an operator should hear about first (disk space, a share without a rescan, the indexer). If the photo share goes away — a NAS that sleeps at night — the gallery answers 503 with a page that says so instead of a 500, keeps the index untouched, and comes back by itself. `/healthz` for monitors. See [Self-watch and failsafe](#self-watch-and-failsafe).
 - **Security headers:** CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy — all set by built-in middleware.
@@ -44,8 +46,8 @@ docker compose up -d --build
 ```
 
 - Gallery: <http://localhost:8000>
-- Console: <http://127.0.0.1:8090> — published to `127.0.0.1` by default.
-  `CONSOLE_HOST` in `.env` decides which host address it appears on; anything
+- Aperture: <http://127.0.0.1:8090> — published to `127.0.0.1` by default.
+  `APERTURE_HOST` in `.env` decides which host address it appears on; anything
   other than loopback is a security decision, not a convenience one.
 
 ## One app, two surfaces
@@ -54,14 +56,14 @@ docker compose up -d --build
 |---|---|---|---|---|
 | `all` | `:8000` + `:8090` | yes | `rw` | one container, the default |
 | `public` | `:8000` | yes | `ro` | the exposed instance |
-| `console` | `:8090` | no | `rw` | the operator instance, internal |
+| `aperture` | `:8090` | no | `rw` | the operator instance, internal |
 
 The indexer follows the *public* role rather than an app lifespan, so in every
-shape there is exactly one writer on the SQLite file. A console-only process
+shape there is exactly one writer on the SQLite file. An Aperture-only process
 is a reader: it asks for scans through the same flag-file control channel the
 CLI uses (`data/control/`, see [Operations CLI](#operations-cli)).
 
-Nothing routes between the two apps. The console's API lives under `/api/` as
+Nothing routes between the two apps. Aperture's API lives under `/api/` as
 well — it can, because a request that arrives on the public socket has no way
 to reach a handler that was never mounted on it.
 
@@ -72,20 +74,20 @@ indexer, what `doctor` checked, what a scan did, what the generated trees cost
 on disk — and `aperture/reports.py` holds the reports that only look (a cfg, a
 photo, the tags, the welcome feed, the export…). Two front ends render both:
 `aperture/cli/` to a terminal, `aperture/console/opsapi.py` over HTTP, where
-the console's **Operations** place has a tab for every command. There is one
+Aperture's **Operations** place has a tab for every command. There is one
 implementation of each report, and a report that changes changes in both
 places at once.
 
 Actions go through the flag-file control channel in `data/control/`, never
-through a function call — **even in the `all` role, where the console shares a
+through a function call — **even in the `all` role, where Aperture shares a
 process with the indexer.** A scan requested in the browser is the same file
 `python -m aperture.cli scan` writes, picked up by the same control loop. So
 is every other write the indexer owns — rebuilding or pruning derivatives,
-recomputing the featured flags, stripping coordinates: the console queues them
+recomputing the featured flags, stripping coordinates: Aperture queues them
 as *jobs* and the indexer runs them. That keeps one writer, one place to look
-when something did not happen, and it means `APERTURE_ROLE=console` in its own
+when something did not happen, and it means `APERTURE_ROLE=aperture` in its own
 container works with no second implementation. A request carries
-`by: console` or `by: cli`, so `status` says afterwards which one asked.
+`by: aperture` or `by: cli`, so `status` says afterwards which one asked.
 
 Add images:
 
@@ -369,11 +371,11 @@ fuji  = japan_2026/hakone/fuji.jpg  # one photo
   So any name is free — `/s/albums` is a link, `/albums` stays the page — and
   a page the gallery gains in a later release can never take over an address
   that is already printed somewhere.
-- `Check all` in the console and `doctor` report every link that would
+- `Check all` in Aperture and `doctor` report every link that would
   answer 404.
 
-The console's **Links** screen edits this file — see
-[the console's README](aperture/console/README.md#what-it-edits). Set
+Aperture's **Links** screen edits this file — see
+[Aperture's README](aperture/console/README.md#what-it-edits). Set
 `PUBLIC_BASE_URL` for it to show and open the full address.
 
 ### Gallery settings (`gallery.cfg`)
@@ -431,11 +433,11 @@ its built-in colours, face and backdrop.
 # the active state, the featured mark, the hero button
 accent = #7ad1ff
 
-# the faces and icons of the chrome, gallery and console alike:
+# the faces and icons of the chrome, gallery and Aperture alike:
 #   stock  JetBrains Mono, Ethnocentric, Font Awesome
 #   nebula Nebula Mono, Nebula Wordmark, Nebula Icons
 # unset = the server's NEBULA_FACES (stock unless it says otherwise).
-# The console switches it under Site > Look; it takes on the next page.
+# Aperture switches it under Site > Look; it takes on the next page.
 faces = nebula
 
 # the display face of the CHROME — the wordmark, the welcome screen's one
@@ -575,13 +577,13 @@ Rules for the hand-picked welcome list:
 - Paths are relative to `photos/` (`album/file.jpg`, nested albums allowed); backslashes are tolerated.
 - Entries accumulate in order (max 24, duplicates collapse).
 - Entries that aren't indexed are skipped with a log warning; if nothing resolves, the feed falls back to showcase/random as if the file weren't there.
-- With a hand-picked list the hero shows a `CURATED` label and hides the ⟳ TUNE (reshuffle) button.
+- With a hand-picked list the hero shows a `Curated` label and hides the reshuffle button.
 - `welcome_mobile` / `welcome_desktop` accept the same syntax as `welcome` and win over it for their device class. Phones are detected via the User-Agent (`Mobi`); Android tablets and iPads in desktop mode get the desktop feed.
 
 ## Design — Nebula
 
 The look has a name, because two surfaces wear it: the gallery, and the
-[console](aperture/console/) that edits its config files. **Nebula**, after
+[Aperture](aperture/console/) that edits its config files. **Nebula**, after
 the accent it rations — `#5865F2`, "Nebula Blue". Six rules, and everything
 in `aperture/gallery/static/style.css` is one of them:
 
@@ -601,11 +603,17 @@ in `aperture/gallery/static/style.css` is one of them:
    hairline: no bevel, no gloss. `--pane` is the one exception to the ladder:
    **deep black**, no hue in the fill and `--blur-1` behind it, so the bar
    framing every screen never picks up an album's colour.
-4. **The mono, tracked, uppercase voice marks the chrome *around* a photo
-   grid** — section labels, counts, measured values, the meta line. Everything
-   a person actually reads is Space Grotesk in sentence case. The display face
-   (Ethnocentric) is the wordmark's voice and is not a heading's. The token
-   name carries the voice: `--fs-chrome-*` against `--fs-text-*`.
+4. **The chrome is quieter than the content.** The furniture *around* a
+   photo grid — section labels, counts, buttons, tabs, the meta line — speaks
+   the *interface voice*: Space Grotesk 500, one step smaller, the `--label`
+   tone, sentence case. Everything a person actually reads is Space Grotesk at
+   the reading sizes. Measured values take tabular figures; mono is left for
+   what really is code (a path, a hex, a key, raw EXIF). The display face
+   (Ethnocentric) is the wordmark's voice and is not a heading's. Four tokens
+   carry the voice (`--ui-font`, `--ui-case`, `--ui-weight`, `--num-font`),
+   and the token name carries the size: `--fs-chrome-*` against `--fs-text-*`.
+   Until 3.0 this voice was mono, uppercase and tracked, which made a page of
+   readouts read as a terminal rather than an application.
 5. **Measure is rationed like colour.** Every size, space, duration and blur
    comes off a named scale — `--s-0..10`, `--fs-*`, `--tr-*`, `--dur-*`,
    `--blur-*`. A raw `px` is the same mistake as a raw hex, and the check is a
@@ -627,12 +635,53 @@ those are the knobs Nebula exposes, and they run through the same derivation
 so a hand-typed hex still lands with the contrast guarantees. Everything else
 is the software's.
 
-The console carries the same tokens and the same controls rather than a
+Aperture carries the same tokens and the same controls rather than a
 lookalike of them; its README lists which of its objects comes from which of
 the gallery's. They ship in one image now, but still as **two stylesheets** —
 `aperture/gallery/static/style.css` and `aperture/console/static/style.css` — so a
 change to the language still has to be made in both. Collapsing them onto one
 shared `nebula.css` is a later milestone.
+
+### Which Nebula (2.2.0)
+
+Nebula is versioned on its own (its `CHANGELOG.md` says what each version
+asks of an app). Both sheets say which one they speak in their first token,
+`--nebula-version: "2.2.0"`, so `python nebula/tools/nebula_lint.py --version
+<sheet>` can tell how far behind one is. Since 3.0 they follow 2.2.0:
+
+* **The interface voice** (rule 4 above) instead of mono caps, with the
+  chrome scale a step larger to match (`--fs-chrome-xs` 11.5px … `-xl` 22px)
+  and the caps tracking gone.
+* **The committing button is solid**: `--acc-deep` under a white label, one
+  per row; the others are outlined glass with a full `--text` label and one
+  row height.
+* **The accent keeps state alone.** Section-label glyphs and the rail's glyphs
+  are mist, the bar's hairline is `--chrome`, and every tint is relative
+  colour (`oklch(from var(--acc) l c h / a)`), so setting `--acc` alone
+  retints everything. The `-rgb` triplets are still defined but no longer
+  read. A kind palette (`--hue-*`) exists for avatars, marks and tags only.
+* **Depth**: an elevation ladder (`--shadow-0/1/2`, `--shadow-bar`, `--lift`) —
+  cards sit on the page with a contact shadow and rise on hover — and a ground
+  with a key light, a vignette and, in the gallery, a slight parallax. The
+  wallpaper grid is gone (the trip map keeps its graticule as `--trip-grid`).
+* **The platform does the work**: cross-document view transitions with the bar
+  held still (`view-transition-name: nebula-bar`), the bar's scrolled state
+  read off a scroll timeline (the scroll listener is only the fallback),
+  dialogs and toasts entering through `@starting-style`, headings balanced and
+  running text `pretty`.
+* **Panes answer to their own width**: Aperture's settings stack is a query
+  container, and a row drops its control under 560px of *pane*.
+* **The keyboard** (`nebula.js`, copied verbatim into Aperture's static
+  files): every pick-one control there is a `radiogroup` of `radio`s and the
+  section tabs a `tablist`, one tab stop each, with the arrow keys, Home and
+  End inside. The gallery has no such group (its language switch is links), so
+  it does not load the script.
+* **The forced-colours gate comes last** in both sheets, so Windows high
+  contrast mode actually wins over the components.
+
+Browsers from 2024 on are the floor: relative colour, container queries and
+the rest. Without view transitions, scroll timelines or `@starting-style` the
+pages are the same pages without the movement.
 
 [`nebula/`](nebula/) is the language on its own, away from either app: an
 interactive specimen book (`index.html` — the component set, plus four
@@ -653,14 +702,14 @@ git clone git@github.com:lucya-astralis/nebula.git nebula
 ### Nebula's own faces (`NEBULA_FACES`)
 
 Nebula has its own faces now, drawn for the language in the nebula repo
-(`assets/fonts/build.py`): **Nebula Mono** for the chrome voice, **Nebula
+(`assets/fonts/build.py`): **Nebula Mono** for what is code (since 3.0 the chrome itself speaks the sans interface voice), **Nebula
 Wordmark** for the brand voice (the eagle's angles, Ethnocentric's stance),
 and **Nebula Icons**, line icons drawn with the same pen. They ship in this
 image and stay **off** until you switch them on:
 
-* **In the console:** Site → Look → `faces`, three positions — the server's
+* **In Aperture:** Site → Look → `faces`, three positions — the server's
   default, `stock`, `Nebula`. Saving writes `faces = …` into gallery.cfg; the
-  gallery's next page wears it, and the console reloads itself into it.
+  gallery's next page wears it, and Aperture reloads itself into it.
 * **For the whole server:** `NEBULA_FACES=1` makes `nebula` the default for
   every gallery.cfg that does not say `faces` itself. Unset, it is `stock`.
 
@@ -934,7 +983,7 @@ The scanner reads the file on the next indexing pass and links the tags. Empty o
 | `previews/`     | Generated stage previews (cache, can be wiped anytime)    |
 | `data/`         | SQLite DB with EXIF cache and tag index                   |
 | `data/control/` | Flag files the CLI and the server talk through (see below)|
-| `data/console/` | The console's own state: its password hash, the audit log, rolling backups of every file it overwrites |
+| `data/console/` | Aperture's own state: its password hash, the audit log, rolling backups of every file it overwrites |
 
 Everything this software is trusted with lives under `data/`, never in the
 photo tree — the gallery *serves* files out of `photos/.gallery/`, so a secret
@@ -945,7 +994,7 @@ in any case: Synology's `@eaDir`, `@tmp`, `@sharebin`, `#recycle` and
 `#snapshot`, QNAP's `@Recycle`, `@Recently-Snapshot` and `.@__thumb`, macOS's
 `.AppleDouble`, `.Trashes`, `.Spotlight-V100` and `.fseventsd`, Windows's
 `$RECYCLE.BIN` and `System Volume Information`, and `lost+found`. The scan does
-not walk into them, the watcher drops their events, the console does not list
+not walk into them, the watcher drops their events, Aperture does not list
 them and cannot write into them, and nothing in them is served. The list is
 `SYSTEM_DIRS` in `aperture/schema.py`.
 
@@ -954,12 +1003,12 @@ Inside the package:
 | Path                | Purpose                                             |
 |---------------------|-----------------------------------------------------|
 | `aperture/gallery/` | the public app: pages, the JSON API, the media routes, its static files and templates |
-| `aperture/console/` | the console app, its static files and templates     |
+| `aperture/console/` | the Aperture app, its static files and templates     |
 | `aperture/albums.py`, `photos.py`, `theme.py`, `config.py`, `branding.py`, … | what an album, a photo, a theme and a cfg ARE. No route and no template reaches in from here, and nothing here imports the web layer — a test asserts that direction |
 | `aperture/schema.py` + `cfgio.py` | which keys a cfg file may hold, and the grammar that reads and rewrites it |
-| `aperture/checks.py`| what is wrong with a cfg file — one implementation, asked by `doctor`, the CLI and the console |
+| `aperture/checks.py`| what is wrong with a cfg file — one implementation, asked by `doctor`, the CLI and Aperture |
 | `aperture/scanner.py` + `indexer.py` | the walk that fills the index and writes the derivatives, and the loop that schedules it |
-| `aperture/ops.py`   | the operations surface the CLI and the console's `/api/ops/*` share: live state, `doctor`, disk usage, and everything that ends in a write (scan, pause, jobs) |
+| `aperture/ops.py`   | the operations surface the CLI and Aperture's `/api/ops/*` share: live state, `doctor`, disk usage, and everything that ends in a write (scan, pause, jobs) |
 | `aperture/reports.py` | the reports that only look — cfg, photo, album, trips, tags, welcome, search, i18n, archive statistics, the export — for the same two front ends |
 | `aperture/server.py`| the process: which listeners open, and shutdown     |
 | `aperture/runtime.py`| the one place that reads the environment            |
@@ -985,30 +1034,34 @@ Inside the package:
 | `PUBLIC_BASE_URL`| (auto)       | Absolute base URL used in OG tags + `/api/showcase` URLs   |
 | `HEALTH_INTERVAL`| `10`         | Seconds between the self-watch's rounds (0 = off). See [Self-watch and failsafe](#self-watch-and-failsafe) |
 | `FAILSAFE`      | `1`           | While the storage is unreachable, answer 503 with a notice. `0` = requests fail as they fall; the index is protected either way |
-| `APERTURE_ROLE` | `all`         | `all` / `public` / `console` — which listeners open         |
+| `APERTURE_ROLE` | `all`         | `all` / `public` / `aperture` — which listeners open         |
 | `NEBULA_FACES`  | `0`           | The default for gallery.cfg `faces` while the file does not set it: `1` = both surfaces wear Nebula's own faces and icons (Nebula Mono, Nebula Wordmark, Nebula Icons) instead of JetBrains Mono, Ethnocentric and Font Awesome. See [Nebula's own faces](#nebulas-own-faces-nebula_faces) |
 
-Console only:
+Aperture only. Until 3.0 these were `CONSOLE_ENABLED`, `CONSOLE_PORT`,
+`CONSOLE_BIND`, `CONSOLE_ALLOW_OPEN` and (in `.env`) `CONSOLE_HOST`, and the
+role was `console`. The old names still work throughout 3.x — a new name wins
+when both are set — and every start logs a warning naming each old one still
+in use:
 
 | Variable          | Default     | Meaning                                            |
 |-------------------|-------------|----------------------------------------------------|
-| `CONSOLE_ENABLED` | `1`         | `0` leaves the second listener closed entirely      |
-| `CONSOLE_PORT`    | `8090`      | Port inside the container                           |
-| `CONSOLE_BIND`    | `127.0.0.1` | Address the console binds. In Docker this is `0.0.0.0` and `CONSOLE_HOST` in `.env` decides which host address the port is published on — a container's own loopback would be unreachable from anywhere |
+| `APERTURE_ENABLED` | `1`         | `0` leaves the second listener closed entirely      |
+| `APERTURE_PORT`    | `8090`      | Port inside the container                           |
+| `APERTURE_BIND`    | `127.0.0.1` | Address Aperture binds. In Docker this is `0.0.0.0` and `APERTURE_HOST` in `.env` decides which host address the port is published on — a container's own loopback would be unreachable from anywhere |
 | `READ_ONLY`       | `0`         | `1` = browse and validate, write nothing            |
 | `BACKUPS`         | `20`        | Versions kept per edited file under `data/console/backups` |
 | `MAX_UPLOAD_MB`   | `8`         | Cap on icon / font / wallpaper uploads              |
-| `UPDATE_CHECK`    | `1`         | Ask images.lucya.sh (at most twice a day) whether a newer release exists, and say so in the console. `0` = never ask |
+| `UPDATE_CHECK`    | `1`         | Ask images.lucya.sh (at most twice a day) whether a newer release exists, and say so in Aperture. `0` = never ask |
 | `UPDATE_URL`      | `https://images.lucya.sh/api/version` | Where that answer is read from — any aperture's `/api/version` |
 
 ## Operations CLI
 
 Everything operational is one command — or the **Operations** place at the top
-of the [console](aperture/console/), which serves the same reports from the
+of [Aperture](aperture/console/), which serves the same reports from the
 same functions (`aperture/ops.py`, `aperture/reports.py`), one tab each. Since
 1.7.0 the two cover the same ground: everything below except `menu`, `help` and
 `term`, which are about the terminal itself. Two differences remain. The
-console's writes that belong to the indexer (`thumbs --rebuild`,
+Aperture's writes that belong to the indexer (`thumbs --rebuild`,
 `thumbs --prune --apply`, `featured --recompute`, `gps --strip`) are *jobs* the
 running indexer picks up, where the CLI does the work in its own process; and
 the CLI is the one of the two that works with nothing running at all.
@@ -1206,9 +1259,9 @@ through three small files in `data/control/` instead:
 
 | File | Written by | Meaning |
 |------|-----------|---------|
-| `paused.json` | CLI / console | Indexing is suspended (holds the reason and since when) |
-| `scan.request.json` | CLI / console | A scan is queued; the server consumes the file when it picks it up |
-| `jobs/<id>.json` | console | A job is queued (rebuild, prune, featured, gps_strip); unlike a scan they queue in order |
+| `paused.json` | CLI / Aperture | Indexing is suspended (holds the reason and since when) |
+| `scan.request.json` | CLI / Aperture | A scan is queued; the server consumes the file when it picks it up |
+| `jobs/<id>.json` | Aperture | A job is queued (rebuild, prune, featured, gps_strip); unlike a scan they queue in order |
 | `jobs/<id>.done.json` | server | A finished job's summary; the newest 20 are kept |
 | `status.json` | server | The live snapshot `status` reads, re-stamped as a heartbeat — including a running job's progress |
 
@@ -1243,10 +1296,10 @@ requested scan starts within ~2s, and `scan` waits for the result by default
 ### What writes what
 
 The originals stay untouched — with one named exception, `gps --strip` (and
-the console's *GPS* job, and a scan with `STRIP_GPS=1`), which rewrites the
+Aperture's *GPS* job, and a scan with `STRIP_GPS=1`), which rewrites the
 photos that still carry coordinates.
 
-| Writes | Commands | In the console |
+| Writes | Commands | In Aperture |
 |--------|----------|----------------|
 | nothing | `status`, `doctor`, `disk`, `cfg`, `photo`, `album`, `trip`, `welcome`, `tags`, `search`, `i18n`, `export --list`, `thumbs` (without flags), `featured` (without `--recompute`), `gps` (without `--strip`) | every report |
 | the SQLite index | `scan`, `featured --recompute` | a scan, the *featured* job — both run by the indexer |
@@ -1419,7 +1472,7 @@ wordmark and the album's title face too. See the Cloudflare notes under
 - Tags, thumbnails and the index live in `data/` and `thumbnails/` — none of it
   is security-critical
 
-### The console is the write path, and it is on the other port
+### Aperture is the write path, and it is on the other port
 
 Until 1.0 the editor was a separate program, and this section could say
 "`photos/` is mounted `:ro`, so even a code bug cannot touch the originals".
@@ -1438,20 +1491,20 @@ What replaces it:
   refuses traversal, absolute paths, reserved Windows device names, alternate
   data streams, trailing dots and spaces, and any path reached through a
   symlink.
-- **Where the console can be reached from.** Its port is published to a host
+- **Where Aperture can be reached from.** Its port is published to a host
   address, not to every interface. `127.0.0.1` is the default; a LAN or VPN
   address puts it on exactly that network. It is not meant for the open
   internet — reach it over WireGuard, Tailscale or an SSH tunnel.
-- **What it never touches.** The console does not write the index. Scans and
+- **What it never touches.** Aperture does not write the index. Scans and
   pauses go through the flag-file control channel, so the indexer stays the
   single writer on the database.
 - **Two containers if you want the old guarantee literally.** Run
-  `APERTURE_ROLE=public` with `photos:ro` and `APERTURE_ROLE=console`
+  `APERTURE_ROLE=public` with `photos:ro` and `APERTURE_ROLE=aperture`
   separately; it costs one environment variable.
 - **Not root.** The image runs as uid 10001; the compose service adds
   `read_only`, `cap_drop: ALL` and `no-new-privileges`.
 
-### The console's door
+### Aperture's door
 
 - **A password, not a port.** One operator password, hashed with `scrypt`
   (stdlib — no new dependency), stored in `data/console/credentials` with mode
@@ -1462,14 +1515,14 @@ What replaces it:
   process refuses to open that socket and prints how to fix it. Inside a
   container the bind is always `0.0.0.0`, so if your boundary is elsewhere
   (the port is only published on `127.0.0.1`, or a firewall covers it) say so
-  with `CONSOLE_ALLOW_OPEN=1`. On loopback, no password runs open with a
-  warning on every start — and a red bar across the console saying so.
+  with `APERTURE_ALLOW_OPEN=1`. On loopback, no password runs open with a
+  warning on every start — and a red bar across Aperture saying so.
 - **Sessions.** Server-side, `HttpOnly` + `SameSite=Strict` cookie, `Secure`
   where the browser would accept it, 30 minutes idle and 12 hours absolute.
   Changing the password ends every open session.
 - **CSRF, three layers.** `SameSite=Strict`, an `Origin` check on every
   mutating request, and a session-bound token in `X-Aperture-CSRF`. The
-  cross-site check applies even when the console runs open.
+  cross-site check applies even when Aperture runs open.
 - **Throttling.** Three free attempts per address, then exponential backoff
   capped at five minutes; the answer becomes `429` with a `Retry-After`.
 - **Uploads.** Extension allowlist *and* a magic-byte check, so an HTML page
@@ -1483,7 +1536,7 @@ Every bullet above has a test in `tests/test_security.py`, which is the point
 of writing them as bullets.
 
 **Still open** — TLS is yours to provide. A session over plain HTTP to a LAN
-address travels in clear, and the console says so in the log. Put it behind
+address travels in clear, and Aperture says so in the log. Put it behind
 WireGuard, Tailscale or an SSH tunnel rather than exposing it.
 
 **Built-in security headers** (set by middleware in `aperture/gallery/app.py`):
@@ -1516,7 +1569,7 @@ WireGuard, Tailscale or an SSH tunnel rather than exposing it.
 ## Self-watch and failsafe
 
 `doctor` answers when it is asked; `aperture/health.py` does not wait. A
-thread in every serving process (gallery and console alike) looks every
+thread in every serving process (gallery and Aperture alike) looks every
 `HEALTH_INTERVAL` seconds at:
 
 | Check | Kind | What makes it fail |
@@ -1528,9 +1581,9 @@ thread in every serving process (gallery and console alike) looks every
 | photo share | environment | photos on SMB/NFS with `SCAN_INTERVAL=0` — such a share delivers no file events |
 | photo mount | environment | `APERTURE_ROLE=public` and the photo tree is writable |
 | index journal | environment | `gallery.db-wal` over 64 MiB |
-| indexer, last scan | environment | no heartbeat (console role), or the last scan failed, was held or could not list folders |
+| indexer, last scan | environment | no heartbeat (`aperture` role), or the last scan failed, was held or could not list folders |
 
-Environment checks only *say* something: the console's bar gets an amber
+Environment checks only *say* something: Aperture's bar gets an amber
 mark, System → Indexer a card, `python -m aperture.cli health` a line.
 Storage checks *act*. Two failed rounds in a row — or one, plus a request
 that already tripped over the storage — and the process goes **down**:
@@ -1630,7 +1683,7 @@ built from `VERSION` and the newest entry in `CHANGELOG.md`:
  "notes": "Every gallery says which aperture it runs, and the update check asks images.lucya.sh."}
 ```
 
-A running console asks `https://images.lucya.sh/api/version` whether there is
+A running Aperture asks `https://images.lucya.sh/api/version` whether there is
 a newer release (`aperture/update_check.py`). That gallery is the maker's own and
 always runs the newest release, so its answer is the latest one — there is no
 file to publish after a push. The server asks, not the browser, at most twice a
@@ -1668,7 +1721,7 @@ run, so while working on one surface start that one on its own:
 
 ```bash
 uvicorn aperture.gallery.app:app --reload --port 8000          # gallery
-uvicorn aperture.console.app:app --reload --port 8090   # console
+uvicorn aperture.console.app:app --reload --port 8090   # Aperture
 ```
 
 Tests:

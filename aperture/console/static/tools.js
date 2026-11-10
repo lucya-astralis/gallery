@@ -1,4 +1,4 @@
-/* lucya.systems aperture — the console's tools: history, many albums at
+/* lucya.systems aperture — Aperture's tools: history, many albums at
  * once, saved Library views, and the activity log.
  *
  * Plain script between library.js and app.js, sharing their scope; nothing

@@ -100,7 +100,7 @@ def set_password(password: str) -> Path:
     and not in the photo tree — see runtime.py.
     """
     if len(password) < 8:
-        raise ValueError("a console password needs at least 8 characters")
+        raise ValueError("an Aperture password needs at least 8 characters")
     path = _cred_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -177,19 +177,19 @@ def assert_safe_binding(bind: str | None = None, port: int | None = None) -> Non
 
     if _is_loopback(bind):
         log.warning(
-            "console: NO PASSWORD SET - open to anything that reaches "
+            "aperture: NO PASSWORD SET - open to anything that reaches "
             "%s:%d. Set one with `python -m aperture.cli passwd`.", bind, port)
         return
     if settings.console_allow_open:
         log.warning(
-            "console: NO PASSWORD SET and bound to %s:%d, running open because "
-            "CONSOLE_ALLOW_OPEN=1. Whatever can reach that port can rewrite "
+            "aperture: NO PASSWORD SET and bound to %s:%d, running open because "
+            "APERTURE_ALLOW_OPEN=1. Whatever can reach that port can rewrite "
             "this gallery's configuration.", bind, port)
         return
 
     raise SystemExit(
         "\n"
-        "  The console has no password and is not bound to loopback.\n"
+        "  Aperture has no password and is not bound to loopback.\n"
         "  It is the only write path into the photo tree, so Aperture will\n"
         "  not open that socket.\n"
         "\n"
@@ -199,10 +199,10 @@ def assert_safe_binding(bind: str | None = None, port: int | None = None) -> Non
         "\n"
         "  Or, if the network boundary is somewhere else - the port is only\n"
         "  published on 127.0.0.1, or a firewall covers it - say so:\n"
-        "      CONSOLE_ALLOW_OPEN=1\n"
+        "      APERTURE_ALLOW_OPEN=1\n"
         "\n"
-        "  Or turn the console off entirely:\n"
-        "      CONSOLE_ENABLED=0\n"
+        "  Or turn Aperture off entirely:\n"
+        "      APERTURE_ENABLED=0\n"
         f"\n  (bind={settings.console_bind}:{settings.console_port})\n"
     )
 
@@ -313,7 +313,7 @@ def check_password(request: Request, password: str, *, status: int = 401) -> Non
                             headers={"Retry-After": str(int(wait) + 1)})
     if not verify_password(password):
         note_failure(ip)
-        log.warning("console: wrong password from %s", ip)
+        log.warning("aperture: wrong password from %s", ip)
         raise HTTPException(status, "wrong password")
     _failures.pop(ip, None)
 
@@ -325,7 +325,7 @@ def login(request: Request, password: str) -> tuple[str, Session]:
     sid = secrets.token_urlsafe(32)
     sess = Session(csrf=secrets.token_urlsafe(32), created=now, seen=now, ip=ip)
     _sessions[sid] = sess
-    log.info("console: session opened from %s", ip)
+    log.info("aperture: session opened from %s", ip)
     return sid, sess
 
 
@@ -347,7 +347,7 @@ def issue_cookie(response, request: Request, sid: str) -> None:
         request.headers.get("x-forwarded-proto", "").split(",")[0].strip() == "https"
     host = request.url.hostname or ""
     if not https and not _is_loopback(host):
-        log.warning("console: session for %s over plain http - the cookie "
+        log.warning("aperture: session for %s over plain http - the cookie "
                     "travels in clear; prefer a VPN or an SSH tunnel", host)
     response.set_cookie(COOKIE, sid, httponly=True, samesite="strict",
                         secure=https, path="/", max_age=ABSOLUTE_TIMEOUT)
@@ -390,7 +390,7 @@ async def guard(request: Request, call_next):
 
     found = current(request)
     if found is None:
-        return _refuse(request, 401, "sign in to the console")
+        return _refuse(request, 401, "sign in to Aperture")
 
     if request.method not in SAFE_METHODS:
         if not _same_origin(request):
@@ -457,7 +457,7 @@ def audit(request: Request, action: str, target: str, *,
         with path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError as exc:                     # pragma: no cover - disk trouble
-        log.warning("console: could not write the audit log: %s", exc)
+        log.warning("aperture: could not write the audit log: %s", exc)
 
 
 def recent(limit: int = 40) -> list[dict]:

@@ -1,4 +1,4 @@
-/* lucya.systems aperture — the console's shell.
+/* lucya.systems aperture — Aperture's shell.
  *
  * The frame every screen sits in: the places on the rail, the address bar
  * that names the place you are on, the command palette that reaches
@@ -277,18 +277,18 @@ function renderAlbums() {
         placeholder: 'Filter albums…', autocomplete: 'off',
         oninput: (ev) => { albumsView.filter = ev.target.value; paintAlbumRows(); },
       }),
-      el('div', { class: 'seg', role: 'group', 'aria-label': 'Show' },
+      el('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Show' },
         [['all', 'All'], ['unwritten', 'Unwritten'], ['issues', 'With issues']].map(([id, label]) =>
           el('button', {
             type: 'button', class: 'seg__opt' + (albumsView.show === id ? ' is-on' : ''),
-            'aria-pressed': String(albumsView.show === id), text: label,
+            role: 'radio', 'aria-checked': String(albumsView.show === id), text: label,
             onclick: () => { albumsView.show = id; renderAlbums(); },
           }))),
-      el('div', { class: 'seg', role: 'group', 'aria-label': 'Sort' },
+      el('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Sort' },
         [['tree', 'Tree'], ['name', 'A–Z'], ['photos', 'Most photos']].map(([id, label]) =>
           el('button', {
             type: 'button', class: 'seg__opt' + (albumsView.sort === id ? ' is-on' : ''),
-            'aria-pressed': String(albumsView.sort === id), text: label,
+            role: 'radio', 'aria-checked': String(albumsView.sort === id), text: label,
             onclick: () => { albumsView.sort = id; renderAlbums(); },
           }))))));
 

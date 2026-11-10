@@ -1,16 +1,20 @@
 # lucya.systems aperture — one image, one container, two ports.
 #
-#   docker compose up -d --build     ->  gallery  http://localhost:8000
-#                                        console  http://127.0.0.1:8090
+#   docker compose up -d --build     ->  gallery   http://localhost:8000
+#                                        Aperture  http://127.0.0.1:8090
 #
-# The console's port is published to a HOST ADDRESS, not to every interface:
-# `CONSOLE_HOST=127.0.0.1` keeps it on the machine, and a LAN or VPN address
-# (`CONSOLE_HOST=10.0.0.5`) puts it on exactly that network and nowhere else.
+# Aperture's port is published to a HOST ADDRESS, not to every interface:
+# `APERTURE_HOST=127.0.0.1` keeps it on the machine, and a LAN or VPN address
+# (`APERTURE_HOST=10.0.0.5`) puts it on exactly that network and nowhere else.
 # That is the boundary — the container itself always listens on 0.0.0.0:8090,
 # because a container's own loopback would be unreachable from anywhere.
 #
+# Aperture was called the console before 3.0. An .env that still says
+# CONSOLE_HOST, CONSOLE_PORT, CONSOLE_ENABLED or CONSOLE_ALLOW_OPEN keeps
+# working: each new name below falls back to its old one.
+#
 # To split the two apart instead, run this file twice with APERTURE_ROLE=public
-# (photos mounted :ro) and APERTURE_ROLE=console.
+# (photos mounted :ro) and APERTURE_ROLE=aperture.
 
 services:
   aperture:
@@ -18,10 +22,10 @@ services:
     container_name: aperture
     ports:
       - "${PORT:-8000}:8000"
-      - "${CONSOLE_HOST:-127.0.0.1}:${CONSOLE_PORT:-8090}:8090"
+      - "${APERTURE_HOST:-${CONSOLE_HOST:-127.0.0.1}}:${APERTURE_PORT:-${CONSOLE_PORT:-8090}}:8090"
     volumes:
-      # Read-write: editing the cfg files in .album/ and .gallery/ is what the
-      # console is for. No route can address a photograph for writing.
+      # Read-write: editing the cfg files in .album/ and .gallery/ is what
+      # Aperture is for. No route can address a photograph for writing.
       - ${PHOTOS_PATH:-./photos}:/photos
       - ${THUMBS_PATH:-./thumbnails}:/thumbnails
       - ${PREVIEWS_PATH:-./previews}:/previews
@@ -43,7 +47,7 @@ services:
       # Vision: search photos by what is in them ("sunset over the sea").
       # Off by default. On, the next scan downloads a ~217 MB local model into
       # DATA_DIR/models once and reads every photo (~40 ms each); nothing ever
-      # leaves the machine. Set it for the console too, so System > Vision
+      # leaves the machine. Set it for Aperture too, so System > Vision
       # reports it. See aperture/vision.py.
       - VISION=${VISION:-0}
       - VISION_THREADS=${VISION_THREADS:-2}
@@ -55,25 +59,25 @@ services:
       # behind a reverse proxy that terminates TLS.
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
       # The reverse proxy's address (or network, comma-separated). Only it is
-      # believed about the real client IP — which the console's login throttle
+      # believed about the real client IP — which Aperture's login throttle
       # and audit log depend on. Leave the default when nothing sits in front.
       - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-127.0.0.1}
-      # ----- console -----
-      - CONSOLE_ENABLED=${CONSOLE_ENABLED:-1}
+      # ----- Aperture -----
+      - APERTURE_ENABLED=${APERTURE_ENABLED:-${CONSOLE_ENABLED:-1}}
       # Always 0.0.0.0 INSIDE the container — a container's own loopback is
       # reachable from nowhere. The boundary is the host address in `ports`
       # above. Because this bind is not loopback, Aperture refuses to start
-      # the console without a password unless CONSOLE_ALLOW_OPEN says the
-      # boundary is handled here:
+      # without a password unless APERTURE_ALLOW_OPEN says the boundary is
+      # handled here:
       #   docker compose run --rm aperture python -m aperture.cli passwd
-      - CONSOLE_BIND=0.0.0.0
-      - CONSOLE_ALLOW_OPEN=${CONSOLE_ALLOW_OPEN:-0}
+      - APERTURE_BIND=0.0.0.0
+      - APERTURE_ALLOW_OPEN=${APERTURE_ALLOW_OPEN:-${CONSOLE_ALLOW_OPEN:-0}}
       - READ_ONLY=${READ_ONLY:-0}
-      # The console asks lucya.sh at most twice a day whether a newer aperture
+      # Aperture asks lucya.sh at most twice a day whether a newer release
       # exists and says so. Nothing is downloaded. 0 = never ask.
       - UPDATE_CHECK=${UPDATE_CHECK:-1}
       # Nebula's own faces and icons instead of the stock set: the default for
-      # gallery.cfg `faces` (the console's Site > Look) when it is not set.
+      # gallery.cfg `faces` (Aperture's Site > Look) when it is not set.
       - NEBULA_FACES=${NEBULA_FACES:-0}
       - BACKUPS=${BACKUPS:-20}
       - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-8}
@@ -82,7 +86,7 @@ services:
     # pre-1.0 container (which ran as root) needs a one-time
     #   sudo chown -R 10001:10001 data thumbnails previews
     # and a CIFS share must be mounted with uid=/gid= set to the same numbers,
-    # or the console cannot write its cfg files. See DEPLOY-LINUX.md.
+    # or Aperture cannot write its cfg files. See DEPLOY-LINUX.md.
     user: "${APERTURE_UID:-10001}:${APERTURE_GID:-10001}"
     read_only: true
     tmpfs:

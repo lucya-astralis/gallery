@@ -97,7 +97,7 @@ def test_the_door_stamps_the_version(console):
         page = console.get("/login").text
         assert brand.VERSION in page
         # in the lockup, not loose on the page
-        assert re.search(r'brand-sub">console <b>' + re.escape(brand.VERSION),
+        assert re.search(r'brand-sub">aperture <b>' + re.escape(brand.VERSION),
                          page)
     finally:
         security.clear_password()

@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <title>Sign in — lucya.systems aperture</title>
+  <title>Sign in — Aperture</title>
   <link rel="icon" type="image/svg+xml" href="{{ static_url('logo/aperture.svg') }}">
   <link rel="stylesheet" href="{{ static_url('style.css') }}">
   {# NEBULA_FACES=1: the gallery's own font sheet, served from where it
@@ -45,7 +45,7 @@
           {# The version belongs on the door as much as in the footer: it is
              the first thing to check when the tool behaves unlike the notes
              for it, and behind a password the footer is not reachable yet. #}
-          <span class="brand-sub">console <b>{{ app_version }}</b></span>
+          <span class="brand-sub">aperture <b>{{ app_version }}</b></span>
         </span>
       </span>
 
@@ -57,8 +57,8 @@
          query string. #}
       {% if reason %}<p class="login__why">{{ reason }}</p>{% endif %}
       <p class="login__note">
-        The console edits the files this gallery is configured by. It is the
-        only part of Aperture that writes.
+        Aperture edits the files this gallery is configured by. The gallery
+        itself only reads them.
       </p>
 
       {# There is one account and it has no name, which is exactly the shape a

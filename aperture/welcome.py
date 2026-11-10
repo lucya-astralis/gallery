@@ -50,7 +50,7 @@ def welcome_feed(mobile: bool = False) -> tuple[list[dict], str, str]:
             feed.append({"album": row["album"], "filename": row["filename"],
                          "rel_path": row["rel_path"]})
         if feed:
-            return feed, "CURATED", "manual"
+            return feed, "Curated", "manual"
         # nothing resolved -> behave as if the key were absent
     if mode != "random":
         showcase_feed = photos.showcase_rows(limit=12, random_order=True)
@@ -59,7 +59,7 @@ def welcome_feed(mobile: bool = False) -> tuple[list[dict], str, str]:
                 {"album": r["album"], "filename": r["filename"], "rel_path": r["rel_path"]}
                 for r in showcase_feed
             ]
-            return feed, "FEATURED", "showcase"
+            return feed, "Featured", "showcase"
     listed, listed_params = albums.unlisted_clause()
     feed = [
         dict(r)
@@ -69,7 +69,7 @@ def welcome_feed(mobile: bool = False) -> tuple[list[dict], str, str]:
             listed_params,
         ).fetchall()
     ]
-    return feed, "RANDOM", "random"
+    return feed, "Random", "random"
 
 
 def archive_updated_at() -> str | None:

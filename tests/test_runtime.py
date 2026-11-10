@@ -37,6 +37,8 @@ def _settings(**env):
 @pytest.mark.parametrize("role,public,console,indexer", [
     ("all", True, True, True),
     ("public", True, False, True),
+    ("aperture", False, True, False),
+    # its name before 3.0, still accepted for it
     ("console", False, True, False),
 ])
 def test_roles_decide_what_opens(role, public, console, indexer):
@@ -48,9 +50,54 @@ def test_roles_decide_what_opens(role, public, console, indexer):
     assert s.owns_indexer is indexer
 
 
-def test_console_can_be_switched_off_entirely():
-    s = _settings(APERTURE_ROLE="all", CONSOLE_ENABLED="0")
+def test_aperture_can_be_switched_off_entirely():
+    s = _settings(APERTURE_ROLE="all", APERTURE_ENABLED="0")
     assert s.runs_public and not s.runs_console
+
+
+def test_the_old_role_name_resolves_to_aperture():
+    assert _settings(APERTURE_ROLE="console").role == "aperture"
+
+
+# ----- 3.0 renamed the console to Aperture, and its variables with it ----
+@pytest.mark.parametrize("old,new,attr,value,expect", [
+    ("CONSOLE_ENABLED", "APERTURE_ENABLED", "console_enabled", "0", False),
+    ("CONSOLE_BIND", "APERTURE_BIND", "console_bind", "10.0.0.5", "10.0.0.5"),
+    ("CONSOLE_PORT", "APERTURE_PORT", "console_port", "9191", 9191),
+    ("CONSOLE_ALLOW_OPEN", "APERTURE_ALLOW_OPEN", "console_allow_open", "1", True),
+])
+def test_a_pre_3_name_still_works(old, new, attr, value, expect):
+    """A deployment keeps working on the day it upgrades: the old name is
+    read when the new one is not set."""
+    import os
+    saved = os.environ.pop(new, None)
+    try:
+        assert getattr(_settings(**{old: value}), attr) == expect
+    finally:
+        if saved is not None:
+            os.environ[new] = saved
+
+
+def test_the_new_name_wins_over_the_old():
+    s = _settings(CONSOLE_PORT="9191", APERTURE_PORT="9292")
+    assert s.console_port == 9292
+
+
+def test_the_old_names_are_named_at_start_up():
+    import os
+    saved = {k: os.environ.get(k) for k in ("CONSOLE_PORT", "APERTURE_ROLE")}
+    os.environ["CONSOLE_PORT"] = "9191"
+    os.environ["APERTURE_ROLE"] = "console"
+    try:
+        found = dict(runtime.deprecated_env())
+        assert found["CONSOLE_PORT"] == "APERTURE_PORT"
+        assert found["APERTURE_ROLE=console"] == "APERTURE_ROLE=aperture"
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
 def test_an_unknown_role_refuses_to_start():
@@ -58,14 +105,15 @@ def test_an_unknown_role_refuses_to_start():
         _settings(APERTURE_ROLE="admin")
 
 
-def test_console_binds_loopback_unless_told_otherwise():
+def test_aperture_binds_loopback_unless_told_otherwise():
     import os
-    saved = os.environ.pop("CONSOLE_BIND", None)
+    saved = {k: os.environ.pop(k, None) for k in ("APERTURE_BIND", "CONSOLE_BIND")}
     try:
         assert runtime.load().console_bind == "127.0.0.1"
     finally:
-        if saved is not None:
-            os.environ["CONSOLE_BIND"] = saved
+        for k, v in saved.items():
+            if v is not None:
+                os.environ[k] = v
 
 
 # ----- what belongs to whom --------------------------------------------

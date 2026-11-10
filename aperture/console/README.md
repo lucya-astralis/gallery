@@ -1,10 +1,14 @@
-# Console
+# Aperture
 
-The web GUI for the gallery's config files — `photos/.gallery/gallery.cfg` and
+The operator's half of lucya.systems aperture, on its own port: the web GUI
+for the gallery's config files — `photos/.gallery/gallery.cfg` and
 every `<album>/.album/album.cfg`, plus the per-language `album_*.md`
 descriptions and the icon/font assets that sit beside them.
 
-It was the standalone *Configurator* until Aperture 1.0. It now ships in the
+It was the standalone *Configurator* until 1.0, and *the console* until 3.0,
+when it took the product's own name: this is the part of aperture an operator
+works in, so it is called Aperture. The code still lives in
+`aperture/console/`, and its state in `data/console/`. It now ships in the
 same package and the same image as the gallery, but it is still a **separate
 ASGI app on a separate listener** — and that separation is the point. The
 public port serves pages and cannot reach a route in here; this port is where
@@ -23,7 +27,7 @@ Two invariants hold whatever else changes:
 - it never writes the index. Operational requests go through the flag-file
   control channel in `aperture/control.py`, the same one the CLI uses, so the
   indexer stays the single writer on the database. `READ_ONLY=1` disables the
-  operations actions too: read-only means the console cannot change anything,
+  operations actions too: read-only means Aperture cannot change anything,
   not merely that it cannot change photos.
 
 Since the gallery re-reads its cfg files per request, a save here shows up on
@@ -34,12 +38,12 @@ cp .env.example .env      # in the repo root; every value has a working default
 docker compose up -d --build
 ```
 
-Then open <http://127.0.0.1:8090>. `CONSOLE_HOST` decides which host address
+Then open <http://127.0.0.1:8090>. `APERTURE_HOST` decides which host address
 that port appears on; see [Security / hosting](../../README.md#security--hosting).
 
-**Signing in.** The console asks for one operator password. Set it with
+**Signing in.** Aperture asks for one operator password. Set it with
 `python -m aperture.cli passwd`. Without one it starts only on a loopback bind
-(with a red bar saying so) or with `CONSOLE_ALLOW_OPEN=1`; anywhere else it
+(with a red bar saying so) or with `APERTURE_ALLOW_OPEN=1`; anywhere else it
 refuses to open the socket. Details in
 [Security / hosting](../../README.md#security--hosting).
 
@@ -67,7 +71,7 @@ Every file also has a **Raw file** mode, one button in its header, if you would 
 
 ### Getting around
 
-The console has **seven places**, and they are the **rail** down the left:
+Aperture has **seven places**, and they are the **rail** down the left:
 **Overview**, **Library**, **Albums**, **Tags**, **Site** (`gallery.cfg`),
 **Links** and **System**. A place is a job, not a file. There is no album tree
 in a sidebar any more: albums are a place of their own, a table, and in the
@@ -96,7 +100,7 @@ edits.
 | **Tags**, **Cameras**, **Formats** | rings, where the question is *what share*: tagged against untagged (then the top tags as bars), the cameras, the file formats with what each costs on disk. Each ring is one colour family (`--ramp-<hue>-1..4`, the glyph hue of what it counts, largest part lightest, the rest one grey); hover a slice or a legend row to read it in the middle, click a camera or a format for its photos |
 | **Indexer** | the lamp, the last scan and what it did, with Scan and Pause right there |
 | **Needs attention** | what the config check found, each line a click from the key — and most with a Fix |
-| **Recent changes** | the audit log — every write this console has made |
+| **Recent changes** | the audit log — every write made in Aperture |
 
 The cards form a **bento**: one pane, shared hairlines, no gaps. Every chart
 and every kind-icon wears Nebula's **mist** — the silver of the headings
@@ -131,10 +135,10 @@ Library.
 | *Machine* — **Health check** | `doctor`: index, files, thumbnails, featured flags and cfg held against each other, each finding a click from its photo or album and each kind of problem a button for the job that fixes it |
 | *Data* — **Privacy** | Hide GPS / Strip GPS, which originals still carry coordinates, and the one job that rewrites originals to strip them |
 | *Data* — **Backup** | every hand-written file as one `.tar.gz` |
-| *Data* — **Activity** | every write this console has made |
-| *Console* — **Password**, **About** | the door, and the release notes |
+| *Data* — **Activity** | every write made in Aperture |
+| *Aperture* — **Password**, **About** | the door, and the release notes |
 
-Four sections went when the rest of the console grew their jobs: *Featured*
+Four sections went when the rest of Aperture grew their jobs: *Featured*
 (featuring is done in the Library, broken entries come with a fix, flag
 drift is part of the Health check), *Front page* (the welcome lists are the
 Site's and its check's), *Translations* (a developer's check —
@@ -250,7 +254,7 @@ scan has seen yet is listed and marked *not indexed yet*.
 | Tags | any of the ticked ones, plus **Untagged** |
 | Year, Camera | what a scan read from the EXIF |
 | Status | Featured, Not indexed yet |
-| Search | the gallery's own grammar (`camera:`, `lens:`, `iso:`, `f:`, `mm:`, `date:` and words), answered by `/api/library/search` through `aperture/search.py` — plus the console's `tag:`, `album:` and `is:featured / is:untagged / is:new`, which it applies itself |
+| Search | the gallery's own grammar (`camera:`, `lens:`, `iso:`, `f:`, `mm:`, `date:` and words), answered by `/api/library/search` through `aperture/search.py` — plus Aperture's `tag:`, `album:` and `is:featured / is:untagged / is:new`, which it applies itself |
 
 Every facet counts what you would get by ticking it, and every active filter
 is a chip above the grid that one click removes.
@@ -283,7 +287,7 @@ line as any other.
 
 Tags are written to a `<photo>.tags` sidecar, which is exactly what the
 gallery's scanner already reads; because it folds the sidecar's mtime into the
-photo's, the next scan picks the change up on its own. The console never
+photo's, the next scan picks the change up on its own. Aperture never
 rewrites a photo file — this library is almost entirely PNG and BMP, where
 there is no dependable metadata container to write into.
 
@@ -429,7 +433,7 @@ save touches only the lines belonging to the key you changed:
 
 Comments, blank lines, ordering and every key you didn't touch come through
 untouched. There is one parser for both surfaces — `aperture/cfgio.py`, which
-the gallery reads with too — so what the console shows and what the gallery
+the gallery reads with too — so what Aperture shows and what the gallery
 renders cannot disagree about a file. That includes the `#label` group markers
 inside `album_order`, which survive a drag-reorder.
 
@@ -451,7 +455,7 @@ that caused it, and the rail's Overview mark turns red.
 Most issues come with their **fix**: remove the unknown line, take the
 missing photo out of `featured`, use the lightened accent the gallery would
 show anyway. `aperture/checks.py` attaches it as `{label, key, value}`; the
-console stages it as an ordinary edit — on the file's page or straight from
+Aperture stages it as an ordinary edit — on the file's page or straight from
 the Overview — so it goes through the same diff and the same save as
 anything you typed. `doctor` ignores it.
 
@@ -464,24 +468,24 @@ once the indexer has picked it up. `doctor` runs the same checks —
 
 All optional — see the repo root's `.env.example`. Paths are no longer set
 here: `PHOTOS_DIR`, `THUMBS_DIR` and `DATA_DIR` are the app's, read once in
-`aperture/runtime.py`, and the console gets the same values the gallery does.
+`aperture/runtime.py`, and Aperture gets the same values the gallery does.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `CONSOLE_ENABLED` | `1` | `0` leaves this listener closed entirely |
-| `CONSOLE_PORT` | `8090` | port inside the container |
-| `CONSOLE_HOST` | `127.0.0.1` | which host address that port is published on. The boundary — see the root README |
+| `APERTURE_ENABLED` | `1` | `0` leaves this listener closed entirely |
+| `APERTURE_PORT` | `8090` | port inside the container |
+| `APERTURE_HOST` | `127.0.0.1` | which host address that port is published on. The boundary — see the root README |
 | `BACKUPS` | `20` | versions kept per edited file, under `data/console/backups` |
 | `MAX_UPLOAD_MB` | `8` | cap on icon/font/wallpaper uploads |
 | `READ_ONLY` | `0` | `1` = browse and validate only; every write endpoint returns 403 and the UI disables its controls |
-| `CONSOLE_ALLOW_OPEN` | `0` | `1` = run without a password on a non-loopback bind. Say this only when the network boundary is somewhere else |
+| `APERTURE_ALLOW_OPEN` | `0` | `1` = run without a password on a non-loopback bind. Say this only when the network boundary is somewhere else |
 
 ### Previews come from the gallery's thumbnails
 
 Photo grids never load originals. `/api/thumb` hands back the gallery's own
 grid thumbnail — the file `/thumb` serves visitors, out of `THUMBS_DIR` — and
 builds it first when the photo has none yet or a stale one. There is one
-derivative tree and the console builds into it exactly as the gallery does, so
+derivative tree and Aperture builds into it exactly as the gallery does, so
 `THUMBS_DIR` has to be writable for this listener too.
 
 ### Pointing at the same share as the gallery
@@ -493,7 +497,7 @@ For an SMB/NFS mount that is usually an absolute host path:
 PHOTOS_PATH=/mnt/photos
 ```
 
-The console needs that mount **read-write** — editing the cfg files is the
+Aperture needs that mount **read-write** — editing the cfg files is the
 whole job. It only ever writes inside `.album/` folders and `.gallery/`; it
 never touches a photo.
 
@@ -502,7 +506,7 @@ never touches a photo.
 ```bash
 pip install -r requirements-dev.txt
 python -m aperture                                        # both surfaces
-APERTURE_ROLE=console python -m aperture                  # this one alone
+APERTURE_ROLE=aperture python -m aperture                  # this one alone
 uvicorn aperture.console.app:app --reload --port 8090     # with a reloader
 ```
 
@@ -526,7 +530,7 @@ aperture/console/
 ```
 
 State lives in `data/console/` — the password hash, the audit log and rolling
-backups of every file the console overwrites. Never in the photo tree: the
+backups of every file Aperture overwrites. Never in the photo tree: the
 gallery serves files out of `photos/.gallery/`.
 
 The format and the vocabulary live one level up, shared with the gallery:

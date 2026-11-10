@@ -625,7 +625,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   } else if (autoLabel) {
-    autoLabel.textContent = frames.length > 1 ? 'MANUAL' : 'SINGLE FRAME';
+    autoLabel.textContent = frames.length > 1 ? 'Manual' : 'Single frame';
   }
 
   const nextBtn = document.getElementById('vf-next');
@@ -1272,6 +1272,10 @@ window.__stagePixelIn = () => {
 (function navScrollState() {
   const nav = document.querySelector('.nav');
   if (!nav) return;
+  // Nebula 2.0: where the browser can read the scroll position itself, the
+  // stylesheet drives the bar's state off a scroll timeline and there is
+  // nothing to listen for. This listener is the fallback for the rest.
+  if (window.CSS && CSS.supports && CSS.supports('animation-timeline: scroll()')) return;
   let ticking = false;
   const apply = () => {
     nav.classList.toggle('nav--scrolled', (window.scrollY || 0) > 8);
@@ -2762,18 +2766,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let phase, target, label, status, place = '';
     if (depart && now < depart) {
       phase = 'pre'; target = depart;
-      label = TXT.departsIn; status = 'T-' + Math.floor((depart - now) / DAY) + ' DAYS';
+      label = TXT.departsIn; status = 'T-' + Math.floor((depart - now) / DAY) + ' days';
     } else if (firstStart && now < firstStart) {
       phase = 'transit'; target = firstStart;
-      label = TXT.arrivingIn(stops[0].cityLabel); status = 'IN TRANSIT';
+      label = TXT.arrivingIn(stops[0].cityLabel); status = 'In transit';
     } else if (activeIdx >= 0) {
       phase = 'active'; target = stops[activeIdx].end;
       label = TXT.leavingIn(stops[activeIdx].cityLabel);
-      status = 'IN';
+      status = 'In';
       place = (away && away.from === stops[activeIdx].city) ? away.city : stops[activeIdx].city;
     } else {
       phase = 'done'; target = null;
-      label = TXT.tripComplete; status = 'COMPLETE';
+      label = TXT.tripComplete; status = 'Complete';
     }
 
     setPhase(phase);

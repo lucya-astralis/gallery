@@ -28,17 +28,50 @@ from . import brand
 
 # The roles a process can run in. See server.py — this is what decides which
 # listeners open, and it is also what decides whether this process owns the
-# indexer.
-ROLES = ("all", "public", "console")
+# indexer. `aperture` is the operator surface; until 3.0 it was called the
+# console, and the old word is still accepted for it (ROLE_ALIASES).
+ROLES = ("all", "public", "aperture")
+ROLE_ALIASES = {"console": "aperture"}
+
+# 3.0 renamed the operator surface from "the console" to Aperture, and its
+# variables with it. The old names are still read throughout 3.x: the new one
+# wins when both are set, and the server names every old one it finds in its
+# start-up log (deprecated_env()), so a deployment keeps working on the day
+# it upgrades and is told what to rename.
+RENAMED_ENV = {
+    "APERTURE_ENABLED":    "CONSOLE_ENABLED",
+    "APERTURE_BIND":       "CONSOLE_BIND",
+    "APERTURE_PORT":       "CONSOLE_PORT",
+    "APERTURE_ALLOW_OPEN": "CONSOLE_ALLOW_OPEN",
+}
+
+
+def _env(name: str) -> str | None:
+    """The variable, or the name it had before 3.0 when it is not set."""
+    if name in os.environ:
+        return os.environ[name]
+    old = RENAMED_ENV.get(name)
+    return os.environ.get(old) if old else None
+
+
+def deprecated_env() -> list[tuple[str, str]]:
+    """(old, new) for every pre-3.0 name this environment still uses, the
+    role included -- what the start-up log tells the operator to rename."""
+    found = [(old, new) for new, old in RENAMED_ENV.items() if old in os.environ]
+    role = (os.environ.get("APERTURE_ROLE") or "").strip().lower()
+    if role in ROLE_ALIASES:
+        found.append(("APERTURE_ROLE=%s" % role, "APERTURE_ROLE=%s" % ROLE_ALIASES[role]))
+    return found
 
 
 def _flag(name: str, default: str = "1") -> bool:
-    return os.environ.get(name, default).strip().lower() not in ("0", "false", "no", "off", "")
+    raw = _env(name)
+    return (default if raw is None else raw).strip().lower() not in ("0", "false", "no", "off", "")
 
 
 def _int(name: str, default: int) -> int:
     try:
-        return int(os.environ.get(name, "").strip() or default)
+        return int((_env(name) or "").strip() or default)
     except ValueError:
         return default
 
@@ -75,7 +108,9 @@ class Settings:
     health_interval: int
     failsafe: bool
 
-    # ----- the console surface -----------------------------------------
+    # ----- the Aperture surface (the operator's; "the console" before 3.0,
+    # which is still the name of these fields and of the code under
+    # aperture/console/) ----------------------------------------------
     console_enabled: bool
     console_bind: str
     console_port: int
@@ -108,7 +143,7 @@ class Settings:
 
     @property
     def runs_console(self) -> bool:
-        return self.console_enabled and self.role in ("all", "console")
+        return self.console_enabled and self.role in ("all", "aperture")
 
     @property
     def owns_indexer(self) -> bool:
@@ -137,6 +172,7 @@ class Settings:
 
 def load() -> Settings:
     role = (os.environ.get("APERTURE_ROLE") or "all").strip().lower()
+    role = ROLE_ALIASES.get(role, role)
     if role not in ROLES:
         raise SystemExit(
             "APERTURE_ROLE=%r is not one of %s" % (role, ", ".join(ROLES)))
@@ -173,17 +209,17 @@ def load() -> Settings:
         health_interval=_int("HEALTH_INTERVAL", 10),
         failsafe=_flag("FAILSAFE"),
 
-        console_enabled=_flag("CONSOLE_ENABLED"),
+        console_enabled=_flag("APERTURE_ENABLED"),
         # Loopback by default. A different address is a deliberate act and
         # carries a condition — see console.security.assert_safe_binding().
-        console_bind=(os.environ.get("CONSOLE_BIND") or "127.0.0.1").strip(),
-        console_port=_int("CONSOLE_PORT", 8090),
+        console_bind=(_env("APERTURE_BIND") or "127.0.0.1").strip(),
+        console_port=_int("APERTURE_PORT", 8090),
         console_read_only=_flag("READ_ONLY", "0"),
         # The one startup rule an operator can wave away, so it belongs
         # with the rest of the configuration rather than being read out
         # of the environment where it is enforced -- see
         # console.security.assert_safe_binding().
-        console_allow_open=_flag("CONSOLE_ALLOW_OPEN", "0"),
+        console_allow_open=_flag("APERTURE_ALLOW_OPEN", "0"),
         console_backups=_int("BACKUPS", 20),
         console_max_upload=_int("MAX_UPLOAD_MB", 8) * 1024 * 1024,
 

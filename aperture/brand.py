@@ -28,7 +28,7 @@ the lot:
   * the EXIF `Software` tag written into every derived JPEG (scanner.py)
   * a banner at the top of style.css and app.js, which an operator serves
     verbatim
-  * the CLI masthead and the console's own chrome (those are the
+  * the CLI masthead and Aperture's own chrome (those are the
     vendor's tools, not the operator's site)
 
 None of it is enforcement: anyone holding the source can delete a line. The
@@ -46,7 +46,7 @@ NAME = "lucya.systems"
 URL = "https://lucya.systems"
 PRODUCT = f"{NAME} aperture"
 
-# Where the code lives and who makes it. The console's Changelog place shows
+# Where the code lives and who makes it. Aperture's Changelog place shows
 # both next to the release notes: the maker is the person behind the software,
 # the vendor above is the label it ships under.
 REPO_URL = "https://github.com/lucya-astralis/gallery"
@@ -58,7 +58,7 @@ DESIGN_URL = "https://github.com/lucya-astralis/nebula"
 
 # Where a running aperture asks whether there is a newer one: the maker's own
 # gallery, which always runs the newest release and says so at /api/version
-# like every gallery does. The console shows the answer and
+# like every gallery does. Aperture shows the answer and
 # aperture/update_check.py is the whole of it; UPDATE_CHECK=0 turns it off and
 # UPDATE_URL points it elsewhere.
 UPDATE_URL = "https://images.lucya.sh/api/version"
@@ -79,7 +79,7 @@ UPDATE_URL = "https://images.lucya.sh/api/version"
 # the configurator were two programs, this is one, and a version is a promise
 # about a thing. Distinct from API_VERSION (gallery/api.py), which versions the
 # JSON API contract and did NOT reset — the endpoints kept their shape.
-VERSION = "2.10.0"
+VERSION = "3.0.0"
 
 # One-line form, shared by <meta name="generator">, the X-Powered-By header
 # and the EXIF `Software` tag so all three can never drift apart.

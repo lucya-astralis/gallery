@@ -1,4 +1,4 @@
-/* lucya.systems aperture — console client.
+/* lucya.systems aperture — Aperture's client (the console until 3.0).
  *
  * Three moving parts: the album tree on the left, a tabbed editor on the
  * right, and one photo browser reused by both the Photos tab and the picker
@@ -513,7 +513,7 @@ const SYSTEM_GROUPS = [
     ['export', 'Backup', 'fa-box-archive'],
     ['activity', 'Activity', 'fa-clock-rotate-left'],
   ]],
-  ['Console', [
+  ['Aperture', [
     ['access', 'Password', 'fa-key'],
     ['about', 'About', 'fa-scroll'],
   ]],
@@ -939,7 +939,7 @@ function paintIndexer(grid, st, ro) {
 
   grid.append(wide(card('fa-microchip', 'Indexer', 'the one writer of the index, whoever asks',
     indexerLive(st, 'ops'),
-    ro ? quiet('The console is mounted read-only. Nothing here can be started from the browser.') : null,
+    ro ? quiet('Aperture is mounted read-only. Nothing here can be started from the browser.') : null,
     el('div', { class: 'card__actions' },
       el('button', {
         type: 'button', class: 'btn btn--primary', id: 'ops-scan',
@@ -1206,7 +1206,7 @@ function paintPrivacy(grid, st, ro) {
         onclick: () => startJob('gps_strip', { album: r.album },
           'Rewrite ' + hits + ' original photo(s) in place to remove their GPS block?\n\n' +
           'This changes the originals themselves. A scan of that scope is queued afterwards.') })));
-    body.push(quiet('This rewrites the photographs — the one job in the console that touches an original.'));
+    body.push(quiet('This rewrites the photographs — the one job in Aperture that touches an original.'));
   }
   if (r.unreadable.length) {
     body.push(sub('unreadable', r.unreadable.length));
@@ -1242,14 +1242,14 @@ function paintOpsAccess(grid, st, ro) {
   const auth = st.auth || {};
   const isSet = auth.mode === 'password';
   grid.append(wide(card('fa-key', isSet ? 'Change the password' : 'Set a password',
-    isSet ? 'the console asks for it wherever it listens' : 'none is set — anyone who reaches this port can use the console',
+    isSet ? 'Aperture asks for it wherever it listens' : 'none is set — anyone who reaches this port can use Aperture',
     el('dl', { class: 'facts' },
       fact('Door', isSet ? 'password' : 'open', isSet ? 'ok' : 'warn'),
       fact('Listens on', auth.bind || '—'),
       fact('Without one', auth.may_run_open
-        ? 'allowed here — loopback, or CONSOLE_ALLOW_OPEN=1'
-        : 'not allowed — this console would refuse to start')),
-    ro ? quiet('The console is mounted read-only.') : null,
+        ? 'allowed here — loopback, or APERTURE_ALLOW_OPEN=1'
+        : 'not allowed — Aperture would refuse to start here')),
+    ro ? quiet('Aperture is mounted read-only.') : null,
     el('div', { class: 'ops__form' },
       isSet ? opsInput('pw-current', { type: 'password', placeholder: 'current password', autocomplete: 'current-password', disabled: ro }) : null,
       opsInput('pw-new', { type: 'password', placeholder: 'new password — 8 characters or more', autocomplete: 'new-password', disabled: ro }),
@@ -1269,9 +1269,9 @@ function paintOpsAccess(grid, st, ro) {
          el('div', { class: 'card__actions' },
            el('button', { type: 'button', class: 'btn', icon: 'fa-lock-open', disabled: ro,
                           text: 'Remove the password', onclick: clearPassword })),
-         quiet('The console then runs open to anything that can reach ' + auth.bind + '.')]
-      : quiet('This console listens on ' + auth.bind + ', where it may not run without a password — ' +
-              'removing it would leave the door open until the next start, and then keep the console ' +
+         quiet('Aperture then runs open to anything that can reach ' + auth.bind + '.')]
+      : quiet('Aperture listens on ' + auth.bind + ', where it may not run without a password — ' +
+              'removing it would leave the door open until the next start, and then keep Aperture ' +
               'from starting at all. Change it instead.'))));
 }
 
@@ -1292,7 +1292,7 @@ async function setPassword() {
 }
 
 async function clearPassword() {
-  if (!confirm('Remove the console password? Anything that can reach this port can then use the console.')) return;
+  if (!confirm('Remove the Aperture password? Anything that can reach this port can then use Aperture.')) return;
   try {
     await api('/api/ops/password', { method: 'DELETE',
       body: JSON.stringify({ current: opsState.inputs['pw-clear'] || '' }) });
@@ -1951,7 +1951,7 @@ function paintHome() {
       el('button', { type: 'button', class: 'btn', icon: 'fa-rotate-right', text: 'Check again', onclick: checkAll }))), 'needs');
 
   /* ---- what happened here ---- */
-  put(4, 9, card('fa-clock-rotate-left', 'Recent changes', 'this console, not the gallery',
+  put(4, 9, card('fa-clock-rotate-left', 'Recent changes', 'made in Aperture, not the gallery',
     !home.audit.length
       ? el('p', { class: 'card__quiet', text: 'Nothing has been saved here yet.' })
       : el('div', { class: 'hrows' }, home.audit.map((entry) => {
@@ -2070,7 +2070,7 @@ function renderPane() {
   /* Header and tabs travel together as one sticky block. */
   pane.append(el('div', { class: 'pane__top' },
     renderHead(isGallery),
-    el('div', { class: 'tabs', role: 'tablist' }, tabs.map(([id, label, icon, groupTitles]) => {
+    el('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Sections' }, tabs.map(([id, label, icon, groupTitles]) => {
       const m = mark(groupTitles);
       return el('button', {
         class: 'tab' + (state.tab === id ? ' is-active' : '') + (m ? ' has-' + m : ''),
@@ -2376,10 +2376,14 @@ function buildControl(key, spec) {
   }
 }
 
+/* A pick-one control is a radiogroup (Nebula 2.2): one tab stop, the arrow
+ * keys inside it (nebula.js), and aria-checked for a screen reader beside
+ * the class the sheet paints. */
 function toggle(options, current, onPick) {
-  return el('div', { class: 'toggle' }, options.map(([val, label]) =>
+  return el('div', { class: 'toggle', role: 'radiogroup' }, options.map(([val, label]) =>
     el('button', {
       type: 'button', class: current === val ? 'is-on' : '', text: label,
+      role: 'radio', 'aria-checked': String(current === val),
       disabled: READ_ONLY, onclick: () => onPick(val),
     })));
 }
@@ -4099,6 +4103,55 @@ async function refreshIssueDots() {
     refreshAlbumViews();
   } catch (_) { /* the dots are a nicety, not worth a toast */ }
 }
+
+/* ----- the keyboard for composite controls (Nebula 2.2) ------------------
+ * nebula.js wires a roving tabindex and the arrow keys into every tablist
+ * and radiogroup it finds, once, when the page loads. This tool draws most
+ * of its screens after that, so it is asked again whenever new markup
+ * lands, at most once a frame (init is idempotent per group).
+ *
+ * And an arrow key in a group selects by CLICKING the option, which here
+ * usually re-renders the pane the group lives in: the focused button is
+ * replaced and focus falls to <body>. So the group that had the key is
+ * remembered, and once the new markup is in, focus goes to the selected
+ * option of the same group (same role, same label, same place among its
+ * namesakes), as if the key had simply moved it. */
+(function nebulaKeyGlue() {
+  let lastKey = null;
+  const GROUPS = '[role="tablist"], [role="radiogroup"]';
+  const sameGroups = (g) => [...document.querySelectorAll(
+    `[role="${g.getAttribute('role')}"]`)].filter((x) =>
+    (x.getAttribute('aria-label') || '') === (g.getAttribute('aria-label') || ''));
+  document.addEventListener('keydown', (ev) => {
+    const g = ev.target.closest && ev.target.closest(GROUPS);
+    if (!g || !/^(Arrow|Home$|End$)/.test(ev.key)) return;
+    lastKey = { role: g.getAttribute('role'), label: g.getAttribute('aria-label') || '',
+      nth: sameGroups(g).indexOf(g), at: Date.now() };
+  }, true);
+  /* a pick can re-render more than once (the field, then the save bar and
+   * the check), so the note holds for its whole short window; a pointer
+   * means the visitor has moved on, and ends it */
+  document.addEventListener('pointerdown', () => { lastKey = null; }, true);
+  let queued = false;
+  new MutationObserver(() => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      if (window.NebulaKeys) window.NebulaKeys.init(document);
+      const k = lastKey;
+      if (!k || Date.now() - k.at > 1200) return;
+      const lost = !document.activeElement || document.activeElement === document.body;
+      if (!lost) return;
+      const like = [...document.querySelectorAll(`[role="${k.role}"]`)]
+        .filter((x) => (x.getAttribute('aria-label') || '') === k.label);
+      const group = like[k.nth] || like[0];
+      const on = group && group.querySelector(
+        '[aria-selected="true"], [aria-checked="true"], .is-on, .is-active');
+      if (on) on.focus();
+    });
+  }).observe(document.body, { childList: true, subtree: true });
+})();
 
 window.addEventListener('beforeunload', (ev) => {
   stashDraft();

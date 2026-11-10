@@ -18,6 +18,84 @@ notes are never one commit apart.
 
 ---
 
+## 3.0.0 — 2026-11-10
+
+The console is called **Aperture** now, and both surfaces speak **Nebula
+2.2**. Aperture is the part of aperture an operator works in, so it carries
+the product's name; the public half is still the gallery. Nebula 2.0 moved the
+language from a console toward a desktop application, and this release follows
+it on both sides: the chrome is quieter, the committing button is solid, the
+accent keeps state alone, and the page has depth.
+
+**Before you upgrade:** nothing has to change on the day. The variables were
+renamed with the surface — `CONSOLE_ENABLED`, `CONSOLE_PORT`, `CONSOLE_BIND`
+and `CONSOLE_ALLOW_OPEN` are now `APERTURE_ENABLED`, `APERTURE_PORT`,
+`APERTURE_BIND` and `APERTURE_ALLOW_OPEN`, `CONSOLE_HOST` in `.env` is
+`APERTURE_HOST`, and the role `APERTURE_ROLE=console` is
+`APERTURE_ROLE=aperture`. The old names keep working throughout 3.x (a new
+name wins when both are set, and `docker-compose.yml` falls back to the old
+ones), and every start logs a warning naming each old one still in use. Rename
+them when you next touch the file. `data/console/` keeps its name, so the
+password, the audit log and the backups stay where they are. Browsers from
+2024 on are the floor now (relative colour, container queries).
+
+**Aperture**
+
+* Every screen, the door, the boot screen, the title, the log lines, the CLI's
+  `passwd` and the docs say Aperture where they said console. The bar reads
+  *lucya.systems aperture*, the footer *Version 3.0.0*, and System's last
+  group is *Aperture* (Password, About). Jobs and pauses it queues are
+  recorded `by: aperture`.
+* The CLI's own interactive menu keeps the word console: it is the terminal
+  one.
+
+**Nebula 2.2, on both surfaces**
+
+* **The interface voice.** Labels, counts, buttons, tabs, badges and the meta
+  lines are Space Grotesk 500 in sentence case, one step smaller and in the
+  label tone, instead of mono caps tracked wide. The chrome scale moved up to
+  match (11.5 / 12.5 / 13 / 14 / 22px) and the caps tracking is gone.
+  Measured values take tabular figures; mono stays for what is code: config
+  keys as written, paths, file names, hexes, diffs, raw EXIF. The fixed words
+  on the welcome viewfinder (`Rec`, `Live view`, `Frame`, `No signal`), the
+  trip stamp (`In Kanto`, `T-12 days`) and the feed label (`Curated`,
+  `Featured`, `Random`) are written in sentence case too.
+* **Buttons.** The one button in a row that commits is a solid `--acc-deep`
+  face with a white label; the others are outlined glass with a full `--text`
+  label, a `--line-strong` hairline and one row height. The welcome hero's
+  call to action keeps its white label on hover instead of flipping to black.
+* **The accent keeps state alone.** Section-label glyphs, card-title glyphs
+  and the rail's glyphs are mist; the bar's hairline is `--chrome`; a trip
+  album's day chip and album-text list markers are neutral. Every tint, ring
+  and glow is relative colour (`oklch(from var(--acc) l c h / a)`), so an
+  album or site accent retints everything from `--acc` alone. The kind
+  palette (`--hue-*`) is defined for avatars, marks and tags.
+* **Depth.** Cards and Aperture's panes sit on the page with a contact
+  shadow (`--shadow-0`) and rise `--lift` on hover onto `--shadow-1`; the bar
+  casts `--shadow-bar` once there is page under it; a dialog pushes the page
+  back to `--blur-2`. The wallpaper grid is gone; the ground has a neutral key
+  light and a vignette, and in the gallery the picture moves with a slight
+  parallax on scroll (off for reduced motion and under Lite). The trip map
+  keeps its graticule as its own `--trip-grid`.
+* **The platform.** Page changes crossfade with the bar held still; the
+  bar's scrolled state is read off a scroll timeline (the gallery's scroll
+  listener is only the fallback); Aperture's dialogs and toasts enter through
+  `@starting-style`; headings balance their lines and running text avoids a
+  last line of one word.
+* **Panes answer to their own width.** Aperture's settings stack is a query
+  container, and a row drops its control under its prose below 560px of pane
+  instead of below a 900px window.
+* **The keyboard.** Aperture ships `nebula.js` 2.2.0 verbatim: the section
+  tabs are a tablist and every pick-one control (the settings toggles, the
+  Library's sort and size, the Albums view's filter and sort) is a radiogroup
+  of radios, one tab stop each, with the arrow keys, Home and End inside and
+  focus kept across the re-render a pick causes.
+* **Forced colours** come last in both sheets, so Windows high contrast mode
+  wins over the components and the controls that carry state take
+  `Highlight`.
+* Both sheets carry `--nebula-version: "2.2.0"`, so the nebula repo's linter
+  can say which Nebula they speak.
+
 ## 2.10.0 — 2026-11-02
 
 **Before you upgrade:** nothing to do, unless you relied on the shipped clip: a

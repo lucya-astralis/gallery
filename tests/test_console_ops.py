@@ -86,7 +86,7 @@ def test_a_scan_request_lands_in_the_control_channel(open_console):
     # The request is a file, and the console is not what reads it back.
     queued = control.take_scan_request()
     assert queued["id"] == body["request"]["id"]
-    assert queued["by"] == "console"
+    assert queued["by"] == "aperture"
 
 
 def test_a_scan_for_an_unknown_album_is_refused(open_console):
@@ -96,7 +96,7 @@ def test_a_scan_for_an_unknown_album_is_refused(open_console):
 def test_pause_and_resume_round_trip(open_console):
     assert open_console.post("/api/ops/pause", json={"reason": "rewiring"}).status_code == 200
     assert ops.status()["paused"] is True
-    assert control.pause_info()["by"] == "console"
+    assert control.pause_info()["by"] == "aperture"
     assert control.pause_info()["reason"] == "rewiring"
 
     body = open_console.post("/api/ops/resume").json()
@@ -250,7 +250,7 @@ def test_a_rebuild_is_a_job_the_indexer_runs(open_console):
     thumb.unlink()
     body = open_console.post("/api/ops/jobs", json={"kind": "rebuild", "album": "berlin"}).json()
     job = body["job"]
-    assert job["by"] == "console" and job["params"] == {"album": "berlin", "all": False}
+    assert job["by"] == "aperture" and job["params"] == {"album": "berlin", "all": False}
     state = open_console.get("/api/ops/jobs/" + job["id"]).json()
     assert state["pending"] is True and state["result"] is None
 

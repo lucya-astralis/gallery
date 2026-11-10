@@ -53,12 +53,12 @@ def build_parser() -> argparse.ArgumentParser:
     add("term", cmd_term, "What this terminal supports, and why colour / the menu are off.")
 
     sp = add("passwd", cmd_passwd,
-             "Set, change or clear the console's operator password.")
+             "Set, change or clear Aperture's operator password.")
     sp.add_argument("--stdin", action="store_true",
                     help="read the password from stdin instead of prompting")
     sp.add_argument("--clear", action="store_true",
-                    help="remove the password; the console then only starts "
-                         "on loopback or with CONSOLE_ALLOW_OPEN=1")
+                    help="remove the password; Aperture then only starts "
+                         "on loopback or with APERTURE_ALLOW_OPEN=1")
 
     add("status", cmd_status, "Live state: server, pause, last scan, watcher queue, index counters.")
     add("health", cmd_health,

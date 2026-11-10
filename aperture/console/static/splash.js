@@ -1,4 +1,4 @@
-/* lucya.systems aperture — the console's boot screen.
+/* lucya.systems aperture — Aperture's boot screen.
  *
  * The mark assembles itself once while the console fetches what it needs.
  * The sequence is the one from the site's own splash, beat for beat and at

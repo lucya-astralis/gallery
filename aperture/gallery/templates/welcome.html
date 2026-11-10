@@ -98,11 +98,11 @@
     </div>
 
     <div class="vf__hudtop">
-      <span class="vf__rec"><i aria-hidden="true"></i>REC</span>
-      <span class="vf__hudchip">LIVE VIEW / <b>{{ feed_label }}</b></span>
+      <span class="vf__rec"><i aria-hidden="true"></i>Rec</span>
+      <span class="vf__hudchip">Live view / <b>{{ feed_label }}</b></span>
       <span class="vf__hudright">
-        <span class="vf__frm">FRM <b id="vf-idx">01</b><span class="vf__frm-of">/{{ '%02d' | format(shuffle | length) }}</span></span>
-        <span class="vf__af doc-min-hide"><i aria-hidden="true"></i>AF·LOCK</span>
+        <span class="vf__frm">Frame <b id="vf-idx">01</b><span class="vf__frm-of">/{{ '%02d' | format(shuffle | length) }}</span></span>
+        <span class="vf__af doc-min-hide"><i aria-hidden="true"></i>AF lock</span>
       </span>
     </div>
 
@@ -122,7 +122,7 @@
       </div>
       {# which photo you are looking at, and a way into it #}
       <a class="vf__meta" id="vf-meta" href="/image/{{ shuffle[0].rel_path }}">
-        <span class="vf__meta-key">FILE</span>
+        <span class="vf__meta-key">File</span>
         <span class="vf__meta-file" id="vf-file">{{ shuffle[0].album }} / {{ shuffle[0].filename }}</span>
       </a>
     </div>
@@ -138,7 +138,7 @@
       {% if feed_mode != 'manual' %}
         <button type="button" class="vf__tune" id="vf-tune" aria-label="{{ t('aria.reshuffle') }}"><i class="fa fa-shuffle" aria-hidden="true"></i>{{ t('welcome.reshuffle') }}</button>
       {% endif %}
-      <span class="vf__auto" id="vf-auto">AUTO · 6.0S</span>
+      <span class="vf__auto" id="vf-auto">Auto · 6.0s</span>
     </div>
   {% else %}
     <div class="vf__hud" aria-hidden="true">
@@ -148,7 +148,7 @@
       <i class="vf__corner vf__corner--br"></i>
     </div>
     <div class="vf__empty">
-      <span class="vf__rec vf__rec--off"><i aria-hidden="true"></i>NO SIGNAL</span>
+      <span class="vf__rec vf__rec--off"><i aria-hidden="true"></i>No signal</span>
       {{ hero_title(brand.hero) }}
       <div class="empty">
         <p>{{ t('welcome.no_images') }}</p>

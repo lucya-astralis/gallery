@@ -155,7 +155,7 @@ os.environ.update(
     HIDE_GPS="1",
     STRIP_GPS="1",
     APERTURE_ROLE="all",
-    CONSOLE_BIND="127.0.0.1",
+    APERTURE_BIND="127.0.0.1",
     # the update notice never reaches the network from a test
     UPDATE_CHECK="0",
 )

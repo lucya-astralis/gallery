@@ -12,10 +12,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY aperture/ ./aperture/
-# the release notes the console's Changelog place reads
+# the release notes Aperture's Changelog place reads
 COPY CHANGELOG.md ./
 
-# The process writes into /data (index, control channel, console state) and
+# The process writes into /data (index, control channel, Aperture's state) and
 # into /thumbnails and /previews. Nothing else needs to be writable, and
 # nothing at all needs root.
 RUN useradd --system --uid 10001 --no-create-home aperture \
@@ -30,7 +30,7 @@ ENV PHOTOS_DIR=/photos \
     APERTURE_ROLE=all \
     PYTHONUNBUFFERED=1
 
-# 8000 is the gallery, 8090 the console. Which of them actually opens is
+# 8000 is the gallery, 8090 Aperture. Which of them actually opens is
 # decided by APERTURE_ROLE at runtime, not here.
 EXPOSE 8000 8090
 

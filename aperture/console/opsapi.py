@@ -53,14 +53,14 @@ router = APIRouter(prefix="/api/ops")
 # The console asks as "console", the CLI as "cli". The value rides into
 # status.json and the audit log, so "who started this scan" is answerable
 # afterwards — and only one of the two leaves a shell history behind.
-BY = "console"
+BY = "aperture"
 
 
 def _guard_actions() -> None:
     """READ_ONLY means the console cannot change anything, not merely that it
     cannot change photos. Pausing the indexer is a change."""
     if settings.console_read_only:
-        raise HTTPException(403, "the console is mounted read-only")
+        raise HTTPException(403, "Aperture is mounted read-only")
 
 
 def _album(raw: str | None) -> str | None:
@@ -426,7 +426,7 @@ async def api_password_set(request: Request):
         raise HTTPException(400, "expected a `password`")
     if security.password_is_set():
         security.check_password(request, str(body.get("current") or ""), status=403)
-    security.audit(request, "console password set", "data/console/credentials",
+    security.audit(request, "Aperture password set", "data/console/credentials",
                    extra={"had_one": security.password_is_set()})
     security.set_password(new)        # ValueError (too short) -> 400
     return {"ok": True, "signed_out": True}
@@ -442,10 +442,10 @@ async def api_password_clear(request: Request):
     if not security.password_is_set():
         raise HTTPException(409, "no password is set")
     if not security.may_run_open():
-        raise HTTPException(409, "this console listens on %s — without a password it "
+        raise HTTPException(409, "this Aperture listens on %s — without a password it "
                                  "would not be allowed to start; set a new one instead"
                                  % settings.console_bind)
     security.check_password(request, str(body.get("current") or ""), status=403)
-    security.audit(request, "console password cleared", "data/console/credentials")
+    security.audit(request, "Aperture password cleared", "data/console/credentials")
     security.clear_password()
     return {"ok": True, "open": True}

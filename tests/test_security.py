@@ -180,7 +180,7 @@ def test_open_on_a_network_refuses_to_start(no_password, host):
         _check(host)
     message = str(caught.value)
     # The refusal has to teach, not just refuse.
-    assert "passwd" in message and "CONSOLE_ALLOW_OPEN" in message
+    assert "passwd" in message and "APERTURE_ALLOW_OPEN" in message
 
 
 def test_the_escape_hatch_is_explicit(no_password):

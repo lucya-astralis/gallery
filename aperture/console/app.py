@@ -195,7 +195,7 @@ def _writes(request: Request, action: str, target: Path, before: str | None) -> 
 # ----- helpers ----------------------------------------------------------
 def _guard_write() -> None:
     if settings.console_read_only:
-        raise HTTPException(403, "the console is mounted read-only")
+        raise HTTPException(403, "Aperture is mounted read-only")
 
 
 def _album_or_400(album: str) -> str:
@@ -296,9 +296,9 @@ async def _json_body(request: Request) -> dict:
 LOGIN_REASONS = {
     "timeout": "That session had been idle for %d minutes, so it ended."
                % (security.IDLE_TIMEOUT // 60),
-    "signout": "Signed out. The console is closed until you sign in again.",
+    "signout": "Signed out. Aperture is closed until you sign in again.",
     "expired": "That session reached its twelve-hour limit and ended.",
-    "password": "The console password was changed, which ends every session. "
+    "password": "The Aperture password was changed, which ends every session. "
                 "Sign in with the new one.",
 }
 
@@ -383,7 +383,7 @@ def api_session(request: Request):
 @app.post("/api/session")
 async def api_session_open(request: Request):
     if security.open_access():
-        raise HTTPException(409, "this console has no password set")
+        raise HTTPException(409, "this Aperture has no password set")
     body = await _json_body(request)
     password = body.get("password")
     if not isinstance(password, str) or not password:

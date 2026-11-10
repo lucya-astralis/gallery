@@ -2,19 +2,20 @@
 
     python -m aperture                    # both, per APERTURE_ROLE
     APERTURE_ROLE=public python -m aperture
-    APERTURE_ROLE=console python -m aperture
+    APERTURE_ROLE=aperture python -m aperture
 
-"Everything in one" and "the console on its own port" are not in tension: one
+"Everything in one" and "Aperture on its own port" are not in tension: one
 process serves both, but each surface is its own ASGI app on its own listener,
 and the port is where the two trust levels part. Nothing routes between them —
-a request that arrives on the public socket cannot reach a console route,
+a request that arrives on the public socket cannot reach an Aperture route,
 because the public app has never heard of them.
 
 The same image therefore covers both deployment shapes without a code change:
 
     role=all      one container, both ports          (the default)
     role=public   the exposed instance, photos:ro    ┐ two containers,
-    role=console  the operator instance, internal    ┘ separate blast radius
+    role=aperture the operator instance, internal    ┘ separate blast radius
+                  (`console`, its name before 3.0, still works)
 
 Two uvicorn details this file exists to get right:
 
@@ -39,7 +40,7 @@ import signal
 
 import uvicorn
 
-from .runtime import ensure_dirs, settings
+from .runtime import deprecated_env, ensure_dirs, settings
 
 log = logging.getLogger("server")
 
@@ -74,8 +75,8 @@ def _configs() -> list[uvicorn.Config]:
             if not out:
                 raise                      # console-only: there is nothing left to serve
             log.error("%s", refused)
-            log.error("console: NOT opening on %s:%d. The gallery is serving; "
-                      "fix the above and restart to get the console back.",
+            log.error("aperture: NOT opening on %s:%d. The gallery is serving; "
+                      "fix the above and restart to get Aperture back.",
                       settings.console_bind, settings.console_port)
         else:
             out.append(uvicorn.Config(
@@ -107,7 +108,7 @@ async def _serve() -> None:
     configs = _configs()
     if not configs:
         raise SystemExit(
-            "APERTURE_ROLE=%s with CONSOLE_ENABLED=%s opens no listener at all"
+            "APERTURE_ROLE=%s with APERTURE_ENABLED=%s opens no listener at all"
             % (settings.role, "1" if settings.console_enabled else "0"))
 
     servers = [uvicorn.Server(c) for c in configs]
@@ -115,12 +116,17 @@ async def _serve() -> None:
         s.install_signal_handlers = lambda: None  # type: ignore[method-assign]
     _install_shutdown(servers)
 
-    log.info("role=%s  gallery=%s  console=%s  photos=%s",
+    log.info("role=%s  gallery=%s  aperture=%s  photos=%s",
              settings.role,
              ":%d" % settings.port if settings.runs_public else "off",
              "%s:%d" % (settings.console_bind, settings.console_port)
              if settings.runs_console else "off",
              settings.photos_dir)
+    # 3.0 renamed the console to Aperture. Its old variable names still work;
+    # say which ones this environment uses, every start, until they are gone.
+    for old, new in deprecated_env():
+        log.warning("%s is the pre-3.0 name; it still works in 3.x, "
+                    "but rename it to %s", old, new)
 
     await asyncio.gather(*(s.serve() for s in servers))
 

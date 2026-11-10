@@ -414,12 +414,12 @@ def cmd_passwd(args) -> int:
         if args.json:
             dump({"ok": True, "cleared": existed, "password_set": False})
             return 0
-        with _screen("console password"):
+        with _screen("Aperture password"):
             if existed:
                 out(f"{ui.C.ye}Password cleared.{ui.C.off}")
                 out("")
-                out("The console now runs OPEN wherever it is allowed to run at all —")
-                out("loopback, or CONSOLE_ALLOW_OPEN=1. Anywhere else it will refuse")
+                out("Aperture now runs OPEN wherever it is allowed to run at all —")
+                out("loopback, or APERTURE_ALLOW_OPEN=1. Anywhere else it will refuse")
                 out("to start until a password is set again.")
             else:
                 out("No password was set.")
@@ -431,7 +431,7 @@ def cmd_passwd(args) -> int:
     else:
         import getpass
         try:
-            password = getpass.getpass("New console password: ")
+            password = getpass.getpass("New Aperture password: ")
             confirm = getpass.getpass("Again: ")
         except (EOFError, KeyboardInterrupt):
             out("")
@@ -449,13 +449,13 @@ def cmd_passwd(args) -> int:
     if args.json:
         dump({"ok": True, "password_set": True, "file": str(path)})
         return 0
-    with _screen("console password"):
+    with _screen("Aperture password"):
         out(f"{ui.C.gn}Password set.{ui.C.off}")
         out("")
         kv("stored in", str(path))
         kv("hash", "scrypt (n=%d, r=%d, p=%d)"
            % (security.SCRYPT["n"], security.SCRYPT["r"], security.SCRYPT["p"]))
         out("")
-        out("Every open console session was ended. The console now asks for this")
+        out("Every open Aperture session was ended. Aperture now asks for this")
         out("password wherever it listens.")
     return 0

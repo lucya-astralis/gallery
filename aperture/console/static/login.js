@@ -1,4 +1,4 @@
-/* lucya.systems aperture — the console's door.
+/* lucya.systems aperture — Aperture's door.
  *
  * A real <form> with a real submit button, progressively enhanced: without
  * this file the browser still posts it, and the API answers JSON rather than
@@ -178,7 +178,7 @@
       } catch (_) { /* an empty body is still an error */ }
       fail(detail);
     } catch (_) {
-      fail('The console did not answer. Is it still running?');
+      fail('Aperture did not answer. Is it still running?');
     } finally {
       if (!ticking) submit.disabled = false;
     }

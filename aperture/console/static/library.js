@@ -265,25 +265,25 @@ function libToolbar() {
       },
       onkeydown: (ev) => { if (ev.key === 'Escape' && ev.target.value) { ev.stopPropagation(); ev.target.value = ''; L.q = ''; refilter(); } },
     }),
-    el('div', { class: 'seg', role: 'group', 'aria-label': 'Sort' },
+    el('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Sort' },
       [['newest', 'Newest'], ['oldest', 'Oldest'], ['name', 'Name'], ['album', 'Album']].map(([id, label]) =>
         el('button', {
           type: 'button', class: 'seg__opt' + (L.sort === id ? ' is-on' : ''), text: label,
-          'aria-pressed': String(L.sort === id),
+          role: 'radio', 'aria-checked': String(L.sort === id),
           onclick: () => { L.sort = id; saveLibPrefs(); renderLibrary(); },
         }))),
-    el('div', { class: 'seg', role: 'group', 'aria-label': 'Thumbnail size' },
+    el('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Thumbnail size' },
       [['s', 'S'], ['m', 'M'], ['l', 'L']].map(([id, label]) =>
         el('button', {
           type: 'button', class: 'seg__opt' + (L.size === id ? ' is-on' : ''), text: label,
-          'aria-pressed': String(L.size === id), title: { s: 'Small', m: 'Medium', l: 'Large' }[id] + ' thumbnails',
+          role: 'radio', 'aria-checked': String(L.size === id), title: { s: 'Small', m: 'Medium', l: 'Large' }[id] + ' thumbnails',
           onclick: () => {
             L.size = id; saveLibPrefs();
             $('#lib-grid').className = 'lgrid lgrid--' + id;
             $$('.lib__bar .seg:last-child .seg__opt').forEach((b) => {
               const on = b.textContent === label;
               b.classList.toggle('is-on', on);
-              b.setAttribute('aria-pressed', String(on));
+              b.setAttribute('aria-checked', String(on));
             });
           },
         }))));
