@@ -21,18 +21,24 @@
       <span class="g-trip__clock" data-trip-clock title="{{ t('trip.jst_title') }}">{{ t('trip.jst_label') }} <b data-trip-time>--:--:--</b> <small>JST</small></span>
     </header>
 
-    <p class="g-trip__phase"><span class="g-trip__beacon" aria-hidden="true"></span><span data-trip-cd-label>{{ t('trip.departs_in') }}</span></p>
-    {# the ":" stay in the markup for copy/paste and screen readers #}
-    <div class="g-trip__cd" role="timer">
-      <span class="g-trip__unit"><b data-cd="d">––</b><small>{{ t('trip.days') }}</small></span>
-      <span class="g-trip__sep" aria-hidden="true">:</span>
-      <span class="g-trip__unit"><b data-cd="h">––</b><small>{{ t('trip.hrs') }}</small></span>
-      <span class="g-trip__sep" aria-hidden="true">:</span>
-      <span class="g-trip__unit"><b data-cd="m">––</b><small>{{ t('trip.min') }}</small></span>
-      <span class="g-trip__sep" aria-hidden="true">:</span>
-      <span class="g-trip__unit"><b data-cd="s">––</b><small>{{ t('trip.sec') }}</small></span>
+    {# the phase and where it is counting to on the left, the countdown on
+       the right: one row, so the panel stays short #}
+    <div class="g-trip__main">
+      <div class="g-trip__what">
+        <p class="g-trip__phase"><span class="g-trip__beacon" aria-hidden="true"></span><span data-trip-cd-label>{{ t('trip.departs_in') }}</span></p>
+        <p class="g-trip__target">{{ t('trip.flight') }} · <b data-trip-cd-target>{{ trip.depart_h }}</b></p>
+      </div>
+      {# the ":" stay in the markup for copy/paste and screen readers #}
+      <div class="g-trip__cd" role="timer">
+        <span class="g-trip__unit"><b data-cd="d">––</b><small>{{ t('trip.days') }}</small></span>
+        <span class="g-trip__sep" aria-hidden="true">:</span>
+        <span class="g-trip__unit"><b data-cd="h">––</b><small>{{ t('trip.hrs') }}</small></span>
+        <span class="g-trip__sep" aria-hidden="true">:</span>
+        <span class="g-trip__unit"><b data-cd="m">––</b><small>{{ t('trip.min') }}</small></span>
+        <span class="g-trip__sep" aria-hidden="true">:</span>
+        <span class="g-trip__unit"><b data-cd="s">––</b><small>{{ t('trip.sec') }}</small></span>
+      </div>
     </div>
-    <p class="g-trip__target">{{ t('trip.flight') }} · <b data-trip-cd-target>{{ trip.depart_h }}</b></p>
 
     {# The journey: the whole trip, departure to the flight home, one bar.
        Each leg is a segment as long as its stay, each side trip a mark on
