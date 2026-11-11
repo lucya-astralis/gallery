@@ -83,11 +83,12 @@ main{ flex:1 0 auto; outline:none }
 .g-brand{ display:flex; align-items:center; gap:var(--s-3); color:var(--text); flex:none; min-width:0 }
 .g-brand img{ height:26px; width:auto }
 .g-brand__name{ font:var(--display-weight, 600) calc(var(--fs-400) * var(--display-scale)) / 1 var(--display-font); letter-spacing:.01em; white-space:nowrap }
-/* the wordmark and its sub as one lockup: name, a hairline, the sub at the
-   name's height, so "gallery" reads as part of the mark, not a caption */
-.g-brand > span{ display:flex; align-items:center; gap:10px; min-width:0 }
-.g-brand__sub{ display:block; padding-left:10px; border-left:1px solid var(--stroke-1); color:var(--text-dim);
-  font:500 var(--fs-300)/1 var(--sans); letter-spacing:.01em; white-space:nowrap }
+/* the sub under the wordmark, as Nebula set it: the mono voice, small and
+   widely tracked, in a lifted accent, flush left under the name, so it
+   reads as the app's name inside the mark rather than a caption */
+.g-brand > span{ display:flex; flex-direction:column; gap:4px; min-width:0 }
+.g-brand__sub{ display:block; color:color-mix(in srgb, var(--acc) 72%, var(--text));
+  font:500 10px/1 var(--mono); letter-spacing:.28em; white-space:nowrap }
 .g-links{ display:flex; gap:var(--s-1) }
 .g-link{ display:inline-flex; align-items:center; gap:var(--s-2); height:34px; padding:0 var(--s-4); border-radius:var(--r-pill);
   color:var(--text-dim); font:500 var(--fs-300)/1 var(--sans); transition:color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease) }
@@ -126,7 +127,7 @@ main{ flex:1 0 auto; outline:none }
   text-wrap:balance; display:flex; align-items:center; gap:var(--s-4) }
 /* an album's mark scales with its title (which an album face and its
    font_scale can make much larger), and keeps a gap measured in the same em */
-.g-title img, .g-reel__title img{ width:auto; height:.8em; margin-right:.22em; vertical-align:-.04em }
+.g-title img, .g-reel__title img{ width:auto; height:.8em; height:1cap; margin-right:.22em; vertical-align:baseline }
 .g-title__jp{ font-size:.5em; color:var(--text-dim); font-weight:500 }
 .g-reel__title .g-title__jp{ margin-left:.35em; color:rgba(255,255,255,.72) }
 .g-meta{ display:flex; flex-wrap:wrap; gap:var(--s-2) var(--s-5); color:var(--text-dim); font:400 var(--fs-300)/1.5 var(--sans);
@@ -511,7 +512,14 @@ details > summary{ cursor:pointer; color:var(--text-dim); font:500 var(--fs-200)
    title runs a little larger, as a display face wants. The kanji beside it
    keep their own face. */
 .album-font :is(.g-reel__title--album, .g-head .g-title){
-  font-family:var(--album-title-font), var(--head-font); font-weight:400; letter-spacing:.015em; line-height:1 }
+  font-family:var(--album-title-font), var(--head-font); font-weight:400; letter-spacing:.015em; line-height:1;
+  /* a display face rarely fills its em (an all-caps one leaves the whole
+     descender band empty): the line is cut to cap height and baseline, with
+     a little kept below for a face that does have descenders */
+  text-box:trim-both cap alphabetic }
+@supports (text-box:trim-both cap alphabetic){
+  .album-font :is(.g-reel__title--album, .g-head .g-title){ padding-bottom:.08em }
+}
 .album-font .g-reel__title--album{ font-size:calc(clamp(36px, 5.6vw, 76px) * var(--album-title-scale, 1)) }
 .album-font .g-head .g-title{ font-size:calc(clamp(30px, 3.8vw, 52px) * var(--album-title-scale, 1)) }
 .album-font .g-title__jp{ font-family:var(--sans); font-weight:500; letter-spacing:0 }
