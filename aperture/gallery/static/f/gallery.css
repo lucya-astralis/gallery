@@ -291,10 +291,37 @@ main{ flex:1 0 auto; outline:none }
 .g-album__top--facts .g-kv > div + div{ border-top:0 }
 .g-album__top--facts .g-kv > div{ flex-direction:column; align-items:flex-start; gap:2px }
 .g-album__top--facts .g-kv dd{ text-align:left; font-weight:600 }
-.g-about{ display:grid; gap:var(--s-4) }
-.g-about__body{ color:var(--text); font:400 var(--fs-300)/1.65 var(--sans); max-width:68ch }
-.g-about__body :is(p, ul, ol){ margin:0 0 .8em }
-.g-about__body a{ color:var(--acc) }
+/* reel left, the album's words and figures right */
+.g-album__hero{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(300px, 380px); gap:var(--s-5); align-items:stretch }
+.g-album__lead{ display:flex; flex-direction:column; gap:var(--s-4); min-width:0 }
+.g-album__hero .g-reel--album{ flex:1 1 auto; height:auto; min-height:clamp(380px, 50dvh, 520px) }
+.g-album__side{ display:flex; flex-direction:column; gap:var(--s-5); min-width:0 }
+.g-album__side .g-about{ flex:1 1 auto }
+.g-album__side .g-kv > div{ padding:var(--s-2) 0 }
+
+.g-about{ display:flex; flex-direction:column; gap:var(--s-3); min-width:0 }
+.g-about__label{ margin:0; display:flex; align-items:center; gap:var(--s-2); color:var(--text-dim); font:500 var(--fs-200)/1 var(--sans) }
+.g-about__body{ color:var(--text); font:400 var(--fs-300)/1.65 var(--sans); max-width:68ch; overflow-wrap:anywhere }
+/* the album's own Markdown: headings scaled to a panel, not to a page */
+.g-about__body > :first-child{ margin-top:0 }
+.g-about__body > :last-child{ margin-bottom:0 }
+.g-about__body :is(p, ul, ol, blockquote, pre, table, figure){ margin:0 0 .8em }
+.g-about__body :is(h1, h2, h3, h4){ margin:1.1em 0 .4em; color:var(--text); font-family:var(--display-font); letter-spacing:-.01em; line-height:1.2 }
+.g-about__body h1{ font-size:var(--fs-600); font-weight:600 }
+.g-about__body h2{ font-size:var(--fs-500); font-weight:600 }
+.g-about__body :is(h3, h4){ font-size:var(--fs-400); font-weight:600 }
+.g-about__body :is(ul, ol){ padding-left:1.3em }
+.g-about__body li + li{ margin-top:.25em }
+.g-about__body blockquote{ padding:var(--s-2) var(--s-4); border-left:2px solid var(--acc-line); border-radius:0 var(--r-inner) var(--r-inner) 0;
+  background:var(--acc-soft); color:var(--text-dim) }
+.g-about__body blockquote > :last-child{ margin-bottom:0 }
+.g-about__body code{ padding:.1em .35em; border-radius:var(--r-xs, 4px); background:color-mix(in srgb, var(--text) 8%, transparent); font:400 .9em/1 var(--mono) }
+.g-about__body pre{ padding:var(--s-3) var(--s-4); overflow:auto; border-radius:var(--r-inner); background:color-mix(in srgb, var(--text) 6%, transparent) }
+.g-about__body pre code{ padding:0; background:none }
+.g-about__body img{ max-width:100%; height:auto; border-radius:var(--r-inner) }
+.g-about__body hr{ border:0; border-top:var(--hair) solid var(--stroke-2); margin:1em 0 }
+.g-about__body a{ color:var(--acc); text-decoration:underline; text-decoration-color:var(--acc-line); text-underline-offset:2px }
+.g-about__body a:hover{ text-decoration-color:currentColor }
 .g-kv{ margin:0; display:grid }
 .g-kv > div{ display:flex; justify-content:space-between; align-items:baseline; gap:var(--s-4); padding:var(--s-2) 0; min-width:0 }
 .g-kv > div + div{ border-top:var(--hair) solid var(--stroke-3) }
@@ -373,6 +400,9 @@ details > summary{ cursor:pointer; color:var(--text-dim); font:500 var(--fs-200)
 /* ---------------- stats page frame (the charts are blocks.css) ---------------- */
 .g-stats{ display:grid; gap:var(--s-5); grid-template-columns:repeat(auto-fill, minmax(min(100%, 420px), 1fr)) }
 .g-stats .g-panel{ display:grid; gap:var(--s-4); align-content:start }
+/* grid cells may shrink below their content: a long chart scrolls in its
+   own .ch-scroll instead of widening the page (phones) */
+.g-page > *, .g-stats > *, .g-stats .g-panel > *{ min-width:0 }
 .g-stats .g-panel--wide{ grid-column:1 / -1 }
 .g-stats h2{ margin:0; font:600 var(--fs-400)/1.2 var(--sans) }
 .g-stats .g-note{ margin:0 }
@@ -416,9 +446,12 @@ details > summary{ cursor:pointer; color:var(--text-dim); font:500 var(--fs-200)
 @media (max-width: 1365px){
   .g-shot{ grid-template-columns:minmax(0,1fr) 320px }
   .g-album__top{ grid-template-columns:minmax(0,1fr) 300px }
+  .g-album__hero{ grid-template-columns:minmax(0,1fr) 320px }
 }
 @media (max-width: 1023px){
-  .g-shot, .g-album__top, .g-search-page{ grid-template-columns:minmax(0,1fr) }
+  .g-shot, .g-album__top, .g-album__hero, .g-search-page{ grid-template-columns:minmax(0,1fr) }
+  .g-album__hero .g-reel--album{ flex:none; min-height:0; height:min(56dvh, 460px) }
+  .g-album__side{ display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 280px), 1fr)); align-items:start }
   .g-facets{ position:static; max-height:none; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)) }
   .g-links{ display:none }
 }
@@ -435,3 +468,9 @@ details > summary{ cursor:pointer; color:var(--text-dim); font:500 var(--fs-200)
   .g-lost{ grid-template-columns:1fr; gap:var(--s-4) }
   .g-foot__meta{ margin-left:0 }
 }
+
+/* Album icons are drawn for a dark ground (most are white marks). Where one
+   lies on a light surface (the crumbs, a card, the plain title) it gets a
+   small dark plate in the light scheme; on photos and in dark it needs none. */
+:is(.g-crumbs, .g-card__name, .g-title) > img, .g-crumbs :is(a, span) > img{
+  box-sizing:content-box; padding:2px; border-radius:5px; background:light-dark(#22222b, transparent) }

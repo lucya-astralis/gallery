@@ -32,9 +32,30 @@
 {% set sort_qs = '' if current_sort == default_sort else ('sort=' ~ current_sort) %}
 {% set col_qs = ('col=' ~ (album | urlencode)) if collection else '' %}
 {% set img_qs = ('?' ~ ([sort_qs, col_qs] | select | join('&'))) if (sort_qs or col_qs) else '' %}
+{% set has_side = album_description or (album_stats and album_stats.has) %}
+{# A reel with a description or facts beside it: the old two-column top row,
+   reel left, the album's words and figures right (trip albums too; their
+   dashboard follows underneath). Without a reel the panels run below. #}
+{% set hero_side = featured and has_side %}
+{% macro side_panels() %}
+    {% if album_description %}
+    <section class="g-panel g-about">
+      <h2 class="g-about__label">{{ t('album.about') }}</h2>
+      <div class="g-about__body">{{ album_description | safe }}</div>
+    </section>
+    {% endif %}
+    {% if album_stats and album_stats.has %}
+    <section class="g-panel g-facts-panel" aria-label="{{ t('aria.album_info') }}">
+      <dl class="g-kv">
+        {% for s in (album_stats.context or []) + (album_stats.capture or []) %}<div><dt>{{ s.key }}</dt><dd>{{ s.val }}</dd></div>{% endfor %}
+      </dl>
+    </section>
+    {% endif %}
+{% endmacro %}
 <div class="g-page g-album">
   {{ crumbs(breadcrumbs) }}
 
+  {% if hero_side %}<div class="g-album__hero{% if not album_description %} g-album__hero--facts{% endif %}"><div class="g-album__lead">{% endif %}
   {% if featured %}
   <section class="g-reel g-reel--album" data-reel aria-label="{{ t('aria.random_photos') if reel_mode == 'random' else t('aria.featured_photos') }}">
     {% for img in featured %}
@@ -76,27 +97,14 @@
       {% if not featured and album_tags %}{% for tg in album_tags %}<span>#{{ tg }}</span>{% endfor %}{% endif %}
     </p>
   </header>
+  {% if hero_side %}</div><aside class="g-album__side" aria-label="{{ t('aria.album_info') }}">{{ side_panels() }}</aside></div>{% endif %}
 
   {% if not featured and album_cover and not trip %}<div class="g-cover"><img src="{{ media_url('preview', album_cover) }}" alt="" decoding="async"></div>{% endif %}
 
   {% if trip %}{% include "_trip.html" %}{% endif %}
 
-  {% if album_description or (album_stats and album_stats.has) %}
-  <div class="g-album__top{% if not album_description %} g-album__top--facts{% endif %}">
-    {% if album_description %}
-    <section class="g-panel g-about">
-      <h2 class="g-section__title">{{ t('album.about') }}</h2>
-      <div class="g-about__body">{{ album_description | safe }}</div>
-    </section>
-    {% endif %}
-    {% if album_stats and album_stats.has %}
-    <aside class="g-panel" aria-label="{{ t('aria.album_info') }}">
-      <dl class="g-kv">
-        {% for s in (album_stats.context or []) + (album_stats.capture or []) %}<div><dt>{{ s.key }}</dt><dd>{{ s.val }}</dd></div>{% endfor %}
-      </dl>
-    </aside>
-    {% endif %}
-  </div>
+  {% if has_side and not hero_side %}
+  <div class="g-album__top{% if not album_description %} g-album__top--facts{% endif %}">{{ side_panels() }}</div>
   {% endif %}
 
   {% if sub_albums %}
