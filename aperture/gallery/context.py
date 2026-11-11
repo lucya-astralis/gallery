@@ -66,8 +66,12 @@ def _i18n_context(request: Request) -> dict:
     the localized month_label overrides the app-wide default for the
     album-card date chips."""
     lang = request_lang(request)
+    ground = request.cookies.get("theme", "system")
+    ground = ground if ground in ("system", "light", "dark") else "system"
     return {
         "lang": lang,
+        "theme": ground,
+        "theme_next": {"system": "light", "light": "dark", "dark": "system"}[ground],
         "html_lang": i18n.HTML_LANG[lang],
         "langs": [
             {"code": code, "label": i18n.LANG_LABELS[code], "active": code == lang}

@@ -43,6 +43,10 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     # for the narrow field — see the data-ph-short attribute in base.html
     "nav.search_ph_short": ("Search", "Suchen", "検索"),
     "nav.lang_label": ("Language", "Sprache", "言語"),
+    "nav.theme": ("Appearance: {mode}", "Darstellung: {mode}", "表示: {mode}"),
+    "nav.theme.system": ("system", "System", "システム"),
+    "nav.theme.light": ("light", "hell", "ライト"),
+    "nav.theme.dark": ("dark", "dunkel", "ダーク"),
     "foot.operator": ("Operator", "Operator", "オペレーター"),
     # {operator} is gallery.cfg's `operator` — who runs this archive. The
     # name used to be baked in here, which made the translation table a

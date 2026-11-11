@@ -18,6 +18,27 @@ notes are never one commit apart.
 
 ---
 
+## 3.1.0 — 2026-11-11
+
+**The gallery wears Facet.** The public pages move from Nebula to Facet, the
+design language of lucya.systems' platform; the console stays on Nebula and
+is now the tool's own, complete fallback while its settings move to Lucent.
+
+* **Light and dark, same rank.** Every colour token is a `light-dark()` pair;
+  the page follows the system, and the new appearance link in the nav pins
+  light or dark (a `theme` cookie, like the language: no script, no flash).
+* **Pictures keep the dark ground.** The hero reel, the welcome viewfinder,
+  the photo stage and the lightbox stay `color-scheme: dark`, so their
+  chrome stays white on a photograph in both modes.
+* **The accent knows both grounds.** `accent` in gallery.cfg / album.cfg now
+  comes out as `light-dark(deep, acc)`: the face already measured against
+  white on the light page, the familiar one on the dark.
+* **Corners by role.** Cards and photo tiles 8 px, controls 4, menus 12,
+  tags and facets as pills. Coloured glows are gone; state is said by fill
+  and line.
+* Lucent's connector gained albums, tags, short links and the change log
+  (see Lucent's CONNECTOR.md §5).
+
 ## 3.0.0 — 2026-11-10
 
 The console is called **Aperture** now, and both surfaces speak **Nebula

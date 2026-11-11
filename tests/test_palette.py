@@ -89,7 +89,7 @@ def test_the_console_wears_the_site_accent_before_sign_in(gallery_cfg):
         css = door.get("/theme.css")
         assert css.status_code == 200
         shades = theme.accent_shades(theme.parse_hex_color("#3fc27a"))
-        assert "--acc:%s" % shades["acc"] in css.text
+        assert "--acc:light-dark(%s, %s)" % (shades["deep"], shades["acc"]) in css.text
         svg = door.get("/bg/nova-wide-16-9.svg")
         assert svg.status_code == 200 and svg.headers["content-type"].startswith("image/svg+xml")
         assert "#4034c0" not in svg.text          # the built-in violet is gone
@@ -110,7 +110,7 @@ def test_the_gallery_wears_nova_by_default(client, gallery_cfg):
     assert client.get(bg["still_desktop"]).status_code == 200
     css = client.get(theme.theme_css_url(None)).text
     assert "--wallpaper-filter:brightness(0.95) contrast(1.04)" in css
-    assert "--wallpaper-shade-bot:rgba(0,0,0,0.62)" in css
+    assert "--wallpaper-shade-bot:light-dark(rgba(244,244,247,.88), rgba(0,0,0,0.62))" in css
     assert "--wallpaper-bloom" not in css        # nova keeps its wash
 
 

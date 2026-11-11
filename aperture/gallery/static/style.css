@@ -14,18 +14,7 @@
         STATE and nothing else; furniture is --chrome or --label. Before
         colouring something purple, ask whether it carries state. The
         accent never sits on its own tint, and reading copy bottoms out
-        at --text-dim: --text-ghost is a ghost, not a text colour.
-     2. Square corners, always. --radius: 0.
-     3. Depth comes from blurred translucency over a drained wallpaper,
-        never from darker fills. SIX surfaces — --glass/-hi, --scrim/-hi,
-        --pane (the bar), --overlay (menus) — each with a step off the
-        --blur-1..3 ladder. A pane that does not read gets more blur or
-        the -hi step. A pane is a fill, a blur and a hairline: NO bevel,
-        NO gloss gradient — that is Aero, and it argues with rule 2.
-     4. The chrome is quieter than the content. The furniture AROUND a
-        photo grid speaks the interface voice -- Space Grotesk 500, a step
-        smaller, --label, sentence case (--ui-font / --ui-case /
-        --ui-weight, --num-font for measured values); everything a person
+        at --text-dim: light-dark(#5b5b66, #a1a1a8); everything a person
         reads is Space Grotesk at the reading sizes; mono is for code.
         Until Nebula 2.0 the chrome was mono, uppercase and tracked. The
         token name carries the voice: --fs-chrome-* vs --fs-text-*.
@@ -292,12 +281,12 @@
      every grey towards blue-violet, so a screen read as purple end to end
      and the actual accents had nothing quiet to sit against. Colour now
      appears once, on purpose, as --acc. */
-  --bg:         #000000;
-  --bg-2:       #08080a;
-  --surface:    #0e0e10;
-  --surface-2:  #16161a;
-  --line:       rgba(255,255,255,0.09);
-  --line-strong:rgba(255,255,255,0.20);
+  --bg:         light-dark(#f4f4f7, #0a0a0e);
+  --bg-2:       light-dark(#ececf1, #08080b);
+  --surface:    light-dark(#ffffff, #17171d);
+  --surface-2:  light-dark(#f4f4f7, #1f1f26);
+  --line:       light-dark(rgba(18,18,30,.12), rgba(255,255,255,.09));
+  --line-strong: light-dark(rgba(18,18,30,.26), rgba(255,255,255,.20));
 
   /* ---- the text ramp, measured rather than picked ----------------------
      Every value carries a stated contrast floor against --surface (#0e0e10)
@@ -319,17 +308,17 @@
      --surface and 3.42:1 on --surface-2 - under the floor everywhere it was
      used, and it was carrying help text, placeholders and the UNSELECTED
      segments of every segmented control. */
-  --text:       #f2f2f4;   /* 17.3:1 on --surface */
+  --text:       light-dark(#121216, #f2f2f4);   /* 17.3:1 on --surface */
   --text-dim:   #a1a1a8;   /*  7.5:1 */
-  --text-ghost: #7d7d86;   /*  4.7:1 - the floor for read text */
+  --text-ghost: light-dark(#73737f, #7d7d86);   /*  4.7:1 - the floor for read text */
   /* Section headings used to sit at full --text alongside the page title, the
      card names and every bold number, so a screen was a field of identical
      white with no way in. This is one step down: still clearly a heading,
      but it stops competing with the title above it and the photos below. */
-  --text-head:  #cdcdd4;   /* 12.2:1 */
+  --text-head:  light-dark(#2a2a33, #cdcdd4);   /* 12.2:1 */
   /* the two ends of the display-title gradient (see .section__slug .name) */
-  --title-a:    #ffffff;
-  --title-b:    #8b8b94;
+  --title-a:    light-dark(#121216, #ffffff);
+  --title-b:    light-dark(#4a4a56, #8b8b94);
 
   /* ---- the one accent, and the grey that replaced the old one ---------
      Purple marks MEANING and nothing else: links and focus, the current /
@@ -377,11 +366,11 @@
      the lowest contrast in the whole sheet (4.14:1) and it was on the
      primary action, the most important control in any row. */
   --acc-src:    #5865f2;   /* the brand hex, for reference only */
-  --acc:        #616ef3;   /* 4.6:1 on --surface, 5.0:1 on --bg */
+  --acc:        light-dark(#404ee7, #616ef3);   /* 4.6:1 on --surface, 5.0:1 on --bg */
   --acc-rgb:    97,110,243;
   --acc-deep:   #404ee7;   /* the only face that carries white text - 6.1:1 */
-  --acc-soft:   #a4abf8;   /* hover face, black text on it - 9.0:1 */
-  --on-acc:     #000000;   /* what goes on top of an --acc fill */
+  --acc-soft:   light-dark(#5c69ec, #a4abf8);   /* hover face, black text on it - 9.0:1 */
+  --on-acc:     light-dark(#ffffff, #000000);   /* what goes on top of an --acc fill */
 
   /* ---- the trip module, deliberately OUTSIDE the accent system --------
      The trip band, its countdown, its timeline and its map keep the palette
@@ -417,11 +406,11 @@
   /* The route map's own graticule. It borrowed the wallpaper's grid until
      Nebula 2.0 took that one away; a grid on a MAP is part of the
      instrument, so it stays, as the module's own token. */
-  --trip-grid:     rgba(255,255,255,.03);
+  --trip-grid:     light-dark(rgba(18,18,30,.05), rgba(255,255,255,.03));
 
-  --chrome:     #e8e8ee;   /* hovers, corner brackets, HUD strokes */
+  --chrome:     light-dark(#26262e, #e8e8ee);   /* hovers, corner brackets, HUD strokes */
   --chrome-rgb: 232,232,238;
-  --label:      #b8b8c2;   /* the interface voice's tone: section labels,
+  --label:      light-dark(#4f4f5a, #b8b8c2);   /* the interface voice's tone: section labels,
                               counts, badges, measured values */
   --label-rgb:  184,184,194;
 
@@ -431,13 +420,13 @@
      carries a -deep face for the rare fill that must hold WHITE text - the
      same guarantee --acc-deep gives, so a danger button is not the one
      control in the app with unchecked contrast. */
-  --amb:        #d9a24a;
+  --amb:        light-dark(#9a5b00, #d9a24a);
   --amb-rgb:    217,162,74;
   --amb-deep:   #7a5410;
-  --ok:         #58f298;
+  --ok:         light-dark(#13805a, #58f298);
   --ok-rgb:     88,242,152;
   --ok-deep:    #11723f;
-  --red:        #e0625f;
+  --red:        light-dark(#c0362f, #e0625f);
   --red-rgb:    224,98,95;
   --red-deep:   #97201d;
   /* The -rgb triplets above are kept for anything outside this sheet that
@@ -623,10 +612,10 @@
      bevel, no gloss gradient. Gradient shades that fade INTO a photo (card
      captions, hero overlays) stay hand-tuned - being see-through at one
      end is their whole job. */
-  --glass:      rgba(30,30,38,.36);
-  --glass-hi:   rgba(22,22,29,.74);
-  --scrim:      rgba(4,4,8,.46);
-  --scrim-hi:   rgba(6,6,10,.64);
+  --glass:      light-dark(rgba(255,255,255,.56), rgba(30,30,38,.36));
+  --glass-hi:   light-dark(rgba(255,255,255,.80), rgba(22,22,29,.74));
+  --scrim:      light-dark(rgba(244,244,247,.50), rgba(4,4,8,.46));
+  --scrim-hi:   light-dark(rgba(244,244,247,.72), rgba(6,6,10,.64));
   /* --pane is DEEP BLACK, and it is the one surface with a stated reason not
      to take the top of the blur ladder. Two things put colour into a bar:
      a hue in the fill itself, and saturation in the blur behind it. --pane
@@ -642,9 +631,9 @@
      moves behind it -- but it reads black at every album and under every
      accent. --pane-scrolled is the deeper step for a bar that has content
      under it; that is a STATE cue, not the legibility fix rule 3 forbids. */
-  --pane:          rgba(0,0,0,.86);
-  --pane-scrolled: rgba(0,0,0,.94);
-  --overlay:       rgba(10,10,14,.82);
+  --pane:          light-dark(rgba(250,250,252,.86), rgba(0,0,0,.86));
+  --pane-scrolled: light-dark(rgba(250,250,252,.94), rgba(0,0,0,.94));
+  --overlay:       light-dark(rgba(252,252,253,.92), rgba(10,10,14,.82));
 
   --glass-blur:   var(--blur-2);
   --scrim-blur:   var(--blur-1);
@@ -661,13 +650,13 @@
        floating  menus, the lightbox: --shadow-2, --blur-3.
      A shadow below a pane is not a darker fill, so rule 3 stands; and it is
      never a bevel -- no light edge on top, no gloss, a shadow BELOW only. */
-  --shadow-0: 0 1px 0 rgba(0,0,0,.45), 0 14px 32px -18px rgba(0,0,0,.85);
-  --shadow-1: 0 2px 0 rgba(0,0,0,.35), 0 18px 40px -14px rgba(0,0,0,.80);
-  --shadow-2: 0 18px 44px rgba(0,0,0,.55), 0 4px 12px rgba(0,0,0,.35);
+  --shadow-0: 0 1px 0 light-dark(rgba(18,18,30,.05), rgba(0,0,0,.45)), 0 14px 32px -18px light-dark(rgba(18,18,30,.18), rgba(0,0,0,.85));
+  --shadow-1: 0 2px 0 light-dark(rgba(18,18,30,.05), rgba(0,0,0,.35)), 0 18px 40px -14px light-dark(rgba(18,18,30,.20), rgba(0,0,0,.80));
+  --shadow-2: 0 18px 44px light-dark(rgba(18,18,30,.16), rgba(0,0,0,.55)), 0 4px 12px light-dark(rgba(18,18,30,.08), rgba(0,0,0,.35));
   /* the bar, once there is page under it: content passes BENEATH the frame */
-  --shadow-bar: 0 10px 28px -14px rgba(0,0,0,.9);
+  --shadow-bar: 0 10px 28px -14px light-dark(rgba(18,18,30,.25), rgba(0,0,0,.9));
   --lift: 3px;   /* how far a raised pane rises */
-  --glow-acc: 0 0 20px -6px oklch(from var(--acc) l c h / .70);
+  --glow-acc: none;   /* Facet: no glow; state is said by fill and line */
   --ring-acc: 0 0 0 1px oklch(from var(--acc) l c h / .22);
 
   /* The DISPLAY face: the brand voice of the chrome, and nothing else - the
@@ -709,8 +698,8 @@
      picture is still at full strength. Artwork that already falls off
      downward (nova, the shipped default; theme.wallpaper_decls) wants both ends flat, or
      the ramp lands on the art's own falloff and the bottom half goes black. */
-  --wallpaper-shade-top: rgba(0,0,0,0.62);
-  --wallpaper-shade-bot: rgba(0,0,0,0.82);
+  --wallpaper-shade-top: light-dark(rgba(244,244,247,0.72), rgba(0,0,0,0.62));
+  --wallpaper-shade-bot: light-dark(rgba(244,244,247,0.88), rgba(0,0,0,0.82));
   /* Depth in the ground (Nebula 2.0). There is no grid any more: a 32px
      lattice repeated over the art on every screen made them all read as the
      same technical sheet (user, 2026-11-09: "das grid im wallpaper weg").
@@ -722,15 +711,17 @@
        --depth-drift         parallax: the picture travels this far over the
                              first --depth-range of scroll while the panes move
                              with the page. Behind the motion gate. */
-  --wallpaper-light:    rgba(255,255,255,.055);
-  --wallpaper-vignette: rgba(0,0,0,.55);
+  --wallpaper-light:    light-dark(rgba(255,255,255,.30), rgba(255,255,255,.055));
+  --wallpaper-vignette: light-dark(rgba(244,244,247,.45), rgba(0,0,0,.55));
   --depth-drift: 6vh;
   --depth-range: 200vh;
 
   /* square, everywhere: the one shape rule the whole surface language is
      built on. Kept as a token so the handful of pills that are genuinely
      round (status dot, lightbox buttons) have to opt out on purpose. */
-  --radius:     0;
+  /* Facet (Aperture 3.1): both grounds rank the same, corners by role. */
+  --r-control: 4px; --r-inner: 6px; --r-card: 8px; --r-overlay: 12px; --r-pill: 999px;
+  --radius:     8px;
   --hair:       1px;      /* the one border width in the system */
   /* MIST -- Nebula's identity tint for the icon that says what KIND of
      thing a label is about; one family for every kind (see the console
@@ -778,6 +769,13 @@
 :root[data-palette="silver"] { --mist: #BDBDC5; }
 :root[data-palette="stardust"] { --glyph-album: #BDAFD9; --glyph-tag: #D0A2B6; --glyph-time: #98BCDC; --glyph-machine: #BCBDC7; }
 
+
+/* Facet: the page follows the system unless the visitor pinned one ground
+   (the nav's appearance link sets data-theme through a cookie). light-dark()
+   in every token above does the rest. */
+:root{ color-scheme: light dark; }
+:root[data-theme="light"]{ color-scheme: light; }
+:root[data-theme="dark"]{ color-scheme: dark; }
 /* ==================================================================
    RULE 6 - THE ENVIRONMENT CAN OVERRULE THE LOOK
    ------------------------------------------------------------------
@@ -1039,7 +1037,7 @@ img{ user-select:none; -webkit-user-drag:none; }
 code{
   font-family:var(--mono);
   font-size:.88em;
-  background:rgba(255,255,255,.05);
+  background:color-mix(in srgb, var(--text) 5%, transparent);
   border:var(--hair) solid var(--line);
   padding:1px var(--s-2);
   color:var(--text);
@@ -1205,7 +1203,7 @@ code{
   border-radius:var(--radius);
   transition:color var(--dur-1), background var(--dur-1), box-shadow var(--dur-1);
 }
-.nav__lang-opt:hover{ color:var(--text); background:rgba(255,255,255,.05); }
+.nav__lang-opt:hover{ color:var(--text); background:color-mix(in srgb, var(--text) 6%, transparent); }
 /* The accent never sits on its own tint: the selected segment is marked by
    the accent FILL and the accent ring, and its label goes to --text. Accent
    on an accent-tinted face was the lowest contrast in the sheet (4.14:1),
@@ -1470,7 +1468,7 @@ section{
   .facet__label{ flex:1 1 auto; }
   .facet.is-on{ box-shadow:none; }
   .facet.is-on .facet__box{ background:var(--acc); border-color:var(--acc); }
-  @media (hover:hover){ .facet:hover{ background:rgba(255,255,255,.04); } }
+  @media (hover:hover){ .facet:hover{ background:color-mix(in srgb, var(--text) 5%, transparent); } }
 }
 
 /* parent-album link before the title (e.g. "↑ japan / tokyo"). Hidden on every
@@ -1966,7 +1964,6 @@ section{
   left:14px;
   color:var(--acc);
   border-color:var(--acc);
-  text-shadow:0 0 6px oklch(from var(--acc) l c h / .5);
 }
 .fhero__chip--frm{ right:14px; }
 .fhero__chip--frm b{ color:var(--label); font-weight:400; font-variant-numeric:tabular-nums; }
@@ -2235,7 +2232,6 @@ section{
   border:var(--hair) solid var(--acc);
   border-radius:var(--radius);
   pointer-events:none;
-  text-shadow: 0 0 6px oklch(from var(--acc) l c h / .6);
 }
 
 /* ================================================================
@@ -4075,7 +4071,7 @@ body.lightbox-open{ overflow:hidden; }
   position:relative; z-index:10;
   margin-top:var(--s-8);
   border-top:var(--hair) solid var(--line);
-  background:#050505;
+  background:var(--bg-2);
 }
 .foot__inner{
   max-width:var(--page-max);
@@ -4377,7 +4373,6 @@ body.page-welcome{ --page-max: 2400px; }
 .vf__rec{
   display:inline-flex; align-items:center; gap:var(--s-3);
   color:#e8908e;
-  text-shadow:0 0 10px oklch(from var(--red) l c h / .4);
 }
 .vf__rec i{
   width:8px; height:8px; border-radius:50%;
@@ -5316,7 +5311,6 @@ body.page-welcome{ --page-max: 2400px; }
   letter-spacing:var(--tr-num);
   line-height:1;
   color:var(--red);
-  text-shadow: 0 0 28px oklch(from var(--red) l c h / .4);
 }
 .notfound__jp{
   font-family:"Noto Sans JP", sans-serif;
@@ -6779,13 +6773,13 @@ html.fx-anim .image-tile:is(:not(.rv), .rv-in) a:has(> img.img-shim)::before{
   display:inline-flex; align-items:center; justify-content:center; align-self:stretch; flex:none;
   width:38px; margin:0 var(--s-3) 0 0; padding:0;
   border:0; border-right:var(--hair) solid var(--line);
-  background:rgba(255,255,255,.04); color:var(--label);
+  background:color-mix(in srgb, var(--text) 5%, transparent); color:var(--label);
   cursor:pointer;
   transition:color var(--dur-1), background-color var(--dur-1), border-color var(--dur-1);
 }
 .nav__search-ico{ font-size:12px; color:inherit; }
 .nav__search:focus-within .nav__search-go{ border-right-color:oklch(from var(--acc) l c h / .45); color:var(--acc); }
-@media (hover:hover){ .nav__search-go:hover{ color:var(--text); background:rgba(255,255,255,.09); } }
+@media (hover:hover){ .nav__search-go:hover{ color:var(--text); background:color-mix(in srgb, var(--text) 9%, transparent); } }
 .nav__search-go:active{ background:oklch(from var(--acc) l c h / .16); }
 .nav__search-go:focus-visible{ outline:none; box-shadow:inset 0 0 0 1px var(--acc); color:var(--acc); }
 
@@ -6882,3 +6876,38 @@ html.fx-anim .image-tile:is(:not(.rv), .rv-in) a:has(> img.img-shim)::before{
     background:Highlight; color:HighlightText; border-color:Highlight;
   }
 }
+
+/* ---- Facet: the appearance link in the nav ---- */
+.nav__theme{ display:grid; place-items:center; width:34px; height:34px; border-radius:var(--r-pill); color:var(--label);
+  transition:color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease); }
+.nav__theme svg{ width:18px; height:18px; }
+.nav__theme:hover{ color:var(--text); background:color-mix(in srgb, var(--text) 8%, transparent); }
+
+/* ---- Facet: what lies on a photograph is always on the dark ground ----
+   The hero reel, the welcome viewfinder, the photo stage and the lightbox
+   draw their words over pictures. They keep the dark scheme in both modes:
+   every light-dark() token inside them resolves to its dark side, so white
+   chrome stays white on a photo while the page around it is light. */
+.fhero, .vf, .stage-wrap, .lightbox{ color-scheme: dark; }
+
+/* the wordmark image is drawn for the dark ground (white on clear); on the
+   light one it turns, hue kept, so a coloured logo stays its colour */
+:root[data-theme="light"] :is(.nav__brand, .foot__brand) img{ filter:invert(1) hue-rotate(180deg); }
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]) :is(.nav__brand, .foot__brand) img{ filter:invert(1) hue-rotate(180deg); }
+}
+
+/* ---- Facet: corners by role ----
+   Nebula drew everything square. Facet rounds by what a thing is: a card or
+   a photo tile is a card (8), a control 4, an overlay 12, a chip a pill. The
+   photograph inside a card takes the card's corner by clipping, never its
+   own, so a cover and its caption read as one object. */
+.album-card, .image-tile, .panel, .feat, .stage, .empty, .facet-group, .search-vision,
+.sub-albums, .day-group, .album-stat, .archive-head + *{ border-radius:var(--r-card); }
+.album-card, .image-tile, .stage{ overflow:hidden; }
+.album-card__img, .image-tile img{ border-radius:0; }
+.crumb, .pathbar, .sort, .toolbar, .nav__search, .nav__lang, .loader-btn, .btn-link,
+.nav-arrow, .tag-bar, input, select, textarea, button{ border-radius:var(--r-control); }
+.sort__menu, .lightbox__bar{ border-radius:var(--r-overlay); }
+.tag, .facet, .swatch{ border-radius:var(--r-pill); }
+.fhero__frame{ border-radius:0; }

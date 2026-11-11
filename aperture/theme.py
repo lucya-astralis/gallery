@@ -310,7 +310,7 @@ def wallpaper_decls(album: str | None = None) -> list[str]:
     if bloom_off or (tint <= 0 and not nova):
         decls.append("--wallpaper-bloom:transparent")
     if nova:
-        decls.append("--wallpaper-shade-bot:%s" % NOVA_SHADE_BOT)
+        decls.append("--wallpaper-shade-bot:light-dark(rgba(244,244,247,.88), %s)" % NOVA_SHADE_BOT)
     return decls
 
 
@@ -337,8 +337,10 @@ def _theme_version(album: str | None) -> int:
 
 def accent_decls(accent: dict) -> list[str]:
     """The accent's four faces as the tokens both sheets read."""
-    return ["--acc:%s" % accent["acc"], "--acc-rgb:%s" % accent["rgb"],
-            "--acc-deep:%s" % accent["deep"], "--acc-soft:%s" % accent["soft"],
+    # Facet: on the light ground the accent is its `deep` face, which is
+    # measured against white already; on the dark one it stays `acc`.
+    return ["--acc:light-dark(%s, %s)" % (accent["deep"], accent["acc"]), "--acc-rgb:%s" % accent["rgb"],
+            "--acc-deep:%s" % accent["deep"], "--acc-soft:light-dark(%s, %s)" % (accent["deep"], accent["soft"]),
             "--acc-soft-rgb:%s" % accent["soft_rgb"]]
 
 

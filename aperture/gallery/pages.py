@@ -20,6 +20,24 @@ from . import context, media
 router = APIRouter()
 
 
+THEMES = ("system", "light", "dark")
+
+
+@router.get("/theme/{mode}")
+def set_theme(mode: str, next: str = "/"):
+    """Light, dark or the system's (Facet: both grounds rank the same). A
+    cookie, like the language, so the page arrives in the right one with no
+    script and no flash; the nav link cycles system -> light -> dark."""
+    mode = mode.strip().lower()
+    if mode not in THEMES:
+        raise HTTPException(404, "unknown theme")
+    if not next.startswith("/") or next.startswith("//") or "\\" in next:
+        next = "/"
+    resp = RedirectResponse(next, status_code=303)
+    resp.set_cookie("theme", mode, max_age=365 * 24 * 3600, path="/", samesite="lax")
+    return resp
+
+
 @router.get("/lang/{code}")
 def set_lang(code: str, next: str = "/"):
     """Language switcher target (nav selector links here). Sets the `lang`
