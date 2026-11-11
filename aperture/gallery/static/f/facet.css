@@ -1028,7 +1028,7 @@ a.f-tilebtn:hover .f-tilebtn__icon{ border-color:var(--acc); color:var(--acc) }
 /* a swatch for a hue picker: .f-swatch[data-h] draws itself in that hue */
 .f-swatch[data-h='277']{ --h:277 } .f-swatch[data-h='250']{ --h:250 } .f-swatch[data-h='215']{ --h:215 } .f-swatch[data-h='150']{ --h:150 }
 .f-swatch[data-h='70']{ --h:70 } .f-swatch[data-h='25']{ --h:25 } .f-swatch[data-h='350']{ --h:350 }
-.f-swatch{ width:32px; height:32px; border-radius:50%; background:oklch(.62 .17 var(--h, 277));
+.f-swatch{ display:inline-block; width:32px; height:32px; border-radius:50%; background:oklch(.62 .17 var(--h, 277));
   box-shadow:inset 0 0 0 1px light-dark(rgba(0,0,0,.12), rgba(255,255,255,.18)); flex:none }
 
 /* motion asked down by the person, not only by the system */
