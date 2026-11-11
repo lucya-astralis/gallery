@@ -69,7 +69,7 @@
     <a class="g-reel__file" href="/image/{{ featured[0].rel_path }}" data-reel-file><i class="fa {{ 'fa-shuffle' if reel_mode == 'random' else 'fa-star' }}" aria-hidden="true"></i><span data-reel-name>{{ featured[0].filename }}</span></a>
     <div class="g-reel__body">
       {% if kicker %}<span class="g-kicker">{{ kicker }}</span>{% endif %}
-      <h1 class="g-reel__title g-reel__title--album">{% if album_icon %}<img src="{{ album_icon }}" alt="" width="48" height="48"> {% endif %}{{ title }}{% if trip and trip.jp %}<span class="g-title__jp" lang="ja">{{ trip.jp }}</span>{% endif %}</h1>
+      <h1 class="g-reel__title g-reel__title--album">{% if album_icon %}<img src="{{ album_icon }}" alt="" width="48" height="48">{% endif %}{{ title }}{% if trip and trip.jp %}<span class="g-title__jp" lang="ja">{{ trip.jp }}</span>{% endif %}</h1>
       {% if album_tags %}<div class="g-reel__tags">{% for tg in album_tags %}<span>#{{ tg }}</span>{% endfor %}</div>{% endif %}
     </div>
     {% if featured | length > 1 %}
