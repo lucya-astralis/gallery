@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "_g.html" import crumbs, card, sort_menu, photos with context %}
+{% block title %}{{ t('search.slug') }}{% if query %}: {{ query }}{% endif %} — {{ brand.title }}{% endblock %}
+{% block body_class %}page-search{% endblock %}
+{% block content %}
+<div class="g-page">
+  <header class="g-head">
+    {{ crumbs(tail=(t('search.crumb') ~ ': ' ~ query) if query else t('search.browse')) }}
+    <h1 class="g-title">{% if query %}{{ query }}{% else %}{{ t('search.slug') }}{% endif %}</h1>
+    <p class="g-meta"><span><b>{{ total }}</b> {% if query %}{{ t('search.hits_one') if total == 1 else t('search.hits_many') }}{% else %}{{ t('search.photos_head') }}{% endif %}</span></p>
+    {% if filters or look_state %}
+    <div class="g-chips">
+      {% for f in filters %}<a class="g-chip g-filter{% if not f.ok %} is-bad{% endif %}" href="{{ f.href }}"{% if not f.ok %} title="{{ t('search.filter_bad') }}"{% endif %} aria-label="{{ t('search.filter_remove', f=f.label) }}">{{ f.label }}<i class="fa fa-xmark" aria-hidden="true"></i></a>{% endfor %}
+      {% if filters | length > 1 or (filters and words) %}<a class="g-chip" href="/search">{{ t('search.clear') }}</a>{% endif %}
+      {% if look_state %}<a class="g-vision{% if look_state == 'on' %} is-on{% endif %}" href="{{ look_toggle }}" aria-pressed="{{ 'true' if look_state == 'on' else 'false' }}"
+         title="{{ t('search.vision_leave_out') if look_state == 'on' else t('search.vision_add') }}"><i class="fa fa-eye" aria-hidden="true"></i>{{ t('search.vision_label') }}</a>{% endif %}
+    </div>
+    {% endif %}
+  </header>
+
+  <div class="g-search-page">
+    {% set groups = [('albums', t('search.albums_head'), 'fa-folder', facets.albums), ('tags', t('search.facet_tags'), 'fa-tag', facets.tags),
+                     ('years', t('search.facet_years'), 'fa-calendar-day', facets.years), ('cameras', t('search.facet_cameras'), 'fa-camera', facets.cameras)] %}
+    <aside class="g-facets" aria-label="{{ t('search.narrow') }}">
+      {% if facets.colors %}
+      <div class="g-facet"><h3><i class="fa fa-palette" aria-hidden="true"></i>{{ t('search.facet_colors') }}</h3>
+        <ul class="g-colors">{% for r in facets.colors %}<li><a class="swatch swatch--{{ r.value }}{% if r.on %} is-on{% endif %}" href="{{ r.href }}" title="{{ r.label }} · {{ r.n }}" aria-label="{{ r.label }}, {{ r.n }}"{% if r.on %} aria-current="true"{% endif %}></a></li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+      {% for key, label, icon, rows in groups %}
+        {% if rows or (key == 'albums' and facets.album_up) %}
+        <div class="g-facet"><h3><i class="fa {{ icon }}" aria-hidden="true"></i>{{ label }}</h3>
+          <ul>
+            {% if key == 'albums' and facets.album_up %}<li><a class="g-facet__up" href="{{ facets.album_up.href }}"><i class="fa fa-arrow-turn-up" aria-hidden="true"></i><span class="g-facet__label">{{ facets.album_up.label or t('search.all_albums') }}</span></a></li>{% endif %}
+            {% for r in rows %}<li><a class="{% if r.on %}is-on{% endif %}" href="{{ r.href }}"{% if r.on %} aria-current="true" title="{{ t('search.filter_remove', f=r.label) }}"{% endif %}><span class="g-facet__label">{{ r.label }}</span><span class="g-facet__n">{{ r.n }}</span></a></li>{% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </aside>
+
+    <div class="g-section">
+    {% if not images and not albums and not look %}
+      <div class="g-empty">{% if query %}<p>{{ t('search.no_match_prefix') }}<code>{{ query }}</code>{{ t('search.no_match_suffix') }}</p>{% endif %}<p class="g-note">{{ t('search.hint') }}</p></div>
+    {% else %}
+      {% if albums %}
+      <section class="g-section">
+        <div class="g-section__head"><h2 class="g-section__title">{{ t('search.albums_head') }}</h2><span class="g-section__n">{{ albums | length }}</span></div>
+        <ul class="g-cards">{% for a in albums %}{{ card(a) }}{% endfor %}</ul>
+      </section>
+      {% endif %}
+      {% if images %}
+      <section class="g-section">
+        <div class="g-section__head"><h2 class="g-section__title">{{ t('search.photos_head') }}</h2><span class="g-section__n">{{ total }}</span>
+          {{ sort_menu(sort_options, sort_label, '/search', ('&q=' ~ (query | urlencode) if query else '') ~ vision_q) }}</div>
+        {{ photos(images, ('?sort=' ~ current_sort) if current_sort != default_sort else '', label=True) }}
+        {% if capped %}<p class="g-note">{{ t('search.capped', n=limit) }}</p>{% endif %}
+      </section>
+      {% endif %}
+      {% if look %}
+      <section class="g-section g-look">
+        <div class="g-section__head"><h2 class="g-section__title"><i class="fa fa-eye" aria-hidden="true"></i> {{ t('search.vision_head', q=words) }}</h2><span class="g-section__n">{{ look | length }}</span></div>
+        <p class="g-note">{{ t('search.vision_note') }} <a href="{{ look_toggle }}">{{ t('search.vision_leave_out') }}</a></p>
+        {{ photos(look, label=True) }}
+      </section>
+      {% endif %}
+    {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

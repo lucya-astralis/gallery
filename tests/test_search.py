@@ -109,8 +109,8 @@ def test_words_and_filters_combine(client, indexed):
 def test_the_search_page_shows_each_filter_as_a_chip(client, indexed):
     body = client.get("/search", params={"q": "berlin iso:400 f:abc"}).text
     assert "gate.jpg" in body
-    assert 'class="tag search-filter"' in body
-    assert 'class="tag search-filter is-bad"' in body
+    assert 'class="g-chip g-filter"' in body
+    assert 'class="g-chip g-filter is-bad"' in body
     assert 'href="/search?q=berlin%20f%3Aabc"' in body        # the chip drops iso:400
     only = client.get("/search", params={"q": "iso:400"}).text
     assert 'href="/albums"' in only and "tv-tower.jpg" in only
@@ -146,7 +146,7 @@ def test_an_empty_search_browses_everything_by_facet(client, everything):
     res = client.get("/search")
     assert res.status_code == 200
     body = res.text
-    assert "search-facets" in body
+    assert "g-facets" in body
     # the facets link to the search with the filter added
     assert 'href="/search?q=album%3Aberlin"' in body
     assert 'href="/search?q=date%3A2026"' in body
@@ -157,16 +157,16 @@ def test_a_facet_that_is_on_takes_itself_away(client, indexed):
     body = client.get("/search", params={"q": "album:berlin"}).text
     # the albums facet has drilled into berlin: its child, and a way back up
     assert 'href="/search?q=album%3Aberlin%20album%3Aberlin%2Fmitte"' in body
-    assert 'class="facet facet--up" href="/search"' in body
+    assert 'class="g-facet__up" href="/search"' in body
     # the chip for the filter drops it
     import re
-    assert re.search(r'class="tag search-filter"\s+href="/search"', body)
+    assert re.search(r'class="g-chip g-filter"\s+href="/search"', body)
 
 
 def test_the_glass_opens_the_search_with_nothing_typed(client):
     """The nav's magnifier is a submit button, and an empty submit lands on
     /search browsing every photo -- the search is reachable without a word."""
     page = client.get("/albums").text
-    assert 'class="nav__search-go"' in page and 'type="submit"' in page
+    assert 'class="g-search__go"' in page and 'type="submit"' in page
     res = client.get("/search", params={"q": ""})
-    assert res.status_code == 200 and "search-facets" in res.text
+    assert res.status_code == 200 and "g-facets" in res.text

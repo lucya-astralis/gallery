@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_g.html" import crumbs, card, posters, sort_menu, units with context %}
+{% block title %}{{ t('index.slug') }} — {{ brand.title }}{% endblock %}
+{% block body_class %}page-albums{% endblock %}
+{% block content %}
+<div class="g-page">
+  <header class="g-head">
+    {{ crumbs() }}
+    <h1 class="g-title">{{ t('index.slug') }}</h1>
+    {% if albums %}<p class="g-meta"><span><b>{{ albums | length }}</b> {{ t('stat.albums') }}</span><span><b>{{ albums | sum(attribute='count') }}</b> {{ t('stat.images') }}</span></p>{% endif %}
+  </header>
+
+  {% if not albums %}
+  <div class="g-empty"><p>{{ t('welcome.no_images') }}</p><p class="g-note">Drop subfolders into <code>photos/</code> — each subfolder is an album, and albums can nest.</p></div>
+  {% else %}
+    {% if showcase_albums %}
+    <section class="g-section" aria-labelledby="feat-head">
+      <div class="g-section__head"><h2 class="g-section__title" id="feat-head"><i class="fa fa-star" aria-hidden="true"></i> {{ t('feat.label') }}</h2><span class="g-section__n">{{ showcase_albums | length }}</span></div>
+      {{ posters(showcase_albums, eager=3) }}
+    </section>
+    {% endif %}
+    {% if archive_albums %}
+    <section class="g-section" aria-labelledby="arc-head">
+      <div class="g-section__head">
+        <h2 class="g-section__title" id="arc-head">{{ t('archive.label') }}</h2>
+        <span class="g-section__n">{{ units(archive_albums | length, 'unit.directory', 'unit.directories') }}</span>
+        {{ sort_menu(sort_options, sort_label, '/albums') }}
+      </div>
+      {% if album_sections %}
+        {% for sec in album_sections %}
+          {% if sec.label %}<div class="g-section__head"><h3 class="g-section__title">{{ sec.label }}</h3><span class="g-section__n">{{ units(sec.cards | length, 'unit.directory', 'unit.directories') }}</span></div>{% endif %}
+          <ul class="g-cards">{% for a in sec.cards %}{{ card(a) }}{% endfor %}</ul>
+        {% endfor %}
+      {% else %}
+      <ul class="g-cards">{% for a in archive_albums %}{{ card(a) }}{% endfor %}</ul>
+      {% endif %}
+    </section>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

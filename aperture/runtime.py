@@ -100,6 +100,9 @@ class Settings:
     enable_watcher: bool
     hide_gps: bool
     strip_gps: bool
+    # the public pages: "facet" (3.2, the default) or "nebula" (the old ones,
+    # kept as a fallback while the new frontend settles)
+    frontend: str
     public_base_url: str
     # ----- vision (aperture/vision.py) -- off unless asked for ------------
     vision: bool
@@ -196,6 +199,7 @@ def load() -> Settings:
         enable_watcher=_flag("ENABLE_WATCHER"),
         hide_gps=_flag("HIDE_GPS"),
         strip_gps=_flag("STRIP_GPS"),
+        frontend=("nebula" if (_env("FRONTEND") or "").strip().lower() == "nebula" else "facet"),
         public_base_url=(os.environ.get("PUBLIC_BASE_URL") or "").rstrip("/"),
         # A local image model for search by what is in a photo. OFF by
         # default: on, it downloads ~225 MB of model into DATA_DIR/models once

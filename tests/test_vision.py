@@ -64,7 +64,7 @@ def test_off_by_default_and_nothing_on_the_page(indexed, client):
     assert settings.vision is False
     assert vision.backend() is None
     body = client.get("/search", params={"q": "anything"}).text
-    assert "search-vision" not in body and "search-group--look" not in body
+    assert "g-vision" not in body and "g-look" not in body
 
 
 def test_the_scan_gives_every_photo_a_vector(model):
@@ -76,7 +76,7 @@ def test_a_search_finds_what_looks_like_the_words(model, client):
     target = _rels()[0]
     _pin(model, "zzlooks", target)
     body = client.get("/search", params={"q": "zzlooks"}).text
-    assert "search-group--look" in body
+    assert "g-look" in body
     assert target.rsplit("/", 1)[-1] in body
     assert 'aria-pressed="true"' in body            # the switch is on
 
@@ -85,11 +85,11 @@ def test_one_switch_leaves_it_out_and_the_links_keep_it(model, client):
     target = _rels()[0]
     _pin(model, "zzlooks", target)
     body = client.get("/search", params={"q": "zzlooks", "vision": "off"}).text
-    assert "search-group--look" not in body
+    assert "g-look" not in body
     assert 'aria-pressed="false"' in body
     # a search with results: its facets and its sort carry the switch along
     listing = client.get("/search", params={"q": "tech", "vision": "off"}).text
-    assert "vision=off" in listing.split("search-facets", 1)[1]
+    assert "vision=off" in listing.split("g-facets", 1)[1]
     assert "&amp;vision=off" in listing              # the sort menu (escaped in the href)
 
 
@@ -108,7 +108,7 @@ def test_what_the_words_found_is_not_shown_twice(model, client):
     name = rel.rsplit("/", 1)[-1].rsplit(".", 1)[0]
     _pin(model, name, rel)                           # the name finds it AND it looks like it
     body = client.get("/search", params={"q": name}).text
-    look = body.split("search-group--look", 1)[1] if "search-group--look" in body else ""
+    look = body.split("g-look", 1)[1] if "g-look" in body else ""
     assert rel not in look
 
 

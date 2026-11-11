@@ -1,0 +1,1142 @@
+/* Aperture 3.2 · building blocks kept from the Nebula sheet: the /stats
+   charts (_charts.html) and the trip dashboard (_trip.html, _trip_map.html).
+   Their markup is pure geometry and data and stayed; their rules came over
+   unchanged and read the Nebula token names, which gallery.css maps onto
+   Facet's (see "Nebula names" there). New work does not add to this file. */
+
+/* the archive's Japanese glyphs and the display faces gallery.cfg can pick */
+@font-face {
+  /* the one face left variable: italic mono is declared for completeness
+     and never requested by the sheet, so the file is never fetched */
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono-Italic-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 100 800;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: url('/static/fonts/NotoSansJP-subset-400.woff2') format('woff2');
+  font-weight: 100 450;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: url('/static/fonts/NotoSansJP-subset-500.woff2') format('woff2');
+  font-weight: 451 550;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: url('/static/fonts/NotoSansJP-subset-600.woff2') format('woff2');
+  font-weight: 551 650;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: url('/static/fonts/NotoSansJP-subset-700.woff2') format('woff2');
+  font-weight: 651 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/NotoSansJP-subset-400.woff2') format('woff2');
+  font-weight: 100 450;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/NotoSansJP-subset-500.woff2') format('woff2');
+  font-weight: 451 550;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/NotoSansJP-subset-600.woff2') format('woff2');
+  font-weight: 551 650;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/static/fonts/NotoSansJP-subset-700.woff2') format('woff2');
+  font-weight: 651 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/NotoSansJP-subset-400.woff2') format('woff2');
+  font-weight: 100 450;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/NotoSansJP-subset-500.woff2') format('woff2');
+  font-weight: 451 550;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/NotoSansJP-subset-600.woff2') format('woff2');
+  font-weight: 551 650;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/NotoSansJP-subset-700.woff2') format('woff2');
+  font-weight: 651 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Ethnocentric';
+  src: url('/static/fonts/Ethnocentric-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  src: url('/static/fonts/ChakraPetch-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  src: url('/static/fonts/ChakraPetch-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Chakra Petch';
+  src: url('/static/fonts/ChakraPetch-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ================================================================
+   STATISTICS  (/stats)  —  charts made of geometry, not of script
+   ----------------------------------------------------------------
+   The page is one grid of cards; each card holds either a ranked list of
+   horizontal bars or a row of vertical columns. Both are HTML — labels,
+   values and layout are real text in real boxes — and only the bar itself
+   is drawn, as a single <rect> inside a stretched SVG (see the note at the
+   top of _charts.html for why it has to be a geometry attribute and not a
+   width in CSS).
+
+   Colour discipline is the site's, applied to what a chart actually means:
+   magnitude. Every mark is the SAME accent hue on a four-step ramp keyed to
+   its value against the series maximum, with the high taking it at full
+   strength. One hue, no rainbow, no second colour and no glow — a chart
+   that needs a legend to explain its palette is a chart that was drawn
+   badly. The step never comes from a row's position; see stats._band for
+   why that distinction matters on the unranked axes.
+   ================================================================ */
+.st-lead{
+  max-width:74ch;
+  margin:0 0 var(--s-6);
+  font-size:var(--fs-text-md);
+  line-height:1.65;
+  color:var(--text-dim);
+}
+/* the headline figures reuse the welcome screen's readout cells verbatim
+   (.arc__cells) so the two read as one instrument; there are twice as many
+   of them here, so the digits come down a step */
+/* Eight cells, always — two rows of four on a desktop, four rows of two on
+   a phone. The readout's auto-flow-column default would put all eight on
+   one line and squeeze each to 100px, so this page takes the tracks back
+   and picks a count that divides the cells exactly. That is also why the
+   template renders the data and pixel cells even when they are empty: an
+   odd number of cells leaves a blank pane in the panel. */
+.st-figs{ margin-bottom:26px; }
+@media (min-width:761px){
+  .st-figs{
+    grid-auto-flow:row;
+    grid-template-columns:repeat(4, minmax(0,1fr));
+  }
+}
+.st-figs .arc__val{ font-size:clamp(23px, 2.3vw, 31px); }
+.st-figs .arc__val--date{ font-size:clamp(16px, 1.5vw, 21px); }
+
+/* Card grid. Two explicit columns rather than auto-fit, because a wide card
+   has to be able to say "span everything" — grid-column:1/-1 is only honest
+   when the track count is known. The 1px gap over a --line ground is the
+   divider, exactly like the readout cells. */
+.st-grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:1px;
+  background:var(--line);
+  border:var(--hair) solid var(--line);
+}
+@media (min-width:900px){
+  .st-grid{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .st-card--wide{ grid-column:1 / -1; }
+}
+.st-card{
+  display:flex; flex-direction:column; gap:14px;
+  min-width:0;
+  padding:var(--s-5) 18px 20px;
+  background:var(--bg-2);
+  /* a chart card is a <section>, so the page-level `section` rule reaches
+     it — and its `margin:0 auto` on a GRID ITEM does not centre a stretched
+     box, it cancels the stretch and shrinks the card to its content. Both
+     halves of that rule have to go, or every card floats narrow and centred
+     inside a full-width cell. */
+  margin:0;
+  max-width:none;
+}
+.st-card__head{
+  display:flex; align-items:baseline; gap:var(--s-3) 14px; flex-wrap:wrap;
+  padding-bottom:var(--s-3);
+  border-bottom:var(--hair) solid var(--line);
+}
+.st-card__title{
+  margin:0;
+  font-family:var(--ui-font);
+  font-size:var(--fs-chrome-sm); font-weight:var(--ui-weight);
+  letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
+  color:var(--label);
+}
+/* The qualifier that keeps a chart honest — a rolling window, a unit, how
+   to read a dial. It belongs beside the title, not in a legend somewhere
+   else on the page.
+
+   Set as a SENTENCE, in the page's sans, not in the tracked mono caps the
+   rest of the chrome uses: these are things a reader has to actually read,
+   and the redesign's own rule is that prose leaves the register-dump voice
+   (see the note above .section__doc). Uppercase at .14em tracking is fine
+   for "35 MM EQUIVALENT" and unreadable for a sentence explaining a clock
+   face. On a narrow card it wraps to a line of its own — the head is a
+   flex-wrap row, so it just takes one. */
+.st-card__note{
+  margin:0; margin-left:auto;
+  max-width:46ch;
+  font-size:var(--fs-text-sm);
+  line-height:1.5;
+  letter-spacing:var(--tr-text);
+  color:var(--text-dim);
+  text-align:right;
+}
+/* Cards in one grid row are stretched to the tallest of them, and the tall
+   one here is the dial. Centring the body means a short chart sits in the
+   middle of its card instead of hugging the head with a drift of empty
+   space under it. */
+.st-card__body{ min-width:0; flex:1 1 auto; display:flex; flex-direction:column; justify-content:center; }
+.st-card__body > *{ width:100%; }
+.st-foot{
+  margin:20px 0 0;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-md); text-transform:var(--ui-case);
+  color:var(--text-dim);
+}
+
+/* ---- ranked horizontal bars ---- */
+.ch-bars{
+  list-style:none; margin:0; padding:0;
+  display:flex; flex-direction:column; gap:var(--s-3);
+}
+.ch-bar{
+  display:grid;
+  /* label / bar / value. The label track is capped in em so a long camera
+     name cannot squeeze the bars down to nothing, and floors at 0 so a
+     narrow card shrinks it instead of overflowing. */
+  grid-template-columns:minmax(0, 9.5em) minmax(0,1fr) auto;
+  align-items:center;
+  gap:var(--s-4);
+}
+.ch-bar__label{
+  min-width:0;
+  font-size:var(--fs-text-md);
+  color:var(--text-dim);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+/* an album bar links into the album it measures, so the chart doubles as
+   navigation — the same job the trip timeline's leg cards do */
+.ch-bar__label--link{ color:var(--text-dim); transition:color var(--dur-1); }
+.ch-bar__label--link:hover{ color:var(--acc); }
+.ch-bar__meter{
+  display:block; min-width:0;
+  height:9px;
+  background:oklch(from var(--label) l c h / .13);
+}
+.ch-bar__meter svg{ display:block; width:100%; height:100%; }
+/* the series high gets its label lifted too, so the row reads as the answer
+   and not only as the longest bar (the fills themselves come from the
+   magnitude ramp further down this section) */
+.ch-bar.is-peak .ch-bar__label{ color:var(--text); }
+/* the tail of a long ranking, folded: a native <details>, so it opens
+   without a script under the strict CSP. The bars inside keep lengths
+   measured against the whole series (stats.fold), not against the rest. */
+.ch-more{ margin-top:var(--s-3); }
+.ch-more > .ch-bars{ margin-top:var(--s-3); }
+.ch-more__toggle{
+  display:inline-flex; align-items:center; gap:var(--s-2);
+  list-style:none;
+  cursor:pointer;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-sm);
+  color:var(--text-dim);
+}
+.ch-more__toggle::-webkit-details-marker{ display:none; }
+.ch-more__toggle:focus-visible{ outline:var(--hair) solid var(--acc); outline-offset:2px; }
+.ch-more__ico{ transition:rotate var(--dur-1) var(--ease); }
+.ch-more[open] .ch-more__ico{ rotate:180deg; }
+@media (hover: hover){
+  .ch-more__toggle:hover{ color:var(--acc); }
+}
+.ch-bar__val{
+  font-family:var(--num-font);
+  font-size:var(--fs-chrome-md); letter-spacing:var(--tr-num);
+  color:var(--text);
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum";
+  white-space:nowrap;
+}
+
+/* ---- vertical columns ---- */
+.ch-cols{
+  list-style:none; margin:0; padding:0;
+  display:flex; align-items:flex-end; gap:var(--s-1);
+  /* the axis the columns stand on — a hairline in CSS, not a drawn line
+     inside the SVG, so it stays one device pixel at any width */
+  border-bottom:var(--hair) solid var(--line-strong);
+  padding-bottom:var(--s-3);
+}
+.ch-col{
+  flex:1 1 0; min-width:0;
+  display:flex; flex-direction:column; align-items:stretch; gap:var(--s-2);
+}
+.ch-col__n{
+  font-family:var(--num-font);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xl);
+  color:var(--text-dim);
+  font-variant-numeric:tabular-nums;
+  text-align:center;
+  white-space:nowrap;
+}
+/* The empty track is kept faint on purpose. Drawn any stronger, twenty-four
+   full-height tracks read as the bars themselves and the actual data — a few
+   short stubs next to one tall month — disappears into them. The baseline
+   rule under the row is what says where zero is. */
+.ch-col__bar{
+  display:block;
+  height:104px;
+  background:oklch(from var(--label) l c h / .07);
+}
+.ch-col__bar svg{ display:block; width:100%; height:100%; }
+.ch-col.is-peak .ch-col__n{ color:var(--text); }
+/* a month with no photos is a fact worth seeing, so the empty track stays
+   and only its figure fades */
+.ch-col.is-zero .ch-col__n{ color:var(--text-ghost); }
+.ch-col__label,
+.ch-col__tick{
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
+  text-align:center;
+  white-space:nowrap;
+  overflow:hidden;
+}
+.ch-col__label{ color:var(--text-dim); }
+/* the year, printed only where it changes — an axis legend that needs no
+   legend. Empty on every other column, but it keeps its line so the labels
+   above it stay on one baseline. */
+.ch-col__tick{
+  color:var(--label);
+  min-height:1.2em;
+  margin-top:-2px;
+}
+/* 24 columns: the per-column figure moves into the accessibility tree only
+   (there is no room to print it), and the ticks thin out so the hour labels
+   stay legible instead of overlapping into a grey smear */
+/* the long axis's own scroller (see the `scroll` arm of the cols macro).
+   The page body must never scroll sideways, so the overflow is owned here
+   by the chart that causes it. */
+.ch-scroll{ overflow-x:auto; }
+.ch-cols--dense{ gap:var(--s-0); }
+.ch-cols--dense .ch-col__bar{ height:84px; }
+.ch-cols--dense .ch-col__label{ font-size:var(--fs-chrome-xs); letter-spacing:.02em; }
+
+/* ---- the magnitude ramp, shared by every chart ----
+   One hue, four steps. The step comes from the VALUE against the series
+   maximum (stats._band), never from the row's position, so the charts whose
+   rows run in their natural order — focal length, aperture, ISO, the
+   calendar axes — are shaded honestly instead of implying that the leftmost
+   bar is the biggest.
+
+   The ramp runs UPWARD in lightness, and it has to: the first cut faded the
+   accent towards the card ground with alpha alone, which put the bottom two
+   steps at 1.5:1 and 1.2:1 against that ground — a bar nobody could see is
+   not a quieter bar, it is a missing one. --acc itself is only 4.3:1 on this
+   black, so there is no room for four legible steps BELOW it; the top of
+   the ramp therefore climbs past it into --acc-soft (8.8:1), which is what
+   that token is for. Every step now clears 3:1 (WCAG 1.4.11 for non-text
+   marks) and the brightest mark is the biggest value, which is the right
+   way round on a dark ground.
+
+   Derived from --acc / --acc-soft rather than hard-coded, so an album accent
+   (album.cfg `accent =`) still repaints them. The color-mix step declares a
+   plain fallback first for engines without it. */
+.ch-bar__fill,
+.ch-col__fill{ fill:oklch(from var(--acc) l c h / .85); }        /* 3.4:1 */
+.is-b2 .ch-bar__fill,
+.is-b2 .ch-col__fill{ fill:var(--acc); }               /* 4.3:1 */
+.is-b3 .ch-bar__fill,
+.is-b3 .ch-col__fill{
+  fill:var(--acc);                                     /* fallback: no color-mix */
+  fill:color-mix(in srgb, var(--acc-soft) 50%, var(--acc));  /* 6.1:1 */
+}
+.is-peak .ch-bar__fill,
+.is-peak .ch-col__fill{ fill:var(--acc-soft); }        /* 8.8:1 */
+
+/* ---- polar dial (hours) ----
+   The one real SVG on the page: a dial cannot be assembled out of stretched
+   rectangles, so this one scales uniformly and its type is in user units.
+   The rendered width is capped here so those units land near the sizes the
+   rest of the page uses — without the cap a half-width card would blow the
+   hour ticks up to headline size. */
+.ch-dial{
+  max-width:300px;
+  margin:0 auto;
+}
+.ch-dial svg{ display:block; width:100%; height:auto; overflow:visible; }
+.ch-dial__ring,
+.ch-dial__hub{ fill:none; stroke:var(--line); stroke-width:1; }
+/* the 100%-of-peak circle is the only reference the dial needs; the hub
+   ring closes the readout in the middle */
+.ch-dial__ring{ stroke:oklch(from var(--label) l c h / .34); }
+.ch-dial__spoke{
+  stroke:oklch(from var(--acc) l c h / .85);
+  stroke-width:7.5;
+  stroke-linecap:butt;
+}
+.ch-dial__spoke.is-b2{ stroke:var(--acc); }
+.ch-dial__spoke.is-b3{
+  stroke:var(--acc);                                   /* fallback: no color-mix */
+  stroke:color-mix(in srgb, var(--acc-soft) 50%, var(--acc));
+}
+.ch-dial__spoke.is-peak{ stroke:var(--acc-soft); }
+.ch-dial__tick{
+  font-family:var(--num-font); font-variant-numeric:tabular-nums;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-num);
+  fill:var(--text-dim);
+}
+/* the reading the shape alone cannot give: which hour wins, and by how much */
+.ch-dial__peak{
+  font-family:"Space Grotesk", sans-serif;
+  font-size:30px; font-weight:700;
+  fill:var(--text);
+}
+.ch-dial__peak-n{
+  font-family:var(--num-font); font-variant-numeric:tabular-nums;
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-num);
+  fill:var(--label);
+}
+
+/* ---- stacked proportion bar (orientation) ----
+   Segments in one bar, ordered largest-first, so here the ramp step IS the
+   rank. The legend under it carries the shares as text: a reader should
+   never have to estimate a percentage off a width. */
+.ch-stack{ display:flex; flex-direction:column; gap:14px; }
+.ch-stack__bar{
+  display:block;
+  height:22px;
+  background:oklch(from var(--label) l c h / .13);
+}
+.ch-stack__bar svg{ display:block; width:100%; height:100%; }
+/* largest-first, so here the ramp step IS the rank — and it runs the same
+   way up as everywhere else. The old bottom two steps (.36 / .2 alpha) put
+   a 7% slice at 1.2:1 against the track, which is why this card read as one
+   bar with a bruise on the end. */
+.ch-stack__seg.is-s1{ fill:var(--acc-soft); }
+.ch-stack__seg.is-s2{
+  fill:var(--acc);                                     /* fallback: no color-mix */
+  fill:color-mix(in srgb, var(--acc-soft) 50%, var(--acc));
+}
+.ch-stack__seg.is-s3{ fill:var(--acc); }
+.ch-stack__seg.is-s4{ fill:oklch(from var(--acc) l c h / .85); }
+.ch-stack__legend{
+  list-style:none; margin:0; padding:0;
+  display:flex; flex-direction:column; gap:var(--s-3);
+}
+.ch-stack__key{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto auto;
+  align-items:center;
+  gap:10px;
+}
+.ch-stack__swatch{
+  width:10px; height:10px;
+  background:oklch(from var(--acc) l c h / .85);
+}
+.ch-stack__swatch.is-s1{ background:var(--acc-soft); }
+.ch-stack__swatch.is-s2{
+  background:var(--acc);                               /* fallback: no color-mix */
+  background:color-mix(in srgb, var(--acc-soft) 50%, var(--acc));
+}
+.ch-stack__swatch.is-s3{ background:var(--acc); }
+.ch-stack__swatch.is-s4{ background:oklch(from var(--acc) l c h / .85); }
+.ch-stack__name{
+  min-width:0;
+  font-size:var(--fs-text-md); color:var(--text-dim);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.ch-stack__share,
+.ch-stack__n{
+  font-family:var(--num-font);
+  font-size:var(--fs-chrome-md); letter-spacing:var(--tr-num);
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum";
+  white-space:nowrap;
+}
+.ch-stack__share{ color:var(--text); font-weight:400; }
+.ch-stack__n{ color:var(--text-dim); }
+
+/* text kept for assistive tech where the layout has no room to print it.
+   Not display:none — a figure only sighted readers can get is not a
+   figure, it is decoration. */
+.sr-only{
+  position:absolute;
+  width:1px; height:1px;
+  margin:-1px; padding:0;
+  overflow:hidden;
+  clip-path:inset(50%);
+  white-space:nowrap;
+  border:0;
+}
+
+/* skip link: the first stop for Tab on every page, off screen until it has
+   focus, then the one accent-filled control in the top corner. */
+.skip-link{
+  position:fixed;
+  top:var(--s-3); left:var(--s-3);
+  z-index:2000;
+  padding:var(--s-3) var(--s-5);
+  background:var(--acc);
+  color:var(--on-acc);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-md);
+  text-decoration:none;
+  translate:0 calc(-100% - var(--s-5));
+}
+/* :focus, not :focus-visible — a screen reader that moves focus here is
+   not a keyboard in the browser's eyes, and the link must still show */
+.skip-link:focus{ translate:0 0; outline:none; }
+/* <main> takes focus only as the skip link's landing spot */
+#main:focus{ outline:none; }
+
+@media (max-width:760px){
+  .st-lead{ font-size:var(--fs-text-md); margin-bottom:18px; }
+  .st-figs{ margin-bottom:18px; }
+  .st-card{ padding:var(--s-4) var(--s-4) var(--s-5); gap:var(--s-4); }
+  .st-card__note{ margin-left:0; flex-basis:100%; max-width:none; text-align:left; font-size:var(--fs-text-sm); }
+  .ch-bar{ grid-template-columns:minmax(0, 7em) minmax(0,1fr) auto; gap:var(--s-3); }
+  .ch-bar__label{ font-size:var(--fs-text-sm); }
+  .ch-col__bar{ height:78px; }
+  .ch-cols--dense .ch-col__bar{ height:62px; }
+  /* the long axis gets its designed density back and the card scrolls to it */
+  .ch-cols--long{ min-width:640px; }
+  /* a year tick is centred over a 13px column: it has to be allowed out of
+     its own box or "2026" arrives as "20" */
+  .ch-col__tick{ overflow:visible; }
+  /* a phone cannot carry 24 hour ticks: keep every sixth (00 / 06 / 12 / 18)
+     so the axis still says what it is */
+  .ch-cols--dense .ch-col__label{ visibility:hidden; }
+  .ch-cols--dense .ch-col:nth-child(6n+1) .ch-col__label{ visibility:visible; }
+  .ch-col__tick{ font-size:var(--fs-chrome-xs); }
+}
+
+/* ================================================================
+
+/* ================================================================
+   TRIP DASHBOARD  (album addon: flight countdown + itinerary)
+   ----------------------------------------------------------------
+   State classes are toggled by initTrip() in app.js:
+     .trip       -> .trip--pre / --transit / --active / --done
+     .trip__stop -> .is-upcoming / .is-active / .is-done   (and .trip__side)
+     .trip-map__* -> the same three, plus is-next / is-away / is-here
+
+   Rebuilt to NEBULA (nebula/NEBULA.md), rule by rule:
+
+   1  Colour. The module is the language's one QUARANTINE: --trip (a leg
+      still ahead), --trip-live (the leg you are on), --trip-done (behind
+      you), and the weather glyph's --trip-warm / --trip-cool. They go on
+      STATE MARKS only — the frame's top rule, the stamp, the countdown
+      label's diamond, the leg dots, the day chip, the progress fill, the
+      active leg's name, the map's regions, dots and legs — and each of
+      those has a word or a shape beside it, so no state is told by hue
+      alone. Inside the module nothing wears --acc, --chrome or --label;
+      the furniture is the neutral ramp, and a hover is a grey edge. Text a
+      person reads bottoms out at --text-dim; --text-ghost is left to marks
+      that are not read (the route chevron, an empty track).
+   2  Square. Diamonds are squares turned with `rotate`, not circles. The
+      map's dots stay round: a position on a map is a genuinely round thing.
+   3  Depth. The module sits on --surface and the map on --bg, the same
+      opaque grounds as the album cards and image tiles next to them, with
+      one hairline. They were --glass for one pass and read as a lighter box
+      on the page, worst in lite mode, where glass turns into an opaque grey
+      ("die hintergründe sind auf jeden fall zu hell", user, 2026-10-26).
+      No wash under the top rule, no glow round the active card: the state
+      is in the border and the marks, not in a halo. Text over a leg's cover
+      sits on --scrim, the surface for chips on a photo.
+   4  Voices. Every measured value is mono — the countdown at the display
+      step (--fs-chrome-display), the clock, dates, temperatures, counters.
+      Names are sans. Data keeps its own case: the trip's title, a stop, a
+      side trip's city are never uppercased, only the fixed chrome is.
+   5  Measure. Every space, size, tracking and duration is a token.
+   6  Environment. Opaque grounds need no lite fallback; forced colours get
+      real edges below, and reduced motion stops the one live animation
+      (the map's "you are here").
+   ================================================================ */
+.trip{
+  /* a compact instrument: bar and body bring their own padding, so the
+     page-section padding is dropped */
+  margin:0 0 var(--s-6);
+  padding:0;
+  background:var(--surface);
+  border:var(--hair) solid var(--line);
+  /* the frame states the phase in one place: a bezel along its top edge,
+     before anything inside is read */
+  border-top:var(--s-0) solid var(--line-strong);
+}
+.trip--pre{ border-top-color:var(--trip); }
+.trip--transit,
+.trip--active{ border-top-color:var(--trip-live); }
+.trip--done{ border-top-color:var(--trip-done); }
+
+/* ---- meta line: the module's own .section__doc ---- */
+.trip__bar{
+  display:flex; align-items:baseline; flex-wrap:wrap;
+  gap:var(--s-2) var(--s-5);
+  padding:var(--s-4) var(--s-5);
+  border-bottom:var(--hair) solid var(--line);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-sm);
+  color:var(--text-dim);
+}
+/* two facts and a clock, on one line: the tag and the leg count on the
+   left, the clock on the right. The tag's glyph is the module's phase. */
+.trip__tag, .trip__legs, .trip__clock{ text-transform:var(--ui-case); }
+.trip__tag > .fa{ margin-right:var(--s-2); color:var(--trip); }
+.trip--transit .trip__tag > .fa,
+.trip--active .trip__tag > .fa{ color:var(--trip-live); }
+.trip--done .trip__tag > .fa{ color:var(--trip-done); }
+.trip__legs b{ color:var(--text); font-weight:400; }
+
+/* live JST wall clock: "JAPAN TIME 16:20:16 JST" */
+.trip__clock{
+  /* centre, not baseline: the digits are size-contained, and a contained
+     box has no text baseline to offer. Same face and size on all three, so
+     centred IS baseline-aligned. */
+  display:inline-flex; align-items:center; gap:var(--s-3);
+  margin-left:auto;
+  color:var(--text-dim);
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+.trip__clock i{ font-style:normal; }
+/* The digits change every second, so they are a layout boundary of their
+   own: a fixed box (eight monospace cells and their tracking, one line high)
+   whose content is laid out inside it. Without one, WebKit laid out the
+   whole page for each tick — some 100 ms a second on a 980-photo album.
+   app.js changes the text node in place (setText), which is what lets the
+   boundary hold. */
+.trip__clock b{
+  font-weight:400; color:var(--text); letter-spacing:var(--tr-num);
+  display:block;
+  width:calc(8ch + 8 * var(--tr-num));
+  height:1.55em;   /* engines without the lh unit; the line-height is body's */
+  height:1lh;
+  contain:size layout style;
+}
+
+/* ---- body ---- */
+.trip__main{
+  display:flex; flex-direction:column; gap:var(--s-5);
+  padding:var(--s-5);
+}
+/* The desktop layout (countdown left, legs as a row to its right) is at the
+   end of this section: it overrides the base rules, so it comes after them. */
+
+/* ---- countdown ---- */
+.trip__cd{
+  display:flex; flex-direction:column; gap:var(--s-3); min-width:0;
+  padding-bottom:var(--s-5); border-bottom:var(--hair) solid var(--line);
+}
+.trip__cd-label{
+  display:flex; align-items:center; gap:var(--s-3);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  /* tracked like a value, not like a cap: the line is a sentence */
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-chrome-lg);
+  color:var(--text-dim);
+}
+/* the phase, in one square turned on its corner. It leads a localized
+   sentence ("Leaving Hokkaido in"), which is why the label itself is not
+   cased: it carries a place name. */
+.trip__cd-label::before{
+  content:""; flex:0 0 auto;
+  width:var(--s-2); height:var(--s-2);
+  rotate:45deg;
+  border:var(--hair) solid var(--text-dim);
+}
+.trip--pre .trip__cd-label::before{ background:var(--trip); border-color:var(--trip); }
+.trip--transit .trip__cd-label::before,
+.trip--active .trip__cd-label::before{ background:var(--trip-live); border-color:var(--trip-live); }
+.trip--done .trip__cd-label::before{ background:var(--trip-done); border-color:var(--trip-done); }
+
+/* four figures on equal columns, no cells: the space between them does
+   what the dividers did, and the figures line up with the label above */
+.trip__cd-clock{
+  display:flex; gap:var(--s-5);
+}
+.trip__cd-unit{
+  flex:1 1 0; min-width:0;
+  display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-2);
+}
+/* the biggest measured value on the page: the mono voice at its display
+   step, in the page title's white→grey fall (the way .arc__val sets big
+   numbers). The phase is said by the marks around it, not by the digits. */
+.trip__cd-unit b{
+  font-family:var(--num-font);
+  font-weight:500; font-size:var(--fs-chrome-display); line-height:1;
+  letter-spacing:var(--tr-chrome-display);
+  font-variant-numeric:tabular-nums;
+  color:var(--title-a);
+  background:linear-gradient(175deg, var(--title-a) 14%, var(--title-b) 98%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+  /* a layout boundary, like the clock's digits: the second ticking over is
+     laid out inside the box instead of across the page. A clipped box of
+     fixed height, not size containment — on desktop the countdown column
+     is as wide as its content, and a size-contained box has none. */
+  width:100%; height:1.04em; padding-bottom:.04em;
+  overflow:hidden;
+}
+.trip__cd-unit b::selection{ -webkit-text-fill-color:var(--text); }
+.trip__cd-unit i{
+  font-family:var(--ui-font); font-weight:var(--ui-weight); font-style:normal;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
+  color:var(--text-dim);
+}
+.trip__cd-sep{ display:none; }
+.trip__cd-target{
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
+  color:var(--text-dim);
+}
+.trip__cd-target b{ color:var(--text); font-weight:400; }
+
+/* ---- itinerary: one card per leg, each a link into its region album.
+   The cover fills the card under a scrim, so the text reads over any
+   photo. ---- */
+.trip__line{
+  list-style:none; margin:0; padding:0;
+  display:flex; flex-direction:column; gap:var(--s-3);
+}
+.trip__stop{
+  position:relative; margin:0; min-width:0;
+  border:var(--hair) solid var(--line);
+  isolation:isolate;
+  transition:border-color var(--dur-1) var(--ease);
+}
+.trip__stop.is-upcoming{ border-color:var(--line-strong); }
+.trip__stop.is-active{ border-color:var(--trip-live); }
+.trip__stop.is-done{ border-color:var(--line); }
+/* a hover is not a state of the trip: a grey edge, gated on a real hovering
+   pointer (re-styling an ANCESTOR of the tapped link is what spends the
+   first tap on hover on a touch screen) */
+@media (hover: hover){
+  .trip__stop:has(a.trip__stop-link:hover){ border-color:var(--text-dim); }
+}
+
+.trip__stop-link{
+  position:relative;
+  display:flex; flex-direction:column;
+  min-height:var(--s-10); min-width:0;
+  padding:var(--s-4);
+  text-decoration:none; color:inherit;
+}
+
+/* z-stack: cover 0, scrim 1, body 2, track 3 (isolated on .trip__stop) */
+.trip__stop-media{ position:absolute; inset:0; z-index:0; overflow:hidden; }
+.trip__stop-media img{
+  width:100%; height:100%; object-fit:cover; display:block;
+  filter:saturate(.8) brightness(.7) contrast(1.05);
+  /* `scale`, never `transform` (Nebula step 4.4) */
+  transition:filter var(--dur-2) var(--ease), scale var(--dur-3) var(--ease-out);
+}
+@media (hover: hover){
+  a.trip__stop-link:hover .trip__stop-media img{
+    filter:saturate(.95) brightness(.85) contrast(1.05);
+    scale:1.04;
+  }
+}
+/* the scrim runs heavy under the text column and lifts towards the open
+   side of the photo */
+.trip__stop-shade{
+  position:absolute; inset:0; z-index:1;
+  background:linear-gradient(90deg, var(--scrim-hi) 0%, var(--scrim-hi) 40%, var(--scrim) 100%);
+}
+
+.trip__stop-body{
+  position:relative; z-index:2;
+  display:flex; flex-direction:column; gap:var(--s-3);
+  flex:1 1 auto; min-width:0;
+}
+.trip__stop-head{ display:flex; align-items:center; gap:var(--s-3); min-width:0; }
+.trip__stop-city{
+  font-family:var(--sans); font-weight:600;
+  font-size:var(--fs-text-lg); letter-spacing:var(--tr-head); color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+/* "you are here", said in the name itself */
+.trip__stop.is-active .trip__stop-city{ color:var(--trip-live); }
+.trip__stop-jp{
+  font-family:"Noto Sans JP", var(--sans); font-size:var(--fs-text-sm); color:var(--text-dim);
+  white-space:nowrap; flex:0 0 auto;
+}
+/* the state dot: outline ahead, filled behind, filled live while there */
+.trip__stop-dot{
+  flex:0 0 auto;
+  width:var(--s-3); height:var(--s-3);
+  rotate:45deg;
+  border:var(--hair) solid var(--text-dim);
+}
+.trip__stop.is-upcoming .trip__stop-dot{ border-color:var(--trip); }
+.trip__stop.is-done .trip__stop-dot{ background:var(--trip-done); border-color:var(--trip-done); }
+.trip__stop.is-active .trip__stop-dot{ background:var(--trip-live); border-color:var(--trip-live); }
+.trip__stop-dates{
+  font-family:var(--num-font);
+  font-size:var(--fs-chrome-sm); letter-spacing:var(--tr-num);
+  color:var(--text-dim);
+  font-variant-numeric:tabular-nums;
+}
+/* each half of the range is unbreakable, so a narrow tile wraps exactly at
+   the dash */
+.trip__stop-dates > span{ display:inline-block; white-space:nowrap; }
+
+/* footer: weather left, day counter right */
+.trip__stop-foot{
+  margin-top:auto; padding-top:var(--s-3);
+  display:flex; align-items:flex-end; gap:var(--s-3); min-width:0;
+}
+.trip__stop-wx{
+  display:flex; flex-direction:column; gap:var(--s-1); min-width:0;
+}
+.trip__stop-wx-now{
+  display:inline-flex; align-items:baseline; gap:var(--s-2);
+  font-family:var(--num-font); font-weight:500;
+  font-size:var(--fs-chrome-lg); letter-spacing:var(--tr-chrome-xl); color:var(--text);
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+.trip__stop-wx-ico{ font-style:normal; color:var(--text-dim); line-height:1; }
+/* the glyph's shape says the weather; the tint only lets it be read first.
+   Warm for sun and storm, cool for rain and snow, neutral for the rest —
+   never one of the three state colours, which mean something else here. */
+.trip__stop-wx[data-wx-kind="sun"]   .trip__stop-wx-ico,
+.trip__stop-wx[data-wx-kind="storm"] .trip__stop-wx-ico{ color:var(--trip-warm); }
+.trip__stop-wx[data-wx-kind="rain"]  .trip__stop-wx-ico,
+.trip__stop-wx[data-wx-kind="snow"]  .trip__stop-wx-ico{ color:var(--trip-cool); }
+/* today's envelope trails the current reading, one step quieter */
+.trip__stop-wx-range{
+  font-size:var(--fs-chrome-xs); font-weight:400; letter-spacing:var(--tr-num);
+  color:var(--text-dim);
+}
+.trip__stop-wx-cond{
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
+  color:var(--text-dim);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+/* the day counter, as plain chrome type: its words ("in 12 days" / "day 3
+   of 37" / ✓) carry the state, the colour repeats it */
+.trip__stop-meta{
+  flex:0 0 auto; margin-left:auto;
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm); text-transform:var(--ui-case);
+  color:var(--text-dim); white-space:nowrap;
+}
+.trip__stop-meta:empty{ display:none; }
+.trip__stop.is-active .trip__stop-meta{ color:var(--trip-live); }
+.trip__stop.is-done .trip__stop-meta{ color:var(--trip-done); }
+
+/* the leg's progress along the card's foot: a meter (--p via the CSSOM) */
+.trip__stop-track{
+  position:absolute; left:0; right:0; bottom:0; z-index:3;
+  height:var(--s-0);
+  background:var(--line);
+  overflow:hidden;
+}
+.trip__stop-track i{
+  display:block; height:100%;
+  width:calc(var(--p, 0) * 1%);
+  background:var(--text-ghost);
+  transition:width var(--dur-3) var(--ease);
+}
+.trip__stop.is-done .trip__stop-track i{ background:var(--trip-done); }
+.trip__stop.is-active .trip__stop-track i{ background:var(--trip-live); }
+
+/* ---- side trips: a labelled list under the timeline. Not a leg, so no
+   card, no cover and no meter — but every row stands on the same columns
+   (dot · place · date · counter, the flights on a line below), so the block
+   reads as a table of excursions rather than a run of words. Rows are
+   divided by hairlines, the way .stack divides its rows; the state is the
+   dot, the counter's words and — while you are there — the name. ---- */
+.trip__sides{ padding:0 var(--s-5) var(--s-5); }
+.trip__sides-head{
+  display:flex; align-items:baseline; gap:var(--s-2);
+  margin:0; padding-bottom:var(--s-2);
+  border-bottom:var(--hair) solid var(--line);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
+  color:var(--text-dim);
+}
+.trip__sides-head b{ font-weight:400; color:var(--text); }
+.trip__sides-list{ list-style:none; margin:0; padding:0; }
+.trip__side{ margin:0; min-width:0; }
+.trip__side + .trip__side{ border-top:var(--hair) solid var(--line); }
+.trip__side-link{
+  display:grid;
+  grid-template-columns:var(--s-3) minmax(0,1fr) auto minmax(calc(var(--s-10) + var(--s-6)), auto);
+  align-items:baseline;
+  gap:var(--s-1) var(--s-4);
+  padding:var(--s-3) var(--s-2);
+  font-family:var(--ui-font); font-weight:var(--ui-weight); font-size:var(--fs-chrome-sm);
+  text-decoration:none; color:var(--text-dim);
+  transition:background-color var(--dur-1) var(--ease);
+}
+@media (hover: hover){
+  a.trip__side-link:hover{ background:var(--surface-2); }
+  a.trip__side-link:hover .trip__side-city{ text-decoration:underline; text-underline-offset:.2em; }
+}
+/* the same dot a leg card leads with, a step smaller */
+.trip__side-dot{
+  align-self:center;
+  width:var(--s-2); height:var(--s-2);
+  rotate:45deg;
+  border:var(--hair) solid var(--text-dim);
+}
+.trip__side.is-upcoming .trip__side-dot{ border-color:var(--trip); }
+.trip__side.is-done .trip__side-dot{ background:var(--trip-done); border-color:var(--trip-done); }
+.trip__side.is-active .trip__side-dot{ background:var(--trip-live); border-color:var(--trip-live); }
+.trip__side-place{ display:flex; align-items:baseline; gap:var(--s-2); min-width:0; }
+.trip__side-city{
+  font-family:var(--sans); font-weight:600;
+  font-size:var(--fs-text-md); letter-spacing:var(--tr-head); color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.trip__side.is-active .trip__side-city{ color:var(--trip-live); }
+.trip__side-jp{ font-family:"Noto Sans JP", var(--sans); font-size:var(--fs-text-sm); white-space:nowrap; }
+.trip__side-date{ letter-spacing:var(--tr-num); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.trip__side-meta{
+  justify-self:end;
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-sm); text-transform:var(--ui-case);
+  white-space:nowrap;
+}
+.trip__side.is-active .trip__side-meta{ color:var(--trip-live); }
+.trip__side.is-done .trip__side-meta{ color:var(--trip-done); }
+/* the flights: their own line under the place, one entry per flight —
+   number, from, arrow, to — set as values */
+.trip__side-flights{
+  grid-column:2 / -1;
+  display:flex; flex-wrap:wrap; gap:var(--s-1) var(--s-5);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-num);
+  font-variant-numeric:tabular-nums;
+}
+.trip__side-flight{ display:inline-flex; gap:var(--s-2); white-space:nowrap; }
+.trip__side-flight b{ font-weight:500; color:var(--text); }
+
+/* ---- route map (generated inline SVG — see _trip_map.html) ----
+   A framed panel on --bg, with a faint neutral grid behind the
+   archipelago. Land, grid and resting dots are grey; only the
+   stop states and the route legs carry the module's colours. */
+.trip-map{
+  /* fills its column (the sidebar on desktop), capped on the stacked
+     layouts so a tablet does not get a poster */
+  margin:0 auto; width:100%; max-width:calc(var(--s-10) * 3.75);
+  padding:var(--s-3) var(--s-3) var(--s-4);
+  border:var(--hair) solid var(--line);
+  background:
+    repeating-linear-gradient(0deg,  var(--trip-grid) 0 var(--hair), transparent var(--hair) var(--s-6)),
+    repeating-linear-gradient(90deg, var(--trip-grid) 0 var(--hair), transparent var(--hair) var(--s-6)),
+    var(--bg);
+}
+.trip-map svg{ display:block; width:100%; height:auto; }
+.trip-map__cap{
+  display:flex; justify-content:flex-end; gap:var(--s-2);
+  margin-top:var(--s-2);
+  font-family:var(--ui-font); font-weight:var(--ui-weight);
+  font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs); text-transform:var(--ui-case);
+  color:var(--text-dim);
+}
+.trip-map__cap [lang="ja"]{ font-family:"Noto Sans JP", var(--mono); letter-spacing:var(--tr-chrome-lg); }
+.trip-map__cap [lang="ja"]::after{ content:"/"; margin-left:var(--s-2); }
+
+.trip-map__land{
+  fill:var(--surface-2); stroke:var(--line-strong); stroke-width:.7;
+  stroke-linejoin:round;
+}
+/* an inset (Okinawa): the frame a map of Japan draws round the islands it
+   moves into the empty corner — a hairline, like every other edge */
+.trip-map__inset{ fill:none; stroke:var(--line-strong); stroke-width:.7; }
+/* the regions the itinerary visits — one path per stop */
+.trip-map__pref{
+  fill:oklch(from var(--trip) l c h / .1); stroke:oklch(from var(--trip) l c h / .55); stroke-width:.8;
+  stroke-linejoin:round;
+}
+.trip-map__pref.is-active{ fill:oklch(from var(--trip-live) l c h / .18); stroke:var(--trip-live); }
+.trip-map__pref.is-done{ fill:oklch(from var(--trip-done) l c h / .08); stroke:oklch(from var(--trip-done) l c h / .45); }
+
+/* route legs: dashed until flown; the next one marches */
+.trip-map__seg{
+  fill:none; stroke:var(--text-ghost); stroke-width:1.1;
+  stroke-dasharray:3 4; stroke-linecap:square; opacity:.6;
+}
+.trip-map__seg.is-next{
+  stroke:var(--trip); stroke-width:1.5; opacity:1;
+  animation:trip-map-dash 1.4s linear infinite;
+}
+.trip-map__seg.is-done{
+  stroke:oklch(from var(--trip-done) l c h / .5); stroke-dasharray:none; stroke-width:1; opacity:.9;
+}
+
+.trip-map__dot{ fill:var(--bg); stroke:var(--text-dim); stroke-width:1.1; }
+.trip-map__city.is-upcoming .trip-map__dot{ stroke:var(--trip); }
+.trip-map__city.is-done   .trip-map__dot{ fill:var(--trip-done); stroke:var(--trip-done); }
+.trip-map__city.is-active .trip-map__dot{ fill:var(--trip-live); stroke:var(--trip-live); }
+/* "you are here": the module's one live thing — an expanding echo and a
+   slowly turning dashed ring */
+.trip-map__pulse, .trip-map__ring{ fill:none; stroke:var(--trip-live); opacity:0; }
+.trip-map__pulse{ stroke-width:1.2; }
+.trip-map__ring{ stroke-width:.8; stroke-dasharray:2.5 3.5; }
+.trip-map__city.is-active .trip-map__pulse,
+.trip-map__city.is-here .trip-map__pulse{ animation:trip-map-pulse 2.4s var(--ease-out) infinite; }
+.trip-map__city.is-active .trip-map__ring,
+.trip-map__city.is-here .trip-map__ring{ opacity:.75; animation:trip-map-spin 16s linear infinite; }
+
+/* the labels are data — the stop names in their own case */
+.trip-map__lbl{
+  font-family:var(--ui-font); font-weight:var(--ui-weight); font-size:var(--fs-chrome-sm);
+  letter-spacing:var(--tr-chrome-xl); fill:var(--text-dim);
+}
+.trip-map__city.is-active .trip-map__lbl{ fill:var(--trip-live); }
+.trip-map__city.is-done   .trip-map__lbl{ fill:var(--text-dim); }
+
+/* side trips: the region it lies in, its out-and-back and its dot are a
+   size quieter than a leg's. While one runs its base stays the active leg
+   but hands it the pulse (is-away), so the map never shows two "you are
+   here"s; back at a leg already done (a revisit), that leg's dot takes the
+   pulse (is-here) without its done state changing. */
+.trip-map__pref--side{ fill:oklch(from var(--trip) l c h / .04); stroke-dasharray:2 2.5; stroke-width:.6; }
+/* an island in an inset is too small for a dashed edge — it breaks into
+   specks — so it keeps the side trip's quiet fill on a solid hairline */
+.trip-map__pref--inset{ stroke-dasharray:none; }
+.trip-map__seg--side{ stroke-width:.9; stroke-dasharray:1.5 2.5; }
+.trip-map__seg--side.is-done{ stroke-dasharray:1.5 2.5; }
+.trip-map__city.is-away .trip-map__pulse,
+.trip-map__city.is-away .trip-map__ring{ animation:none; opacity:0; }
+
+@keyframes trip-map-pulse{
+  0%{ r:4.5; opacity:.75; }
+  75%, 100%{ r:16; opacity:0; }
+}
+@keyframes trip-map-spin{ to{ stroke-dashoffset:-63; } }
+@keyframes trip-map-dash{ to{ stroke-dashoffset:-14; } }
+
+/* rule 6: less motion asked for — the marks stay, the movement goes. The
+   live dot keeps its fill and the ring its dashes, standing still. */
+@media (prefers-reduced-motion: reduce){
+  .trip__stop, .trip__stop-media img, .trip__stop-track i{ transition:none; }
+  @media (hover: hover){ a.trip__stop-link:hover .trip__stop-media img{ scale:none; } }
+  .trip-map__pulse, .trip-map__ring, .trip-map__seg.is-next{ animation:none; }
+}
+html.fx-lite .trip-map__pulse,
+html.fx-lite .trip-map__ring,
+html.fx-lite .trip-map__seg.is-next{ animation:none; }
+/* forced colours: the OS owns the palette, so the state marks need edges
+   the compositor keeps — the words beside them already carry the meaning */
+@media (forced-colors: active){
+  .trip, .trip__stop, .trip-map{ border-color:CanvasText; }
+  .trip__stop-dot, .trip__cd-label::before{ border-color:CanvasText; }
+  .trip__stop.is-active .trip__stop-dot,
+  .trip__stop.is-done .trip__stop-dot,
+  .trip__stop-track i{ background:Highlight; }
+  .trip__cd-unit b{ -webkit-text-fill-color:CanvasText; background:none; }
+}
+
+/* desktop: the countdown on the left, the legs as a left→right row of
+   cards to its right. Needs real width for three cards plus the countdown;
+   narrower screens keep the stacked cards above. */
+@media (min-width:1100px){
+  .trip__main{
+    display:grid; grid-template-columns:auto minmax(0,1fr);
+    gap:var(--s-6); align-items:stretch;
+  }
+  .trip__cd{
+    justify-content:center;
+    padding:0 var(--s-6) 0 0; border-bottom:0;
+    border-right:var(--hair) solid var(--line);
+  }
+  .trip__line{ flex-direction:row; gap:var(--s-4); }
+  .trip__stop{ flex:1 1 0; }
+  .trip__stop-link{ min-height:calc(var(--s-10) + var(--s-7)); padding:var(--s-4) var(--s-5) var(--s-5); }
+}
+
+/* phones: the three stops sit SIDE BY SIDE as one row of portrait tiles —
+   the whole route in one glance — reading bottom-up over a foot-heavy
+   scrim: name, kanji and dot, the dates in miniature, the temperature. */
+@media (max-width:760px){
+  .trip__bar{ padding:var(--s-3) var(--s-4); gap:var(--s-2) var(--s-4); font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-md); }
+  .trip__main{ padding:var(--s-4); gap:var(--s-4); }
+  .trip__sides{ padding:0 var(--s-4) var(--s-4); }
+  /* a row on a phone: dot · place · counter, the date and the flights
+     under the place */
+  .trip__side-link{ grid-template-columns:var(--s-3) minmax(0,1fr) auto; padding-inline:0; }
+  .trip__side-date{ grid-column:2; grid-row:2; }
+  .trip__side-meta{ grid-column:3; grid-row:1; }
+  .trip__line{ display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:var(--s-3); }
+  .trip__stop-link{ min-height:calc(var(--s-10) + var(--s-8)); padding:var(--s-3); }
+  .trip__stop-shade{
+    background:linear-gradient(0deg, var(--scrim-hi) 0%, var(--scrim-hi) 45%, var(--scrim) 100%);
+  }
+  .trip__stop-body{ gap:var(--s-1); justify-content:flex-end; }
+  .trip__stop-head{ flex-wrap:wrap; gap:var(--s-0) var(--s-2); }
+  .trip__stop-city{ font-size:var(--fs-text-md); }
+  .trip__stop-dates{ font-size:var(--fs-chrome-xs); line-height:1.5; }
+  .trip__stop-foot{ padding-top:var(--s-2); }
+  /* too narrow for the readout's second line: the temperature only */
+  .trip__stop-wx-now{ font-size:var(--fs-chrome-md); }
+  .trip__stop-wx-cond, .trip__stop-wx-range, .trip__stop-meta{ display:none; }
+}
+
+@media (max-width:420px){
+  .trip__tag, .trip__legs{ white-space:nowrap; }
+}
+
+/* ================================================================

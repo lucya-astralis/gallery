@@ -18,6 +18,30 @@ notes are never one commit apart.
 
 ---
 
+## 3.2.0 — 2026-11-11
+
+**A new gallery, built on Facet from the ground up.** The public pages are
+new templates, a new stylesheet and a new script; the routes, the data, the
+search, the themes and gallery.cfg are the same. `FRONTEND=nebula` brings
+the old pages back while the new ones settle; it will go in a later release.
+
+* **Pages:** welcome with a full-bleed photo reel and the archive's facts;
+  albums with featured posters and the archive grid; an album with its reel
+  or cover, its facts, sub-albums, tags, sort and day groups; a photo with
+  its stage, actions, file, palette, tags and EXIF, and a lightbox (arrows,
+  swipe, `f`, Esc); search with filters, facets, colours and the vision
+  group; statistics; a 404.
+* **No script needed:** the sort menu is a `<details>`, the reshuffle is a
+  link, every tile has a real `src`. The script (`static/f/gallery.js`) adds
+  the reels' motion, the lightbox and the original-quality swap.
+* **Nova, in the gallery's colour.** With no wallpaper configured the
+  backdrop is Facet's Nova, tinted by the accent of the gallery or the
+  album; a configured wallpaper shows under a veil, light or dark.
+* **Kept as building blocks:** the server-drawn charts (`_charts.html`) and
+  the trip dashboard (`_trip.html`, `_trip_map.html`, `trip.js`), restyled
+  through `static/f/blocks.css`.
+* `gallery.cfg faces` (Nebula Mono and icons) still switches the faces.
+
 ## 3.1.0 — 2026-11-11
 
 **The gallery wears Facet.** The public pages move from Nebula to Facet, the

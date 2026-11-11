@@ -1,0 +1,1038 @@
+/* ==================================================================
+   FACET — the design language of lucya.systems, third generation
+   ------------------------------------------------------------------
+   Facet replaces Nebula. It keeps what Nebula got right (two voices,
+   rationed measure, declared fallbacks) and drops what made it stiff
+   (black only, square only, no gloss, motion as an afterthought).
+
+   Seven rules. FACET.md has the reasoning behind each one.
+
+     1. Two grounds, equal rank. Light and dark are both first class.
+        Every colour is ONE token written as light-dark(), so a
+        component can never be right in one theme and wrong in the other.
+     2. Round, by size. Corners come off --r-*, and a nested corner
+        is the outer one minus the inset: --r-inner().
+     3. Glass is a material. It floats: bars, rails, menus, dialogs,
+        toasts, cards over Nova. Reading happens on --surface. Glass is
+        a fill, a blur, a hairline and a sheen.
+     4. One accent, for focus and state. Primary actions are drawn
+        in --ink (the inverse neutral). The accent marks what is
+        selected, active, in progress or linked.
+     5. Two voices. Space Grotesk in sentence case is what a person
+        reads. JetBrains Mono, upper case and tracked, is the chrome:
+        labels, counts, measured values.
+     6. Motion is part of the design. Every state change moves, on
+        the --dur-* and --ease-* / --spring scales. Things enter,
+        respond and settle. Nothing loops unless it reports work.
+     7. The environment can overrule the look. Reduced motion,
+        reduced transparency, more contrast and forced colours are
+        reached by redefining tokens, never by overriding components.
+   ================================================================== */
+
+/* ---------------- faces ---------------- */
+@font-face{font-family:'Space Grotesk';src:url('/static/fonts/SpaceGrotesk-400.woff2') format('woff2');font-weight:100 450;font-display:swap}
+@font-face{font-family:'Space Grotesk';src:url('/static/fonts/SpaceGrotesk-500.woff2') format('woff2');font-weight:451 550;font-display:swap}
+@font-face{font-family:'Space Grotesk';src:url('/static/fonts/SpaceGrotesk-600.woff2') format('woff2');font-weight:551 650;font-display:swap}
+@font-face{font-family:'Space Grotesk';src:url('/static/fonts/SpaceGrotesk-700.woff2') format('woff2');font-weight:651 900;font-display:swap}
+@font-face{font-family:'JetBrains Mono';src:url('/static/fonts/JetBrainsMono-400.woff2') format('woff2');font-weight:100 450;font-display:swap}
+@font-face{font-family:'JetBrains Mono';src:url('/static/fonts/JetBrainsMono-500.woff2') format('woff2');font-weight:451 550;font-display:swap}
+@font-face{font-family:'JetBrains Mono';src:url('/static/fonts/JetBrainsMono-600.woff2') format('woff2');font-weight:551 650;font-display:swap}
+@font-face{font-family:'JetBrains Mono';src:url('/static/fonts/JetBrainsMono-700.woff2') format('woff2');font-weight:651 900;font-display:swap}
+
+/* ---------------- tokens ---------------- */
+:root{
+  color-scheme: light dark;   /* follows the OS; data-theme pins it below */
+
+  /* GROUND (layers). Opaque steps with fixed roles, after Fluent 2's neutral
+     backgrounds: each layer sits on the one before it, and in dark mode a
+     layer is LIGHTER than what it sits on. Nothing a person reads lies on a
+     translucent surface. Darker than Fluent's greys, with our trace of blue.
+       --bg-deep   behind everything (the door, under Nova)
+       --bg        the page ground
+       --bg-frame  the app's frame: a docked rail, a header bar
+       --surface   a region of content on the ground
+       --card      a card
+       --surface-2 a step inside a card; also the hover fill
+       --surface-3 a second step: tiles, tracks, pressed */
+  --bg-deep:     light-dark(#ececf1, #050508);
+  --bg:          light-dark(#f4f4f7, #0a0a0e);
+  --bg-2:        light-dark(#ececf1, #08080b);
+  --bg-frame:    light-dark(#ececf1, #0f0f14);
+  --surface:     light-dark(#fafafc, #131318);
+  --card:        light-dark(#ffffff, #17171d);
+  --surface-2:   light-dark(#f4f4f7, #1f1f26);
+  --surface-3:   light-dark(#e9e9ef, #282830);
+  /* STROKES, three, by role (Fluent's Stroke 1-3):
+       --stroke-1  outlines a control: a field, a button, a chip
+       --stroke-2  outlines a container: a card, a table, a panel
+       --stroke-3  divides rows inside a container
+     --line / --line-strong are the old names for 2 and 1. */
+  --stroke-1:    light-dark(#c4c4cf, #4c4c59);
+  --stroke-2:    light-dark(#dcdce5, #2b2b34);
+  --stroke-3:    light-dark(#e9e9ef, #212129);
+  --line:        var(--stroke-2);
+  --line-strong: var(--stroke-1);
+  --divider:     var(--stroke-3);
+
+  /* TEXT. Floors are measured on --surface: 4.5:1 for anything read. */
+  --text:        light-dark(#121216, #f2f2f4);
+  --text-dim:    light-dark(#5b5b66, #a1a1a8);
+  --text-ghost:  light-dark(#73737f, #7d7d86);
+  --title-a:     light-dark(#121216, #ffffff);
+  --title-b:     light-dark(#4a4a56, #8b8b94);
+
+  /* INK. The primary action and anything that must outrank the accent. */
+  --ink:         light-dark(#121216, #f2f2f4);
+  --on-ink:      light-dark(#ffffff, #000000);
+
+  /* THE ACCENT. Brand hex #5865f2, derived for each ground. */
+  --acc:         light-dark(#404ee7, #616ef3);  /* text and marks, 6:1 / 4.6:1 */
+  --acc-fill:    light-dark(#404ee7, #4b58ea);  /* carries white text */
+  --on-acc:      #ffffff;
+  --acc-soft:    light-dark(rgba(64,78,231,.09), rgba(97,110,243,.16));
+  --acc-line:    light-dark(rgba(64,78,231,.36), rgba(97,110,243,.50));
+  --ring:        0 0 0 3px light-dark(rgba(64,78,231,.28), rgba(97,110,243,.42));
+
+  /* STATE. Separate from the accent; always paired with a word or glyph. */
+  --ok:          light-dark(#13805a, #3ecf8e);
+  --ok-soft:     light-dark(rgba(19,128,90,.10), rgba(62,207,142,.14));
+  --warn:        light-dark(#9a5b00, #f2b53a);
+  --warn-soft:   light-dark(rgba(154,91,0,.10), rgba(242,181,58,.14));
+  --err:         light-dark(#c4303d, #ff6b72);
+  --err-soft:    light-dark(rgba(196,48,61,.09), rgba(255,107,114,.14));
+
+  /* NOVA, the atmosphere: violet from one edge at 22°, both themes. */
+  --nova-a:      light-dark(#cfc9ff, #4034c0);
+  --nova-b:      light-dark(#e6e3ff, #221b6a);
+  --nova-c:      light-dark(#f1f0fb, #0b0a18);
+  --nova-d:      light-dark(#f4f4f7, #05050a);
+  --nova-shard:  light-dark(rgba(120,105,240,.26), rgba(120,105,240,.55));
+  --nova-shard-2:light-dark(rgba(64,52,192,.12), rgba(60,50,175,.35));
+  --nova-line:   light-dark(rgba(106,92,245,.55), rgba(139,125,255,.90));
+  --nova-silver: light-dark(rgba(91,91,110,.30), rgba(198,200,215,.55));
+  --nova-angle:  68deg;   /* gradient direction = shards at 22° from vertical */
+
+  /* GLASS. Fill + blur + hairline + sheen. */
+  --glass:       light-dark(rgba(255,255,255,.56), rgba(18,18,24,.68));
+  --glass-hi:    light-dark(rgba(255,255,255,.78), rgba(22,22,28,.84));
+  --glass-solid: light-dark(#fbfbfd, #17171c);    /* the fallback */
+  --glass-line:  light-dark(rgba(255,255,255,.80), rgba(255,255,255,.11));
+  --glass-edge:  light-dark(rgba(18,18,30,.08), rgba(0,0,0,.55));
+  --glass-sheen: light-dark(rgba(255,255,255,.75), rgba(255,255,255,.05));
+  --glass-glint: light-dark(rgba(255,255,255,.55), rgba(255,255,255,.10));
+  --blur-1:      blur(8px) saturate(120%);
+  --blur-2:      blur(24px) saturate(130%);
+  --blur-3:      blur(40px) saturate(140%);
+
+  /* ELEVATION, by role (Fluent's shadow ramp). Each is an ambient shadow
+     (soft, says how far) plus a key shadow (sharp, draws the edge).
+       --shadow-4   a card that is raised
+       --shadow-8   a menu, a tooltip, a dropdown
+       --shadow-16  a popover, a hover card
+       --shadow-28  a side panel, a drawer
+       --shadow-64  a dialog
+     A card at rest has a stroke and no shadow. */
+  --sh-a:        light-dark(rgba(20,20,40,.10), rgba(0,0,0,.40));
+  --sh-k:        light-dark(rgba(20,20,40,.14), rgba(0,0,0,.50));
+  --shadow-4:    0 0 2px var(--sh-a), 0 2px 4px var(--sh-k);
+  --shadow-8:    0 0 2px var(--sh-a), 0 4px 8px var(--sh-k);
+  --shadow-16:   0 0 2px var(--sh-a), 0 8px 16px var(--sh-k);
+  --shadow-28:   0 0 8px var(--sh-a), 0 14px 28px var(--sh-k);
+  --shadow-64:   0 0 8px var(--sh-a), 0 32px 64px var(--sh-k);
+  --shadow-1:    var(--shadow-4);    /* old names */
+  --shadow-2:    var(--shadow-16);
+  --shadow-3:    var(--shadow-64);
+  --sh-c:        var(--sh-a);
+  --sh-c2:       var(--sh-k);
+
+  /* SHAPE, by role (Fluent's corner radii):
+       --r-none     0   what reaches the edge of the screen: a docked rail, a bar
+       --r-small    2   anything under 32px: a badge, a checkbox, a tile
+       --r-control  4   the default: buttons, fields, chips, rows
+       --r-card     8   cards, tables, panels
+       --r-overlay  12  what floats: dialogs, popovers, menus, toasts
+     --r-xs ... --r-2xl are the old size names, mapped onto the roles. */
+  --r-none: 0; --r-small: 2px; --r-control: 4px; --r-inner: 6px; --r-card: 8px; --r-overlay: 12px;
+  --r-xs: var(--r-small); --r-sm: var(--r-control); --r-md: var(--r-control); --r-lg: var(--r-inner);
+  --r-xl: var(--r-card); --r-2xl: var(--r-overlay); --r-pill: 999px;
+  --hair: 1px;
+
+  /* SPACE */
+  --s-0: 2px; --s-1: 4px; --s-2: 6px; --s-3: 8px; --s-4: 12px; --s-5: 16px;
+  --s-6: 20px; --s-7: 24px; --s-8: 32px; --s-9: 48px; --s-10: 64px; --s-11: 96px;
+  --page-pad: max(16px, env(safe-area-inset-left, 0px));
+  /* WIDTH (1.2.1): the console is widescreen, a tool's dashboard needs the
+     room; running text still holds its measure */
+  --page-max: 1880px;
+  --read-max: 72ch;
+  --tap: 34px;
+
+  /* TYPE (rule 5) */
+  --sans: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* The ramp (Fluent's sizes, our faces): whole pixels, and every size has
+     ONE line height on the 4px grid, so text in neighbouring columns shares
+     its baselines.
+       caption-2 10/14 · caption 12/16 · body 14/20 · subtitle-2 16/22
+       subtitle 20/28 · title-3 24/32 · title-2 28/36 · title-1 32/40 */
+  --fs-100: 10px; --lh-100: 14px;
+  --fs-200: 12px; --lh-200: 16px;
+  --fs-300: 14px; --lh-300: 20px;
+  --fs-400: 16px; --lh-400: 22px;
+  --fs-500: 20px; --lh-500: 28px;
+  --fs-600: 24px; --lh-600: 32px;
+  --fs-700: 28px; --lh-700: 36px;
+  --fs-800: 32px; --lh-800: 40px;
+  /* old names */
+  --fs-chrome-xs: var(--fs-100); --tr-chrome-xs: .16em;
+  --fs-chrome-sm: 11px;          --tr-chrome-sm: .14em;
+  --fs-chrome-md: var(--fs-200); --tr-chrome-md: .10em;
+  --fs-text-sm: var(--fs-200); --fs-text-md: var(--fs-300); --fs-text-lg: var(--fs-400); --fs-text-xl: var(--fs-500);
+  --fs-h3: var(--fs-400); --fs-h2: var(--fs-600); --fs-h1: var(--fs-800);
+  --fs-display: clamp(48px, 9vw, 112px);
+  --tr-head: -.02em; --tr-display: -.045em;
+
+  /* MOTION (rule 6) */
+  --dur-1: .14s;   /* state: colour, opacity */
+  --dur-2: .26s;   /* movement: a thumb, a lift */
+  --dur-3: .42s;   /* settle: a panel, a dialog */
+  --dur-4: .70s;   /* entrance */
+  --dur-5: 1.4s;   /* set piece: the mark assembling, a count-up */
+  --stagger: 55ms;
+  --ease:     cubic-bezier(.2,.7,.2,1);
+  --ease-out: cubic-bezier(.16,1,.3,1);
+  --ease-io:  cubic-bezier(.65,0,.35,1);
+  --spring: linear(0, .009, .035 2.1%, .141 4.4%, .723 12.9%, .938 16.7%, 1.017 19.4%, 1.067, 1.099 24.3%, 1.108 26%, 1.103, 1.085 30.8%, 1.002 38.4%, .987 41.6%, .983 44.5%, .985 47.9%, 1.001 59.7%, 1);
+  --spring-soft: linear(0, .042 3.3%, .158 6.9%, .579 16.4%, .797 22.6%, .925 28.9%, 1.002 35.5%, 1.032 41.3%, 1.04 47.6%, 1.012 64.5%, 1.001 79.7%, 1);
+  --lift: translateY(-2px);
+  --press: scale(.97);
+}
+:root[data-theme="light"]{ color-scheme: light }
+:root[data-theme="dark"]{ color-scheme: dark }
+
+/* ---------------- rule 7: the environment ---------------- */
+@media (prefers-reduced-motion: reduce){
+  :root{ --dur-1:1ms; --dur-2:1ms; --dur-3:1ms; --dur-4:1ms; --dur-5:1ms; --stagger:0ms; --lift:none; --press:none }
+  *,*::before,*::after{ animation-iteration-count:1 !important; scroll-behavior:auto !important }
+}
+@media (prefers-reduced-transparency: reduce){
+  :root{ --glass:var(--glass-solid); --glass-hi:var(--glass-solid); --blur-1:none; --blur-2:none; --blur-3:none }
+}
+.fx-lite{ --glass:var(--glass-solid); --glass-hi:var(--glass-solid); --blur-1:none; --blur-2:none; --blur-3:none }
+@media (prefers-contrast: more){
+  :root{ --line:var(--line-strong); --text-dim:var(--text); --text-ghost:var(--text-dim); --glass:var(--glass-solid) }
+}
+@media (forced-colors: active){
+  .f-glass,.f-card,.f-btn,.f-field,.f-menu,.f-dialog,.f-toast{ border:1px solid CanvasText !important; forced-color-adjust:auto }
+}
+
+/* ---------------- base ---------------- */
+/* `hidden` wins over every display rule a component sets (1.1) */
+[hidden]{ display:none !important }
+*,*::before,*::after{ box-sizing:border-box }
+html{ -webkit-text-size-adjust:100%; scroll-behavior:smooth }
+body{ margin:0; background:var(--bg); color:var(--text); font:400 var(--fs-300)/var(--lh-300) var(--sans);
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  transition:background-color var(--dur-3) var(--ease), color var(--dur-3) var(--ease) }
+h1,h2,h3,h4,h5,h6,p{ margin:0 }
+h1,h2,h3,h4{ font-weight:600; letter-spacing:var(--tr-head); text-wrap:balance; line-height:1.1 }
+::selection{ background:var(--acc-soft); color:var(--text) }
+/* focus is a thicker stroke in the accent (Fluent), not a glow */
+:focus-visible{ outline:2px solid var(--acc); outline-offset:1px; border-radius:var(--r-control) }
+a{ color:var(--acc); text-decoration:none }
+a:not([class]){ background:linear-gradient(currentColor,currentColor) 0 100%/0 1px no-repeat;
+  transition:background-size var(--dur-2) var(--ease-out) }
+a:not([class]):hover{ background-size:100% 1px }
+
+.f-h1{ font-size:var(--fs-800); line-height:var(--lh-800); letter-spacing:-.03em }
+.f-h2{ font-size:var(--fs-600); line-height:var(--lh-600) }
+.f-h3{ font-size:var(--fs-400); line-height:var(--lh-400) }
+/* the ramp as classes; add .f-strong for the semibold of any step */
+.f-caption-2{ font-size:var(--fs-100); line-height:var(--lh-100) }
+.f-caption{ font-size:var(--fs-200); line-height:var(--lh-200) }
+.f-body{ font-size:var(--fs-300); line-height:var(--lh-300) }
+.f-subtitle-2{ font-size:var(--fs-400); line-height:var(--lh-400); font-weight:600 }
+.f-subtitle{ font-size:var(--fs-500); line-height:var(--lh-500); font-weight:600 }
+.f-title-3{ font-size:var(--fs-600); line-height:var(--lh-600); font-weight:600 }
+.f-title-2{ font-size:var(--fs-700); line-height:var(--lh-700); font-weight:600 }
+.f-title-1{ font-size:var(--fs-800); line-height:var(--lh-800); font-weight:600 }
+.f-strong{ font-weight:600 }
+.f-display{ font:600 var(--fs-display)/.95 var(--sans); letter-spacing:var(--tr-display);
+  background:linear-gradient(var(--title-a), var(--title-b)); -webkit-background-clip:text; background-clip:text; color:transparent }
+.f-lede{ font-size:var(--fs-400); line-height:var(--lh-400); color:var(--text-dim); max-width:60ch; text-wrap:pretty }
+.f-dim{ color:var(--text-dim) }
+.f-label{ font:500 var(--fs-chrome-sm)/var(--lh-200) var(--mono); letter-spacing:var(--tr-chrome-sm); text-transform:uppercase; color:var(--text-dim) }
+.f-label--xs{ font-size:var(--fs-chrome-xs); letter-spacing:var(--tr-chrome-xs) }
+.f-num{ font-family:var(--mono); font-variant-numeric:tabular-nums; letter-spacing:0 }
+.f-kbd{ font:500 var(--fs-chrome-xs)/1 var(--mono); padding:3px 6px; border-radius:var(--r-xs); border:var(--hair) solid var(--line-strong); color:var(--text-dim); background:var(--surface-2) }
+
+/* ---------------- materials ---------------- */
+.f-surface{ background:var(--surface); border:var(--hair) solid var(--line); border-radius:var(--r-lg) }
+
+/* Glass: fill, blur, hairline, sheen. The sheen follows the pointer when
+   facet.js sets --mx/--my; without it, it rests in the top-left corner. */
+.f-glass{ position:relative; isolation:isolate; background:var(--glass);
+  -webkit-backdrop-filter:var(--blur-2); backdrop-filter:var(--blur-2);
+  border:var(--hair) solid var(--glass-line); border-radius:var(--r-xl);
+  box-shadow:0 0 0 var(--hair) var(--glass-edge), var(--shadow-2) }
+.f-glass::before{ content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none; z-index:-1;
+  background:
+    radial-gradient(420px circle at var(--mx, 12%) var(--my, 0%), var(--glass-glint), transparent 55%),
+    linear-gradient(180deg, var(--glass-sheen), transparent 38%);
+  opacity:.9; transition:opacity var(--dur-3) var(--ease) }
+.f-glass--hi{ background:var(--glass-hi) }
+.f-glass--thin{ -webkit-backdrop-filter:var(--blur-1); backdrop-filter:var(--blur-1) }
+.f-glass--deep{ -webkit-backdrop-filter:var(--blur-3); backdrop-filter:var(--blur-3) }
+
+/* Nova: CSS-drawn, so it themes. Shards drift by a few pixels when
+   .f-nova--live is set; that is the only ambient loop in the system. */
+.f-nova{ position:relative; overflow:clip; background:var(--nova-d) }
+.f-nova::before,.f-nova::after{ content:""; position:absolute; inset:-10%; pointer-events:none; z-index:0 }
+.f-nova::before{ background:
+  linear-gradient(var(--nova-angle), transparent 0 21%, var(--nova-silver) 21% 21.2%, transparent 21.2%),
+  linear-gradient(var(--nova-angle), transparent 0 26%, var(--nova-line) 26% 26.3%, transparent 26.3%),
+  linear-gradient(var(--nova-angle), transparent 0 6%, var(--nova-shard) 6% 14%, var(--nova-shard-2) 14% 19%, transparent 19%),
+  linear-gradient(var(--nova-angle), var(--nova-a) 0%, var(--nova-b) 18%, var(--nova-c) 40%, var(--nova-d) 62%) }
+.f-nova::after{ background:
+  linear-gradient(var(--nova-angle), transparent 0 33%, var(--nova-shard-2) 33% 36%, transparent 36%),
+  linear-gradient(var(--nova-angle), transparent 0 41%, var(--nova-silver) 41% 41.12%, transparent 41.12%);
+  opacity:.8 }
+.f-nova > *{ position:relative; z-index:1 }
+/* 1.2: Nova behind a whole app. --fixed keeps it to the viewport while the
+   page scrolls; --veil lets it run out under the content in one long,
+   eased fall instead of an edge. */
+.f-nova--fixed::before,.f-nova--fixed::after{ position:fixed }
+.f-nova--veil::after{ background:
+  linear-gradient(90deg, transparent 0%,
+    color-mix(in srgb, var(--nova-d) 18%, transparent) 14%,
+    color-mix(in srgb, var(--nova-d) 42%, transparent) 26%,
+    color-mix(in srgb, var(--nova-d) 66%, transparent) 40%,
+    color-mix(in srgb, var(--nova-d) 82%, transparent) 56%,
+    color-mix(in srgb, var(--nova-d) 92%, transparent) 74%,
+    var(--nova-d) 100%),
+  linear-gradient(var(--nova-angle), transparent 0 33%, var(--nova-shard-2) 33% 36%, transparent 36%);
+  opacity:1 }
+.f-nova--mirror::before{ transform:scaleX(-1) }
+.f-nova--live::before{ animation:f-drift 18s var(--ease-io) infinite alternate }
+.f-nova--live::after{ animation:f-drift 24s var(--ease-io) infinite alternate-reverse }
+@keyframes f-drift{ to{ transform:translate3d(2.5%, -1.5%, 0) } }
+.f-nova--mirror.f-nova--live::before{ animation-name:f-drift-m }
+@keyframes f-drift-m{ from{ transform:scaleX(-1) } to{ transform:scaleX(-1) translate3d(2.5%, -1.5%, 0) } }
+
+/* ---------------- buttons ---------------- */
+.f-btn{ --_bg:var(--surface); --_fg:var(--text); --_bd:var(--line-strong);
+  appearance:none; display:inline-flex; align-items:center; justify-content:center; gap:var(--s-3);
+  height:var(--tap); padding:0 var(--s-5); border-radius:var(--r-md); border:var(--hair) solid var(--_bd);
+  background:var(--_bg); color:var(--_fg); font:600 var(--fs-text-sm)/1 var(--sans); cursor:pointer; white-space:nowrap;
+  position:relative; overflow:hidden; isolation:isolate;
+  transition:transform var(--dur-2) var(--spring), background-color var(--dur-1) var(--ease), box-shadow var(--dur-2) var(--ease), border-color var(--dur-1) var(--ease) }
+/* hover is a step of colour, not a movement: in a dense screen, things that
+   jump under the pointer read as nervous. Only the press answers with scale. */
+.f-btn:hover{ --_bg:var(--surface-2) }
+.f-btn--primary:hover{ --_bg:color-mix(in srgb, var(--ink) 86%, var(--bg)) }
+.f-btn--accent:hover{ --_bg:color-mix(in srgb, var(--acc-fill) 86%, var(--text)) }
+.f-btn:active{ transform:var(--press); transition-duration:var(--dur-1) }
+.f-btn svg{ width:16px; height:16px; flex:none }
+.f-btn--primary{ --_bg:var(--ink); --_fg:var(--on-ink); --_bd:transparent }
+.f-btn--accent{ --_bg:var(--acc-fill); --_fg:var(--on-acc); --_bd:transparent }
+.f-btn--ghost{ --_bg:transparent; --_bd:transparent }
+.f-btn--ghost:hover{ --_bg:var(--surface-2) }
+.f-btn--glass{ --_bg:var(--glass); --_bd:var(--glass-line); -webkit-backdrop-filter:var(--blur-1); backdrop-filter:var(--blur-1) }
+.f-btn--danger{ --_fg:var(--err); --_bd:var(--err-soft) }
+/* not now: visibly there, visibly out of reach */
+.f-btn:disabled,.f-btn[aria-disabled="true"]{ opacity:.45; cursor:not-allowed; pointer-events:none; box-shadow:none }
+.f-btn--sm{ height:32px; padding:0 var(--s-4); border-radius:var(--r-sm); font-size:var(--fs-chrome-md) }
+.f-btn--lg{ height:48px; padding:0 var(--s-7); border-radius:var(--r-lg); font-size:var(--fs-text-md) }
+.f-btn--icon{ width:var(--tap); padding:0 }
+.f-btn--pill{ border-radius:var(--r-pill) }
+/* the sheen sweep on primary and accent buttons */
+.f-btn--primary::after,.f-btn--accent::after{ content:""; position:absolute; inset:0; z-index:-1;
+  background:linear-gradient(105deg, transparent 30%, rgba(255,255,255,.28) 50%, transparent 70%);
+  transform:translateX(-120%); transition:transform var(--dur-4) var(--ease-out) }
+.f-btn--primary:hover::after,.f-btn--accent:hover::after{ transform:translateX(120%) }
+/* ripple, set by facet.js at the press point */
+.f-ripple{ position:absolute; border-radius:50%; pointer-events:none; background:currentColor; opacity:.18;
+  transform:translate(-50%,-50%) scale(0); animation:f-ripple var(--dur-4) var(--ease-out) forwards }
+@keyframes f-ripple{ to{ transform:translate(-50%,-50%) scale(1); opacity:0 } }
+
+/* ---------------- fields ---------------- */
+.f-field{ display:grid; gap:var(--s-2) }
+.f-field > span{ font-size:var(--fs-text-sm); font-weight:500 }
+.f-field small{ color:var(--text-dim); font-size:var(--fs-text-sm) }
+.f-input{ height:var(--tap); width:100%; padding:0 var(--s-4); border-radius:var(--r-md);
+  border:var(--hair) solid var(--line-strong); background:var(--surface); color:var(--text);
+  font:400 16px/1 var(--sans);   /* 16px: the iOS focus-zoom threshold, a behaviour, not a size */
+  transition:border-color var(--dur-1) var(--ease), box-shadow var(--dur-2) var(--ease), background-color var(--dur-1) var(--ease) }
+.f-input::placeholder{ color:var(--text-ghost) }
+.f-input:hover{ border-color:var(--text-ghost); background:var(--surface-2) }
+.f-input:focus{ outline:2px solid var(--acc); outline-offset:-1px; border-color:var(--acc) }
+.f-field.is-error .f-input{ border-color:var(--err) }
+.f-field.is-error small{ color:var(--err) }
+.f-field.is-error small::before{ content:"! "; font-weight:700 }
+/* A select is a field like the others: no native chrome, a chevron drawn
+   from the text tokens so it follows the theme (1.1). */
+select.f-input, .f-select{ appearance:none; -webkit-appearance:none; padding-right:38px; cursor:pointer;
+  background-image:linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+                   linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position:calc(100% - 19px) 52%, calc(100% - 14px) 52%;
+  background-size:5px 5px; background-repeat:no-repeat }
+.f-search{ position:relative }
+.f-search svg{ position:absolute; left:var(--s-4); top:50%; width:16px; height:16px; transform:translateY(-50%); color:var(--text-dim) }
+.f-search .f-input{ padding-left:38px; padding-right:52px }
+.f-search .f-kbd{ position:absolute; right:var(--s-3); top:50%; transform:translateY(-50%) }
+
+/* ---------------- switch, check, segmented ---------------- */
+.f-switch{ display:inline-flex; align-items:center; gap:var(--s-4); cursor:pointer; font-size:var(--fs-text-sm) }
+.f-switch input{ position:absolute; opacity:0; pointer-events:none }
+.f-switch i{ width:44px; height:26px; border-radius:var(--r-pill); background:var(--surface-3); border:var(--hair) solid var(--line);
+  position:relative; transition:background-color var(--dur-2) var(--ease); flex:none }
+.f-switch i::after{ content:""; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3);
+  transition:transform var(--dur-3) var(--spring), width var(--dur-2) var(--ease) }
+.f-switch:active i::after{ width:26px }
+.f-switch input:checked + i{ background:var(--acc-fill); border-color:transparent }
+.f-switch input:checked + i::after{ transform:translateX(18px) }
+.f-switch:active input:checked + i::after{ transform:translateX(12px) }
+.f-switch input:focus-visible + i{ outline:2px solid var(--acc); outline-offset:1px }
+
+.f-check{ display:inline-flex; align-items:center; gap:var(--s-3); cursor:pointer; font-size:var(--fs-text-sm) }
+.f-check input{ appearance:none; width:20px; height:20px; margin:0; border-radius:var(--r-xs); border:1.5px solid var(--line-strong);
+  background:var(--surface); display:grid; place-items:center; transition:background-color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease) }
+.f-check input::after{ content:""; width:10px; height:6px; border:2px solid var(--on-acc); border-top:0; border-right:0;
+  transform:translateY(-1px) rotate(-45deg) scale(0); transition:transform var(--dur-3) var(--spring) }
+.f-check input:checked{ background:var(--acc-fill); border-color:transparent }
+.f-check input:checked::after{ transform:translateY(-1px) rotate(-45deg) scale(1) }
+.f-check input:focus-visible{ outline:2px solid var(--acc); outline-offset:1px }
+
+/* the indicator slides: facet.js sets --x and --w from the checked item */
+.f-seg{ display:inline-flex; position:relative; padding:3px; border-radius:var(--r-md); background:var(--surface-3); gap:0 }
+.f-seg input{ position:absolute; opacity:0; pointer-events:none }
+.f-seg label{ position:relative; z-index:1; padding:7px 14px; font:500 var(--fs-text-sm)/1 var(--sans); color:var(--text-dim);
+  border-radius:calc(var(--r-md) - 3px); cursor:pointer; transition:color var(--dur-2) var(--ease) }
+.f-seg input:checked + label{ color:var(--text) }
+.f-seg input:focus-visible + label{ outline:2px solid var(--acc); outline-offset:1px }
+.f-seg__thumb{ position:absolute; top:3px; bottom:3px; left:0; width:var(--w, 0); transform:translateX(var(--x, 0));
+  border-radius:calc(var(--r-md) - 3px); background:var(--surface); box-shadow:var(--shadow-1);
+  transition:transform var(--dur-3) var(--spring), width var(--dur-3) var(--spring) }
+
+/* ---------------- chips, badges, status ---------------- */
+.f-chip{ display:inline-flex; align-items:center; gap:var(--s-2); height:30px; padding:0 var(--s-4); border-radius:var(--r-pill);
+  border:var(--hair) solid var(--line-strong); font:500 var(--fs-text-sm)/1 var(--sans); color:var(--text-dim); background:transparent; cursor:pointer;
+  transition:all var(--dur-2) var(--ease) }
+.f-chip:hover{ color:var(--text); border-color:var(--text-ghost) }
+.f-chip.is-on{ background:var(--acc-soft); border-color:var(--acc-line); color:var(--acc) }
+.f-badge{ display:inline-flex; align-items:center; gap:var(--s-1); height:22px; padding:0 var(--s-3); border-radius:var(--r-pill);
+  font:500 var(--fs-chrome-xs)/1 var(--mono); letter-spacing:var(--tr-chrome-xs); text-transform:uppercase; white-space:nowrap; background:var(--surface-3); color:var(--text-dim) }
+.f-badge--acc{ background:var(--acc-soft); color:var(--acc) }
+.f-badge--ok{ background:var(--ok-soft); color:var(--ok) }
+.f-badge--warn{ background:var(--warn-soft); color:var(--warn) }
+.f-badge--err{ background:var(--err-soft); color:var(--err) }
+.f-status{ display:inline-flex; align-items:center; gap:var(--s-2); white-space:nowrap; font:500 var(--fs-chrome-md)/1 var(--mono); color:var(--text-dim) }
+.f-status::before{ content:""; width:8px; height:8px; border-radius:50%; background:var(--ok); box-shadow:0 0 0 0 var(--ok);
+  animation:f-ping 2.4s var(--ease-out) infinite }
+.f-status--warn::before{ background:var(--warn); animation:none }
+.f-status--err::before{ background:var(--err); animation:none }
+@keyframes f-ping{ 0%{ box-shadow:0 0 0 0 var(--ok-soft) } 70%,100%{ box-shadow:0 0 0 8px transparent } }
+.f-count{ min-width:20px; height:20px; padding:0 6px; border-radius:var(--r-pill); background:var(--acc-fill); color:var(--on-acc);
+  font:600 var(--fs-chrome-xs)/20px var(--mono); text-align:center; animation:f-pop var(--dur-3) var(--spring) both }
+
+/* ---------------- cards & panels ---------------- */
+/* No backdrop-filter on a card (1.2.1): a card is not floating, cards sit in
+   cards, and a blur over the moving Nova inside another blur is repainted
+   every frame, which flickers. The card is translucent; the blur belongs to
+   what floats (rail, menus, dialogs, toasts). */
+.f-card{ background:var(--card);
+  border:var(--hair) solid var(--line); border-radius:var(--r-xl); padding:var(--s-5);
+  display:grid; gap:var(--s-4); align-content:start; min-width:0;
+  transition:transform var(--dur-3) var(--spring-soft), box-shadow var(--dur-3) var(--ease), border-color var(--dur-2) var(--ease) }
+/* the one lift left: a card that leads somewhere else */
+.f-card--hover:hover{ transform:translateY(-2px); box-shadow:var(--shadow-4); border-color:var(--stroke-1) }
+.f-card--flat{ background:var(--surface-2); border-color:transparent }
+.f-card__head{ display:flex; align-items:center; justify-content:space-between; gap:var(--s-4) }
+.f-kpi{ display:grid; gap:var(--s-2) }
+/* 1.3: values side by side are a strip, not a row of boxes. Cells split by
+   hairlines; a cell is a label, a value and a note, nothing around it. */
+.f-stats{ display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 130px), 1fr));
+  border-top:var(--hair) solid var(--line); border-bottom:var(--hair) solid var(--line) }
+.f-stats > *{ display:grid; gap:var(--s-1); align-content:start; padding:var(--s-4) var(--s-5) var(--s-4) 0; min-width:0 }
+.f-stats > * + *{ padding-left:var(--s-5); box-shadow:inset var(--hair) 0 0 var(--divider) }
+.f-stats .f-kpi__v{ font-size:20px }
+/* narrow: two per row, the divider between the two, a hairline between rows */
+@media (max-width: 639px){
+  .f-stats{ grid-template-columns:1fr 1fr }
+  .f-stats > *:nth-child(odd){ padding-left:0; box-shadow:none }
+  .f-stats > *:nth-child(n+3){ border-top:var(--hair) solid var(--line) }
+}
+/* 1.3: a list inside a card is rows split by hairlines, never cards in a card */
+.f-rows > * + *{ border-top:var(--hair) solid var(--divider) }
+.f-kpi__v{ font:600 22px/1 var(--sans); letter-spacing:-.03em; font-variant-numeric:tabular-nums; white-space:nowrap }
+.f-kpi__v small{ font:500 var(--fs-chrome-md) var(--mono); color:var(--text-dim); letter-spacing:0 }
+
+.f-meter{ height:6px; border-radius:var(--r-pill); background:var(--surface-3); overflow:hidden }
+.f-meter > b{ display:block; height:100%; width:var(--v, 0%); border-radius:inherit; background:var(--acc-fill);
+  transform-origin:left; animation:f-grow var(--dur-5) var(--ease-out) both }
+@keyframes f-grow{ from{ transform:scaleX(0) } }
+.f-meter--warn > b{ background:var(--warn) }
+
+/* ---------------- lists & tables ---------------- */
+.f-list{ display:grid }
+.f-row{ position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:var(--s-4); align-items:center; padding:var(--s-3) var(--s-3);
+  margin:0 calc(var(--s-3) * -1); border-radius:var(--r-md); transition:background-color var(--dur-1) var(--ease) }
+.f-row:hover{ background:var(--surface-2) }
+/* the divider is inset to the text, so it never follows the hover radius */
+/* Space first, lines second (Fluent): a short list is held together by its
+   spacing alone. .f-list--lined adds the inset divider, for a list long
+   enough that the eye loses its row. */
+.f-list--lined > .f-row + .f-row::before{ content:""; position:absolute; top:0; left:var(--s-3); right:var(--s-3); height:var(--hair); background:var(--divider);
+  transition:opacity var(--dur-1) var(--ease) }
+.f-list--lined > .f-row:hover::before, .f-list--lined > .f-row:hover + .f-row::before{ opacity:0 }
+.f-row > span{ min-width:0; line-height:var(--lh-300) }
+/* the second line of a row is reading text, not chrome */
+.f-row small{ display:block; color:var(--text-dim); font:400 var(--fs-200)/var(--lh-200) var(--sans) }
+/* a time at the start of a row: its own column, not squeezed into a tile (1.2.3) */
+.f-time{ min-width:44px; font:500 var(--fs-chrome-md)/1 var(--mono); font-variant-numeric:tabular-nums; color:var(--text-dim); letter-spacing:.02em }
+.f-row__meta{ font:400 var(--fs-200)/var(--lh-200) var(--sans); color:var(--text-dim); font-variant-numeric:tabular-nums; white-space:nowrap }
+.f-tile{ width:28px; height:28px; border-radius:var(--r-md); background:var(--surface-3); display:grid; place-items:center; color:var(--text-dim);
+  font:600 9px var(--mono); letter-spacing:.06em }
+.f-tile svg{ width:15px; height:15px }
+.f-table-wrap{ overflow-x:auto; border-radius:var(--r-lg); border:var(--hair) solid var(--line); background:var(--surface) }
+.f-table{ width:100%; border-collapse:collapse; font-size:var(--fs-text-sm) }
+.f-table th{ text-align:left; font:500 var(--fs-chrome-xs)/1 var(--mono); letter-spacing:var(--tr-chrome-xs); text-transform:uppercase; color:var(--text-dim);
+  padding:var(--s-4) var(--s-5); border-bottom:var(--hair) solid var(--line); background:var(--surface-2) }
+.f-table td{ padding:var(--s-4) var(--s-5); border-bottom:var(--hair) solid var(--line) }
+.f-table tr:last-child td{ border-bottom:0 }
+.f-table tbody tr{ transition:background-color var(--dur-1) var(--ease) }
+.f-table tbody tr:hover{ background:var(--surface-2) }
+.f-table td.f-num{ color:var(--text-dim); white-space:nowrap }
+
+/* ---------------- navigation ---------------- */
+.f-appbar{ position:sticky; top:env(safe-area-inset-top, 0px); z-index:20; display:flex; align-items:center; gap:var(--s-5);
+  height:60px; padding:0 var(--s-5); border-radius:var(--r-xl) }
+.f-nav{ display:grid; gap:var(--s-0) }
+.f-nav__item{ position:relative; display:flex; align-items:center; gap:var(--s-4); padding:9px var(--s-4); border-radius:var(--r-md);
+  color:var(--text-dim); font:500 var(--fs-text-sm)/1.2 var(--sans); cursor:pointer;
+  transition:color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease), transform var(--dur-2) var(--spring) }
+.f-nav__item svg{ width:18px; height:18px; flex:none }
+.f-nav__item:hover{ color:var(--text); background:var(--surface-2) }
+.f-nav__item.is-on{ color:var(--text); background:var(--surface-3) }
+.f-nav__item.is-on svg{ color:var(--acc) }
+.f-nav__item .f-count{ margin-left:auto }
+.f-nav__group{ padding:var(--s-5) var(--s-4) var(--s-2) }
+
+.f-tabs{ display:flex; gap:var(--s-1); position:relative; border-bottom:var(--hair) solid var(--line) }
+.f-tabs button{ appearance:none; border:0; background:none; padding:var(--s-4) var(--s-4); font:500 var(--fs-text-sm)/1 var(--sans); color:var(--text-dim); cursor:pointer;
+  border-radius:var(--r-sm) var(--r-sm) 0 0; transition:color var(--dur-1) var(--ease) }
+.f-tabs button:hover{ color:var(--text) }
+.f-tabs button[aria-selected="true"]{ color:var(--text) }
+.f-tabs__ink{ position:absolute; bottom:-1px; left:0; height:2px; width:var(--w,0); transform:translateX(var(--x,0)); background:var(--acc); border-radius:2px;
+  transition:transform var(--dur-3) var(--spring), width var(--dur-3) var(--spring) }
+
+/* ---------------- floating layers ---------------- */
+.f-menu{ min-width:220px; padding:var(--s-2); border-radius:var(--r-lg); display:grid; gap:var(--s-0);
+  transform-origin:top left; animation:f-pop var(--dur-3) var(--spring) both }
+.f-menu button{ appearance:none; border:0; background:none; text-align:left; display:flex; align-items:center; gap:var(--s-4); padding:9px var(--s-4);
+  border-radius:calc(var(--r-lg) - var(--s-2)); font:500 var(--fs-text-sm)/1 var(--sans); color:var(--text); cursor:pointer; transition:background-color var(--dur-1) var(--ease) }
+.f-menu button:hover{ background:var(--acc-soft); color:var(--acc) }
+.f-menu button .f-kbd{ margin-left:auto }
+.f-menu hr{ border:0; height:var(--hair); background:var(--line); margin:var(--s-1) var(--s-2) }
+
+.f-dialog{ border:0; padding:0; background:transparent; color:var(--text); max-width:min(440px, calc(100vw - 32px)) }
+.f-dialog::backdrop{ background:light-dark(rgba(20,20,40,.18), rgba(0,0,0,.5)); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+  animation:f-fade var(--dur-3) var(--ease) both }
+.f-dialog[open] > .f-glass{ animation:f-dialog-in var(--dur-3) var(--spring) both }
+/* A dialog taller than the screen: head and foot stay, the body scrolls
+   (1.1). Markup: .f-glass > .f-dialog__head, .f-dialog__body, .f-dialog__foot */
+.f-dialog > .f-glass{ display:flex; flex-direction:column; max-height:calc(100dvh - 48px) }
+.f-dialog__head, .f-dialog__foot{ flex:none }
+.f-dialog__body{ flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain }
+.f-dialog__foot{ display:flex; justify-content:flex-end; gap:var(--s-3); padding-top:var(--s-5); border-top:var(--hair) solid var(--line) }
+@keyframes f-dialog-in{ from{ opacity:0; transform:translateY(16px) scale(.96) } }
+
+.f-toasts{ position:fixed; z-index:50; right:calc(var(--s-5) + env(safe-area-inset-right, 0px)); bottom:calc(var(--s-5) + env(safe-area-inset-bottom, 0px));
+  display:grid; gap:var(--s-3); width:min(360px, calc(100vw - 32px)) }
+.f-toast{ display:grid; grid-template-columns:auto 1fr auto; gap:var(--s-4); align-items:center; padding:var(--s-4) var(--s-5); border-radius:var(--r-lg);
+  font-size:var(--fs-text-sm); animation:f-toast-in var(--dur-3) var(--spring) both }
+.f-toast.is-out{ animation:f-toast-out var(--dur-2) var(--ease) both }
+@keyframes f-toast-in{ from{ opacity:0; transform:translateY(20px) scale(.95) } }
+@keyframes f-toast-out{ to{ opacity:0; transform:translateX(30px) } }
+
+.f-tip{ position:relative }
+.f-tip::after{ content:attr(data-tip); position:absolute; left:50%; bottom:calc(100% + 8px); white-space:nowrap; pointer-events:none;
+  padding:6px 10px; border-radius:var(--r-sm); background:var(--ink); color:var(--on-ink); font:500 var(--fs-chrome-sm)/1 var(--mono);
+  opacity:0; transform:translate(-50%, 4px) scale(.96); transition:opacity var(--dur-1) var(--ease), transform var(--dur-2) var(--spring) }
+.f-tip:hover::after,.f-tip:focus-visible::after{ opacity:1; transform:translate(-50%, 0) scale(1) }
+
+/* ---------------- values that can outgrow their line (1.1) ---------------- */
+/* a path: cut at the start, so the end (the file) stays readable */
+.f-path{ display:block; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+  direction:rtl; text-align:left; font:400 var(--fs-chrome-md)/1.5 var(--mono); color:var(--text-dim) }
+.f-path::before{ content:"\200E" }     /* keeps a leading "/" where it belongs */
+/* the meta line under a title: one line, never pushes the actions away */
+.f-meta{ display:block; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis }
+
+/* ---------------- media (1.1) ---------------- */
+/* a picture in a grid: rounded like every box of its size, a quiet ground
+   while it loads, and a lift on hover like any card */
+.f-media{ position:relative; display:block; overflow:hidden; border-radius:var(--r-md); background:var(--surface-3);
+  transition:transform var(--dur-3) var(--spring-soft), box-shadow var(--dur-3) var(--ease) }
+.f-media img{ width:100%; height:100%; object-fit:cover; display:block }
+.f-media:hover{ outline:2px solid var(--stroke-1); outline-offset:-2px }
+
+/* ---------------- avatars, skeleton ---------------- */
+.f-avatars{ display:flex }
+.f-avatar{ width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font:600 10px var(--mono); color:var(--on-ink);
+  background:var(--ink); box-shadow:0 0 0 2px var(--surface); transition:transform var(--dur-2) var(--spring) }
+.f-avatars .f-avatar + .f-avatar{ margin-left:-8px }
+.f-avatars:hover .f-avatar{ transform:translateX(calc(var(--i, 0) * 4px)) }
+.f-skeleton{ border-radius:var(--r-sm); background:linear-gradient(90deg, var(--surface-3) 30%, var(--surface-2) 50%, var(--surface-3) 70%) 0 0/300% 100%;
+  animation:f-shimmer 1.6s linear infinite }
+@keyframes f-shimmer{ to{ background-position:-100% 0 } }
+
+/* ---------------- the mark ---------------- */
+/* The Lucent prism, as markup: four paths, top / right / bottom / left,
+   the gaps already cut (FACET.md has the geometry). Facets fly in from
+   their own side and settle (data-anim="assemble"); on hover they part. */
+.f-mark{ --f1:light-dark(#2b2b34, #f2f2f4); --f2:light-dark(#121216, #ffffff); --f3:light-dark(#8b8b94, #8b8b94); --f4:light-dark(#5b5b66, #c6c8d7);
+  display:block; overflow:visible; aspect-ratio:100 / 108 }
+.f-mark--mono{ --f1:currentColor; --f2:currentColor; --f3:currentColor; --f4:currentColor }
+.f-mark--brand{ --f1:#5865f2; --f2:#5865f2; --f3:#5865f2; --f4:#5865f2 }
+.f-mark path{ transform-box:view-box; transform-origin:50px 54px; transition:transform var(--dur-3) var(--spring) }
+.f-mark--split:hover path:nth-child(1){ transform:translate(1px,-3px) }
+.f-mark--split:hover path:nth-child(2){ transform:translate(3px,1px) }
+.f-mark--split:hover path:nth-child(3){ transform:translate(-1px,3px) }
+.f-mark--split:hover path:nth-child(4){ transform:translate(-3px,-1px) }
+[data-anim="assemble"] path{ animation:f-facet var(--dur-5) var(--spring) both }
+[data-anim="assemble"] path:nth-child(1){ --fx:8px;   --fy:-40px; animation-delay:0ms }
+[data-anim="assemble"] path:nth-child(2){ --fx:40px;  --fy:8px;   animation-delay:90ms }
+[data-anim="assemble"] path:nth-child(3){ --fx:-8px;  --fy:40px;  animation-delay:180ms }
+[data-anim="assemble"] path:nth-child(4){ --fx:-40px; --fy:-8px;  animation-delay:270ms }
+@keyframes f-facet{ from{ transform:translate(var(--fx), var(--fy)) rotate(-8deg) scale(.6); opacity:0 } 40%{ opacity:1 } }
+
+/* ---------------- entrances ---------------- */
+@keyframes f-fade{ from{ opacity:0 } }
+@keyframes f-pop{ from{ opacity:0; transform:scale(.9) } }
+@keyframes f-rise{ from{ opacity:0; transform:translateY(18px); filter:blur(6px) } }
+/* On load: children of [data-stagger] rise in sequence. facet.js writes --i. */
+[data-stagger] > *{ animation:f-rise var(--dur-4) var(--ease-out) backwards; animation-delay:calc(var(--i, 0) * var(--stagger)) }
+/* On scroll: never hidden at rest, only lifted and slightly dimmed. */
+@supports (animation-timeline: view()){
+  [data-reveal]{ animation:f-reveal linear both; animation-timeline:view(); animation-range:entry 0% entry 60% }
+  @keyframes f-reveal{ from{ opacity:.55; transform:translateY(28px) scale(.985) } }
+}
+@media (prefers-reduced-motion: reduce){ [data-reveal]{ animation:none } }
+
+/* the theme change: a circle opening from the toggle (facet.js) */
+::view-transition-old(root),::view-transition-new(root){ animation:none; mix-blend-mode:normal }
+
+/* Definition metrics (1.3.1): label, value and note read as one unit. Values
+   sit on one axis close to their labels, also on wide cards; a note is plain
+   reading text under its value. Use .f-metrics when a value needs words around
+   it, .f-stats for three to five numbers read at a glance. */
+.f-metrics{ margin:0; display:grid }
+.f-metric{ display:grid; grid-template-columns:minmax(8ch, 14ch) minmax(0,1fr); gap:0 var(--s-5); padding:var(--s-2) 0 }
+.f-metrics--lined > .f-metric{ padding:var(--s-3) 0 }
+.f-metrics--lined > .f-metric + .f-metric{ border-top:var(--hair) solid var(--divider) }
+.f-metric dt{ display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2); color:var(--text-dim); font:400 var(--fs-300)/var(--lh-300) var(--sans) }
+.f-metric dd{ margin:0 }
+.f-metric__value{ font:600 var(--fs-300)/var(--lh-300) var(--sans); font-variant-numeric:tabular-nums; overflow-wrap:anywhere }
+.f-metric__value small{ font-size:var(--fs-200); font-weight:400; color:var(--text-dim) }
+/* a fact, not a figure: same row, reading weight */
+.f-metric__value--plain{ font-weight:400 }
+.f-metric__note{ grid-column:2; color:var(--text-dim); font:400 var(--fs-200)/var(--lh-200) var(--sans); overflow-wrap:anywhere }
+@media (max-width: 479px){
+  .f-metric{ grid-template-columns:minmax(0,1fr) auto }
+  .f-metric__value{ text-align:right }
+  .f-metric__note{ grid-column:1 / -1 }
+}
+
+/* Optional subtle blur for a card directly above a background. */
+.f-card--blur{ -webkit-backdrop-filter:var(--blur-2); backdrop-filter:var(--blur-2) }
+.f-card--blur .f-card--blur{ -webkit-backdrop-filter:none; backdrop-filter:none }
+
+/* ---------------- layout (Fluent's size classes and grid) ----------------
+   Size classes, the same in every tool. A media query cannot read a custom
+   property, so these are written out; use these numbers and no others:
+     small    up to 479      one column, stacked
+     medium   480-639        one column, two for small things
+     large    640-1023       the rail folds away below 1024
+     x-large  1024-1365      rail + content
+     xx-large 1366-1919      rail + content + a side column
+     xxx-large 1920 and up   content stops growing at --page-max
+   How a layout changes between them: reposition, resize, reflow, show/hide,
+   and re-architect (list beside detail on wide screens, detail on demand on
+   narrow ones). */
+.f-grid{ display:grid; grid-template-columns:repeat(12, minmax(0,1fr)); gap:var(--s-5); align-items:start }
+.f-grid > *{ grid-column:span 12; min-width:0 }
+.f-col-3{ grid-column:span 3 } .f-col-4{ grid-column:span 4 } .f-col-6{ grid-column:span 6 }
+.f-col-8{ grid-column:span 8 } .f-col-9{ grid-column:span 9 }
+@media (max-width: 1365px){ .f-col-3{ grid-column:span 6 } .f-col-4{ grid-column:span 6 } .f-col-8,.f-col-9{ grid-column:span 12 } }
+@media (max-width: 1023px){ .f-col-6{ grid-column:span 12 } }
+@media (max-width: 639px){ .f-grid > *{ grid-column:span 12 } }
+
+/* The app frame: a rail docked to the edge of the window (no radius: what
+   reaches the edge of the screen is square), and the content beside it. */
+.f-app{ display:grid; grid-template-columns:var(--rail-w, 240px) minmax(0,1fr); min-height:100dvh; background:var(--bg) }
+.f-rail{ position:sticky; top:0; height:100dvh; display:flex; flex-direction:column; gap:var(--s-1); min-width:0;
+  padding:var(--s-4) var(--s-3); background:var(--bg-frame); border-right:var(--hair) solid var(--stroke-2) }
+.f-rail > .f-nav{ min-height:0; overflow-y:auto; overscroll-behavior:contain }
+.f-content{ min-width:0; width:100%; max-width:var(--page-max); padding:var(--s-6) var(--s-7) var(--s-9) }
+@media (max-width: 1023px){
+  .f-app{ grid-template-columns:1fr }
+  .f-rail{ position:static; height:auto; border-right:0; border-bottom:var(--hair) solid var(--stroke-2) }
+  .f-content{ padding:var(--s-5) var(--page-pad) var(--s-9) }
+}
+/* A group is held together by tight spacing and set apart by loose spacing. */
+.f-group{ display:grid; gap:var(--s-3) }
+.f-section{ display:grid; gap:var(--s-4) }
+.f-sections{ display:grid; gap:var(--s-8) }
+
+/* ---------------- 1.4.1: identity on the frame, order in the card ----------------
+   The console carries Nova again, but only on the frame: behind the rail and in
+   the gaps between cards. Cards stay opaque, so nothing a person reads sits on
+   the light. Nova is static there (no --live): the rail's blur then has nothing
+   moving under it and cannot flicker. */
+.f-app.f-nova{ background:var(--nova-d) }
+/* behind a console the veil falls slower: the light reaches the gaps between
+   the cards instead of ending at the rail */
+.f-app.f-nova--veil::after{ background:
+  linear-gradient(90deg, transparent 0%,
+    color-mix(in srgb, var(--nova-d) 10%, transparent) 20%,
+    color-mix(in srgb, var(--nova-d) 30%, transparent) 40%,
+    color-mix(in srgb, var(--nova-d) 52%, transparent) 62%,
+    color-mix(in srgb, var(--nova-d) 70%, transparent) 84%,
+    color-mix(in srgb, var(--nova-d) 78%, transparent) 100%),
+  linear-gradient(var(--nova-angle), transparent 0 33%, var(--nova-shard-2) 33% 36%, transparent 36%) }
+/* the floating rail: glass, set off the window's edge by one gap, rounded as
+   what floats. Markup: .f-app.f-nova.f-nova--fixed.f-nova--veil > .f-rail.f-rail--float */
+.f-rail--float{ top:var(--s-3); height:calc(100dvh - 2 * var(--s-3)); margin:var(--s-3) 0 var(--s-3) var(--s-3);
+  background:var(--glass-hi); -webkit-backdrop-filter:var(--blur-2); backdrop-filter:var(--blur-2);
+  border:var(--hair) solid var(--glass-line); border-radius:var(--r-overlay);
+  box-shadow:0 0 0 var(--hair) var(--glass-edge), var(--shadow-8) }
+@media (max-width: 1023px){
+  .f-rail--float{ height:auto; margin:var(--s-3) var(--s-3) 0; border:var(--hair) solid var(--glass-line) }
+}
+/* a page title with Nova's silver in it: one per page, never body text */
+.f-sheen{ background:linear-gradient(100deg, var(--text) 0 45%, color-mix(in srgb, var(--acc) 70%, var(--text)) 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent }
+@media (forced-colors: active){ .f-shell.f-nova .f-main__title{ background:none; color:CanvasText } }
+@media (forced-colors: active){ .f-sheen{ background:none; color:CanvasText } }
+
+/* A card has fixed zones; nothing floats in its middle.
+     .f-card__head   name and state, top
+     a band          edge to edge: .f-metrics--grid
+     .f-card__foot   edge to edge, at the bottom however tall the card is:
+                     what is known on the left, what to do on the right */
+.f-card:has(> .f-card__foot, > form > .f-card__foot){ display:flex; flex-direction:column }
+.f-card:has(> .f-card__foot, > form > .f-card__foot, > .f-metrics--grid){ overflow:clip }
+/* a form inside the card that ends in the foot: its fields join the card's flow */
+.f-card > form:has(> .f-card__foot){ display:contents }
+.f-card__foot{ margin:auto calc(-1 * var(--s-5)) calc(-1 * var(--s-5)); padding:var(--s-3) var(--s-5);
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--s-2) var(--s-4);
+  background:var(--surface-2); border-top:var(--hair) solid var(--stroke-3);
+  color:var(--text-dim); font:400 var(--fs-200)/var(--lh-200) var(--sans) }
+.f-card__foot > :first-child:not(:last-child){ flex:1 1 14ch; min-width:0 }
+.f-card__foot > :last-child:not(:first-child){ flex:none; margin-left:auto }
+.f-card__actions{ display:flex; align-items:center; flex-wrap:wrap; gap:var(--s-2) }
+/* values as a grid band: cells fill the card's width and are split by
+   hairlines; a cell is a label, a value and a note. Inside lines only (each
+   cell draws its top and left line, the band clips the outer ones). */
+.f-metrics--grid{ grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); overflow:clip;
+  margin-inline:calc(-1 * var(--s-5)); border-block:var(--hair) solid var(--divider) }
+.f-metrics--grid > .f-metric{ display:flex; flex-direction:column; gap:2px; padding:var(--s-3) var(--s-5);
+  margin:calc(-1 * var(--hair)) 0 0 calc(-1 * var(--hair));
+  border-top:var(--hair) solid var(--divider); border-left:var(--hair) solid var(--divider) }
+.f-metrics--grid .f-metric dt{ font-size:var(--fs-200); line-height:var(--lh-200) }
+.f-metrics--grid .f-metric__value{ font-size:var(--fs-500); line-height:var(--lh-500); text-align:left }
+.f-metrics--grid .f-metric__value--plain{ font-size:var(--fs-300); line-height:var(--lh-300) }
+/* a band that opens or closes the card takes the card's edge */
+.f-card > .f-metrics--grid:first-child{ margin-top:calc(-1 * var(--s-5)); border-top:0 }
+.f-card > .f-metrics--grid:last-child{ margin-bottom:calc(-1 * var(--s-5)); border-bottom:0 }
+
+/* ======================= 1.5: the console =======================
+   A console is a tool for watching and changing many things at once. Its
+   frame stays out of the way: a top bar (where am I, which app), a narrow
+   rail of icons (which part of it), and flat panels on the ground. Panels
+   are told apart by a hairline and a gap, never by a shadow or a tint.
+   Titles are written as words ("Zustand aller Tools"), not as labels.
+   Nova is the door's; the console's identity is the mark, the accent and
+   the order of its panels.
+
+     .f-shell > .f-topbar, .f-irail, .f-main
+*/
+:root{
+  --topbar-h: 48px;
+  --irail-w:  56px;
+  --down:     light-dark(#2f63d8, #6ea0ff);   /* what comes in */
+  --up:       light-dark(#7a3fe0, #b48cff);   /* what goes out */
+}
+.f-shell{ display:grid; grid-template-columns:var(--irail-w) minmax(0,1fr); grid-template-rows:var(--topbar-h) minmax(0,1fr);
+  min-height:100dvh; background:var(--bg) }
+
+/* the top bar: the product on the left, its apps as tabs, the person on the right */
+.f-topbar{ grid-column:1 / -1; position:sticky; top:0; z-index:30; display:flex; align-items:stretch; min-width:0;
+  background:var(--card); border-bottom:var(--hair) solid var(--stroke-2) }
+.f-topbar__brand{ flex:none; display:flex; align-items:center; gap:var(--s-3); padding:0 var(--s-5) 0 18px; color:var(--text);
+  font:600 var(--fs-200)/1 var(--sans); letter-spacing:.24em; border-right:var(--hair) solid var(--stroke-3) }
+.f-topbar__brand .f-mark{ width:20px }
+.f-topbar__tabs{ display:flex; align-items:stretch; min-width:0; overflow-x:auto; scrollbar-width:none }
+.f-topbar__tabs::-webkit-scrollbar{ display:none }
+.f-apptab{ position:relative; flex:none; display:flex; align-items:center; gap:var(--s-3); padding:0 var(--s-5);
+  color:var(--text-dim); font:500 var(--fs-300)/1 var(--sans); white-space:nowrap; transition:color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease) }
+.f-apptab svg{ width:16px; height:16px; flex:none }
+.f-apptab:hover{ color:var(--text); background:var(--surface-2) }
+.f-apptab.is-on{ color:var(--acc); background:var(--bg) }
+.f-apptab.is-on::after{ content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--acc) }
+.f-apptab__dot{ width:6px; height:6px; border-radius:50%; background:var(--ok) }
+.f-apptab__dot[data-state="warn"]{ background:var(--warn) } .f-apptab__dot[data-state="err"],.f-apptab__dot[data-state="down"]{ background:var(--err) }
+.f-topbar__end{ margin-left:auto; flex:none; display:flex; align-items:center; gap:var(--s-2); padding:0 var(--s-4) }
+.f-iconbtn{ width:32px; height:32px; display:grid; place-items:center; border:0; border-radius:50%; background:none; color:var(--text-dim); cursor:pointer;
+  transition:color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease) }
+.f-iconbtn svg{ width:18px; height:18px }
+.f-iconbtn:hover{ color:var(--text); background:var(--surface-2) }
+.f-avatar{ width:30px; height:30px; display:grid; place-items:center; border-radius:50%; background:var(--acc-soft); color:var(--acc);
+  font:600 var(--fs-200)/1 var(--sans); flex:none }
+a.f-avatar:hover{ box-shadow:0 0 0 2px var(--acc-line) }
+
+/* the icon rail: one icon per part, the name as a tip */
+.f-irail{ position:sticky; top:var(--topbar-h); height:calc(100dvh - var(--topbar-h)); display:flex; flex-direction:column; align-items:center;
+  gap:2px; padding:var(--s-3) 0; background:var(--card); border-right:var(--hair) solid var(--stroke-2); z-index:20 }
+.f-irail__item{ position:relative; width:40px; height:40px; flex:none; display:grid; place-items:center; border-radius:var(--r-inner); color:var(--text-dim);
+  transition:color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease) }
+.f-irail__item svg{ width:20px; height:20px }
+.f-irail__item:hover{ color:var(--text); background:var(--surface-2) }
+.f-irail__item.is-on{ color:var(--acc); background:var(--acc-soft) }
+.f-irail__sep{ width:24px; height:var(--hair); margin:var(--s-2) 0; background:var(--stroke-2); flex:none }
+.f-irail__foot{ margin-top:auto; display:flex; flex-direction:column; align-items:center; gap:2px }
+[data-tip]::after{ content:attr(data-tip); position:absolute; left:calc(100% + 10px); top:50%; transform:translate(-4px,-50%); opacity:0; pointer-events:none;
+  padding:6px 10px; border-radius:var(--r-control); background:var(--ink); color:var(--on-ink); white-space:nowrap;
+  font:500 var(--fs-200)/1 var(--sans); box-shadow:var(--shadow-8); transition:opacity var(--dur-1) var(--ease), transform var(--dur-2) var(--ease-out); z-index:40 }
+[data-tip]:hover::after,[data-tip]:focus-visible::after{ opacity:1; transform:translate(0,-50%) }
+
+.f-main{ min-width:0; display:grid; gap:var(--s-4); align-content:start; padding:var(--s-5) var(--s-6) var(--s-8) }
+.f-main__head{ display:flex; align-items:center; gap:var(--s-4); min-height:32px; flex-wrap:wrap }
+.f-main__title{ font:600 var(--fs-500)/var(--lh-500) var(--sans) }
+.f-main__head > :last-child:not(:first-child):not(.f-panel__meta){ margin-left:auto }
+
+/* a panel: a region with a title row. No shadow, no tint. */
+.f-panel{ min-width:0; display:grid; gap:var(--s-4); align-content:start; padding:var(--s-4) var(--s-5) var(--s-5);
+  background:var(--card); border:var(--hair) solid var(--stroke-2); border-radius:var(--r-card) }
+.f-panel__head{ display:flex; align-items:center; gap:var(--s-3) var(--s-4); min-height:28px; flex-wrap:wrap; min-width:0 }
+.f-panel__title{ font:500 var(--fs-400)/var(--lh-400) var(--sans); color:var(--text) }
+.f-panel__meta{ color:var(--text-dim); font:400 var(--fs-200)/var(--lh-200) var(--sans); font-variant-numeric:tabular-nums }
+.f-panel__tools{ margin-left:auto; display:flex; align-items:center; gap:var(--s-3) }
+.f-panel__more{ width:28px; height:28px; display:grid; place-items:center; border-radius:50%; color:var(--text-dim); margin-left:auto }
+.f-panel__tools + .f-panel__more{ margin-left:0 }
+.f-panel__more:hover{ color:var(--text); background:var(--surface-2) }
+.f-panel__more svg{ width:14px; height:14px }
+.f-panel > .f-metrics--grid{ margin-inline:calc(-1 * var(--s-5)) }
+.f-panel > .f-metrics--grid:last-child{ margin-bottom:calc(-1 * var(--s-5)); border-bottom:0 }
+.f-panel:has(> .f-metrics--grid, > .f-card__foot){ overflow:clip }
+.f-panel:has(> .f-card__foot, > form > .f-card__foot){ display:flex; flex-direction:column }
+.f-panel > form:has(> .f-card__foot){ display:contents }
+.f-panel > .f-card__foot{ margin:auto calc(-1 * var(--s-5)) calc(-1 * var(--s-5)) }
+
+/* small time and filter pills, one of them on */
+.f-pills{ display:inline-flex; align-items:center; gap:2px }
+.f-pills > *{ height:26px; display:inline-flex; align-items:center; padding:0 10px; border-radius:var(--r-pill); color:var(--text-dim);
+  font:500 var(--fs-200)/1 var(--sans); transition:color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease) }
+.f-pills > *:hover{ color:var(--text); background:var(--surface-2) }
+.f-pills > .is-on{ color:var(--on-acc); background:var(--acc-fill) }
+
+/* key and value, the value on the right: a summary column's lines */
+.f-kv{ margin:0; display:grid }
+.f-kv > div{ display:flex; align-items:baseline; justify-content:space-between; gap:var(--s-4); padding:var(--s-2) 0; min-width:0 }
+.f-kv > div + div{ border-top:var(--hair) solid var(--stroke-3) }
+.f-kv dt{ color:var(--text) }
+.f-kv dd{ margin:0; color:var(--text-dim); text-align:right; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; min-width:0 }
+
+/* tiles: things as icons with their name under them, in groups side by side */
+.f-tilegroups{ display:flex; flex-wrap:wrap; gap:var(--s-4) 0 }
+.f-tilegroup{ display:grid; gap:var(--s-3); align-content:start; padding:0 var(--s-5); min-width:0 }
+.f-tilegroup:first-child{ padding-left:0 }
+.f-tilegroup + .f-tilegroup{ border-left:var(--hair) solid var(--stroke-3) }
+.f-tilegroup > span{ color:var(--text-dim); font:400 var(--fs-200)/var(--lh-200) var(--sans) }
+.f-tiles{ display:flex; flex-wrap:wrap; gap:var(--s-2) var(--s-1) }
+.f-tilebtn{ width:68px; display:grid; justify-items:center; gap:6px; color:var(--text-dim); font:400 var(--fs-100)/var(--lh-100) var(--sans); text-align:center }
+.f-tilebtn > span:last-child{ max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.f-tilebtn__icon{ position:relative; width:40px; height:40px; display:grid; place-items:center; border-radius:var(--r-inner);
+  border:var(--hair) solid var(--stroke-2); background:var(--surface); color:var(--text); transition:border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease) }
+.f-tilebtn__icon svg{ width:18px; height:18px }
+a.f-tilebtn:hover{ color:var(--text) }
+a.f-tilebtn:hover .f-tilebtn__icon{ border-color:var(--acc); color:var(--acc) }
+.f-tilebtn__icon[data-state]::after{ content:""; position:absolute; right:-3px; top:-3px; width:9px; height:9px; border-radius:50%;
+  background:var(--ok); box-shadow:0 0 0 2px var(--card) }
+.f-tilebtn__icon[data-state="warn"]::after{ background:var(--warn) }
+.f-tilebtn__icon[data-state="err"]::after,.f-tilebtn__icon[data-state="down"]::after{ background:var(--err) }
+.f-tilebtn__icon[data-state="none"]::after{ background:var(--stroke-1) }
+
+/* a health strip: one segment per time slot, coloured by what was seen */
+.f-health{ display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:2px; height:6px }
+.f-health > i{ border-radius:1px; background:var(--surface-3) }
+.f-health > i[data-s="ok"]{ background:var(--ok) }
+.f-health > i[data-s="warn"]{ background:var(--warn) }
+.f-health > i[data-s="err"],.f-health > i[data-s="down"]{ background:var(--err) }
+.f-axis{ display:flex; justify-content:space-between; color:var(--text-ghost); font:400 var(--fs-100)/var(--lh-100) var(--sans); font-variant-numeric:tabular-nums }
+
+/* a chart drawn as inline SVG by the server: grid, area, lines */
+.f-chart{ display:block; width:100%; height:180px; overflow:visible }
+.f-chart__grid{ stroke:var(--stroke-3); stroke-width:1; vector-effect:non-scaling-stroke }
+.f-chart__line{ fill:none; stroke:var(--acc); stroke-width:1.5; stroke-linejoin:round; vector-effect:non-scaling-stroke }
+.f-chart__line--2{ stroke:var(--up) }
+.f-chart__line--3{ stroke:var(--ok) }
+/* series colours, in this order, for lines and their legend */
+.f-s1{ --_c:var(--acc) } .f-s2{ --_c:var(--up) } .f-s3{ --_c:var(--ok) } .f-s4{ --_c:var(--warn) } .f-s5{ --_c:var(--down) }
+.f-chart__line[class*="f-s"]{ stroke:var(--_c) }
+.f-chart__area{ fill:var(--acc-soft); stroke:none }
+.f-chart__wrap{ display:grid; grid-template-columns:auto minmax(0,1fr); gap:var(--s-2) var(--s-3); align-items:stretch }
+.f-chart__ticks{ display:flex; flex-direction:column; justify-content:space-between; color:var(--text-ghost); font:400 var(--fs-100)/1 var(--sans); text-align:right; font-variant-numeric:tabular-nums }
+.f-chart__wrap > .f-axis{ grid-column:2 }
+.f-legend{ display:flex; flex-wrap:wrap; gap:var(--s-2) var(--s-4); color:var(--text-dim); font:400 var(--fs-200)/var(--lh-200) var(--sans) }
+.f-legend > span{ display:inline-flex; align-items:center; gap:6px }
+.f-legend > span::before{ content:""; width:10px; height:2px; border-radius:1px; background:var(--_c, var(--acc)) }
+
+.f-num--down{ color:var(--down) } .f-num--up{ color:var(--up) }
+.f-num--ok{ color:var(--ok) } .f-num--warn{ color:var(--warn) } .f-num--err{ color:var(--err) }
+
+/* a feed: who did what, the date under it */
+.f-feed{ display:grid }
+.f-feed > *{ display:grid; gap:2px; padding:var(--s-3) 0; min-width:0; overflow-wrap:anywhere }
+.f-feed > * + *{ border-top:var(--hair) solid var(--stroke-3) }
+.f-feed b{ font-weight:500; color:var(--acc) }
+.f-feed time,.f-feed small{ color:var(--text-dim); font:400 var(--fs-200)/var(--lh-200) var(--sans) }
+
+/* summary column beside the work */
+.f-split{ display:grid; grid-template-columns:300px minmax(0,1fr); gap:var(--s-4); align-items:start }
+.f-split > *{ min-width:0; display:grid; gap:var(--s-4); align-content:start }
+
+@media (max-width: 1365px){ .f-split{ grid-template-columns:260px minmax(0,1fr) } }
+@media (max-width: 1023px){
+  .f-shell{ grid-template-columns:minmax(0,1fr); grid-template-rows:var(--topbar-h) auto minmax(0,1fr) }
+  .f-irail{ position:sticky; top:var(--topbar-h); height:auto; flex-direction:row; justify-content:flex-start; overflow-x:auto; scrollbar-width:none;
+    padding:var(--s-1) var(--s-3); border-right:0; border-bottom:var(--hair) solid var(--stroke-2) }
+  .f-irail__sep{ width:var(--hair); height:24px; margin:0 var(--s-2) }
+  .f-irail__foot{ margin:0 0 0 auto; flex-direction:row }
+  [data-tip]::after{ display:none }
+  .f-split{ grid-template-columns:minmax(0,1fr) }
+  .f-split > aside{ order:2 }   /* the summary follows the work on a narrow screen */
+  .f-topbar__brand span{ display:none }
+}
+@media (max-width: 639px){
+  .f-main{ padding:var(--s-4) var(--page-pad) var(--s-8) }
+  .f-tilegroup{ padding:0 }
+  .f-tilegroup + .f-tilegroup{ border-left:0; border-top:var(--hair) solid var(--stroke-3); padding-top:var(--s-4) }
+  .f-tilegroups{ flex-direction:column }
+}
+
+/* ---------------- 1.5.1: the console on Nova ----------------
+   The wallpaper is back behind the console: static (no --live), fixed to the
+   window, veiled towards the right. Top bar and icon rail are glass over it;
+   nothing moves under them, so the blur cannot flicker. Panels stay opaque:
+   Nova shows in the gaps and through the frame, never under text.
+     .f-shell.f-nova.f-nova--fixed.f-nova--veil */
+.f-shell.f-nova{ background:var(--nova-d) }
+.f-shell.f-nova--veil::after{ background:
+  linear-gradient(90deg, transparent 0%,
+    color-mix(in srgb, var(--nova-d) 10%, transparent) 20%,
+    color-mix(in srgb, var(--nova-d) 30%, transparent) 40%,
+    color-mix(in srgb, var(--nova-d) 52%, transparent) 62%,
+    color-mix(in srgb, var(--nova-d) 70%, transparent) 84%,
+    color-mix(in srgb, var(--nova-d) 78%, transparent) 100%),
+  linear-gradient(var(--nova-angle), transparent 0 33%, var(--nova-shard-2) 33% 36%, transparent 36%) }
+.f-shell.f-nova > .f-topbar,.f-shell.f-nova > .f-irail{ background:var(--glass-hi);
+  -webkit-backdrop-filter:var(--blur-2); backdrop-filter:var(--blur-2); border-color:var(--glass-line) }
+.f-shell.f-nova .f-apptab.is-on{ background:color-mix(in srgb, var(--card) 70%, transparent) }
+.f-shell.f-nova .f-topbar__brand{ border-color:var(--glass-line) }
+/* a title that sits on Nova directly gets the sheen and a quiet meta */
+.f-shell.f-nova .f-main__title,.f-shell.f-nova .top .f-main__title{ background:linear-gradient(100deg, var(--text) 0 45%, color-mix(in srgb, var(--acc) 70%, var(--text)) 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent }
+@media (forced-colors: active){ .f-shell.f-nova .f-main__title{ background:none; color:CanvasText } }
+
+/* ---------------- 1.5.2: marks, and titles that read on Nova ----------------
+   A thing that brings its own mark shows it: the tile holds the logo edge to
+   edge, the top bar's tab shows it small with the state dot on its corner. */
+.f-tile--logo{ padding:0; background:none; overflow:hidden }
+.f-tile--logo img{ width:100%; height:100%; display:block; border-radius:inherit }
+.f-apptab__logo{ position:relative; width:18px; height:18px; flex:none }
+.f-apptab__logo img{ width:100%; height:100%; display:block; border-radius:4px }
+.f-apptab__logo .f-apptab__dot{ position:absolute; right:-3px; bottom:-3px; width:7px; height:7px; box-shadow:0 0 0 2px var(--card) }
+/* Text that lies on Nova itself (page titles and their lines, outside any
+   panel) is solid, a step stronger, and lifted by a soft shadow in the
+   ground's colour. No gradients there: violet on violet does not read. */
+.f-shell.f-nova .f-main__title,.f-shell.f-nova .top .f-main__title{ background:none; -webkit-background-clip:border-box; background-clip:border-box; color:var(--text) }
+/* 1.5.3: no glow. One line of meta under a title on Nova, in --text. */
+.f-shell.f-nova .f-main > .f-main__head .f-panel__meta,.f-shell.f-nova .f-main > .top .f-panel__meta{ color:var(--text) }
+
+/* ---------------- 1.5.3: a rail you may widen, big screens, faces ----------------
+   The icon rail stays narrow unless a person widens it; then every icon has
+   its name beside it and the groups their titles. The choice is theirs and is
+   kept (Lucent: a cookie, so the page arrives already right).
+     .f-shell.f-shell--wide */
+.f-irail__label,.f-irail__group{ display:none }
+.f-shell--wide{ --irail-w:224px }
+.f-shell--wide .f-irail{ align-items:stretch; padding:var(--s-3) var(--s-3) }
+.f-shell--wide .f-irail__item{ width:auto; justify-content:flex-start; gap:var(--s-3); padding:0 var(--s-3); grid-auto-flow:column; display:flex; align-items:center }
+.f-shell--wide .f-irail__label{ display:block; font:500 var(--fs-300)/1 var(--sans); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0 }
+.f-shell--wide .f-irail__group{ display:block; padding:var(--s-4) var(--s-3) var(--s-1); color:var(--text-dim); font:500 var(--fs-200)/var(--lh-200) var(--sans);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.f-shell--wide .f-irail__sep{ display:none }
+.f-shell--wide .f-irail__foot{ align-items:stretch }
+.f-shell--wide [data-tip]::after{ display:none }
+.f-irail__toggle svg{ transition:transform var(--dur-2) var(--ease-out) }
+.f-shell--wide .f-irail__toggle svg{ transform:scaleX(-1) }
+@media (max-width: 1023px){
+  .f-shell--wide .f-irail{ padding:var(--s-1) var(--s-3) }
+  .f-shell--wide .f-irail__label,.f-shell--wide .f-irail__group{ display:none }
+  .f-shell--wide .f-irail__item{ width:40px; justify-content:center; padding:0 }
+  .f-irail__toggle{ display:none }
+}
+
+/* big screens: the work gets room, the summary a little more */
+@media (min-width: 1920px){
+  .f-main{ padding:var(--s-6) var(--s-8) var(--s-9) }
+  .f-split{ grid-template-columns:360px minmax(0,1fr); gap:var(--s-5) }
+  .f-main,.f-split > *{ gap:var(--s-5) }
+}
+
+/* a face: a picture when there is one, the initial when there is not */
+.f-avatar{ overflow:hidden }
+.f-avatar img{ width:100%; height:100%; object-fit:cover; display:block }
+.f-avatar--sm{ width:24px; height:24px; font-size:var(--fs-100) }
+.f-avatar--lg{ width:72px; height:72px; font-size:var(--fs-600) }
+
+/* ---------------- 1.6: the accent tints Nova ----------------
+   One hue drives the accent, Nova's light and shards, and the focus ring.
+   Set data-tint on <html> to a named hue, or set --tint-h (an oklch hue in
+   degrees) for any other; without either, Facet keeps its own violet exactly.
+   Lightness and chroma stay Facet's, so contrast holds whatever the hue:
+   the accent is 0.52 L on the light ground, 0.68 L on the dark one.
+   The mark is identity and does not take the tint. */
+:root[data-tint]{
+  --tint-h: 277;
+  --acc:        light-dark(oklch(.52 .20 var(--tint-h)), oklch(.68 .16 var(--tint-h)));
+  --acc-fill:   light-dark(oklch(.52 .20 var(--tint-h)), oklch(.58 .19 var(--tint-h)));
+  --acc-soft:   light-dark(oklch(.52 .20 var(--tint-h) / .09), oklch(.68 .16 var(--tint-h) / .16));
+  --acc-line:   light-dark(oklch(.52 .20 var(--tint-h) / .36), oklch(.68 .16 var(--tint-h) / .50));
+  --ring:       0 0 0 3px light-dark(oklch(.52 .20 var(--tint-h) / .28), oklch(.68 .16 var(--tint-h) / .42));
+  --nova-a:     light-dark(oklch(.86 .07 var(--tint-h)), oklch(.40 .19 var(--tint-h)));
+  --nova-b:     light-dark(oklch(.93 .035 var(--tint-h)), oklch(.25 .11 var(--tint-h)));
+  --nova-c:     light-dark(oklch(.96 .012 var(--tint-h)), oklch(.13 .04 var(--tint-h)));
+  --nova-shard: light-dark(oklch(.62 .16 var(--tint-h) / .26), oklch(.60 .17 var(--tint-h) / .55));
+  --nova-shard-2: light-dark(oklch(.45 .20 var(--tint-h) / .12), oklch(.42 .18 var(--tint-h) / .35));
+  --nova-line:  light-dark(oklch(.58 .20 var(--tint-h) / .55), oklch(.72 .15 var(--tint-h) / .90));
+}
+:root[data-tint="violet"]{ --tint-h:277 }  :root[data-tint="blau"]{ --tint-h:250 }
+:root[data-tint="cyan"]{ --tint-h:215 }    :root[data-tint="gruen"]{ --tint-h:150 }
+:root[data-tint="bernstein"]{ --tint-h:70 } :root[data-tint="rot"]{ --tint-h:25 }
+:root[data-tint="pink"]{ --tint-h:350 }
+/* a swatch for a hue picker: .f-swatch[data-h] draws itself in that hue */
+.f-swatch[data-h='277']{ --h:277 } .f-swatch[data-h='250']{ --h:250 } .f-swatch[data-h='215']{ --h:215 } .f-swatch[data-h='150']{ --h:150 }
+.f-swatch[data-h='70']{ --h:70 } .f-swatch[data-h='25']{ --h:25 } .f-swatch[data-h='350']{ --h:350 }
+.f-swatch{ width:32px; height:32px; border-radius:50%; background:oklch(.62 .17 var(--h, 277));
+  box-shadow:inset 0 0 0 1px light-dark(rgba(0,0,0,.12), rgba(255,255,255,.18)); flex:none }
+
+/* motion asked down by the person, not only by the system */
+:root[data-motion="reduced"]{ --dur-1:1ms; --dur-2:1ms; --dur-3:1ms; --dur-4:1ms; --dur-5:1ms; --stagger:0ms; --lift:none; --press:none }
+:root[data-motion="reduced"] [data-reveal]{ animation:none }
+/* the wallpaper switched off: the plain ground instead of Nova */
+:root[data-wallpaper="off"] .f-nova::before,:root[data-wallpaper="off"] .f-nova::after{ display:none }
+:root[data-wallpaper="off"] .f-nova{ background:var(--bg) }

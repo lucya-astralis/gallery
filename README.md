@@ -1029,6 +1029,7 @@ Inside the package:
 | `SCAN_INTERVAL` | `0`           | Periodic rescan in seconds (0 = off). For SMB use ~300.    |
 | `ENABLE_WATCHER`| `1`           | inotify watcher (on SMB/NFS, prefer `0` and use interval)  |
 | `HIDE_GPS`      | `1`           | Strip GPS from EXIF display                                |
+| `FRONTEND`      | `facet`       | The public pages: `facet` (3.2, the new gallery) or `nebula` (the old pages, kept for now) |
 | `STRIP_GPS`     | `1`           | Strip GPS from the original file on import (in-place)      |
 | `VISION`        | `0`           | Search by what is in a photo: a local model (~217 MB, fetched once into `DATA_DIR/models`) reads every photo on the next scan. Off by default; every search can leave its matches out |
 | `VISION_THREADS`| `2`           | CPU threads the vision model may use                       |

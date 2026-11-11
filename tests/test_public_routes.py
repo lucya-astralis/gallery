@@ -130,7 +130,7 @@ def test_photo_tiles_load_without_script(client):
     alone would be a hole for the one and invisible to the other."""
     import re
     body = client.get("/album/berlin").text
-    tiles = re.findall(r'<li class="image-tile[^"]*">\s*<a [^>]*>\s*<img ([^>]*)>', body)
+    tiles = re.findall(r'<li class="g-photo[^"]*">\s*<a [^>]*>\s*<img ([^>]*)>', body)
     assert tiles
     for attrs in tiles:
         assert 'src="/thumb/' in attrs

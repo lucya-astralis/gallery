@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% from "_g.html" import crumbs with context %}
+{% block title %}{{ image.filename }} — {{ image.album }} — {{ brand.title }}{% endblock %}
+{% block body_class %}page-image{% endblock %}
+{% block head_extra %}{% if unlisted %}<meta name="robots" content="noindex">{% endif %}{% endblock %}
+{% block meta %}
+  {% set og_title = image.filename ~ ' — ' ~ image.album %}
+  {% set og_desc = description if description else t('image.og_desc', album=image.album, brand=brand.title) %}
+  {% set og_image = public_base_url(request) ~ '/preview/' ~ image.rel_path %}
+  <meta property="og:site_name" content="{{ brand.title }}">
+  <meta property="og:title" content="{{ og_title }}">
+  <meta property="og:description" content="{{ og_desc }}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ public_base_url(request) }}{{ request.url.path }}">
+  <meta property="og:image" content="{{ og_image }}">
+  {% if image.width and image.height %}<meta property="og:image:width" content="{{ image.width }}"><meta property="og:image:height" content="{{ image.height }}">{% endif %}
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="{{ og_image }}">
+  <meta name="twitter:title" content="{{ og_title }}"><meta name="twitter:description" content="{{ og_desc }}">
+{% endblock %}
+{% block content %}
+{% set _sort_qs = ('sort=' ~ current_sort) if current_sort != default_sort else '' %}
+{% set _col_qs = ('col=' ~ (collection_root | urlencode)) if collection_root else '' %}
+{% set _qs = [_sort_qs, _col_qs] | select | join('&') %}
+{% set img_qs = ('?' ~ _qs) if _qs else '' %}
+<div class="g-page">
+  <header class="g-head">
+    {{ crumbs(breadcrumbs, tail=image.filename) }}
+    <div class="g-head__row">
+      <h1 class="g-title">{{ image.filename }}</h1>
+      <p class="g-meta">
+        {% if image.width and image.height %}<span><b>{{ image.width }}×{{ image.height }}</b></span>{% endif %}
+        {% if image.size %}<span><b>{{ (image.size / 1024 / 1024) | round(2) }}</b> MB</span>{% endif %}
+        {% if current_index >= 0 %}<span><b>{{ current_index + 1 }}</b> / {{ album_rels | length }}</span>{% endif %}
+      </p>
+    </div>
+  </header>
+
+  <div class="g-shot">
+    <div>
+      <div class="g-stage">
+        {% if prev_rel %}<a class="g-stage__arrow g-stage__arrow--prev" href="/image/{{ prev_rel }}{{ img_qs }}" data-prev aria-label="{{ t('aria.previous') }}"><i class="fa fa-chevron-left" aria-hidden="true"></i></a>{% endif %}
+        <img id="stage-img" src="{{ media_url('preview', image) }}" data-full="{{ media_url('full', image) }}" alt="{{ image.filename }}"
+             {% if image.width and image.height %}width="{{ image.width }}" height="{{ image.height }}"{% endif %}>
+        {% if next_rel %}<a class="g-stage__arrow g-stage__arrow--next" href="/image/{{ next_rel }}{{ img_qs }}" data-next aria-label="{{ t('aria.next') }}"><i class="fa fa-chevron-right" aria-hidden="true"></i></a>{% endif %}
+        <span class="g-stage__q" id="quality-stamp" data-q-preview="{{ t('quality.preview') }}" data-q-original="{{ t('quality.original') if t('quality.original') != 'quality.original' else 'Original' }}">{{ t('quality.preview') }}</span>
+      </div>
+      <div class="g-actions">
+        <button type="button" class="g-btn g-btn--sm" id="load-full-btn"><i class="fa fa-image" aria-hidden="true"></i>{{ t('btn.load_original') }}</button>
+        <button type="button" class="g-btn g-btn--sm" id="open-fullscreen-btn"><i class="fa fa-expand" aria-hidden="true"></i>{{ t('btn.fullscreen') }}</button>
+        <a href="{{ media_url('full', image) }}" download="{{ image.filename }}" class="g-btn g-btn--sm"><i class="fa fa-download" aria-hidden="true"></i>{{ t('btn.download') }}</a>
+      </div>
+    </div>
+
+    <aside class="g-side">
+      <section class="g-panel">
+        <h2><i class="fa fa-circle-info" aria-hidden="true"></i>{{ t('panel.file') }}</h2>
+        <dl class="g-kv">
+          <div><dt>{{ t('kv.album') }}</dt><dd><a href="/album/{{ image.album }}">{{ image.album }}</a></dd></div>
+          <div><dt>{{ t('kv.filename') }}</dt><dd>{{ image.filename }}</dd></div>
+          {% if image.width and image.height %}<div><dt>{{ t('kv.dimensions') }}</dt><dd>{{ image.width }} × {{ image.height }} px</dd></div>{% endif %}
+          {% if image.size %}<div><dt>{{ t('kv.size') }}</dt><dd>{{ (image.size / 1024 / 1024) | round(2) }} MB</dd></div>{% endif %}
+          <div><dt>{{ t('kv.original') }}</dt><dd><a href="{{ media_url('full', image) }}" download="{{ image.filename }}">{{ t('kv.download') }}</a></dd></div>
+        </dl>
+      </section>
+      {% if description %}<section class="g-panel"><h2><i class="fa fa-align-left" aria-hidden="true"></i>{{ t('panel.description') }}</h2><p class="g-about__body">{{ description }}</p></section>{% endif %}
+      {% if tags %}<section class="g-panel"><h2><i class="fa fa-tags" aria-hidden="true"></i>{{ t('panel.tags') }}</h2>
+        <div class="g-chips">{% for tg in tags %}<a href="/album/{{ image.album }}?tag={{ tg | urlencode }}" class="g-chip">#{{ tg }}</a>{% endfor %}</div></section>{% endif %}
+      {% if photo_palette %}
+      <section class="g-panel">
+        <h2><i class="fa fa-palette" aria-hidden="true"></i>{{ t('photo.palette') }}</h2>
+        <svg class="g-palette" viewBox="0 0 100 10" preserveAspectRatio="none" role="list">
+          {% for s in photo_palette %}<a href="{{ s.href }}" role="listitem" aria-label="{{ t('photo.palette_find', c=s.label) }}"><title>{{ s.label }} · {{ s.share }}% · {{ s.hex }}</title><rect x="{{ s.x }}" y="0" width="{{ s.w }}" height="10" fill="{{ s.hex }}"/></a>{% endfor %}
+        </svg>
+        <div class="g-chips">{% for s in photo_palette | unique(attribute='name') %}<a href="{{ s.href }}" class="g-chip"><span class="swatch swatch--{{ s.name }}" aria-hidden="true"></span>{{ s.label }}</a>{% endfor %}</div>
+      </section>
+      {% endif %}
+      <section class="g-panel">
+        <h2><i class="fa fa-camera" aria-hidden="true"></i>EXIF</h2>
+        {% if exif %}
+        <dl class="g-kv">{% for row in exif %}<div><dt>{{ row.key }}</dt><dd>{% if row.q %}<a href="/search?q={{ row.q | urlencode }}">{{ row.val }}</a>{% else %}{{ row.val }}{% endif %}</dd></div>{% endfor %}</dl>
+        <details><summary>{{ t('panel.raw_dump') }}</summary><pre class="g-raw">{{ exif_raw | tojson(indent=2) }}</pre></details>
+        {% else %}<p class="g-note">{{ t('panel.no_exif') }}</p>{% endif %}
+      </section>
+    </aside>
+  </div>
+</div>
+<script id="album-data" type="application/json">{"album": {{ image.album | tojson }}, "collection_root": {{ collection_root | tojson }}, "current": {{ current_index | tojson }}, "rels": {{ album_rels | tojson }}, "stamps": {{ album_stamps | tojson }}}</script>
+<dialog class="g-lb" id="lightbox" aria-label="{{ t('aria.lightbox') }}">
+  <div class="g-lb__stage">
+    <button type="button" class="g-stage__arrow g-stage__arrow--prev" data-lb-prev aria-label="{{ t('aria.previous') }}"><i class="fa fa-chevron-left" aria-hidden="true"></i></button>
+    <img id="lb-img" alt="">
+    <button type="button" class="g-stage__arrow g-stage__arrow--next" data-lb-next aria-label="{{ t('aria.next') }}"><i class="fa fa-chevron-right" aria-hidden="true"></i></button>
+    <button type="button" class="g-reel__nav g-lb__close" data-lb-close aria-label="{{ t('aria.close') }}"><i class="fa fa-xmark" aria-hidden="true"></i></button>
+  </div>
+  <div class="g-lb__bar">
+    <span class="g-lb__count" id="lb-count"></span>
+    <span class="g-lb__title" id="lb-title"></span>
+    <button type="button" class="g-btn g-btn--sm g-btn--glass" id="lb-full"><i class="fa fa-image" aria-hidden="true"></i>{{ t('btn.load_original') }}</button>
+    <a class="g-btn g-btn--sm g-btn--glass" id="lb-dl" href="" download=""><i class="fa fa-download" aria-hidden="true"></i>{{ t('btn.download') }}</a>
+  </div>
+</dialog>
+{% endblock %}

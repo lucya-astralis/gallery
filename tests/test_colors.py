@@ -82,7 +82,7 @@ def test_the_colour_facet_is_offered_and_toggles(indexed, client):
 def test_the_photo_page_draws_its_palette(indexed, client):
     rel, _ = _a_colour_the_fixture_has()
     body = client.get("/image/" + rel).text
-    assert 'class="palette-strip"' in body
+    assert 'class="g-palette"' in body
     assert '<rect x="0' in body and 'fill="#' in body
     assert "/search?q=color%3A" in body
 

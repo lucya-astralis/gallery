@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="{{ html_lang }}" data-palette="{{ palette }}"{% if theme != 'system' %} data-theme="{{ theme }}"{% endif %}>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="{{ 'light dark' if theme == 'system' else theme }}">
+  <title>{% block title %}{{ brand.title }}{% endblock %}</title>
+  <link rel="icon" type="{{ brand.favicon_type }}" href="{{ brand.favicon }}">
+  <meta name="generator" content="{{ vendor.generator }}">
+  <link rel="author" href="/humans.txt">
+  {# Facet first, then the accent the gallery or the album sets (theme
+     sheet), then the gallery's own sheet, which derives Facet's accent faces
+     from that accent, then the kept building blocks (charts, trip). #}
+  <link rel="stylesheet" href="{{ static_url('f/facet.css') }}">
+  {% set theme_css = theme_css_url(bg_album | default(none)) %}
+  {% if theme_css %}<link rel="stylesheet" href="{{ theme_css }}">{% endif %}
+  <link rel="stylesheet" href="{{ static_url('f/gallery.css') }}">
+  <link rel="stylesheet" href="{{ static_url('f/blocks.css') }}">
+  {# gallery.cfg `faces` (the console's Site > Look): Nebula Mono and the
+     Nebula icon font in place of the stock set, the same fa-* class names #}
+  {% set nebula = nebula_faces() %}
+  {% if nebula %}
+  <link rel="stylesheet" href="{{ static_url('nebula-faces.css') }}">
+  <link rel="stylesheet" href="{{ static_url('nebula-icons.css') }}">
+  <link rel="preload" href="/static/fonts/NebulaIcons.woff2" as="font" type="font/woff2" crossorigin>
+  {% else %}
+  <link rel="stylesheet" href="{{ static_url('fa-icons.css') }}">
+  <link rel="preload" href="/static/fonts/fa-solid-subset.woff2" as="font" type="font/woff2" crossorigin>
+  {% endif %}
+  <link rel="preload" href="/static/fonts/{{ 'NebulaMono-400' if nebula else 'JetBrainsMono-400' }}.woff2" as="font" type="font/woff2" crossorigin>
+  {% set site_face = site_font() %}
+  {% if site_face %}
+  <link rel="preload" href="{{ site_face.preload.href }}" as="font" type="{{ site_face.preload.type }}" crossorigin>
+  <link rel="stylesheet" href="{{ site_face.css }}">
+  {% endif %}
+  <link rel="preload" href="/static/fonts/SpaceGrotesk-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/SpaceGrotesk-600.woff2" as="font" type="font/woff2" crossorigin>
+  {% block meta %}
+  <meta property="og:site_name" content="{{ brand.title }}">
+  <meta property="og:title" content="{{ brand.og_title }}">
+  <meta property="og:description" content="{{ brand.desc }}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ public_base_url(request) }}{{ request.url.path }}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{{ brand.og_title }}">
+  <meta name="twitter:description" content="{{ brand.desc }}">
+  {% endblock %}
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="g-skip" href="#main">{{ t('aria.skip') }}</a>
+  {# The backdrop. With nothing configured it is Facet's Nova, drawn in CSS
+     and tinted by the accent; an album or gallery.cfg wallpaper shows the
+     picture under a veil instead (one <picture>, so only one file loads). #}
+  {% set _bga = bg_album | default(none) %}
+  {% if wears_nova(_bga) %}
+  <div class="g-bg f-nova f-nova--fixed f-nova--veil" aria-hidden="true"></div>
+  {% else %}
+  {% set bg = site_bg(_bga) %}
+  <div class="g-bg" aria-hidden="true">
+    <picture>
+      <source media="(max-width: 760px)" srcset="{{ bg.still_mobile }}">
+      <img class="g-bg__still" src="{{ bg.still_desktop }}" alt="" decoding="async">
+    </picture>
+    {% if bg.video %}<video muted loop playsinline preload="none" data-bg-video data-src="{{ bg.video }}"></video>{% endif %}
+    <div class="g-bg__veil"></div>
+  </div>
+  {% endif %}
+
+  {% set _next = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
+  {% set _path = request.url.path %}
+  <header class="g-bar">
+    <div class="g-bar__in">
+      <a href="/" class="g-brand" aria-label="{{ brand.title }}">
+        <img src="{{ brand.logo }}" alt="">
+        <span><span class="g-brand__name">{{ brand.name }}</span>{% if brand.sub %}<span class="g-brand__sub">{{ brand.sub }}</span>{% endif %}</span>
+      </a>
+      <nav class="g-links" aria-label="{{ t('aria.main_nav') if t('aria.main_nav') != 'aria.main_nav' else 'Navigation' }}">
+        <a class="g-link{% if _path.startswith('/album') %} is-on{% endif %}" href="/albums">{{ t('crumb.albums') }}</a>
+        <a class="g-link{% if _path.startswith('/stats') %} is-on{% endif %}" href="/stats">{{ t('stats.slug') }}</a>
+      </nav>
+      <form action="/search" method="get" class="g-search" role="search">
+        <button type="submit" class="g-search__go" aria-label="{{ t('nav.search_go') }}" title="{{ t('nav.search_open') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5 20 20"/></svg></button>
+        <input type="search" name="q" placeholder="{{ t('nav.search_ph') }}" value="{{ query or '' }}" autocomplete="off" aria-label="{{ t('nav.search_open') }}">
+      </form>
+      <div class="g-tools">
+        {% set _mode = t('nav.theme.' ~ theme) %}
+        <a class="g-icon" href="/theme/{{ theme_next }}?next={{ _next | urlencode }}" title="{{ t('nav.theme', mode=_mode) }}" aria-label="{{ t('nav.theme', mode=_mode) }}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">{% if theme == 'light' %}<g fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></g>{% elif theme == 'dark' %}<path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>{% else %}<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>{% endif %}</svg></a>
+        <div class="g-lang" aria-label="{{ t('nav.lang_label') }}">
+          {% for l in langs %}<a class="{% if l.active %}is-on{% endif %}" href="/lang/{{ l.code }}?next={{ _next | urlencode }}"{% if l.active %} aria-current="true"{% endif %}>{{ l.label }}</a>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="g-foot">
+    <div class="g-foot__in">
+      <span class="g-foot__brand"><img src="{{ brand.logo }}" alt="">{{ brand.name }}</span>
+      {% if brand.operator_url %}
+      <a class="g-foot__op" href="{{ brand.operator_url }}" target="_blank" rel="noopener" aria-label="{{ t('foot.about', operator=brand.operator) }}">
+        {% if brand.pfp %}<img src="{{ brand.pfp }}" alt="" width="28" height="28" loading="lazy" decoding="async">{% endif %}
+        <span><small>{{ t('foot.operator') }}</small>{{ t('foot.about', operator=brand.operator) }}</span>
+      </a>
+      {% endif %}
+      <nav class="g-foot__links">
+        <a href="/stats"><i class="fa fa-chart-simple" aria-hidden="true"></i>{{ t('stats.slug') }}</a>
+        {% if brand.privacy_url %}<a href="{{ brand.privacy_url }}" target="_blank" rel="noopener">{{ t('foot.privacy') }}</a>{% endif %}
+        {% if brand.imprint_url %}<a href="{{ brand.imprint_url }}" target="_blank" rel="noopener">{{ t('foot.imprint') }}</a>{% endif %}
+      </nav>
+      {% if brand.badges %}
+      <div class="g-foot__badges">{% for badge in brand.badges %}<img src="{{ badge.url }}" width="88" height="31" alt="{{ badge.label }}" title="{{ badge.label }}">{% endfor %}</div>
+      {% endif %}
+      <span class="g-foot__meta"><a href="{{ vendor.url }}" target="_blank" rel="noopener">{{ vendor.product }}</a> · {{ vendor.version }}</span>
+    </div>
+  </footer>
+  <script src="{{ static_url('f/facet.js') }}" defer></script>
+  <script src="{{ static_url('f/gallery.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

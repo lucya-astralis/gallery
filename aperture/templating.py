@@ -32,10 +32,13 @@ def static_url(base_dir: Path, path: str) -> str:
     return f"/static/{path}?v={stamp}"
 
 
-def make_templates(base_dir: Path, context_processors=()) -> Jinja2Templates:
-    """`<base_dir>/templates`, with `static_url` bound to `<base_dir>/static`."""
-    templates = Jinja2Templates(directory=str(Path(base_dir) / "templates"),
-                                context_processors=list(context_processors))
+def make_templates(base_dir: Path, context_processors=(), first: str | None = None) -> Jinja2Templates:
+    """`<base_dir>/templates`, with `static_url` bound to `<base_dir>/static`.
+    `first` names a sibling folder searched before it: the Facet frontend
+    (templates_facet/) replaces pages and keeps the old folder's pure
+    building blocks (charts, trip) reachable."""
+    dirs = ([str(Path(base_dir) / first)] if first else []) + [str(Path(base_dir) / "templates")]
+    templates = Jinja2Templates(directory=dirs, context_processors=list(context_processors))
     templates.env.globals["static_url"] = partial(static_url, base_dir)
     # gallery.cfg `faces` (or NEBULA_FACES): both surfaces pick their font and
     # icon sheets from it, asked per render so the console's switch is live

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% from "_g.html" import crumbs, card, sort_menu, photos, units with context %}
+{% set album_label = breadcrumbs | map(attribute='name') | join(' / ') if breadcrumbs else album %}
+{% block title %}{{ album_label }} — {{ brand.title }}{% endblock %}
+{% block body_class %}page-album{% if trip %} trip-{{ trip.key }}{% endif %}{% if album_font_css %} album-font{% endif %}{% endblock %}
+{% block head_extra %}
+  {% if unlisted %}<meta name="robots" content="noindex">{% endif %}
+  {% if album_font_preload %}<link rel="preload" href="{{ album_font_preload.href }}" as="font" type="{{ album_font_preload.type }}" crossorigin>{% endif %}
+  {% if album_font_css %}<link rel="stylesheet" href="{{ album_font_css }}">{% endif %}
+{% endblock %}
+{% block meta %}
+  {% set og_title = album_label ~ ' — ' ~ brand.title %}
+  {% set img_count = images | length %}
+  {% set og_desc = t('album.og_desc', count=img_count, unit=t('album.og_unit_one' if img_count == 1 else 'album.og_unit_many'), album=album_label) %}
+  {% set cover_rel = album_cover or (sub_albums[0].cover if sub_albums else None) %}
+  <meta property="og:site_name" content="{{ brand.title }}">
+  <meta property="og:title" content="{{ og_title }}">
+  <meta property="og:description" content="{{ og_desc }}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ public_base_url(request) }}{{ request.url.path }}">
+  {% if cover_rel %}{% set og_image = public_base_url(request) ~ '/preview/' ~ cover_rel %}
+  <meta property="og:image" content="{{ og_image }}"><meta property="og:image:alt" content="{{ album_label }}">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="{{ og_image }}">
+  {% else %}<meta name="twitter:card" content="summary">{% endif %}
+  <meta name="twitter:title" content="{{ og_title }}">
+  <meta name="twitter:description" content="{{ og_desc }}">
+{% endblock %}
+{% block content %}
+{% set title = trip.title if trip else (breadcrumbs[-1].name if breadcrumbs else album) %}
+{% set kicker = t('stamp.sub_album') if breadcrumbs | length > 1 else (t('stamp.showcase_album') if album_is_showcase else none) %}
+{% set sort_qs = '' if current_sort == default_sort else ('sort=' ~ current_sort) %}
+{% set col_qs = ('col=' ~ (album | urlencode)) if collection else '' %}
+{% set img_qs = ('?' ~ ([sort_qs, col_qs] | select | join('&'))) if (sort_qs or col_qs) else '' %}
+<div class="g-page g-album">
+  {{ crumbs(breadcrumbs) }}
+
+  {% if featured %}
+  <section class="g-reel g-reel--album" data-reel aria-label="{{ t('aria.random_photos') if reel_mode == 'random' else t('aria.featured_photos') }}">
+    {% for img in featured %}
+    {% set _name = (img.album[(album | length) + 1:] ~ ' / ' if img.album != album else '') ~ img.filename %}
+    <a class="g-reel__slide{% if loop.first %} is-on{% endif %}" href="/image/{{ img.rel_path }}" data-name="{{ _name }}" tabindex="-1" aria-hidden="{{ 'false' if loop.first else 'true' }}">
+      {% if loop.first %}<img src="{{ media_url('preview', img) }}" alt="{{ _name }}" fetchpriority="high" decoding="async">
+      {% else %}<img data-src="{{ media_url('preview', img) }}" alt="{{ _name }}" decoding="async">{% endif %}
+    </a>
+    {% endfor %}
+    <div class="g-reel__shade"></div>
+    <a class="g-reel__file" href="/image/{{ featured[0].rel_path }}" data-reel-file><i class="fa {{ 'fa-shuffle' if reel_mode == 'random' else 'fa-star' }}" aria-hidden="true"></i><span data-reel-name>{{ featured[0].filename }}</span></a>
+    <div class="g-reel__body">
+      {% if kicker %}<span class="g-kicker">{{ kicker }}</span>{% endif %}
+      <h1 class="g-reel__title g-reel__title--album">{% if album_icon %}<img src="{{ album_icon }}" alt="" width="48" height="48"> {% endif %}{{ title }}</h1>
+      {% if album_tags %}<div class="g-reel__tags">{% for tg in album_tags %}<span>#{{ tg }}</span>{% endfor %}</div>{% endif %}
+    </div>
+    {% if featured | length > 1 %}
+    <div class="g-reel__deck">
+      <button type="button" class="g-reel__nav" data-reel-prev aria-label="{{ t('aria.prev_photo') }}"><i class="fa fa-chevron-left" aria-hidden="true"></i></button>
+      <div class="g-reel__dots">{% for img in featured %}<button type="button" class="g-reel__dot{% if loop.first %} is-on{% endif %}" data-goto="{{ loop.index0 }}" aria-label="{{ loop.index }}"></button>{% endfor %}</div>
+      <button type="button" class="g-reel__nav" data-reel-next aria-label="{{ t('aria.next_photo') }}"><i class="fa fa-chevron-right" aria-hidden="true"></i></button>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <header class="g-head">
+    {% if not featured %}
+      {% if kicker %}<span class="g-kicker">{{ kicker }}</span>{% endif %}
+      <h1 class="g-title">{% if album_icon %}<img src="{{ album_icon }}" alt="">{% endif %}{{ title }}{% if trip and trip.jp %}<span class="g-title__jp">{{ trip.jp }}</span>{% endif %}</h1>
+    {% endif %}
+    <p class="g-meta">
+      {% if images or not sub_albums %}<span><b>{{ images | length }}</b> {{ t('unit.image') if images | length == 1 else t('unit.images') }}</span>{% endif %}
+      {% if sub_albums %}<span><b>{{ sub_albums | length }}</b> {{ t('unit.directory') if sub_albums | length == 1 else t('unit.directories') }}</span>{% endif %}
+      {% if breadcrumbs | length > 1 %}<span>{{ t('stamp.sub_album') }} · <b>{{ breadcrumbs[-2].name }}</b></span>{% endif %}
+      {% if album_is_showcase %}<span class="g-mark"><i class="fa fa-star" aria-hidden="true"></i> {{ t('stamp.showcase') }}</span>{% endif %}
+      {% if collection %}<span class="g-mark"><i class="fa fa-layer-group" aria-hidden="true"></i> {{ t('stamp.collection') }}</span>{% endif %}
+      {% if active_tag %}<span class="g-mark">#{{ active_tag }}</span>{% endif %}
+      {% if not featured and album_tags %}{% for tg in album_tags %}<span>#{{ tg }}</span>{% endfor %}{% endif %}
+    </p>
+  </header>
+
+  {% if not featured and album_cover and not trip %}<div class="g-cover"><img src="{{ media_url('preview', album_cover) }}" alt="" decoding="async"></div>{% endif %}
+
+  {% if trip %}{% include "_trip.html" %}{% endif %}
+
+  {% if album_description or (album_stats and album_stats.has) %}
+  <div class="g-album__top{% if not album_description %} g-album__top--facts{% endif %}">
+    {% if album_description %}
+    <section class="g-panel g-about">
+      <h2 class="g-section__title">{{ t('album.about') }}</h2>
+      <div class="g-about__body">{{ album_description | safe }}</div>
+    </section>
+    {% endif %}
+    {% if album_stats and album_stats.has %}
+    <aside class="g-panel" aria-label="{{ t('aria.album_info') }}">
+      <dl class="g-kv">
+        {% for s in (album_stats.context or []) + (album_stats.capture or []) %}<div><dt>{{ s.key }}</dt><dd>{{ s.val }}</dd></div>{% endfor %}
+      </dl>
+    </aside>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if sub_albums %}
+  <section class="g-section" aria-label="{{ t('aria.folders') }}">
+    <div class="g-section__head"><h2 class="g-section__title">{{ t('album.folders') }}</h2><span class="g-section__n">{{ units(sub_albums | length, 'unit.album_one', 'unit.album_many') }}</span></div>
+    <ul class="g-cards">{% for a in sub_albums %}{{ card(a) }}{% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  {% if images or active_tag %}
+  <section class="g-section" aria-label="{{ t('album.photos') }}">
+    <div class="g-toolbar">
+      {% if sub_albums %}<h2 class="g-section__title">{{ t('album.photos') }}</h2>{% endif %}
+      {% if tags %}
+      <div class="g-chips">
+        <a href="/album/{{ album }}{% if sort_qs %}?{{ sort_qs }}{% endif %}" class="g-chip{% if not active_tag %} is-on{% endif %}">{{ t('tag.all') }}</a>
+        {% for tg in tags %}<a href="/album/{{ album }}?tag={{ tg | urlencode }}{% if sort_qs %}&{{ sort_qs }}{% endif %}" class="g-chip{% if active_tag == tg %} is-on{% endif %}">#{{ tg }}</a>{% endfor %}
+      </div>
+      {% endif %}
+      {{ sort_menu(sort_options, sort_label, '/album/' ~ album, ('&tag=' ~ (active_tag | urlencode)) if active_tag else '') }}
+    </div>
+    {% if images %}
+      {% if day_sections %}
+        {% for sec in day_sections %}
+        <section class="g-day" aria-label="{{ sec.date_h or t('day.undated') }}">
+          <header class="g-day__head">
+            {% if sec.day_h %}<span class="g-day__n">{{ sec.day_h }}</span>{% endif %}
+            <span class="g-day__date">{{ sec.date_h or t('day.undated') }}</span>
+            {% if sec.weekday %}<span class="g-day__wd">{{ sec.weekday }}</span>{% endif %}
+            {% if sec.stop %}<span class="g-day__stop">{{ sec.stop }}</span>{% endif %}
+            <span class="g-day__count">{{ units(sec.images | length, 'unit.image_one', 'unit.image_many') }}</span>
+          </header>
+          {{ photos(sec.images, img_qs) }}
+        </section>
+        {% endfor %}
+      {% else %}{{ photos(images, img_qs) }}{% endif %}
+    {% elif active_tag %}
+      <div class="g-empty"><p>{{ t('empty.tag_prefix') }}<code>#{{ active_tag }}</code>{{ t('empty.tag_suffix') }}</p></div>
+    {% endif %}
+  </section>
+  {% elif not sub_albums %}
+  <div class="g-empty"><p>{{ t('empty.no_images') }}</p></div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}{% if trip %}<script src="{{ static_url('f/trip.js') }}" defer></script>{% endif %}{% endblock %}

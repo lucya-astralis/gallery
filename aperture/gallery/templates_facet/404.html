@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}404 — {{ t('nf.title') }} — {{ brand.title }}{% endblock %}
+{% block body_class %}page-404{% endblock %}
+{% block content %}
+<div class="g-page">
+  <section class="g-lost">
+    <span class="g-lost__code" aria-hidden="true">404</span>
+    <div class="g-lost__body">
+      <h1 class="g-title">{{ t('nf.title') }}</h1>
+      <p class="g-about__body">{{ t('nf.lead_prefix') }}<code>{{ path }}</code>{{ t('nf.lead_suffix') }}</p>
+      <p class="g-note">{{ t('nf.note') }}</p>
+      <div class="g-actions"><a href="/" class="g-btn"><i class="fa fa-house" aria-hidden="true"></i>{{ t('nf.home') }}</a><a href="/albums" class="g-btn g-btn--primary"><i class="fa fa-images" aria-hidden="true"></i>{{ t('nf.albums') }}</a></div>
+    </div>
+  </section>
+</div>
+{% endblock %}

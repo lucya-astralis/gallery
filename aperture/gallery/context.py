@@ -118,7 +118,10 @@ def json_cors(payload, max_age: int = 300, vary: str | None = None) -> JSONRespo
 
 
 # ----- templates ----------------------------------------------------------
-templates = templating.make_templates(templating.WEB_DIR, context_processors=[_i18n_context])
+templates = templating.make_templates(templating.WEB_DIR, context_processors=[_i18n_context],
+                                      first="templates_facet" if settings.frontend == "facet" else None)
+templates.env.globals["frontend"] = settings.frontend
+templates.env.globals["wears_nova"] = theme.wears_nova
 
 templates.env.globals["app_version"] = brand.VERSION
 
