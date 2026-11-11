@@ -65,9 +65,12 @@ CSP = (
     "object-src 'none'; "
     "base-uri 'self'; "
     "form-action 'self'; "
-    "frame-ancestors 'none'; "
-    "upgrade-insecure-requests"
+    "frame-ancestors 'none'"
 )
+# Sent only on https. Safari upgrades every subresource of an http page to
+# https when this is there, so on a plain-http origin (a LAN box, localhost)
+# the stylesheets and scripts never load and the page shows bare HTML.
+CSP_HTTPS = CSP + "; upgrade-insecure-requests"
 
 
 # ----- failsafe -----------------------------------------------------------
@@ -159,7 +162,8 @@ async def security_headers(request: Request, call_next):
         vary = response.headers.get("vary")
         response.headers["Vary"] = f"{vary}, {extra}" if vary else extra
         response.headers.setdefault("Cache-Control", "no-store")
-    response.headers.setdefault("Content-Security-Policy", CSP)
+    https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    response.headers.setdefault("Content-Security-Policy", CSP_HTTPS if https else CSP)
     # Which software served this — the header half of the attribution the
     # footer carries in words (aperture/brand.py). Not a security header; it sits
     # here because this is the one place every response passes through.
