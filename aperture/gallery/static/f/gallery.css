@@ -42,9 +42,6 @@
   --scrim: light-dark(rgba(244,244,247,.5), rgba(4,4,8,.46));
   --scrim-hi: light-dark(rgba(244,244,247,.72), rgba(6,6,10,.64));
   --amb: var(--warn); --red: var(--err);
-  --trip: light-dark(#2f63d8, #5b8aff); --trip-live: light-dark(#6a4fe0, #a594ff);
-  --trip-done: var(--ok); --trip-warm: light-dark(#b06a00, #ffb547); --trip-cool: light-dark(#2a7fb0, #9fd8ff);
-  --trip-grid: light-dark(rgba(18,18,30,.05), rgba(255,255,255,.03));
   --radius: var(--r-card);
 }
 :root[data-theme="light"]{ color-scheme: light; }
@@ -115,6 +112,7 @@ main{ flex:1 0 auto; outline:none }
   text-wrap:balance; display:flex; align-items:center; gap:var(--s-4) }
 .g-title img{ width:.9em; height:.9em }
 .g-title__jp{ font-size:.5em; color:var(--text-dim); font-weight:500 }
+.g-reel__title .g-title__jp{ margin-left:.35em; color:rgba(255,255,255,.72) }
 .g-meta{ display:flex; flex-wrap:wrap; gap:var(--s-2) var(--s-5); color:var(--text-dim); font:400 var(--fs-300)/1.5 var(--sans);
   font-variant-numeric:tabular-nums }
 .g-meta b{ color:var(--text); font-weight:600 }

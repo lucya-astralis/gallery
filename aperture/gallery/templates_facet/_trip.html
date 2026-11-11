@@ -1,0 +1,112 @@
+{# The trip dashboard, built on Facet (Aperture 3.2).
+
+   One section, four parts on a grid: the live panel (phase, countdown,
+   the journey bar), the route map beside it, the legs as cards under it, and
+   the side trips as a list. Everything is read against the viewer's own
+   clock by f/trip.js from the data-* attributes; the markup alone is a
+   sensible page without it (the stops, dates and links are all here, only
+   the live figures, the journey bar and the weather stay empty / hidden).
+
+   State colour is the accent for "now" and Facet's ok for "done"; every
+   colour has a word or a shape beside it (the badge, the dot, the fill).
+   The map is the generated _trip_map.html from the kept templates, so
+   tools/generate_trip_map.py stays its one source; trip.css styles it. #}
+{% set _last = trip.stops[-1] if trip.stops else none %}
+<section class="g-trip" data-trip data-trip-key="{{ trip.key }}" data-depart="{{ trip.depart }}" aria-label="{{ t('trip.status_aria', title=trip.title) }}">
+
+  <div class="g-trip__now g-panel">
+    <header class="g-trip__head">
+      <span class="g-kicker"><i class="fa fa-route" aria-hidden="true"></i>{{ t('trip.tag') }}</span>
+      <span class="g-trip__count"><b>{{ trip.stops | length }}</b> {{ t('trip.leg') if trip.stops | length == 1 else t('trip.legs') }}{% if trip.side_trips %} · <b>{{ trip.side_trips | length }}</b> {{ t('trip.side_trips') }}{% endif %}</span>
+      <span class="g-trip__clock" data-trip-clock title="{{ t('trip.jst_title') }}">{{ t('trip.jst_label') }} <b data-trip-time>--:--:--</b> <small>JST</small></span>
+    </header>
+
+    <p class="g-trip__phase"><span class="g-trip__beacon" aria-hidden="true"></span><span data-trip-cd-label>{{ t('trip.departs_in') }}</span></p>
+    {# the ":" stay in the markup for copy/paste and screen readers #}
+    <div class="g-trip__cd" role="timer">
+      <span class="g-trip__unit"><b data-cd="d">––</b><small>{{ t('trip.days') }}</small></span>
+      <span class="g-trip__sep" aria-hidden="true">:</span>
+      <span class="g-trip__unit"><b data-cd="h">––</b><small>{{ t('trip.hrs') }}</small></span>
+      <span class="g-trip__sep" aria-hidden="true">:</span>
+      <span class="g-trip__unit"><b data-cd="m">––</b><small>{{ t('trip.min') }}</small></span>
+      <span class="g-trip__sep" aria-hidden="true">:</span>
+      <span class="g-trip__unit"><b data-cd="s">––</b><small>{{ t('trip.sec') }}</small></span>
+    </div>
+    <p class="g-trip__target">{{ t('trip.flight') }} · <b data-trip-cd-target>{{ trip.depart_h }}</b></p>
+
+    {# The journey: the whole trip, departure to the flight home, one bar.
+       Each leg is a segment as long as its stay, each side trip a mark on
+       the lane under it, the line is "now". Placed by trip.js (--a/--b, the
+       CSSOM, since the CSP drops inline styles), so it stays hidden without
+       it. The leg names are the cards right below; the bar names only its
+       two ends. #}
+    <div class="g-journey" data-journey hidden aria-hidden="true">
+      <div class="g-journey__track">
+        {% for s in trip.stops %}<span class="g-journey__leg" data-j-stop="{{ s.city }}" title="{{ s.city }}"><i data-j-fill></i></span>{% endfor %}
+        {% for s in trip.side_trips %}<span class="g-journey__side" data-j-side="{{ s.city }}" title="↗ {{ s.city }}"></span>{% endfor %}
+        <span class="g-journey__now" data-j-now></span>
+      </div>
+      <div class="g-journey__names">{% for s in trip.stops %}<span data-j-name="{{ s.city }}">{{ s.jp if html_lang == 'ja' and s.jp else s.city }}</span>{% endfor %}</div>
+      <div class="g-journey__ends"><span>{{ trip.depart_h }}</span>{% if _last %}<span>{{ _last.end_h }}</span>{% endif %}</div>
+    </div>
+  </div>
+
+  <div class="g-trip__map g-panel">{% include "_trip_map.html" %}</div>
+
+  {# A leg: the region album's cover, its name, the stay, today's weather
+     there and where it stands ("in 12 days" / "Day 3 / 7" / ✓). The whole
+     card is the link into the region album when that album has photos. #}
+  <ol class="g-trip__legs" data-trip-timeline>
+    {% for s in trip.stops %}
+    <li class="g-leg" data-stop data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}"{% if s.jp %} data-city-jp="{{ s.jp }}"{% endif %}>
+      {% if s.href %}<a class="g-leg__in" href="{{ s.href }}">{% else %}<div class="g-leg__in">{% endif %}
+        <span class="g-leg__media{% if s.cover %} g-leg__media--photo{% endif %}" aria-hidden="true">
+          {% if s.cover %}<img src="{{ media_url('thumb', s.cover) }}" alt="" loading="lazy" decoding="async">{% elif s.jp %}<span class="g-leg__glyph" lang="ja">{{ s.jp }}</span>{% endif %}
+          <span class="g-leg__n">{{ '%02d' | format(loop.index) }}</span>
+          <span class="g-leg__state" data-stop-meta></span>
+        </span>
+        <span class="g-leg__body">
+          <span class="g-leg__name"><span class="g-leg__dot" aria-hidden="true"></span>{{ s.city }}{% if s.jp %}<span class="g-leg__jp" lang="ja">{{ s.jp }}</span>{% endif %}</span>
+          <span class="g-leg__dates"><span>{{ s.start_h }} –</span> <span>{{ s.end_h }}</span></span>
+          <span class="g-leg__foot">
+            <span class="g-wx" data-stop-wx hidden>
+              <span class="g-wx__ico" data-wx-ico aria-hidden="true"></span>
+              <b data-wx-temp></b>
+              <span class="g-wx__cond" data-wx-cond></span>
+              <span class="g-wx__range" data-wx-range hidden></span>
+            </span>
+            <span class="g-leg__count">{% if s.count %}{{ s.count }} {{ t('unit.image') if s.count == 1 else t('unit.images') }}{% endif %}</span>
+          </span>
+        </span>
+      {% if s.href %}</a>{% else %}</div>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+
+  {# Side trips: excursions from a leg's base, not legs of their own. One
+     row each: the state dot, the place, from where, the dates, the flights,
+     where it stands. #}
+  {% if trip.side_trips %}
+  <section class="g-trip__sides g-panel" aria-label="{{ t('trip.side_trips') }}">
+    <h3 class="g-trip__sides-title"><span aria-hidden="true">↗</span> {{ t('trip.side_trips') }} <span class="g-section__n">{{ trip.side_trips | length }}</span></h3>
+    <ol class="g-sides">
+      {% for s in trip.side_trips %}
+      <li class="g-side" data-side data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}" data-from="{{ s.from }}"{% if s.region %} data-region="{{ s.region }}"{% endif %}{% if s.revisit %} data-revisit{% endif %}>
+        {% if s.href %}<a class="g-side__in" href="{{ s.href }}">{% else %}<div class="g-side__in">{% endif %}
+          <span class="g-side__dot" aria-hidden="true"></span>
+          <span class="g-side__place">
+            <b>{{ s.city }}</b>{% if s.jp %}<span lang="ja">{{ s.jp }}</span>{% endif %}
+            {% if s.from %}<small>{{ s.from }} ↗{% if s.count %} · {{ s.count }} {{ t('unit.image') if s.count == 1 else t('unit.images') }}{% endif %}</small>{% endif %}
+          </span>
+          <span class="g-side__date">{{ s.arrive_h }}{% if s.end_h %} – {{ s.end_h }}{% endif %}</span>
+          {% if s.flights %}
+          <span class="g-side__flights">{% for f in s.flights %}<span class="g-flight"><b>{{ f.no }}</b> {{ f['from'] }} {{ f.dep }} <span aria-hidden="true">→</span> {{ f.to }} {{ f.arr }}</span>{% endfor %}</span>
+          {% endif %}
+          <span class="g-side__meta" data-side-meta></span>
+        {% if s.href %}</a>{% else %}</div>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endif %}
+</section>

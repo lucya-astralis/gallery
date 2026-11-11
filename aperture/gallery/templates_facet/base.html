@@ -10,7 +10,7 @@
   <link rel="author" href="/humans.txt">
   {# Facet first, then the accent the gallery or the album sets (theme
      sheet), then the gallery's own sheet, which derives Facet's accent faces
-     from that accent, then the kept building blocks (charts, trip). #}
+     from that accent, then the kept building blocks (charts). #}
   <link rel="stylesheet" href="{{ static_url('f/facet.css') }}">
   {% set theme_css = theme_css_url(bg_album | default(none)) %}
   {% if theme_css %}<link rel="stylesheet" href="{{ theme_css }}">{% endif %}

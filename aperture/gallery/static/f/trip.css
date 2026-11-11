@@ -1,0 +1,229 @@
+/* ==================================================================
+   APERTURE 3.2 — the trip dashboard, on Facet (_trip.html, f/trip.js)
+   ------------------------------------------------------------------
+   Loaded on a trip album only. State classes come from trip.js:
+     [data-trip]          .is-live once the script runs; .trip--pre /
+                          --transit / --active / --done for the phase
+     .g-leg / .g-side     .is-upcoming / .is-active / .is-done
+     the map              the same three on [data-map-city] / [data-map-pref],
+                          .is-done / .is-next on [data-map-seg],
+                          .is-done on [data-map-side], .is-away / .is-here
+                          on a base's dot while a side trip runs
+   "Now" is the accent, "done" is Facet's ok, "later" is the neutral ramp.
+   ================================================================== */
+
+.g-trip{
+  --now: var(--acc);
+  --now-soft: var(--acc-soft);
+  --done: var(--ok);
+  --later: var(--stroke-1);
+  display:grid; gap:var(--s-5); margin-block:var(--s-6) var(--s-8);
+  grid-template-columns:minmax(0, 1fr) minmax(300px, 380px);
+  grid-template-areas: "now map" "legs map" "sides sides";
+  align-items:start;
+}
+.g-trip__now{ grid-area:now; display:flex; flex-direction:column; gap:var(--s-4); padding:var(--s-5) var(--s-6) var(--s-6) }
+.g-trip__map{ grid-area:map; padding:var(--s-4); position:sticky; top:calc(var(--bar-h) + var(--s-4)) }
+.g-trip__legs{ grid-area:legs }
+.g-trip__sides{ grid-area:sides }
+
+/* ---- head: what the module is, how big it is, what time it is there ---- */
+.g-trip__head{ display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2) var(--s-4) }
+.g-trip__head .g-kicker .fa{ margin-right:2px }
+.g-trip__count{ color:var(--text-dim); font:400 var(--fs-200)/1 var(--sans) }
+.g-trip__count b{ color:var(--text); font-weight:600 }
+.g-trip__clock{ margin-left:auto; display:inline-flex; align-items:baseline; gap:6px; height:28px; padding:0 var(--s-3);
+  align-items:center; border-radius:var(--r-pill); background:color-mix(in srgb, var(--text) 6%, transparent);
+  color:var(--text-dim); font:400 var(--fs-200)/1 var(--sans); white-space:nowrap }
+/* the digits change every second: their own layout boundary, so a tick
+   never lays out the page around them */
+.g-trip__clock b{ display:inline-block; min-width:8ch; contain:layout paint; color:var(--text);
+  font:500 var(--fs-200)/1 var(--mono); font-variant-numeric:tabular-nums }
+.g-trip__clock small{ font:500 var(--fs-100)/1 var(--mono); letter-spacing:.04em }
+
+/* ---- the phase and the countdown ---- */
+.g-trip__phase{ margin:var(--s-2) 0 0; display:flex; align-items:center; gap:var(--s-3);
+  color:var(--text); font:500 var(--fs-400)/1.25 var(--sans) }
+.g-trip__beacon{ position:relative; width:10px; height:10px; flex:none; border-radius:50%; background:var(--now) }
+.g-trip__beacon::after{ content:""; position:absolute; inset:-5px; border-radius:50%; border:1.5px solid var(--now); opacity:0;
+  animation:g-trip-ping 2.4s var(--ease-out) infinite }
+.trip--done .g-trip__beacon{ background:var(--done) }
+.trip--done .g-trip__beacon::after, .g-trip:not(.is-live) .g-trip__beacon::after{ animation:none }
+@keyframes g-trip-ping{ 0%{ transform:scale(.6); opacity:.7 } 80%,100%{ transform:scale(1.5); opacity:0 } }
+
+.g-trip__cd{ display:flex; align-items:flex-start; gap:clamp(6px, 1.4vw, 18px) }
+.g-trip__unit{ display:grid; gap:var(--s-2); min-width:0 }
+.g-trip__unit b{ display:block; contain:layout paint; color:var(--text);
+  font:600 clamp(40px, 6.2vw, 84px)/.92 var(--display-font); letter-spacing:-.03em; font-variant-numeric:tabular-nums }
+.g-trip__unit b[data-cd="d"]{ min-width:2ch }
+.g-trip__unit small{ color:var(--text-dim); font:500 var(--fs-200)/1 var(--sans) }
+.g-trip__sep{ color:var(--text-ghost); font:300 clamp(32px, 5vw, 66px)/1 var(--display-font) }
+.trip--done .g-trip__cd{ opacity:.45 }
+.g-trip__target{ margin:0; color:var(--text-dim); font:400 var(--fs-300)/1.3 var(--sans) }
+.g-trip__target b{ color:var(--text); font-weight:500 }
+
+/* ---- the journey bar: the whole trip, positioned by trip.js ---- */
+.g-journey{ margin-top:var(--s-3); display:grid; gap:var(--s-2) }
+.g-journey__track{ position:relative; height:22px }
+.g-journey__leg, .g-journey__side{ position:absolute; left:calc(var(--a, 0) * 1%); width:calc((var(--b, 0) - var(--a, 0)) * 1%) }
+.g-journey__leg{ top:0; height:10px; border-radius:var(--r-pill); overflow:hidden; background:var(--later);
+  box-shadow:inset 0 0 0 1px var(--card); transition:background var(--dur-3) var(--ease) }
+.g-journey__leg i{ position:absolute; inset:0 auto 0 0; width:calc(var(--p, 0) * 1%); border-radius:inherit; background:var(--now) }
+.g-journey__leg.is-active{ background:color-mix(in srgb, var(--now) 28%, transparent) }
+.g-journey__leg.is-done{ background:color-mix(in srgb, var(--done) 70%, transparent) }
+.g-journey__leg.is-done i{ display:none }
+.g-journey__side{ top:15px; height:5px; min-width:5px; border-radius:var(--r-pill); background:var(--later) }
+.g-journey__side.is-active{ background:var(--now) }
+.g-journey__side.is-done{ background:color-mix(in srgb, var(--done) 70%, transparent) }
+.g-journey__now{ position:absolute; top:-5px; bottom:-3px; left:calc(var(--p, 0) * 1%); width:2px; margin-left:-1px;
+  border-radius:2px; background:var(--text) }
+.trip--pre .g-journey__now, .trip--done .g-journey__now{ display:none }
+.g-journey__names{ position:relative; height:16px }
+.g-journey__names span{ position:absolute; left:calc(var(--a, 0) * 1%); max-width:calc((var(--b, 0) - var(--a, 0)) * 1%);
+  overflow:hidden; text-overflow:clip; white-space:nowrap; padding:0 10px 0 2px; box-sizing:border-box;
+  color:var(--text-dim); font:500 var(--fs-200)/16px var(--sans) }
+.g-journey__names span.is-active{ color:var(--text) }
+.g-journey__names span.is-tight{ visibility:hidden }
+.g-journey__ends{ display:flex; justify-content:space-between; color:var(--text-ghost); font:400 var(--fs-100)/1 var(--sans) }
+
+/* ---- legs: one card per region ---- */
+.g-trip__legs{ list-style:none; margin:0; padding:0; display:grid; gap:var(--s-4);
+  grid-template-columns:repeat(auto-fit, minmax(min(100%, 200px), 1fr)) }
+.g-leg{ min-width:0 }
+.g-leg__in{ height:100%; display:grid; grid-template-rows:auto 1fr; border-radius:var(--r-card); overflow:clip;
+  background:var(--card); border:var(--hair) solid var(--stroke-2); color:var(--text);
+  transition:transform var(--dur-3) var(--spring-soft, var(--ease)), box-shadow var(--dur-3) var(--ease), border-color var(--dur-3) var(--ease) }
+a.g-leg__in:hover{ transform:translateY(-3px); box-shadow:var(--shadow-16); border-color:var(--stroke-1) }
+a.g-leg__in:focus-visible{ outline:none; box-shadow:var(--ring) }
+.g-leg.is-active .g-leg__in{ border-color:var(--acc-line); box-shadow:0 0 0 1px var(--acc-line) }
+.g-leg__media{ position:relative; aspect-ratio:16/9; overflow:hidden;
+  background:linear-gradient(135deg, color-mix(in srgb, var(--acc) 22%, var(--surface-3)), var(--surface-3)) }
+.g-leg__media img{ width:100%; height:100%; object-fit:cover; transition:transform var(--dur-5) var(--ease) }
+a.g-leg__in:hover .g-leg__media img{ transform:scale(1.04) }
+/* a photo keeps the dark scheme; the shade only lies on a photo */
+.g-leg__media--photo{ color-scheme:dark }
+.g-leg__media--photo::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.38), transparent 45%) }
+.g-leg__media:not(.g-leg__media--photo) .g-leg__n{ color:var(--text-dim) }
+.g-leg__glyph{ position:absolute; inset:0; display:grid; place-items:center; color:color-mix(in srgb, var(--text) 30%, transparent);
+  font:600 clamp(34px, 4vw, 52px)/1 var(--sans); letter-spacing:.04em }
+.g-leg__n{ position:absolute; z-index:1; top:var(--s-3); left:var(--s-3); color:rgba(255,255,255,.9);
+  font:500 var(--fs-100)/1 var(--mono); letter-spacing:.06em }
+.g-leg__state:empty{ display:none }
+.g-leg__state{ position:absolute; z-index:1; top:var(--s-2); right:var(--s-2); display:inline-flex; align-items:center; height:24px;
+  padding:0 var(--s-3); border-radius:var(--r-pill); background:rgba(0,0,0,.5); color:#fff;
+  -webkit-backdrop-filter:var(--blur-1); backdrop-filter:var(--blur-1); font:500 var(--fs-100)/1 var(--sans); white-space:nowrap }
+.g-leg.is-active .g-leg__state{ background:var(--acc-fill); color:var(--on-acc) }
+.g-leg.is-done .g-leg__state{ background:color-mix(in srgb, var(--done) 85%, #000) }
+.g-leg__body{ display:flex; flex-direction:column; gap:var(--s-2); padding:var(--s-4) var(--s-4) var(--s-4) }
+.g-leg__name{ display:flex; align-items:baseline; gap:var(--s-2); min-width:0; font:600 var(--fs-400)/1.2 var(--sans) }
+.g-leg__jp{ color:var(--text-dim); font-weight:400; font-size:var(--fs-300) }
+.g-leg__dot, .g-side__dot{ flex:none; width:8px; height:8px; border-radius:50%; align-self:center;
+  border:1.5px solid var(--text-ghost); background:transparent }
+.g-leg.is-active .g-leg__dot, .g-side.is-active .g-side__dot{ border-color:var(--now); background:var(--now) }
+.g-leg.is-done .g-leg__dot, .g-side.is-done .g-side__dot{ border-color:var(--done); background:var(--done) }
+.g-leg__dates{ color:var(--text-dim); font:400 var(--fs-200)/1.35 var(--sans) }
+.g-leg__dates span{ white-space:nowrap }
+.g-leg__foot{ margin-top:auto; padding-top:var(--s-2); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--s-2) var(--s-3);
+  border-top:var(--hair) solid var(--stroke-3, var(--stroke-2)) }
+.g-leg__count{ color:var(--text-dim); font:400 var(--fs-200)/1 var(--sans) }
+.g-leg__count:empty{ display:none }
+
+/* weather: glyph, temperature, today's range, the condition */
+.g-wx{ display:inline-flex; align-items:baseline; flex-wrap:wrap; gap:4px 6px; min-width:0; font:400 var(--fs-200)/1.2 var(--sans); color:var(--text-dim) }
+.g-wx[hidden]{ display:none }
+.g-wx b{ color:var(--text); font-weight:600; font-variant-numeric:tabular-nums }
+.g-wx__ico{ color:var(--text); font-family:var(--mono) }
+.g-wx[data-wx-kind="sun"] .g-wx__ico, .g-wx[data-wx-kind="storm"] .g-wx__ico{ color:var(--warn) }
+.g-wx[data-wx-kind="rain"] .g-wx__ico, .g-wx[data-wx-kind="snow"] .g-wx__ico{ color:var(--acc) }
+.g-wx__range{ font-variant-numeric:tabular-nums; color:var(--text-ghost) }
+.g-wx__range[hidden]{ display:none }
+
+/* ---- side trips ---- */
+.g-trip__sides{ padding:var(--s-4) var(--s-5) }
+.g-trip__sides-title{ margin:0 0 var(--s-2); display:flex; align-items:center; gap:var(--s-2); font:600 var(--fs-400)/1.2 var(--sans) }
+.g-trip__sides-title > span:first-child{ color:var(--acc) }
+.g-sides{ list-style:none; margin:0; padding:0; display:grid }
+.g-side + .g-side{ border-top:var(--hair) solid var(--stroke-2) }
+.g-side__in{ display:grid; align-items:center; gap:var(--s-2) var(--s-4); padding:var(--s-3) var(--s-2); margin-inline:calc(var(--s-2) * -1);
+  grid-template-columns:auto minmax(150px, 1.1fr) minmax(130px, 1fr) minmax(0, 2fr) auto; color:var(--text);
+  border-radius:var(--r-inner); transition:background var(--dur-2) var(--ease) }
+a.g-side__in:hover{ background:var(--hover) }
+a.g-side__in:focus-visible{ outline:none; box-shadow:var(--ring) }
+.g-side__place{ display:flex; align-items:baseline; flex-wrap:wrap; gap:2px var(--s-2); min-width:0 }
+.g-side__place b{ font:600 var(--fs-300)/1.2 var(--sans) }
+.g-side__place span{ color:var(--text-dim); font-size:var(--fs-200) }
+.g-side__place small{ flex-basis:100%; color:var(--text-ghost); font:400 var(--fs-100)/1.2 var(--sans) }
+.g-side__date{ color:var(--text-dim); font:400 var(--fs-200)/1.3 var(--sans) }
+.g-side__flights{ display:flex; flex-wrap:wrap; gap:var(--s-2) }
+.g-flight{ display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 var(--s-3); border-radius:var(--r-pill);
+  background:color-mix(in srgb, var(--text) 6%, transparent); color:var(--text-dim); font:400 var(--fs-100)/1 var(--mono); white-space:nowrap }
+.g-flight b{ color:var(--text); font-weight:600 }
+.g-side__meta{ justify-self:end; color:var(--text-dim); font:500 var(--fs-200)/1 var(--sans); white-space:nowrap }
+.g-side.is-active .g-side__meta{ color:var(--acc); font-weight:600 }
+.g-side.is-done .g-side__meta{ color:var(--done) }
+.g-side.is-done .g-side__place b, .g-leg.is-done .g-leg__name{ color:var(--text-dim) }
+
+/* ---- the route map (the generated _trip_map.html) ---- */
+.trip-map{ margin:0; display:grid; gap:var(--s-3) }
+.trip-map svg{ display:block; width:100%; height:auto; overflow:visible }
+.trip-map__land{ fill:color-mix(in srgb, var(--text) 9%, transparent); stroke:var(--card); stroke-width:.5 }
+.trip-map__inset{ fill:none; stroke:var(--stroke-1); stroke-width:.8; stroke-dasharray:2 2; rx:3 }
+.trip-map__pref{ fill:color-mix(in srgb, var(--text) 16%, transparent); stroke:var(--card); stroke-width:.5;
+  transition:fill var(--dur-4) var(--ease) }
+.trip-map__pref--side{ fill:color-mix(in srgb, var(--text) 12%, transparent) }
+.trip-map__pref.is-active{ fill:color-mix(in srgb, var(--now) 45%, transparent) }
+.trip-map__pref.is-done{ fill:color-mix(in srgb, var(--done) 32%, transparent) }
+.trip-map__seg{ fill:none; stroke:var(--text-ghost); stroke-width:1.4; stroke-linecap:round; stroke-dasharray:1 4 }
+.trip-map__seg.is-done{ stroke:var(--done); stroke-dasharray:none; opacity:.85 }
+.trip-map__seg.is-next{ stroke:var(--now); stroke-dasharray:4 4; animation:g-trip-dash 1.2s linear infinite }
+.trip-map__seg--side{ stroke-width:1; stroke-dasharray:1 3 }
+.trip-map__seg--side.is-done{ stroke:var(--done); stroke-dasharray:1 3; opacity:.8 }
+@keyframes g-trip-dash{ to{ stroke-dashoffset:-8 } }
+.trip-map__dot{ fill:var(--card); stroke:var(--text-dim); stroke-width:1.4 }
+.trip-map__city.is-active .trip-map__dot, .trip-map__city.is-here .trip-map__dot{ fill:var(--now); stroke:var(--now) }
+.trip-map__city.is-done .trip-map__dot{ fill:var(--done); stroke:var(--done) }
+.trip-map__ring{ fill:none; stroke:var(--now); stroke-width:1; opacity:0 }
+.trip-map__pulse{ fill:var(--now); opacity:0; transform-box:fill-box; transform-origin:center }
+.trip-map__city.is-active:not(.is-away) .trip-map__ring, .trip-map__city.is-here .trip-map__ring{ opacity:.55 }
+.trip-map__city.is-active:not(.is-away) .trip-map__pulse, .trip-map__city.is-here .trip-map__pulse{ animation:g-trip-pulse 2.4s var(--ease-out) infinite }
+@keyframes g-trip-pulse{ 0%{ opacity:.5; transform:scale(1) } 80%,100%{ opacity:0; transform:scale(3.2) } }
+.trip-map__lbl{ fill:var(--text-dim); font:500 9px var(--sans); paint-order:stroke; stroke:var(--card); stroke-width:3px; stroke-linejoin:round }
+.trip-map__city--side .trip-map__lbl{ font-size:8px; fill:var(--text-ghost) }
+.trip-map__city.is-active .trip-map__lbl, .trip-map__city.is-here .trip-map__lbl{ fill:var(--text); font-weight:600 }
+.trip-map__cap{ display:flex; justify-content:space-between; gap:var(--s-2); padding:0 var(--s-2);
+  color:var(--text-dim); font:500 var(--fs-200)/1 var(--sans) }
+
+@media (prefers-reduced-motion: reduce){
+  .g-trip__beacon::after, .trip-map__pulse, .trip-map__seg.is-next{ animation:none }
+}
+:root[data-motion="reduced"] .g-trip__beacon::after, :root[data-motion="reduced"] .trip-map__pulse,
+:root[data-motion="reduced"] .trip-map__seg.is-next{ animation:none }
+
+/* ---- narrower: the map moves under the legs ---- */
+@media (max-width: 1080px){
+  .g-trip{ grid-template-columns:minmax(0, 1fr); grid-template-areas: "now" "legs" "map" "sides" }
+  .g-trip__map{ position:static }
+  .trip-map{ max-width:520px; margin-inline:auto; width:100% }
+}
+@media (max-width: 860px){
+  .g-side__in{ grid-template-columns:auto minmax(0, 1fr) auto; grid-template-areas:"dot place meta" ". date date" ". fl fl" }
+  .g-side__dot{ grid-area:dot } .g-side__place{ grid-area:place } .g-side__meta{ grid-area:meta }
+  .g-side__date{ grid-area:date } .g-side__flights{ grid-area:fl }
+  .g-side__flights:empty{ display:none }
+}
+@media (max-width: 560px){
+  /* a leg becomes a row: a small picture left, the words right */
+  .g-trip__legs{ gap:var(--s-3) }
+  .g-leg__in{ grid-template-rows:none; grid-template-columns:92px minmax(0, 1fr) }
+  .g-leg__media{ aspect-ratio:auto; min-height:100% }
+  .g-leg__glyph{ font-size:22px }
+  .g-leg__state{ top:auto; bottom:var(--s-2); left:50%; right:auto; transform:translateX(-50%); height:20px; padding:0 var(--s-2) }
+  .g-leg__body{ padding:var(--s-3) var(--s-3) var(--s-3) var(--s-4); gap:var(--s-1) }
+  .g-leg__name{ font-size:var(--fs-300) }
+  .g-leg__foot{ padding-top:var(--s-2); margin-top:var(--s-1) }
+  .g-trip__now{ padding:var(--s-4) }
+  .g-trip__clock{ margin-left:0 }
+  .g-trip__phase{ font-size:var(--fs-300) }
+  .g-trip__unit b{ font-size:clamp(34px, 11vw, 48px) }
+  .g-trip__sep{ font-size:clamp(26px, 8vw, 38px) }
+}

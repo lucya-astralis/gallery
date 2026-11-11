@@ -1,20 +1,12 @@
-/* Aperture 3.2 · the trip dashboard, kept from the Nebula app.js as it was. */
-// ---------- UI LANGUAGE ----------------------------------------
-// The server renders <html lang="en|de|ja"> from the language cookie
-// (selector in the nav); client-side strings pick their translation here.
-// Keep the wording in sync with app/i18n.py — including the quality marker
-// on the image stage, which used to be an English-only HUD stamp and is now
-// a translated label like everything else the reader is meant to read.
-// NB: new Japanese text may need a font-subset rebuild — see
-// tools/build_jp_subset.py.
+/* Aperture 3.2 · the trip dashboard (_trip.html, f/trip.css). Every date is
+   the viewer's local wall-clock, so it reads right from home before the
+   flight and on the ground once the trip is underway. State is class
+   toggles and CSSOM custom properties only (the CSP drops inline styles).
+   NB: new Japanese text may need a font-subset rebuild, see
+   tools/build_jp_subset.py. */
 const UI_LANG = (document.documentElement.lang || 'en').toLowerCase().slice(0, 2);
 const UI_STRINGS = {
   en: {
-    loadOriginal: 'Load original',
-    qualityPreview: 'Preview',
-    qualityOriginal: 'Original',
-    loading: 'Loading…',
-    errRetry: 'Error — retry?',
     departsIn: 'Departs in',
     arrivingIn: (city) => 'Arriving in ' + city,
     leavingIn: (city) => 'Leaving ' + city + ' in',
@@ -26,11 +18,6 @@ const UI_STRINGS = {
     fmtDate: (d, M) => `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`,
   },
   de: {
-    loadOriginal: 'Original laden',
-    qualityPreview: 'Vorschau',
-    qualityOriginal: 'Original',
-    loading: 'Lädt…',
-    errRetry: 'Fehler — erneut?',
     departsIn: 'Abflug in',
     arrivingIn: (city) => 'Ankunft in ' + city,
     leavingIn: (city) => 'Abreise aus ' + city + ' in',
@@ -42,11 +29,6 @@ const UI_STRINGS = {
     fmtDate: (d, M) => `${d.getDate()}. ${M[d.getMonth()]} ${d.getFullYear()}`,
   },
   ja: {
-    loadOriginal: 'オリジナルを読み込む',
-    qualityPreview: 'プレビュー',
-    qualityOriginal: 'オリジナル',
-    loading: '読み込み中…',
-    errRetry: 'エラー — 再試行？',
     departsIn: '出発まで',
     arrivingIn: (city) => city + 'に到着まで',
     leavingIn: (city) => city + 'を出発まで',
@@ -54,18 +36,12 @@ const UI_STRINGS = {
     soon: 'まもなく',
     inDays: (d) => 'あと' + d + '日',
     dayOf: (n, total) => n + '日目 / ' + total + '日',
-    months: null, // fmtDate below doesn't use month names
+    months: null,
     fmtDate: (d) => `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`,
   },
 };
 const TXT = UI_STRINGS[UI_LANG] || UI_STRINGS.en;
 
-// ---------- TRIP DASHBOARD (album addon) -----------------------
-// Live flight countdown + itinerary "you are here" marker. Every date is
-// read as the viewer's LOCAL wall-clock, so the widget reads correctly both
-// from home before departure and on the ground once the trip is underway.
-// State is driven purely by class toggles + CSSOM custom properties
-// (CSP-safe — no inline <script>/<style>); all styling lives in style.css.
 document.addEventListener('DOMContentLoaded', () => {
   const root = document.querySelector('[data-trip]');
   if (!root) return;
@@ -84,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const depart = parseLocal(root.dataset.depart);
   // `city` is the stop's region name and stays the English key (matches
-  // _trip_map.html's data-map-city and the HUD status stamp); `cityLabel` is
+  // _trip_map.html's data-map-city); `cityLabel` is
   // what countdown sentences display — the Japanese name on the JP page when
   // the template provides one.
   const stops = Array.from(root.querySelectorAll('[data-stop]')).map((el) => ({
@@ -93,7 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
     cityLabel: (UI_LANG === 'ja' && el.dataset.cityJp) ? el.dataset.cityJp : (el.dataset.city || ''),
     start: parseLocal(el.dataset.start),
     end: parseLocal(el.dataset.end),
-    fill: el.querySelector('[data-stop-fill]'),
     meta: el.querySelector('[data-stop-meta]'),
   })).filter((s) => s.start && s.end);
 
@@ -149,8 +124,6 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const labelEl = root.querySelector('[data-trip-cd-label]');
   const targetEl = root.querySelector('[data-trip-cd-target]');
-  const statusEl = root.querySelector('[data-trip-status]');
-  const statusPlaceEl = root.querySelector('[data-trip-status-place]');
 
   const firstStart = stops.length ? stops[0].start : null;
   const lastEnd = stops.length ? stops[stops.length - 1].end : null;
@@ -170,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // second, mostly with what they already said), and text that has is
   // changed IN its text node: replacing the node — which is what assigning
   // textContent does — reaches through the layout boundary around the
-  // digits (.trip__cd-unit b / .trip__clock b in style.css) and WebKit lays
+  // digits (.g-trip__unit b / .g-trip__clock b in trip.css) and WebKit lays
   // the whole page out again, photo grid and all: ~100 ms every second on
   // the Japan album once it had been scrolled through, which is what left it
   // deaf to taps and showing painted tiles as empty boxes.
@@ -191,6 +164,40 @@ document.addEventListener('DOMContentLoaded', () => {
     setText(cd.m, pad2(Math.floor((t % 3600000) / 60000)));
     setText(cd.s, pad2(Math.floor((t % 60000) / 1000)));
   };
+
+  const setProp = (el, k, v) => { if (el && el.style.getPropertyValue(k) !== String(v)) el.style.setProperty(k, v); };
+  const clampPct = (x) => Math.max(0, Math.min(100, x));
+
+  // the journey bar: departure (or the first stop) to the flight home. Each
+  // leg and side trip is placed once (--a/--b in percent of that span); the
+  // tick only moves the fills and the "now" line.
+  const journey = root.querySelector('[data-journey]');
+  const t0 = depart || firstStart, span0 = (t0 && lastEnd) ? lastEnd - t0 : 0;
+  const at = (d) => clampPct((d - t0) / span0 * 100).toFixed(3);
+  const jStop = {}, jName = {}, jSide = {};
+  const jNow = journey && journey.querySelector('[data-j-now]');
+  if (journey && span0 > 0) {
+    stops.forEach((s) => {
+      const el = journey.querySelector(`[data-j-stop="${CSS.escape(s.city)}"]`);
+      const nm = journey.querySelector(`[data-j-name="${CSS.escape(s.city)}"]`);
+      [el, nm].forEach((x) => { if (x) { setProp(x, '--a', at(s.start)); setProp(x, '--b', at(s.end)); } });
+      if (el) jStop[s.city] = { el, fill: el.querySelector('[data-j-fill]') };
+      if (nm) jName[s.city] = nm;
+    });
+    sides.forEach((s) => {
+      const el = journey.querySelector(`[data-j-side="${CSS.escape(s.city)}"]`);
+      if (el) { setProp(el, '--a', at(s.start)); setProp(el, '--b', at(s.end)); jSide[s.city] = el; }
+    });
+    journey.hidden = false;
+    // a stay too short for its name keeps the bar and drops the word
+    const fit = () => Object.values(jName).forEach((nm) => {
+      nm.classList.remove('is-tight');
+      nm.classList.toggle('is-tight', nm.scrollWidth > nm.clientWidth + 1);
+    });
+    fit();
+    addEventListener('resize', fit, { passive: true });
+    document.fonts?.ready.then(fit);
+  }
 
   function tick() {
     const now = new Date();
@@ -218,14 +225,9 @@ document.addEventListener('DOMContentLoaded', () => {
         : state === 'upcoming' ? 0
         : span > 0 ? ((now - s.start) / span) * 100 : 0;
       pct = Math.max(0, Math.min(100, pct));
-      // a meter: the value rides --p (Nebula's .meter), the stylesheet
-      // turns it into a width — so a reveal can hold it at zero without
-      // fighting an inline width
-      if (s.fill) {
-        const p = pct.toFixed(2);
-        if (s.fill.style.getPropertyValue('--p') !== p) s.fill.style.setProperty('--p', p);
-      }
-
+      const j = jStop[s.city];
+      if (j) { setState(j.el, state); setProp(j.fill, '--p', pct.toFixed(2)); }
+      if (jName[s.city]) jName[s.city].classList.toggle('is-active', state === 'active');
       if (s.meta) {
         if (state === 'upcoming') {
           const dleft = ceilDays(now, s.start);
@@ -263,6 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (s.region) setState(mapPref[s.region], state);
       }
       if (mapSide[s.city]) mapSide[s.city].classList.toggle('is-done', state !== 'upcoming');
+      setState(jSide[s.city], state);
       if (s.meta) {
         if (state === 'upcoming') {
           const dleft = ceilDays(now, s.start);
@@ -281,37 +284,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (jstFmt && clockTimeEl) setText(clockTimeEl, jstFmt.format(now));
 
-    // phase + headline countdown (label is localized; the status stamp is
-    // HUD chrome and stays English in every language). The stamp's word is
-    // fixed chrome; the place after it is data and keeps its own case.
-    let phase, target, label, status, place = '';
+    // phase + headline countdown (label is localized).
+    let phase, target, label;
     if (depart && now < depart) {
       phase = 'pre'; target = depart;
-      label = TXT.departsIn; status = 'T-' + Math.floor((depart - now) / DAY) + ' days';
+      label = TXT.departsIn;
     } else if (firstStart && now < firstStart) {
       phase = 'transit'; target = firstStart;
-      label = TXT.arrivingIn(stops[0].cityLabel); status = 'In transit';
+      label = TXT.arrivingIn(stops[0].cityLabel);
     } else if (activeIdx >= 0) {
       phase = 'active'; target = stops[activeIdx].end;
       label = TXT.leavingIn(stops[activeIdx].cityLabel);
-      status = 'In';
-      place = (away && away.from === stops[activeIdx].city) ? away.city : stops[activeIdx].city;
     } else {
       phase = 'done'; target = null;
-      label = TXT.tripComplete; status = 'Complete';
+      label = TXT.tripComplete;
     }
 
     setPhase(phase);
     setClock(target ? target - now : 0);
     setText(labelEl, label);
-    setText(statusEl, status);
-    if (statusPlaceEl) {
-      setText(statusPlaceEl, place);
-      statusPlaceEl.hidden = !place;
-    }
+    if (jNow && span0 > 0) setProp(jNow, '--p', clampPct((now - t0) / span0 * 100).toFixed(2));
     setText(targetEl, fmtDate(target || lastEnd));
   }
 
+  root.classList.add('is-live');
   tick();
   setInterval(tick, 1000);
 
@@ -320,8 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // to Open-Meteo — the browser never talks to a third party, so no consent
   // UI is needed and connect-src 'self' holds). Chips stay hidden unless
   // real data arrives; glyphs use text-presentation symbols so they render
-  // in the mono HUD style instead of as emoji. Condition names are HUD
-  // chrome (English, tooltip only), like the status stamps.
+  // in the mono HUD style instead of as emoji. Condition names follow the page language.
   const wxByCity = {};
   stops.forEach((s) => {
     const el = s.el.querySelector('[data-stop-wx]');
@@ -331,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (tripKey && window.fetch && Object.keys(wxByCity).length) {
     // WMO weather_code buckets -> [glyph, label, kind]; ☀/☾ pick by is_day.
     // `kind` lands on the chip as data-wx-kind and only tints the glyph
-    // (style.css) — sun amber, night violet, rain blue, snow ice, …
+    // (trip.css): warm for sun and storm, the accent for rain and snow
     // the weather's words in the page's language (they were English only)
     const WX = {
       de: { 'Clear': 'Klar', 'Mostly clear': 'Überwiegend klar', 'Partly cloudy': 'Teils bewölkt', 'Overcast': 'Bedeckt',
