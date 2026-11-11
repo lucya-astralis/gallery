@@ -79,6 +79,9 @@ services:
       # Nebula's own faces and icons instead of the stock set: the default for
       # gallery.cfg `faces` (Aperture's Site > Look) when it is not set.
       - NEBULA_FACES=${NEBULA_FACES:-0}
+      # The public gallery's frontend: facet (3.2, the default) or nebula
+      # (the pre-3.2 pages, kept as a fallback while Facet settles in).
+      - FRONTEND=${FRONTEND:-facet}
       - BACKUPS=${BACKUPS:-20}
       - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-8}
     # Nothing in here needs a privilege it isn't given. The user owns the four
