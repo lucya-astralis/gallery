@@ -143,6 +143,7 @@ def trip_for_album(album: str, lang: str = i18n.DEFAULT_LANG) -> dict | None:
             "flights": [dict(zip(("no", "from", "dep", "to", "arr"), f))
                         for f in s.get("flights") or []],
             "href": f"/album/{sub}" if count else None,
+            "cover": card["cover"] if card else None,
             "count": count,
         })
     return {

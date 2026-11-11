@@ -5,7 +5,8 @@
    Loaded on a trip album only. State classes come from trip.js:
      [data-trip]          .is-live once the script runs; .trip--pre /
                           --transit / --active / --done for the phase
-     .g-leg / .g-side     .is-upcoming / .is-active / .is-done
+     .g-leg (legs and     .is-upcoming / .is-active / .is-done
+             side trips)
      the map              the same three on [data-map-city] / [data-map-pref],
                           .is-done / .is-next on [data-map-seg],
                           .is-done on [data-map-side], .is-away / .is-here
@@ -20,7 +21,9 @@
   --later: var(--stroke-1);
   display:grid; gap:var(--s-5); margin-block:var(--s-6) var(--s-8);
   grid-template-columns:minmax(0, 1fr) minmax(300px, 380px);
-  grid-template-areas: "now map" "legs map" "sides sides";
+  /* the map has the right column to itself, the whole height: sticky, it
+     travels inside the grid, so nothing may share that column with it */
+  grid-template-areas: "now map" "legs map" "sides map";
   align-items:start;
 }
 .g-trip__now{ grid-area:now; display:flex; flex-direction:column; gap:var(--s-4); padding:var(--s-5) var(--s-6) var(--s-6) }
@@ -118,10 +121,10 @@ a.g-leg__in:hover .g-leg__media img{ transform:scale(1.04) }
 .g-leg__body{ display:flex; flex-direction:column; gap:var(--s-2); padding:var(--s-4) var(--s-4) var(--s-4) }
 .g-leg__name{ display:flex; align-items:baseline; gap:var(--s-2); min-width:0; font:600 var(--fs-400)/1.2 var(--sans) }
 .g-leg__jp{ color:var(--text-dim); font-weight:400; font-size:var(--fs-300) }
-.g-leg__dot, .g-side__dot{ flex:none; width:8px; height:8px; border-radius:50%; align-self:center;
+.g-leg__dot{ flex:none; width:8px; height:8px; border-radius:50%; align-self:center;
   border:1.5px solid var(--text-ghost); background:transparent }
-.g-leg.is-active .g-leg__dot, .g-side.is-active .g-side__dot{ border-color:var(--now); background:var(--now) }
-.g-leg.is-done .g-leg__dot, .g-side.is-done .g-side__dot{ border-color:var(--done); background:var(--done) }
+.g-leg.is-active .g-leg__dot{ border-color:var(--now); background:var(--now) }
+.g-leg.is-done .g-leg__dot{ border-color:var(--done); background:var(--done) }
 .g-leg__dates{ color:var(--text-dim); font:400 var(--fs-200)/1.35 var(--sans) }
 .g-leg__dates span{ white-space:nowrap }
 .g-leg__foot{ margin-top:auto; padding-top:var(--s-2); display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--s-2) var(--s-3);
@@ -139,30 +142,22 @@ a.g-leg__in:hover .g-leg__media img{ transform:scale(1.04) }
 .g-wx__range{ font-variant-numeric:tabular-nums; color:var(--text-ghost) }
 .g-wx__range[hidden]{ display:none }
 
-/* ---- side trips ---- */
-.g-trip__sides{ padding:var(--s-4) var(--s-5) }
-.g-trip__sides-title{ margin:0 0 var(--s-2); display:flex; align-items:center; gap:var(--s-2); font:600 var(--fs-400)/1.2 var(--sans) }
+/* ---- side trips: smaller cards, in the legs' column ---- */
+.g-trip__sides{ display:grid; gap:var(--s-3); min-width:0 }
+.g-trip__sides-title{ margin:var(--s-2) 0 0; display:flex; align-items:center; gap:var(--s-2); font:600 var(--fs-400)/1.2 var(--sans) }
 .g-trip__sides-title > span:first-child{ color:var(--acc) }
-.g-sides{ list-style:none; margin:0; padding:0; display:grid }
-.g-side + .g-side{ border-top:var(--hair) solid var(--stroke-2) }
-.g-side__in{ display:grid; align-items:center; gap:var(--s-2) var(--s-4); padding:var(--s-3) var(--s-2); margin-inline:calc(var(--s-2) * -1);
-  grid-template-columns:auto minmax(150px, 1.1fr) minmax(130px, 1fr) minmax(0, 2fr) auto; color:var(--text);
-  border-radius:var(--r-inner); transition:background var(--dur-2) var(--ease) }
-a.g-side__in:hover{ background:var(--hover) }
-a.g-side__in:focus-visible{ outline:none; box-shadow:var(--ring) }
-.g-side__place{ display:flex; align-items:baseline; flex-wrap:wrap; gap:2px var(--s-2); min-width:0 }
-.g-side__place b{ font:600 var(--fs-300)/1.2 var(--sans) }
-.g-side__place span{ color:var(--text-dim); font-size:var(--fs-200) }
-.g-side__place small{ flex-basis:100%; color:var(--text-ghost); font:400 var(--fs-100)/1.2 var(--sans) }
-.g-side__date{ color:var(--text-dim); font:400 var(--fs-200)/1.3 var(--sans) }
-.g-side__flights{ display:flex; flex-wrap:wrap; gap:var(--s-2) }
-.g-flight{ display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 var(--s-3); border-radius:var(--r-pill);
+.g-sides{ list-style:none; margin:0; padding:0; display:grid; gap:var(--s-4);
+  grid-template-columns:repeat(auto-fill, minmax(min(100%, 200px), 1fr)) }
+.g-leg--side .g-leg__media{ aspect-ratio:21/9 }
+.g-leg--side .g-leg__glyph{ font-size:clamp(26px, 3vw, 36px) }
+.g-leg--side .g-leg__name{ font-size:var(--fs-300) }
+.g-leg--side .g-leg__n{ font-size:var(--fs-200) }
+.g-side__flights{ display:flex; flex-wrap:wrap; gap:var(--s-1) var(--s-2); margin-top:var(--s-1) }
+.g-flight{ display:inline-flex; align-items:center; gap:5px; height:24px; padding:0 var(--s-2); border-radius:var(--r-pill);
   background:color-mix(in srgb, var(--text) 6%, transparent); color:var(--text-dim); font:400 var(--fs-100)/1 var(--mono); white-space:nowrap }
 .g-flight b{ color:var(--text); font-weight:600 }
-.g-side__meta{ justify-self:end; color:var(--text-dim); font:500 var(--fs-200)/1 var(--sans); white-space:nowrap }
-.g-side.is-active .g-side__meta{ color:var(--acc); font-weight:600 }
-.g-side.is-done .g-side__meta{ color:var(--done) }
-.g-side.is-done .g-side__place b, .g-leg.is-done .g-leg__name{ color:var(--text-dim) }
+.g-side__from{ color:var(--text-ghost); font:400 var(--fs-200)/1 var(--sans) }
+.g-leg.is-done .g-leg__name{ color:var(--text-dim) }
 
 /* ---- the route map (the generated _trip_map.html) ---- */
 .trip-map{ margin:0; display:grid; gap:var(--s-3) }
@@ -206,17 +201,12 @@ a.g-side__in:focus-visible{ outline:none; box-shadow:var(--ring) }
   .g-trip__map{ position:static }
   .trip-map{ max-width:520px; margin-inline:auto; width:100% }
 }
-@media (max-width: 860px){
-  .g-side__in{ grid-template-columns:auto minmax(0, 1fr) auto; grid-template-areas:"dot place meta" ". date date" ". fl fl" }
-  .g-side__dot{ grid-area:dot } .g-side__place{ grid-area:place } .g-side__meta{ grid-area:meta }
-  .g-side__date{ grid-area:date } .g-side__flights{ grid-area:fl }
-  .g-side__flights:empty{ display:none }
-}
 @media (max-width: 560px){
   /* a leg becomes a row: a small picture left, the words right */
   .g-trip__legs{ gap:var(--s-3) }
   .g-leg__in{ grid-template-rows:none; grid-template-columns:92px minmax(0, 1fr) }
-  .g-leg__media{ aspect-ratio:auto; min-height:100% }
+  .g-leg__media, .g-leg--side .g-leg__media{ aspect-ratio:auto; min-height:100% }
+  .g-leg--side .g-leg__glyph{ font-size:22px }
   .g-leg__glyph{ font-size:22px }
   .g-leg__state{ top:auto; bottom:var(--s-2); left:50%; right:auto; transform:translateX(-50%); height:20px; padding:0 var(--s-2) }
   .g-leg__body{ padding:var(--s-3) var(--s-3) var(--s-3) var(--s-4); gap:var(--s-1) }

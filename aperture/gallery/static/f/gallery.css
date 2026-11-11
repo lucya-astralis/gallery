@@ -457,6 +457,19 @@ details > summary{ cursor:pointer; color:var(--text-dim); font:500 var(--fs-200)
 }
 @media (max-width: 639px){
   :root{ --bar-h:56px }
+  /* albums two to a row: a phone shows a shelf, not one album at a time */
+  .g-cards, .g-posters{ grid-template-columns:repeat(2, minmax(0, 1fr)); gap:var(--s-3) }
+  .g-card__cap{ gap:2px; padding:var(--s-3) }
+  .g-card__name{ font-size:var(--fs-300) }
+  .g-card__name img{ width:15px; height:15px }
+  .g-card__meta{ flex-wrap:wrap; gap:0 var(--s-2); font-size:var(--fs-100) }
+  .g-card__badge{ top:6px; left:6px; height:20px; padding:0 7px }
+  .g-poster > a{ aspect-ratio:4/5 }
+  .g-poster__cap{ padding:var(--s-7) var(--s-3) var(--s-3) }
+  .g-poster__name{ font-size:var(--fs-300) }
+  .g-poster__name img{ width:16px; height:16px }
+  .g-poster__meta{ font-size:var(--fs-100) }
+  .g-poster__go{ display:none }
   .g-brand__name, .g-brand__sub{ display:none }
   .g-bar__in{ gap:var(--s-3) }
   .g-lang a{ padding:5px 7px }

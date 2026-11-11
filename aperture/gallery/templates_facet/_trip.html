@@ -2,7 +2,7 @@
 
    One section, four parts on a grid: the live panel (phase, countdown,
    the journey bar), the route map beside it, the legs as cards under it, and
-   the side trips as a list. Everything is read against the viewer's own
+   the side trips as smaller cards. Everything is read against the viewer's own
    clock by f/trip.js from the data-* attributes; the markup alone is a
    sensible page without it (the stops, dates and links are all here, only
    the live figures, the journey bar and the weather stay empty / hidden).
@@ -87,22 +87,31 @@
      row each: the state dot, the place, from where, the dates, the flights,
      where it stands. #}
   {% if trip.side_trips %}
-  <section class="g-trip__sides g-panel" aria-label="{{ t('trip.side_trips') }}">
+  {# Side trips: excursions from a leg's base, not legs of their own. A card
+     each, smaller than a leg's: the album's cover (or the place's kanji),
+     where it stands, the place, from which base, the dates, the flights. #}
+  <section class="g-trip__sides" aria-label="{{ t('trip.side_trips') }}">
     <h3 class="g-trip__sides-title"><span aria-hidden="true">↗</span> {{ t('trip.side_trips') }} <span class="g-section__n">{{ trip.side_trips | length }}</span></h3>
     <ol class="g-sides">
       {% for s in trip.side_trips %}
-      <li class="g-side" data-side data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}" data-from="{{ s.from }}"{% if s.region %} data-region="{{ s.region }}"{% endif %}{% if s.revisit %} data-revisit{% endif %}>
-        {% if s.href %}<a class="g-side__in" href="{{ s.href }}">{% else %}<div class="g-side__in">{% endif %}
-          <span class="g-side__dot" aria-hidden="true"></span>
-          <span class="g-side__place">
-            <b>{{ s.city }}</b>{% if s.jp %}<span lang="ja">{{ s.jp }}</span>{% endif %}
-            {% if s.from %}<small>{{ s.from }} ↗{% if s.count %} · {{ s.count }} {{ t('unit.image') if s.count == 1 else t('unit.images') }}{% endif %}</small>{% endif %}
+      <li class="g-leg g-leg--side" data-side data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}" data-from="{{ s.from }}"{% if s.region %} data-region="{{ s.region }}"{% endif %}{% if s.revisit %} data-revisit{% endif %}>
+        {% if s.href %}<a class="g-leg__in" href="{{ s.href }}">{% else %}<div class="g-leg__in">{% endif %}
+          <span class="g-leg__media{% if s.cover %} g-leg__media--photo{% endif %}" aria-hidden="true">
+            {% if s.cover %}<img src="{{ media_url('thumb', s.cover) }}" alt="" loading="lazy" decoding="async">{% elif s.jp %}<span class="g-leg__glyph" lang="ja">{{ s.jp }}</span>{% endif %}
+            <span class="g-leg__n">↗</span>
+            <span class="g-leg__state" data-side-meta></span>
           </span>
-          <span class="g-side__date">{{ s.arrive_h }}{% if s.end_h %} – {{ s.end_h }}{% endif %}</span>
-          {% if s.flights %}
-          <span class="g-side__flights">{% for f in s.flights %}<span class="g-flight"><b>{{ f.no }}</b> {{ f['from'] }} {{ f.dep }} <span aria-hidden="true">→</span> {{ f.to }} {{ f.arr }}</span>{% endfor %}</span>
-          {% endif %}
-          <span class="g-side__meta" data-side-meta></span>
+          <span class="g-leg__body">
+            <span class="g-leg__name"><span class="g-leg__dot" aria-hidden="true"></span>{{ s.city }}{% if s.jp %}<span class="g-leg__jp" lang="ja">{{ s.jp }}</span>{% endif %}</span>
+            <span class="g-leg__dates">{{ s.arrive_h }}{% if s.end_h %} – {{ s.end_h }}{% endif %}</span>
+            {% if s.flights %}
+            <span class="g-side__flights">{% for f in s.flights %}<span class="g-flight"><b>{{ f.no }}</b> {{ f['from'] }} {{ f.dep }} <span aria-hidden="true">→</span> {{ f.to }} {{ f.arr }}</span>{% endfor %}</span>
+            {% endif %}
+            <span class="g-leg__foot">
+              {% if s.from %}<span class="g-side__from">{{ s.from }} ↗</span>{% endif %}
+              <span class="g-leg__count">{% if s.count %}{{ s.count }} {{ t('unit.image') if s.count == 1 else t('unit.images') }}{% endif %}</span>
+            </span>
+          </span>
         {% if s.href %}</a>{% else %}</div>{% endif %}
       </li>
       {% endfor %}
