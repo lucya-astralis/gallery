@@ -188,8 +188,16 @@ def manifest(request: Request):
     p = _require_lucent(request)
     return {"contract": CONTRACT, "kind": "aperture", "name": "Aperture",
             "version": brand.VERSION, "ui_url": p["ui_url"],
-            "description": "Galerie und Bildverwaltung",
+            "description": "Galerie und Bildverwaltung", "icon": _icon(),
             "actions": [] if settings.console_read_only else ACTIONS}
+
+
+def _icon() -> str | None:
+    """Aperture's mark as SVG text; Lucent shows it beside the name (contract 1, optional)."""
+    try:
+        return (Path(__file__).parent / "static" / "logo" / "aperture.svg").read_text("utf-8")
+    except OSError:
+        return None
 
 
 def _ago(ts) -> str:
