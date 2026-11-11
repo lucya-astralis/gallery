@@ -189,7 +189,7 @@ def manifest(request: Request):
     return {"contract": CONTRACT, "kind": "aperture", "name": "Aperture",
             "version": brand.VERSION, "ui_url": p["ui_url"],
             "description": "Galerie und Bildverwaltung", "icon": _icon(),
-            "offers": ["media"],
+            "offers": ["media"], "media": {"browse": True, "writes": [] if settings.console_read_only else ["tags"]},
             "events": {"emits": ["media.tag_added", "media.tag_removed"]},
             "actions": [] if settings.console_read_only else ACTIONS}
 
@@ -226,23 +226,140 @@ def _num(n) -> str:
 MEDIA_LIMIT = 48
 
 
+def _item(r, ui_url: str) -> dict:
+    return {"id": str(r["id"]), "title": r["filename"], "album": r["album"],
+            "width": r["width"], "height": r["height"], "taken_at": r["taken_at"],
+            "url": f"{ui_url}/albums/{urllib.parse.quote(r['album'])}"}
+
+
 @router.get("/lucent/v1/media")
-def media(request: Request, ref: str = ""):
-    _require_lucent(request)
-    ref = ref.strip()
-    if not ref or len(ref) > 80:
-        raise HTTPException(400, "ref is required")
+def media(request: Request, ref: str = "", album: str = "", q: str = "", offset: int = 0, limit: int = MEDIA_LIMIT):
+    """Photos for a reference (a tag, exactly), an album (with its sub-albums)
+    or a search in names and tags. One of the three is required."""
+    p = _require_lucent(request)
+    ref, album, q = ref.strip(), album.strip().strip("/"), q.strip()
+    if not (ref or album or q) or max(len(ref), len(album), len(q)) > 200:
+        raise HTTPException(400, "ref, album or q is required")
+    limit, offset = max(1, min(limit, 200)), max(0, offset)
     from .. import db
-    rows = db.conn().execute(
-        "SELECT i.id, i.album, i.filename, i.width, i.height, i.taken_at FROM images i"
-        " JOIN image_tags it ON it.image_id = i.id JOIN tags t ON t.id = it.tag_id"
-        " WHERE t.name = ? COLLATE NOCASE ORDER BY i.taken_at DESC, i.id DESC LIMIT ?",
-        (ref, MEDIA_LIMIT)).fetchall()
+    base = "SELECT DISTINCT i.id, i.album, i.filename, i.width, i.height, i.taken_at FROM images i"
+    if ref:
+        sql = base + (" JOIN image_tags it ON it.image_id = i.id JOIN tags t ON t.id = it.tag_id"
+                      " WHERE t.name = ? COLLATE NOCASE")
+        args = [ref]
+    elif album:
+        sql = base + " WHERE i.album = ? OR substr(i.album, 1, ?) = ?"
+        args = [album, len(album) + 1, album + "/"]
+    else:
+        like = f"%{q}%"
+        sql = base + (" LEFT JOIN image_tags it ON it.image_id = i.id LEFT JOIN tags t ON t.id = it.tag_id"
+                      " WHERE i.filename LIKE ? OR i.album LIKE ? OR t.name LIKE ?")
+        args = [like, like, like]
+    c = db.conn()
+    total = c.execute(f"SELECT COUNT(*) FROM ({sql})", args).fetchone()[0]
+    rows = c.execute(sql + " ORDER BY i.taken_at DESC, i.id DESC LIMIT ? OFFSET ?", (*args, limit, offset)).fetchall()
+    return {"ref": ref, "album": album, "q": q, "total": total, "items": [_item(r, p["ui_url"]) for r in rows]}
+
+
+@router.get("/lucent/v1/media/albums")
+def media_albums(request: Request):
+    _require_lucent(request)
+    from .. import albums, db
+    c = db.conn()
+    out = []
+    for name in sorted(albums.all_album_nodes(), key=str.lower):
+        row = c.execute("SELECT COUNT(*) AS n, MAX(taken_at) AS last FROM images WHERE album = ? OR substr(album, 1, ?) = ?",
+                        (name, len(name) + 1, name + "/")).fetchone()
+        cover = c.execute("SELECT id FROM images WHERE album = ? OR substr(album, 1, ?) = ? ORDER BY taken_at DESC LIMIT 1",
+                          (name, len(name) + 1, name + "/")).fetchone()
+        out.append({"id": name, "title": name.rsplit("/", 1)[-1], "parent": name.rpartition("/")[0],
+                    "count": row["n"], "last": row["last"], "cover": str(cover["id"]) if cover else None})
+    return {"albums": out}
+
+
+_EXIF = (("Make", "Kamera"), ("Model", "Modell"), ("LensModel", "Objektiv"), ("FNumber", "Blende"),
+         ("ExposureTime", "Belichtung"), ("ISOSpeedRatings", "ISO"), ("FocalLength", "Brennweite"))
+
+
+def _detail(image_id: int) -> dict:
+    from .. import db
+    from .app import lib
+    r = db.conn().execute("SELECT * FROM images WHERE id = ?", (image_id,)).fetchone()
+    if r is None:
+        raise HTTPException(404, "no such photo")
     p = pairing()
-    return {"ref": ref, "items": [{
-        "id": str(r["id"]), "title": r["filename"], "album": r["album"],
-        "width": r["width"], "height": r["height"], "taken_at": r["taken_at"],
-        "url": f"{p['ui_url']}/albums/{urllib.parse.quote(r['album'])}"} for r in rows]}
+    try:
+        exif = json.loads(r["exif_json"] or "{}")
+    except ValueError:
+        exif = {}
+    facts = [{"label": "Album", "value": r["album"]}, {"label": "Datei", "value": r["filename"]}]
+    if r["width"] and r["height"]:
+        facts.append({"label": "Größe", "value": f"{r['width']} × {r['height']}"})
+    if r["taken_at"]:
+        facts.append({"label": "Aufgenommen", "value": str(r["taken_at"])})
+    if r["size"]:
+        size = r["size"]
+        facts.append({"label": "Datei-Größe", "value": f"{size / 1e6:.1f} MB" if size >= 1e6 else f"{max(1, round(size / 1e3))} KB"})
+    facts += [{"label": label, "value": str(exif[k])} for k, label in _EXIF if exif.get(k) not in (None, "")]
+    return {**_item(r, p["ui_url"]), "rel": r["rel_path"], "tags": lib.read_tags(r["rel_path"]), "facts": facts}
+
+
+@router.get("/lucent/v1/media/{image_id}")
+def media_detail(request: Request, image_id: int):
+    _require_lucent(request)
+    return _detail(image_id)
+
+
+@router.put("/lucent/v1/media/{image_id}/tags")
+async def media_tags(request: Request, image_id: int):
+    """Replace a photo's tags on behalf of a Lucent person (`by`). The same
+    write as the console's: the sidecar, an audit line, an event, a rescan of
+    its album so lookups by tag see it."""
+    _require_lucent(request)
+    if settings.console_read_only:
+        raise HTTPException(403, "Aperture is mounted read-only")
+    try:
+        body = await request.json()
+    except ValueError:
+        raise HTTPException(400, "expected JSON")
+    tags = body.get("tags")
+    if not isinstance(tags, list) or len(tags) > 100:
+        raise HTTPException(400, "tags must be a list")
+    d = _detail(image_id)
+    from ..paths import PathRefused, sidecar_target
+    from .. import schema
+    from .app import lib
+    try:
+        sidecar_target(settings.photos_dir, d["rel"], is_image=schema.is_image)
+    except PathRefused as exc:
+        raise HTTPException(400, str(exc))
+    lib.write_tags(d["rel"], [str(t)[:80] for t in tags])
+    by = body.get("by") or {}
+    security.audit(request, "tags set", d["rel"], extra={"by": f"lucent:{str(by.get('email') or '')[:120]}"})
+    try:
+        ops.request_scan(album=d["album"], by=BY)
+    except Exception:          # no indexer running: the next scan picks it up
+        pass
+    return _detail(image_id)
+
+
+@router.get("/lucent/v1/media/{image_id}/preview")
+def media_preview(request: Request, image_id: int):
+    """The bigger picture for Lucent's photo page: the gallery's preview when
+    it exists, the thumbnail otherwise."""
+    _require_lucent(request)
+    from .. import db, scanner
+    row = db.conn().execute("SELECT rel_path FROM images WHERE id = ?", (image_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "no such photo")
+    prev = ops.derivatives(row["rel_path"])["preview"]
+    if prev.is_file():
+        return FileResponse(prev, media_type="image/webp" if prev.suffix == ".webp" else "image/jpeg",
+                            headers={"Cache-Control": "private, max-age=3600"})
+    thumb = scanner.ensure_thumb(settings.photos_dir, settings.thumbs_dir, row["rel_path"], settings.thumb_size)
+    if thumb is None:
+        raise HTTPException(415, "cannot decode this photo")
+    return FileResponse(thumb, media_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
 
 
 @router.get("/lucent/v1/media/{image_id}/thumb")

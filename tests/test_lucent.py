@@ -254,3 +254,35 @@ def test_a_tag_write_lands_in_the_outbox(paired, monkeypatch):
         assert later == []
     finally:
         console.lib.write_tags(rel, before)
+
+
+def test_lucent_browses_albums_and_sets_tags(paired, monkeypatch):
+    from aperture import db
+    from aperture.console import app as console
+    fake, c = paired
+    monkeypatch.setattr(lucent, "_poke_soon", lambda: None)
+    h = bearer(fake)
+    m = c.get("/lucent/v1/manifest", headers=h).json()
+    assert m["media"] == {"browse": True, "writes": ["tags"]}
+    names = [a["id"] for a in c.get("/lucent/v1/media/albums", headers=h).json()["albums"]]
+    assert "berlin" in names and "berlin/mitte" in names
+    page = c.get("/lucent/v1/media", params={"album": "berlin"}, headers=h).json()
+    assert page["total"] >= 5 and {i["album"] for i in page["items"]} <= {"berlin", "berlin/mitte"}
+    assert c.get("/lucent/v1/media", headers=h).status_code == 400
+    img = db.conn().execute("SELECT id, rel_path FROM images WHERE filename = 'gate.jpg'").fetchone()
+    before = console.lib.read_tags(img["rel_path"])
+    try:
+        d = c.get(f"/lucent/v1/media/{img['id']}", headers=h).json()
+        assert d["title"] == "gate.jpg" and {"label": "Album", "value": "berlin"} in d["facts"]
+        assert c.put(f"/lucent/v1/media/{img['id']}/tags", json={"tags": ["x"]}).status_code == 401
+        r = c.put(f"/lucent/v1/media/{img['id']}/tags", json={"tags": before + ["NB-LEN-26-0042-5"],
+                  "by": {"email": "lucya@example.org"}}, headers=h)
+        assert r.status_code == 200 and "NB-LEN-26-0042-5" in r.json()["tags"]
+        ev = c.get("/lucent/v1/events", headers=h).json()["events"]
+        assert any(e["type"] == "media.tag_added" and e["subject"] == "NB-LEN-26-0042-5" for e in ev)
+        prev = c.get(f"/lucent/v1/media/{img['id']}/preview", headers=h)
+        assert prev.status_code == 200 and prev.headers["content-type"].startswith("image/")
+        q = c.get("/lucent/v1/media", params={"q": "gate"}, headers=h).json()
+        assert str(img["id"]) in [i["id"] for i in q["items"]]
+    finally:
+        console.lib.write_tags(img["rel_path"], before)
