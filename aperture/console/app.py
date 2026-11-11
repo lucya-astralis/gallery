@@ -642,8 +642,11 @@ def api_album_cfg_delete(request: Request, path: str = ""):
 
 @app.put("/api/album/description")
 async def api_album_description(request: Request):
+    return album_description(request, await _json_body(request))
+
+
+def album_description(request: Request, body: dict) -> dict:
     _guard_write()
-    body = await _json_body(request)
     album = _album_or_400(body.get("album", ""))
     lang = str(body.get("lang", "")).strip().lower()
     if lang not in schema.LANGS:
@@ -821,8 +824,12 @@ async def api_tags_write(request: Request):
     place, which is what bulk tagging needs -- selecting forty photos should
     add a tag without flattening whatever else each one already carries.
     """
+    return tags_write(request, await _json_body(request))
+
+
+def tags_write(request: Request, body: dict) -> dict:
+    """The tag write behind PUT /api/tags, for the console and for Lucent."""
     _guard_write()
-    body = await _json_body(request)
     rels = body.get("photos")
     if not isinstance(rels, list) or not rels:
         raise HTTPException(400, "expected a non-empty `photos` list")
@@ -910,7 +917,10 @@ def _tag_name(body: dict, field: str) -> str:
 async def api_tags_rename(request: Request):
     """Rename a tag on every photo that carries it. Renaming onto a tag that
     already exists is a merge: a photo with both keeps one."""
-    body = await _json_body(request)
+    return tags_rename(request, await _json_body(request))
+
+
+def tags_rename(request: Request, body: dict) -> dict:
     old, new = _tag_name(body, "from"), _tag_name(body, "to")
 
     def change(tags: list[str]) -> list[str]:
@@ -930,7 +940,10 @@ async def api_tags_rename(request: Request):
 async def api_tags_delete(request: Request):
     """Take a tag off every photo. A sidecar left with nothing in it is
     removed, as lib.write_tags always does."""
-    body = await _json_body(request)
+    return tags_delete(request, await _json_body(request))
+
+
+def tags_delete(request: Request, body: dict) -> dict:
     name = _tag_name(body, "tag")
     return _retag(request, lambda tags: [t for t in tags if t.lower() != name.lower()])
 
@@ -1219,8 +1232,11 @@ async def api_links_write(request: Request):
     is a 409 rather than an overwrite: two links are made from two places in
     the UI, and the second one silently taking over the first is exactly the
     kind of edit nobody meant."""
+    return links_write(request, await _json_body(request))
+
+
+def links_write(request: Request, body: dict) -> dict:
     _guard_write()
-    body = await _json_body(request)
     slug = links.normalize_slug(body.get("slug"))
     was = links.normalize_slug(body.get("was")) or None
     target = links.normalize_target(body.get("target"))

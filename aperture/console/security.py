@@ -469,6 +469,9 @@ def audit(request: Request, action: str, target: str, *,
     found = current(request)
     if found is not None:
         record["session"] = found[0][:8]
+    by = getattr(request.state, "lucent_by", None)     # a write made through Lucent
+    if by:
+        record["by"] = by
     if extra:
         record.update(extra)
     try:

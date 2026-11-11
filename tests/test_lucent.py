@@ -263,7 +263,7 @@ def test_lucent_browses_albums_and_sets_tags(paired, monkeypatch):
     monkeypatch.setattr(lucent, "_poke_soon", lambda: None)
     h = bearer(fake)
     m = c.get("/lucent/v1/manifest", headers=h).json()
-    assert m["media"] == {"browse": True, "writes": ["tags"]}
+    assert m["media"]["browse"] and "tags" in m["media"]["writes"] and "de" in m["media"]["langs"]
     names = [a["id"] for a in c.get("/lucent/v1/media/albums", headers=h).json()["albums"]]
     assert "berlin" in names and "berlin/mitte" in names
     page = c.get("/lucent/v1/media", params={"album": "berlin"}, headers=h).json()
@@ -286,3 +286,41 @@ def test_lucent_browses_albums_and_sets_tags(paired, monkeypatch):
         assert str(img["id"]) in [i["id"] for i in q["items"]]
     finally:
         console.lib.write_tags(img["rel_path"], before)
+
+
+def test_lucent_manages_tags_albums_and_links(paired, monkeypatch):
+    from aperture import db
+    from aperture.console import app as console
+    fake, c = paired
+    monkeypatch.setattr(lucent, "_poke_soon", lambda: None)
+    h = bearer(fake)
+    by = {"email": "lucya@example.org"}
+    rows = db.conn().execute("SELECT id, rel_path FROM images WHERE album = 'berlin' ORDER BY id LIMIT 2").fetchall()
+    before = {r["rel_path"]: console.lib.read_tags(r["rel_path"]) for r in rows}
+    desc_before = console.lib.read_desc("berlin", "de")
+    try:
+        r = c.post("/lucent/v1/media/tags/bulk", json={"ids": [r["id"] for r in rows], "add": ["Probe-X"], "by": by}, headers=h)
+        assert r.status_code == 200 and r.json()["changed"] == 2
+        names = {t["name"]: t["count"] for t in c.get("/lucent/v1/media/tags", headers=h).json()["tags"]}
+        assert names["Probe-X"] == 2
+        assert c.post("/lucent/v1/media/tags/rename", json={"from": "Probe-X", "to": "Probe-Y", "by": by},
+                      headers=h).json()["changed"] == 2
+        assert all("Probe-Y" in console.lib.read_tags(r["rel_path"]) for r in rows)
+        assert c.post("/lucent/v1/media/tags/delete", json={"tag": "Probe-Y", "by": by}, headers=h).json()["changed"] == 2
+        changes = c.get("/lucent/v1/media/changes", headers=h).json()["changes"]
+        assert changes[0]["by"] == "lucent:lucya@example.org"
+        # an album's description and the links to it
+        a = c.get("/lucent/v1/media/album", params={"album": "berlin"}, headers=h).json()
+        assert set(a["descriptions"]) >= {"de", "en"}
+        r = c.put("/lucent/v1/media/album/description", json={"album": "berlin", "lang": "de", "text": "Probe", "by": by}, headers=h)
+        assert r.status_code == 200 and r.json()["text"].strip() == "Probe"
+        r = c.put("/lucent/v1/media/links", json={"slug": "probe-berlin", "target": "berlin", "by": by}, headers=h)
+        assert r.status_code == 200 and any(l["slug"] == "probe-berlin" for l in r.json()["links"])
+        a = c.get("/lucent/v1/media/album", params={"album": "berlin"}, headers=h).json()
+        assert [l["slug"] for l in a["links"]] == ["probe-berlin"]
+        assert c.delete("/lucent/v1/media/links", params={"slug": "probe-berlin"}, headers=h).status_code == 200
+        assert c.get("/lucent/v1/media/tags").status_code == 401
+    finally:
+        for rel, tags in before.items():
+            console.lib.write_tags(rel, tags)
+        console.lib.write_desc("berlin", "de", desc_before)

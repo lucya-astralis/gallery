@@ -189,7 +189,8 @@ def manifest(request: Request):
     return {"contract": CONTRACT, "kind": "aperture", "name": "Aperture",
             "version": brand.VERSION, "ui_url": p["ui_url"],
             "description": "Galerie und Bildverwaltung", "icon": _icon(),
-            "offers": ["media"], "media": {"browse": True, "writes": [] if settings.console_read_only else ["tags"]},
+            "offers": ["media"], "media": {"browse": True, "writes": [] if settings.console_read_only else ["tags", "albums", "links"],
+                      "langs": _langs()},
             "events": {"emits": ["media.tag_added", "media.tag_removed"]},
             "actions": [] if settings.console_read_only else ACTIONS}
 
@@ -304,13 +305,13 @@ def _detail(image_id: int) -> dict:
     return {**_item(r, p["ui_url"]), "rel": r["rel_path"], "tags": lib.read_tags(r["rel_path"]), "facts": facts}
 
 
-@router.get("/lucent/v1/media/{image_id}")
+@router.get("/lucent/v1/media/{image_id:int}")
 def media_detail(request: Request, image_id: int):
     _require_lucent(request)
     return _detail(image_id)
 
 
-@router.put("/lucent/v1/media/{image_id}/tags")
+@router.put("/lucent/v1/media/{image_id:int}/tags")
 async def media_tags(request: Request, image_id: int):
     """Replace a photo's tags on behalf of a Lucent person (`by`). The same
     write as the console's: the sidecar, an audit line, an event, a rescan of
@@ -343,7 +344,137 @@ async def media_tags(request: Request, image_id: int):
     return _detail(image_id)
 
 
-@router.get("/lucent/v1/media/{image_id}/preview")
+def _langs() -> list[str]:
+    from .. import schema
+    return list(schema.LANGS)
+
+
+async def _as_person(request: Request) -> dict:
+    """A write's body, with the Lucent person noted for Aperture's audit log."""
+    _require_lucent(request)
+    try:
+        body = await request.json()
+    except ValueError:
+        raise HTTPException(400, "expected JSON")
+    if not isinstance(body, dict):
+        raise HTTPException(400, "expected a JSON object")
+    by = body.get("by") or {}
+    request.state.lucent_by = f"lucent:{str(by.get('email') or '?')[:120]}"
+    return body
+
+
+def _rels(ids) -> list[str]:
+    from .. import db
+    if not isinstance(ids, list) or not ids or len(ids) > 500:
+        raise HTTPException(400, "ids must be a list of 1 to 500 photo ids")
+    try:
+        nums = [int(i) for i in ids]
+    except (TypeError, ValueError):
+        raise HTTPException(400, "ids must be photo ids")
+    rows = db.conn().execute(f"SELECT rel_path, album FROM images WHERE id IN ({','.join('?' * len(nums))})", nums).fetchall()
+    return rows
+
+
+def _rescan(albums_: set[str]) -> None:
+    for a in albums_:
+        try:
+            ops.request_scan(album=a, by=BY)
+        except Exception:
+            pass
+
+
+@router.get("/lucent/v1/media/tags")
+def media_tags_all(request: Request):
+    _require_lucent(request)
+    from .app import lib
+    counts = lib.all_tags()
+    return {"tags": [{"name": n, "count": c} for n, c in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))]}
+
+
+@router.post("/lucent/v1/media/tags/bulk")
+async def media_tags_bulk(request: Request):
+    """Add and remove tags on many photos at once; each keeps its other tags."""
+    body = await _as_person(request)
+    from .app import tags_write
+    rows = _rels(body.get("ids"))
+    out = tags_write(request, {"photos": [r["rel_path"] for r in rows],
+                               "add": body.get("add") or [], "remove": body.get("remove") or []})
+    _rescan({r["album"] for r in rows})
+    return {"ok": True, "changed": out.get("changed", 0)}
+
+
+@router.post("/lucent/v1/media/tags/rename")
+async def media_tags_rename(request: Request):
+    body = await _as_person(request)
+    from .app import tags_rename
+    out = tags_rename(request, {"from": body.get("from"), "to": body.get("to")})
+    _rescan({p.rpartition("/")[0] for p in out.get("photos", [])})
+    return {"ok": True, "changed": out.get("changed", 0)}
+
+
+@router.post("/lucent/v1/media/tags/delete")
+async def media_tags_delete(request: Request):
+    body = await _as_person(request)
+    from .app import tags_delete
+    out = tags_delete(request, {"tag": body.get("tag")})
+    _rescan({p.rpartition("/")[0] for p in out.get("photos", [])})
+    return {"ok": True, "changed": out.get("changed", 0)}
+
+
+@router.get("/lucent/v1/media/album")
+def media_album(request: Request, album: str = ""):
+    """One album for Lucent's album page: its descriptions and the links that lead to it."""
+    _require_lucent(request)
+    from .. import links
+    from .app import _album_or_400, lib
+    name = _album_or_400(album)
+    descs = {lang: lib.read_desc(name, lang) for lang in _langs()}
+    to_it = [e for e in links.entries() if e["kind"] != "photo" and (e["target"] or "").strip("/") == name]
+    return {"id": name, "title": name.rsplit("/", 1)[-1], "descriptions": descs,
+            "links": [{"slug": e["slug"], "address": links.address(e["slug"])} for e in to_it]}
+
+
+@router.put("/lucent/v1/media/album/description")
+async def media_album_description(request: Request):
+    body = await _as_person(request)
+    from .app import album_description
+    return album_description(request, {"album": body.get("album"), "lang": body.get("lang"), "text": body.get("text")})
+
+
+@router.get("/lucent/v1/media/links")
+def media_links(request: Request):
+    _require_lucent(request)
+    from .. import links
+    return {"links": [{**e, "address": links.address(e["slug"])} for e in links.entries()]}
+
+
+@router.put("/lucent/v1/media/links")
+async def media_links_write(request: Request):
+    body = await _as_person(request)
+    from .app import links_write
+    links_write(request, {"slug": body.get("slug"), "target": body.get("target"), "was": body.get("was")})
+    return media_links(request)
+
+
+@router.delete("/lucent/v1/media/links")
+async def media_links_delete(request: Request, slug: str = ""):
+    body = await _as_person(request) if request.headers.get("content-length", "0") != "0" else {}
+    _require_lucent(request)
+    from .app import api_links_delete
+    api_links_delete(request, slug or str(body.get("slug") or ""))
+    return media_links(request)
+
+
+@router.get("/lucent/v1/media/changes")
+def media_changes(request: Request, limit: int = 20):
+    """Aperture's own log of writes, newest first (who, what, where)."""
+    _require_lucent(request)
+    rows = security.recent(max(1, min(limit, 100)))
+    return {"changes": [{"at": r.get("ts"), "action": r.get("action"), "target": r.get("target"),
+                         "by": r.get("by") or ("Konsole" if r.get("session") else r.get("ip") or "")} for r in rows]}
+
+
+@router.get("/lucent/v1/media/{image_id:int}/preview")
 def media_preview(request: Request, image_id: int):
     """The bigger picture for Lucent's photo page: the gallery's preview when
     it exists, the thumbnail otherwise."""
@@ -362,7 +493,7 @@ def media_preview(request: Request, image_id: int):
     return FileResponse(thumb, media_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
 
 
-@router.get("/lucent/v1/media/{image_id}/thumb")
+@router.get("/lucent/v1/media/{image_id:int}/thumb")
 def media_thumb(request: Request, image_id: int):
     _require_lucent(request)
     from .. import db, scanner
