@@ -15,7 +15,8 @@ What goes into the subset:
     from: photos/**/album*.md (the per-language album descriptions),
     photos/**/*.cfg (album names, and the branding block in gallery.cfg —
     site_name, site_desc_jp and the rest), aperture/i18n.py (UI strings),
-    aperture/gallery/templates/*.html, aperture/gallery/static/app.js and aperture/*.py (trip config).
+    aperture/gallery/templates{,_facet}/*.html, aperture/gallery/static/app.js,
+    aperture/gallery/static/f/*.js and aperture/*.py (trip config).
 
 Note the limit this has: the cfg files are RUNTIME data, read per request,
 while the subset is built here. Editing Japanese branding text on a running
@@ -57,7 +58,9 @@ def collect_text() -> str:
     files += sorted((ROOT / "photos").rglob("album*.md"))
     files += sorted((ROOT / "photos").rglob("*.cfg"))
     files += sorted((ROOT / "aperture" / "gallery" / "templates").glob("*.html"))
+    files += sorted((ROOT / "aperture" / "gallery" / "templates_facet").glob("*.html"))
     files += [ROOT / "aperture" / "gallery" / "static" / "app.js"]
+    files += sorted((ROOT / "aperture" / "gallery" / "static" / "f").glob("*.js"))
     files += sorted(p for p in (ROOT / "aperture").rglob("*.py") if "console" not in p.parts)
     chunks = []
     for f in files:
@@ -75,6 +78,15 @@ def main() -> int:
 
     text = collect_text()
     used = {cp for cp in map(ord, set(text)) if _in_jp_ranges(cp)}
+    # Never drop a glyph the shipped subset already has: it may have been
+    # built from album texts that aren't in this checkout (a test env or a
+    # dev clone without the real photos/), and a dropped glyph is tofu in prod.
+    # Pass --fresh to rebuild from the scanned text alone.
+    if OUT.is_file() and "--fresh" not in sys.argv:
+        from fontTools.ttLib import TTFont
+        kept = {cp for cp in TTFont(OUT).getBestCmap() if _in_jp_ranges(cp)}
+        print(f"keeping {len(kept - used)} glyphs from the current subset")
+        used |= kept
     extra = sorted(cp for cp in used if not (BASE_RANGE[0] <= cp <= BASE_RANGE[1]))
 
     unicodes = [f"{BASE_RANGE[0]:04X}-{BASE_RANGE[1]:04X}"]

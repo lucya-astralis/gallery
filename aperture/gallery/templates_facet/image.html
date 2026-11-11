@@ -55,7 +55,7 @@
       <section class="g-panel">
         <h2><i class="fa fa-circle-info" aria-hidden="true"></i>{{ t('panel.file') }}</h2>
         <dl class="g-kv">
-          <div><dt>{{ t('kv.album') }}</dt><dd><a href="/album/{{ image.album }}">{{ image.album }}</a></dd></div>
+          <div><dt>{{ t('kv.album') }}</dt><dd><a href="/album/{{ image.album }}">{{ breadcrumbs | map(attribute='name') | join(' / ') if breadcrumbs else image.album }}</a></dd></div>
           <div><dt>{{ t('kv.filename') }}</dt><dd>{{ image.filename }}</dd></div>
           {% if image.width and image.height %}<div><dt>{{ t('kv.dimensions') }}</dt><dd>{{ image.width }} × {{ image.height }} px</dd></div>{% endif %}
           {% if image.size %}<div><dt>{{ t('kv.size') }}</dt><dd>{{ (image.size / 1024 / 1024) | round(2) }} MB</dd></div>{% endif %}

@@ -120,7 +120,7 @@
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.target.closest('input, textarea, select')) return;
+    if (e.target.closest?.('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
     if (lb?.open) {
       if (e.key === 'ArrowRight') step(1);
       else if (e.key === 'ArrowLeft') step(-1);

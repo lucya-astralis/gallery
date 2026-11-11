@@ -332,7 +332,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // WMO weather_code buckets -> [glyph, label, kind]; ☀/☾ pick by is_day.
     // `kind` lands on the chip as data-wx-kind and only tints the glyph
     // (style.css) — sun amber, night violet, rain blue, snow ice, …
+    // the weather's words in the page's language (they were English only)
+    const WX = {
+      de: { 'Clear': 'Klar', 'Mostly clear': 'Überwiegend klar', 'Partly cloudy': 'Teils bewölkt', 'Overcast': 'Bedeckt',
+            'Fog': 'Nebel', 'Drizzle': 'Nieselregen', 'Rain': 'Regen', 'Snow': 'Schnee', 'Rain showers': 'Regenschauer',
+            'Snow showers': 'Schneeschauer', 'Thunderstorm': 'Gewitter' },
+      ja: { 'Clear': '快晴', 'Mostly clear': '晴れ', 'Partly cloudy': '晴れ時々曇り', 'Overcast': '曇り', 'Fog': '霧',
+            'Drizzle': '霧雨', 'Rain': '雨', 'Snow': '雪', 'Rain showers': 'にわか雨', 'Snow showers': 'にわか雪', 'Thunderstorm': '雷雨' },
+    }[UI_LANG] || {};
     const wmo = (code, isDay) => {
+      const [glyph, label, kind] = wmoEn(code, isDay);
+      return [glyph, WX[label] || label, kind];
+    };
+    const wmoEn = (code, isDay) => {
       if (code <= 1) return [isDay ? '☀︎' : '☾︎', code === 0 ? 'Clear' : 'Mostly clear', isDay ? 'sun' : 'night'];
       if (code <= 3) return ['☁︎', code === 2 ? 'Partly cloudy' : 'Overcast', 'cloud'];
       if (code <= 48) return ['≡', 'Fog', 'fog'];
