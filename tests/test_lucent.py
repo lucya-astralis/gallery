@@ -203,3 +203,30 @@ def test_a_callback_in_another_browser_is_refused(paired):
     # and the state is spent: the right browser cannot reuse it either
     r = c.get("/auth/lucent/callback", params={"code": "abc", "state": q["state"]}, follow_redirects=False)
     assert r.headers["location"] == "/login?reason=lucent"
+
+
+def test_media_for_a_reference(paired):
+    from aperture import db
+    fake, c = paired
+    c_ = db.conn()
+    img = c_.execute("SELECT id FROM images WHERE filename = 'gate.jpg'").fetchone()["id"]
+    with db.lock():
+        c_.execute("INSERT OR IGNORE INTO tags (name) VALUES ('NB-LEN-26-0042-5')")
+        tag = c_.execute("SELECT id FROM tags WHERE name = 'NB-LEN-26-0042-5'").fetchone()["id"]
+        c_.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (img, tag))
+        c_.commit()
+    try:
+        m = c.get("/lucent/v1/manifest", headers=bearer(fake)).json()
+        assert m["offers"] == ["media"] and m["icon"].startswith("<svg")
+        assert c.get("/lucent/v1/media?ref=x").status_code == 401
+        r = c.get("/lucent/v1/media", params={"ref": "nb-len-26-0042-5"}, headers=bearer(fake)).json()
+        assert [i["id"] for i in r["items"]] == [str(img)] and r["items"][0]["album"] == "berlin"
+        t = c.get(f"/lucent/v1/media/{img}/thumb", headers=bearer(fake))
+        assert t.status_code == 200 and t.headers["content-type"] == "image/webp"
+        assert c.get("/lucent/v1/media/999999/thumb", headers=bearer(fake)).status_code == 404
+        assert c.get("/lucent/v1/media", headers=bearer(fake)).status_code == 400
+    finally:
+        with db.lock():
+            c_.execute("DELETE FROM image_tags WHERE tag_id = ?", (tag,))
+            c_.execute("DELETE FROM tags WHERE id = ?", (tag,))
+            c_.commit()

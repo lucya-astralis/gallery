@@ -43,7 +43,7 @@ import urllib.request
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from .. import brand, health, ops
 from ..runtime import settings
@@ -189,6 +189,7 @@ def manifest(request: Request):
     return {"contract": CONTRACT, "kind": "aperture", "name": "Aperture",
             "version": brand.VERSION, "ui_url": p["ui_url"],
             "description": "Galerie und Bildverwaltung", "icon": _icon(),
+            "offers": ["media"],
             "actions": [] if settings.console_read_only else ACTIONS}
 
 
@@ -215,6 +216,45 @@ def _ago(ts) -> str:
 
 def _num(n) -> str:
     return f"{int(n or 0):,}".replace(",", " ")
+
+
+# ---- exchange: media for a reference (contract 1, "offers": ["media"]) ------
+# A reference is another tool's id for a thing, e.g. arca's inventory code. A
+# photo belongs to it when it carries that id as a tag. Lucent asks; Aperture
+# never learns who else is paired.
+MEDIA_LIMIT = 48
+
+
+@router.get("/lucent/v1/media")
+def media(request: Request, ref: str = ""):
+    _require_lucent(request)
+    ref = ref.strip()
+    if not ref or len(ref) > 80:
+        raise HTTPException(400, "ref is required")
+    from .. import db
+    rows = db.conn().execute(
+        "SELECT i.id, i.album, i.filename, i.width, i.height, i.taken_at FROM images i"
+        " JOIN image_tags it ON it.image_id = i.id JOIN tags t ON t.id = it.tag_id"
+        " WHERE t.name = ? COLLATE NOCASE ORDER BY i.taken_at DESC, i.id DESC LIMIT ?",
+        (ref, MEDIA_LIMIT)).fetchall()
+    p = pairing()
+    return {"ref": ref, "items": [{
+        "id": str(r["id"]), "title": r["filename"], "album": r["album"],
+        "width": r["width"], "height": r["height"], "taken_at": r["taken_at"],
+        "url": f"{p['ui_url']}/albums/{urllib.parse.quote(r['album'])}"} for r in rows]}
+
+
+@router.get("/lucent/v1/media/{image_id}/thumb")
+def media_thumb(request: Request, image_id: int):
+    _require_lucent(request)
+    from .. import db, scanner
+    row = db.conn().execute("SELECT rel_path FROM images WHERE id = ?", (image_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "no such photo")
+    thumb = scanner.ensure_thumb(settings.photos_dir, settings.thumbs_dir, row["rel_path"], settings.thumb_size)
+    if thumb is None:
+        raise HTTPException(415, "cannot decode this photo")
+    return FileResponse(thumb, media_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
 
 
 def status_report() -> dict:
