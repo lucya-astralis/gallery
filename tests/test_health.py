@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The self-watch and the failsafe (aperture/health.py).
 
 The case they are for: the NAS the photos live on switches itself off at

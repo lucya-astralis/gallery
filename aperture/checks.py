@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """What is wrong with a cfg file -- one implementation, for every front end.
 
 `doctor` and the `cfg` / `album` commands in the CLI, and "Check all" and the

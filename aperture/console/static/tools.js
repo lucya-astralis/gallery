@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later · Copyright © 2026 lucya.systems — https://lucya.systems */
 /* lucya.systems aperture — Aperture's tools: history, many albums at
  * once, saved Library views, and the activity log.
  *

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """What the console's home screen is made of.
 
 The dashboard invents nothing: it asks the same four routes the rest of the

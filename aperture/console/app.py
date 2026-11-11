@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The Console -- Aperture's operator surface, on its own port.
 
 Was the standalone Configurator. It is now part of the same package as the

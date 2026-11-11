@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 · Copyright © 2026 lucya.systems — https://lucya.systems */
 /* ==================================================================
    NEBULA 2.2.0  —  the keyboard, for the parts that need one
    ------------------------------------------------------------------

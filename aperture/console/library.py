@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The photo tree as this tool sees it.
 
 Read straight off the filesystem -- no database, no gallery import. That keeps

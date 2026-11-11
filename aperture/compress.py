@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """gzip for the responses that benefit from it, and only those.
 
 The gallery is served by uvicorn directly — a reverse proxy in front of it is

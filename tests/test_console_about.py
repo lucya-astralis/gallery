@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The console's Changelog place: the release notes, the repository, the maker.
 
 The notes come from CHANGELOG.md, rendered on the server at /api/about, so

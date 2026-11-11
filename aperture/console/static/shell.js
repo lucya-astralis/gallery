@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later · Copyright © 2026 lucya.systems — https://lucya.systems */
 /* lucya.systems aperture — Aperture's shell.
  *
  * The frame every screen sits in: the places on the rail, the address bar

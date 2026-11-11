@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The template setup both surfaces share.
 
 The gallery and the console each built a Jinja2Templates and registered their

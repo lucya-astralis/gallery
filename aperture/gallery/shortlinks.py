@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Pretty links: /s/<name> -> an album or a photo. What a link is, where the
 list lives and why it redirects the way it does: aperture/links.py.
 

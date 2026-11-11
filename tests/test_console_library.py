@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The console's Library and its tag manager.
 
 The Library lists every photo with the index's facts and the sidecar's tags

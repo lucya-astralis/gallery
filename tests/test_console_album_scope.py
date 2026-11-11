@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The console's album routes address ONE album, and the root is not one.
 
 An empty `album` used to slip through: it strips to "", `safe("")` resolves to

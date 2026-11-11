@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Rebuild the Font Awesome glyph subset + its stylesheet.
 
     aperture/gallery/static/fonts/fa-solid-subset.woff2   (font, generated)

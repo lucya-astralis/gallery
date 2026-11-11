@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Pretty links: a short address on the public site for one album or one photo.
 
     https://archive.example/s/tokyo   ->  /album/japan_2026/tokyo

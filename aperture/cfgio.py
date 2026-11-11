@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The cfg format: one parser, one writer, for both surfaces.
 
 `album.cfg` and `gallery.cfg` used to be read by two implementations of the

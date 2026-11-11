@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Who the archive belongs to.
 
 The operator's wordmark, marks, links and footer badges, as gallery.cfg names

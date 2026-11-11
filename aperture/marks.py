@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """What a derived image says about whose it is.
 
 gallery.cfg `credit`, written as EXIF Artist/Copyright into every thumbnail,

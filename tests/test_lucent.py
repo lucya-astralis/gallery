@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Aperture as a Lucent tool (beta): pairing, the connector API and "Sign in
 with Lucent". Lucent itself is played by a stand-in for `lucent._post`, so
 this suite needs no second service; the lucent repository tests the other

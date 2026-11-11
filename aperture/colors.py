@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The colours of a photo: what `color:blue` searches and the palette strip.
 
 Read once per photo at index time, from its thumbnail rather than the

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The operator CLI, one call per command.
 
 The CLI had no tests, and the operations surface is about to be lifted out of

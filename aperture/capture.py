@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Capture facts: what a photo was shot with, read once when it is indexed.
 
 The EXIF blob is a few KB of JSON per photo, and a search that parsed it per

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later · Copyright © 2026 lucya.systems — https://lucya.systems */
 /* Aperture 3.2 · the trip dashboard (_trip.html, f/trip.css). Every date is
    the viewer's local wall-clock, so it reads right from home before the
    flight and on the ground once the trip is underway. State is class

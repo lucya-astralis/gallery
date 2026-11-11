@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The one function that turns a request into a writable path.
 
 Before Aperture the gallery and the configurator each had their own guard —

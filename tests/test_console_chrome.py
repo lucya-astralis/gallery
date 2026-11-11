@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The console's own face: the mark, the boot screen, and the version stamp.
 
 None of this is about photographs. It is about the three things that broke

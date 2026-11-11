@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The update notice: what every gallery says about itself, and what the
 console makes of the maker's answer.
 

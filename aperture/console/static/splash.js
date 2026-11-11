@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later · Copyright © 2026 lucya.systems — https://lucya.systems */
 /* lucya.systems aperture — Aperture's boot screen.
  *
  * The mark assembles itself once while the console fetches what it needs.

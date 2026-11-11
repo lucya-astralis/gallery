@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The JSON API's shape, pinned.
 
 The API is the one surface with consumers that are not this repo, so it is

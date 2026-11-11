@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Rebuild the Noto Sans JP glyph subset (aperture/gallery/static/fonts/NotoSansJP-subset.woff2)
 and its static per-weight instances (NotoSansJP-subset-<w>.woff2).
 

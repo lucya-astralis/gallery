@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later · Copyright © 2026 lucya.systems — https://lucya.systems */
 /* Aperture 3.2 · the gallery's script. Every page works without it: the
    reels show their first picture, the sort menu is a <details>, a photo's
    arrows are links. This file adds motion and the lightbox, nothing else. */

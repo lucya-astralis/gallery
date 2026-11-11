@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The commands that DO something: the indexer, the derivatives, the door.
 
 `status`, `scan`, `pause` and `resume` talk to the running server the only way

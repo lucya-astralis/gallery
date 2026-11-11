@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Trip itinerary: which leg a day is filed under, and side trips riding
 along on their base's chip — a new region (Sendai) and a revisit of a leg
 already done (Sapporo)."""

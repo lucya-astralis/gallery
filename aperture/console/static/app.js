@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later · Copyright © 2026 lucya.systems — https://lucya.systems */
 /* lucya.systems aperture — Aperture's client (the console until 3.0).
  *
  * Three moving parts: the album tree on the left, a tabbed editor on the

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The process layer: roles, paths, and the separation between the surfaces.
 
 What this pins is the shape of the merge itself — that one package holds two

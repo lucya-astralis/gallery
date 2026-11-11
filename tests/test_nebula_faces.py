@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """gallery.cfg `faces` / NEBULA_FACES: the stock voice or Nebula's own.
 
 The switch is gallery.cfg `faces` (the console's Site > Look); NEBULA_FACES

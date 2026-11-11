@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """What every gallery response shares.
 
 The templates and their globals, the request's language, the public base URL,

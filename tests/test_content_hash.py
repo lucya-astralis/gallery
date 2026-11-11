@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """A photo is known by its bytes, not only by its mtime.
 
 Edited photos come back under the same name, and plenty of copy tools keep

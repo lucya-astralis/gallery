@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Vision: search a photo by what is in it. Optional, and OFF by default.
 
 A local image model (CLIP ViT-B/32, with a multilingual text side) turns

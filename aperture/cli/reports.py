@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The commands that LOOK: what the app would resolve, printed.
 
 `cfg`, `photo`, `album`, `search`, `tags`, `gps`, `welcome`, `trip`, `i18n`

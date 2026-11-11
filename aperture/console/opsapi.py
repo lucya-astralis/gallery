@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Operations, over HTTP.
 
 The CLI could always run or pause the indexer and check the gallery for drift.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """One set of config checks, and every front end asking it.
 
 The console's "Check all" and the doctor used to be two implementations of

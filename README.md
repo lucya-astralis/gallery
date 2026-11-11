@@ -1743,3 +1743,16 @@ so they never touch `photos/` and never race the scanner.
 - Rename a tag: edit the `.tags` file.
 - Thumbnails, previews, and DB can be wiped any time — they are regenerated on the next scan.
 - Something looks off? `python -m aperture.cli doctor` compares index, files, derivatives and config in one pass.
+
+## Licence
+
+Aperture is by **lucya.systems** (https://lucya.systems) and licensed under the
+**GNU Affero General Public License v3.0 or later** (`LICENSE`), with the
+additional terms in `NOTICE`: the attribution "lucya.systems" with its link
+stays in every copy and every modified version, including where the program
+shows its users its legal notices (the footer, the about page), and a modified
+version says it is one. Running a modified version over a network means
+offering its users the source code.
+
+The names and logos are not licensed with the code, see `TRADEMARKS.md`.
+Fonts and other third-party parts keep their own licences, see `NOTICE`.

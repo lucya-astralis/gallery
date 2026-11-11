@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Is the ground still there? The process watching its own feet.
 
 `doctor` answers when it is asked. This does not wait to be asked: a thread

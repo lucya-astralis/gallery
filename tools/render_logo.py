@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Rasterise the site logo to a PNG for the terminal CLI.
 
     python tools/render_logo.py

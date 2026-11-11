@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Reading album.cfg and gallery.cfg.
 
 Where the files live, their cached parses, and the answers that are about the

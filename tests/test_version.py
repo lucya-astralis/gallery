@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The version is one constant, and the changelog is what it means.
 
 A release number that nobody can check drifts in the obvious way: the constant

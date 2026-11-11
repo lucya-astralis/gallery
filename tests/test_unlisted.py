@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Unlisted albums: reachable by their address, absent from every listing.
 
 `unlisted = true` in an album.cfg takes the album and everything under it out

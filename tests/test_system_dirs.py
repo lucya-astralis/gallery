@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The folders a NAS keeps for itself are not albums, at any depth.
 
 A Synology writes `@eaDir/<photo>/SYNOPHOTO_THUMB_*.jpg` beside every photo it

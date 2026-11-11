@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The HTML pages: welcome, albums, one album, one photo, search, stats."""
 
 from __future__ import annotations

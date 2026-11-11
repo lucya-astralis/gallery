@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Test fixtures: a throwaway photo tree, indexed, served by the real app.
 
 The app reads its paths from the environment AT IMPORT TIME, so everything

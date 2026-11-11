@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """How every command writes: the short names, the frame, the system block.
 
 The vocabulary itself lives in aperture/termui.py -- colour, rules, meters,

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The console's photo tiles are the gallery's thumbnails.
 
 /api/thumb used to look for a JPEG the gallery never writes, found none, and

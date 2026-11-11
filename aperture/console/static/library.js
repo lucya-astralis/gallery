@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later · Copyright © 2026 lucya.systems — https://lucya.systems */
 /* lucya.systems aperture — the Library and the tag manager.
  *
  * Every photo in the archive in one grid, narrowed by facets and by the

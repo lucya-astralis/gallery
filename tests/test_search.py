@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The search grammar (search.py) and the capture facts it filters on.
 
 Every fixture photo carries the same EXIF (see conftest._jpeg): Fixture Optics

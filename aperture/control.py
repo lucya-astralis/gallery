@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Cross-process control channel between the CLI and the running server.
 
 The gallery speaks HTTP strictly read-only — there is no endpoint that can be

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """History: the backups every save keeps, readable and restorable.
 
 A restore is itself an ordinary write -- the file it replaces is backed up

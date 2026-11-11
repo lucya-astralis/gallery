@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Photos as queries.
 
 The scope an album stands for, the rows it returns, how they sort (by date,

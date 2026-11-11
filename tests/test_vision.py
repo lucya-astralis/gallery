@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Vision's plumbing, with a stand-in model: the scan fills the vectors, the
 search shows what looks like the words as a group of its own, one switch
 leaves it out, the filters still hold, and a download that does not match

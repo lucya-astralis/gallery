@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Build static per-weight woff2 instances of the site's variable fonts.
 
 The gallery's three text faces ship as VARIABLE fonts (Space Grotesk,

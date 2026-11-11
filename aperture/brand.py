@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Who built this — as opposed to who runs it.
 
 The two used to be one string. Every page said "lucya.systems gallery",

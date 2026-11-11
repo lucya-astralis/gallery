@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Compress the shipped display faces to woff2.
 
 Space Grotesk, JetBrains Mono and Noto Sans JP arrive here as woff2 already

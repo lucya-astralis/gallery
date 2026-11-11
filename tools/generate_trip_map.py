@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 # Generates aperture/gallery/templates/_trip_map.html from a MapSVG prefecture map of Japan.
 # - parses all 47 prefecture paths, converts to absolute polylines
 # - verifies whether the map's y-axis is linear or Mercator in latitude

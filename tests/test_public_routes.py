@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Every public route, once, against the fixture tree.
 
 This is the characterization net the refactor runs under: it does not say the

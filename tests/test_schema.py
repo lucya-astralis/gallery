@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """One registry for what a cfg file may say, and one grammar for how.
 
 Before Aperture the gallery and the configurator each kept their own copy of

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Who may talk to the console, and what a write leaves behind.
 
 Until 1.0 the answer was "whoever reaches the port", which was defensible only

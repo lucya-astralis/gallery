@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The identity palettes follow the accent -- on the gallery, in the console
 and on the console's backdrop -- and resolve to the sheets' own values for
 the built-in accent."""

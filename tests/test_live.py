@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Live status: the running scan says how far it is, the console streams
 every change of the status, and the stream ends with the session without
 ever keeping it alive."""

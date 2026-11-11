@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Operator CLI for the gallery backend.
 
     python -m aperture.cli <command> [options]

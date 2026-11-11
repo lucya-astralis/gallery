@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The looking half of the operations surface, as data.
 
 `aperture/ops.py` holds what the indexer is doing and the reports that act on

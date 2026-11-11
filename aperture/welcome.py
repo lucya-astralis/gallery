@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The welcome screen's hero feed, as gallery.cfg resolves it."""
 
 from __future__ import annotations

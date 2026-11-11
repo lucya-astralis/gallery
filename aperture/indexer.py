@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The indexer's lifecycle, in the process that owns it.
 
 Scans, the control loop that picks up requests from data/control/, and the

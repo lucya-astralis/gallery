@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """What album.cfg and gallery.cfg may say -- the one registry.
 
 This used to be a hand-kept copy of the gallery's vocabulary, living in the

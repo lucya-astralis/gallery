@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The photo whose pixels lie: EXIF Orientation 5-8.
 
 `phone/portrait.jpg` in the fixture tree is a 900x600 buffer tagged

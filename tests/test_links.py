@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Pretty links: the file, the redirect, the console screen and the check.
 
 One claim per test, in the order a link lives: written by the console into

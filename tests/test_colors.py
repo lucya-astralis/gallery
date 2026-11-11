@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Colour search: read at index time, searched by name in three languages,
 offered as a facet and drawn as a strip on the photo page."""
 

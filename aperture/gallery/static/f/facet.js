@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 · Copyright © 2026 lucya.systems — https://lucya.systems */
 /* FACET — behaviour that CSS cannot do alone.
    Every effect here is a progressive enhancement: without this file the
    components still render and work; they just move less. */

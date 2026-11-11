@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The empty-walk guard: a scan that finds nothing must not empty the index.
 
 An SMB share that did not mount leaves an empty directory behind, and a

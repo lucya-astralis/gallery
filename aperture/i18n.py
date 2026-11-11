@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """UI translations (EN / DE / JP).
 
 One flat dict: key -> (en, de, jp). `t(lang, key)` picks the column and

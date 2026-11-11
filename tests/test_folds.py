@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Long rankings fold instead of summing their tail into one row.
 
 /stats used to end the camera, album and tag charts in a single "+14 more"

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The path guard on the photo-serving routes.
 
 These four routes (`/image`, `/thumb`, `/preview`, `/full`) read straight off

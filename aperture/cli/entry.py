@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """The command line itself: the parser, the presentation flags, main().
 
 One place that knows every command, so `--help` and the menu cannot disagree

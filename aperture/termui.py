@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright © 2026 lucya.systems — https://lucya.systems
 """Terminal presentation layer for the operator CLI (aperture/cli.py).
 
 Same editorial line as the site itself: a megacorp-terminal HUD — uppercase
