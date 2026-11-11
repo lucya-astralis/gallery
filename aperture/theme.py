@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 
-from . import cfgio, config, palette, schema, templating
+from . import brand, cfgio, config, palette, schema, templating
 
 
 # ----- per-album title font (album.cfg `font = ...`) --------------------
@@ -94,7 +94,7 @@ def album_font_css_url(album: str) -> str | None:
     points at are cached hard, so the version is what makes edits land."""
     if album_font_file(album) is None:
         return None
-    return f"/album-font.css/{quote(album)}?v={album_font_version(album)}"
+    return f"/album-font.css/{quote(album)}?v={album_font_version(album)}-{brand.VERSION}"
 
 
 def album_font_preload(album: str) -> dict | None:
@@ -565,7 +565,9 @@ def site_font() -> dict | None:
     _fmt, mime = ALBUM_FONT_TYPES[font.suffix.lower()]
     stamp = config.gallery_asset_stamp(font)
     return {
-        "css": f"/site-font.css?v={stamp}",
+        # the sheet's text is the code's, not only the font's: the release
+        # rides in its version so an update reaches a sheet cached immutable
+        "css": f"/site-font.css?v={stamp}-{brand.VERSION}",
         "preload": {"href": f"/site-font?v={stamp}", "type": mime},
     }
 

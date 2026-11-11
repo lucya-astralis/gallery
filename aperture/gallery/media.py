@@ -120,8 +120,10 @@ def site_font_css():
     scale = theme.site_font_scale()
     # the stock stack stays behind it: a display face that has no glyph for
     # what the chrome is currently saying falls through rather than tofus
+    # --display-weight: a site face is taken as single-weight (like an
+    # album's), so the rules that set it hold it at 400 instead of a faux bold
     root = (f"--display-font:'{theme.SITE_FONT_FAMILY}','Ethnocentric',"
-            "'Space Grotesk',sans-serif")
+            "'Space Grotesk',sans-serif;--display-weight:400")
     if scale is not None:
         root += f";--display-scale:{scale:g}"
     css = (
