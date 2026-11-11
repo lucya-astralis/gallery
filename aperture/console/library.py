@@ -395,12 +395,16 @@ class Library:
             seen.add(tag.lower())
             clean.append(tag)
         path = self.tags_path(rel)
+        before = self.read_tags(rel)
         if not clean:
             path.unlink(missing_ok=True)
-            return []
-        # One tag per line: the gallery accepts either form, and this is the
-        # one that stays readable in a diff.
-        path.write_text("\n".join(clean) + "\n", encoding="utf-8", newline="\n")
+        else:
+            # One tag per line: the gallery accepts either form, and this is
+            # the one that stays readable in a diff.
+            path.write_text("\n".join(clean) + "\n", encoding="utf-8", newline="\n")
+        if before != clean:
+            from . import lucent          # Lucent hears of it, if paired (events)
+            lucent.tags_changed(rel, before, clean)
         return clean
 
     def all_tags(self) -> dict[str, int]:

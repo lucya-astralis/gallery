@@ -190,6 +190,7 @@ def manifest(request: Request):
             "version": brand.VERSION, "ui_url": p["ui_url"],
             "description": "Galerie und Bildverwaltung", "icon": _icon(),
             "offers": ["media"],
+            "events": {"emits": ["media.tag_added", "media.tag_removed"]},
             "actions": [] if settings.console_read_only else ACTIONS}
 
 
@@ -255,6 +256,103 @@ def media_thumb(request: Request, image_id: int):
     if thumb is None:
         raise HTTPException(415, "cannot decode this photo")
     return FileResponse(thumb, media_type="image/webp", headers={"Cache-Control": "private, max-age=3600"})
+
+
+# ---- events (contract 1, "events": {"emits": [...]}) ------------------------
+# The outbox: numbered events in a small sqlite file beside the pairing file,
+# kept 30 days. Lucent takes them by number; a poke only says "look now".
+# Nothing here waits on Lucent: a poke runs in a thread and may fail.
+OUTBOX_DAYS = 30
+
+
+from contextlib import contextmanager  # noqa: E402
+
+
+@contextmanager
+def _outbox():
+    """The outbox, opened for one use and closed after; commits on success."""
+    import sqlite3
+    c = sqlite3.connect(settings.console_dir / "lucent_outbox.sqlite", timeout=5)
+    c.row_factory = sqlite3.Row
+    try:
+        c.execute("CREATE TABLE IF NOT EXISTS outbox (seq INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL,"
+                  " type TEXT NOT NULL, subject TEXT, data TEXT NOT NULL DEFAULT '{}')")
+        with c:
+            yield c
+    finally:
+        c.close()
+
+
+def emit(type_: str, subject: str, data: dict) -> None:
+    """Put an event in the outbox and poke Lucent. Silent when unpaired."""
+    if not is_paired():
+        return
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    try:
+        with _outbox() as c:
+            c.execute("INSERT INTO outbox (at, type, subject, data) VALUES (?,?,?,?)",
+                      (now.isoformat(timespec="seconds"), type_, subject, json.dumps(data)))
+            c.execute("DELETE FROM outbox WHERE at < ?", ((now - timedelta(days=OUTBOX_DAYS)).isoformat(),))
+    except Exception:              # an event is never worth failing the write it reports
+        log.exception("aperture: could not write the Lucent outbox")
+        return
+    _poke_soon()
+
+
+_poke_lock = __import__("threading").Lock()
+_poke_due = False
+
+
+def _poke_soon() -> None:
+    """One poke for a burst of events: a rename across four hundred photos
+    is eight hundred events and still one poke."""
+    import threading
+    global _poke_due
+    with _poke_lock:
+        if _poke_due:
+            return
+        _poke_due = True
+
+    def poke():
+        global _poke_due
+        with _poke_lock:
+            _poke_due = False
+        p = pairing()
+        if not p:
+            return
+        token = base64.b64encode(f"{p['client_id']}:{p['client_secret']}".encode()).decode()
+        req = urllib.request.Request(f"{p['issuer']}/api/connect/poke", data=b"{}", method="POST",
+                                     headers={"Authorization": f"Basic {token}", "Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req, timeout=5).close()
+        except Exception:          # Lucent down or slow: it looks once a minute anyway
+            log.info("aperture: poke to Lucent failed; it will catch up")
+    t = threading.Timer(0.5, poke)
+    t.daemon = True
+    t.start()
+
+
+def tags_changed(rel: str, before: list[str], after: list[str]) -> None:
+    """Called by the library on every tag write: one event per tag that came or went."""
+    old, new = {t.lower(): t for t in before}, {t.lower(): t for t in after}
+    album, _, name = rel.rpartition("/")
+    for key, tag in new.items():
+        if key not in old:
+            emit("media.tag_added", tag, {"rel": rel, "title": name, "album": album})
+    for key, tag in old.items():
+        if key not in new:
+            emit("media.tag_removed", tag, {"rel": rel, "title": name, "album": album})
+
+
+@router.get("/lucent/v1/events")
+def events(request: Request, after: int = 0, limit: int = 200):
+    _require_lucent(request)
+    limit = max(1, min(limit, 500))
+    with _outbox() as c:
+        rows = c.execute("SELECT * FROM outbox WHERE seq > ? ORDER BY seq LIMIT ?", (after, limit)).fetchall()
+    return {"events": [{"seq": r["seq"], "at": r["at"], "type": r["type"], "subject": r["subject"],
+                        "data": json.loads(r["data"] or "{}")} for r in rows]}
 
 
 def status_report() -> dict:

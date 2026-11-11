@@ -230,3 +230,27 @@ def test_media_for_a_reference(paired):
             c_.execute("DELETE FROM image_tags WHERE tag_id = ?", (tag,))
             c_.execute("DELETE FROM tags WHERE id = ?", (tag,))
             c_.commit()
+
+
+def test_a_tag_write_lands_in_the_outbox(paired, monkeypatch):
+    fake, c = paired
+    pokes = []
+    monkeypatch.setattr(lucent, "_poke_soon", lambda: pokes.append(1))
+    from aperture.console import app as console
+    rel = "berlin/gate.jpg"
+    before = console.lib.read_tags(rel)
+    try:
+        console.lib.write_tags(rel, before + ["NB-LEN-26-0042-5"])
+        console.lib.write_tags(rel, before)
+        m = c.get("/lucent/v1/manifest", headers=bearer(fake)).json()
+        assert m["events"]["emits"] == ["media.tag_added", "media.tag_removed"]
+        assert c.get("/lucent/v1/events").status_code == 401
+        ev = c.get("/lucent/v1/events", params={"after": 0}, headers=bearer(fake)).json()["events"]
+        mine = [e for e in ev if e["subject"] == "NB-LEN-26-0042-5"]
+        assert [e["type"] for e in mine] == ["media.tag_added", "media.tag_removed"]
+        assert mine[0]["data"] == {"rel": rel, "title": "gate.jpg", "album": "berlin"}
+        assert mine[0]["seq"] < mine[1]["seq"] and len(pokes) == 2
+        later = c.get("/lucent/v1/events", params={"after": mine[1]["seq"]}, headers=bearer(fake)).json()["events"]
+        assert later == []
+    finally:
+        console.lib.write_tags(rel, before)
