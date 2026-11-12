@@ -196,7 +196,6 @@ main{ flex:1 0 auto; outline:none }
 .g-card > a:hover{ transform:translateY(-3px); box-shadow:var(--shadow-16); border-color:var(--stroke-1) }
 .g-card__cover{ position:relative; aspect-ratio:4/3; background:var(--surface-3); overflow:hidden }
 .g-card__cover img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform var(--dur-4) var(--ease-out) }
-.g-card > a:hover .g-card__cover img{ transform:scale(1.04) }
 .g-card__none{ position:absolute; inset:0; display:grid; place-items:center; color:var(--text-ghost); font:400 var(--fs-200)/1 var(--sans) }
 .g-card__badge{ position:absolute; top:10px; left:10px; display:inline-flex; align-items:center; gap:5px; height:24px; padding:0 9px;
   border-radius:var(--r-pill); background:rgba(0,0,0,.55); color:#fff; font:500 var(--fs-100)/1 var(--sans);
@@ -216,7 +215,6 @@ main{ flex:1 0 auto; outline:none }
   transition:transform var(--dur-2) var(--spring-soft), box-shadow var(--dur-2) var(--ease) }
 .g-poster > a:hover{ transform:translateY(-3px); box-shadow:var(--shadow-28) }
 .g-poster img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform var(--dur-5) var(--ease-out) }
-.g-poster > a:hover img{ transform:scale(1.05) }
 .g-poster__cap{ position:absolute; inset:auto 0 0; padding:var(--s-8) var(--s-6) var(--s-5);
   background:linear-gradient(transparent, rgba(0,0,0,.78)); display:grid; gap:4px }
 .g-poster__name{ display:flex; align-items:center; gap:var(--s-2); font:600 var(--fs-500)/1.2 var(--sans) }
@@ -233,7 +231,6 @@ main{ flex:1 0 auto; outline:none }
 .g-photo{ position:relative; min-width:0; content-visibility:auto; contain-intrinsic-size:auto 220px }
 .g-photo > a{ display:block; position:relative; aspect-ratio:1; border-radius:var(--r-inner); overflow:hidden; background:var(--surface-3) }
 .g-photo img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform var(--dur-3) var(--ease-out), opacity var(--dur-3) var(--ease) }
-.g-photo > a:hover img{ transform:scale(1.05) }
 .g-photo > a::after{ content:""; position:absolute; inset:0; border-radius:inherit; box-shadow:inset 0 0 0 1px light-dark(rgba(0,0,0,.06), rgba(255,255,255,.06)) }
 .g-photo__star{ position:absolute; top:8px; right:8px; width:24px; height:24px; display:grid; place-items:center; border-radius:50%;
   background:rgba(0,0,0,.5); color:#ffd27a; font-size:11px }
@@ -461,6 +458,14 @@ details > summary{ cursor:pointer; color:var(--text-dim); font:500 var(--fs-200)
 }
 @media (prefers-reduced-motion: reduce){ .g-reel__slide img{ transition:none } }
 
+/* A photo grows under the pointer only where there is one: on a touch
+   screen :hover sticks to whatever a finger touched while scrolling. */
+@media (hover: hover) and (pointer: fine){
+  .g-card > a:hover .g-card__cover img{ transform:scale(1.04) }
+  .g-poster > a:hover img{ transform:scale(1.05) }
+  .g-photo > a:hover img{ transform:scale(1.05) }
+}
+
 /* ---------------- narrower screens ---------------- */
 @media (max-width: 1365px){
   .g-shot{ grid-template-columns:minmax(0,1fr) 320px }
@@ -499,10 +504,10 @@ details > summary{ cursor:pointer; color:var(--text-dim); font:500 var(--fs-200)
   .g-reel__file{ display:none }
   .g-lost{ grid-template-columns:1fr; gap:var(--s-4) }
   .g-foot__meta{ margin-left:0 }
-  /* the photo page: the photo edge to edge and only as tall as it is, the
-     arrows out of its way, the three buttons one row */
+  /* the photo page: the photo only as tall as it is, the arrows out of its
+     way, the three buttons one row */
   .g-shot{ gap:var(--s-5) }
-  .g-stage{ min-height:0; margin-inline:calc(-1 * var(--page-pad)); border-radius:0 }
+  .g-stage{ min-height:0 }
   .g-stage img{ max-height:72dvh }
   .g-stage__arrow{ width:36px; height:36px; opacity:.6 }
   .g-stage__arrow--prev{ left:var(--s-2) } .g-stage__arrow--next{ right:var(--s-2) }

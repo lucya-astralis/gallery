@@ -106,7 +106,7 @@ a.g-leg__in:focus-visible{ outline:none; box-shadow:var(--ring) }
 .g-leg__media{ position:relative; aspect-ratio:5/2; overflow:hidden;
   background:linear-gradient(135deg, color-mix(in srgb, var(--acc) 22%, var(--surface-3)), var(--surface-3)) }
 .g-leg__media img{ width:100%; height:100%; object-fit:cover; transition:transform var(--dur-5) var(--ease) }
-a.g-leg__in:hover .g-leg__media img{ transform:scale(1.04) }
+@media (hover: hover) and (pointer: fine){ a.g-leg__in:hover .g-leg__media img{ transform:scale(1.04) } }
 /* a photo keeps the dark scheme; the shade only lies on a photo */
 .g-leg__media--photo{ color-scheme:dark }
 .g-leg__media--photo::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.38), transparent 45%) }
