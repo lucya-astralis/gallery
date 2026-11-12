@@ -71,6 +71,82 @@
     vid.addEventListener('canplay', () => { vid.classList.add('is-on'); vid.play().catch(() => {}); }, { once: true });
   }
 
+  /* ---- the photo grid decides what loads (the old frontend's 2.7.1) ----
+     loading="lazy" starts a thumbnail for every tile a fast scroll runs past
+     and never calls one off, so the tiles the scroll stops on wait behind
+     dozens nobody looks at, grey. Here: what is on screen loads at once,
+     at most eight more ahead in the direction of the scroll, nothing starts
+     while the page flies past (more than three screens a second), and a
+     request whose tile is two screens away is called off and asked for
+     again on return. Without this script the tiles are plain lazy images. */
+  if ('IntersectionObserver' in window) {
+    const MAX_AHEAD = 8, FLING = 3, SETTLE_MS = 140;
+    const near = new Set(), inflight = new Set();
+    let dir = 1, lastY = scrollY, lastT = performance.now(), flinging = false, settle = null, pumping = null;
+    const imgOf = (tile) => tile.querySelector('img');
+    const schedule = () => { if (!pumping) pumping = setTimeout(pump, 0); };
+    const finish = (img) => {
+      if (!inflight.delete(img)) return;
+      const tile = img.closest('.g-photo');
+      if (tile) { near.delete(tile); io.unobserve(tile); }
+      schedule();
+    };
+    // a src taken back fires nothing; one that did arrive (or failed) does
+    const arrived = (e) => { if (e.target.getAttribute('src')) finish(e.target); };
+    const start = (img) => { inflight.add(img); img.src = img.dataset.src; delete img.dataset.src; };
+    const callOff = (img) => { inflight.delete(img); img.dataset.src = img.getAttribute('src'); img.removeAttribute('src'); };
+    function pump() {
+      pumping = null;
+      if (flinging || !near.size) return;
+      const vh = innerHeight || document.documentElement.clientHeight || 0;
+      const queue = [];
+      near.forEach((tile) => {
+        if (!tile.isConnected) { near.delete(tile); io.unobserve(tile); return; }
+        const img = imgOf(tile);
+        if (!img || !img.dataset.src) return;
+        const b = tile.getBoundingClientRect(), below = b.top >= vh;
+        let d = below ? b.top - vh : (b.bottom <= 0 ? -b.bottom : 0);
+        if (d && below === (dir > 0)) d /= 2;          // ahead of the scroll counts double
+        queue.push([d, b.top, b.left, img]);
+      });
+      queue.sort((x, y) => x[0] - y[0] || x[1] - y[1] || x[2] - y[2]);
+      for (const q of queue) {
+        // what is on screen never waits for a slot; the cap is for reading ahead
+        if (q[0] > 0 && inflight.size >= MAX_AHEAD) break;
+        start(q[3]);
+      }
+    }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((en) => {
+        if (en.isIntersecting) { near.add(en.target); return; }
+        near.delete(en.target);
+        const img = imgOf(en.target);
+        if (img && inflight.has(img)) callOff(img);
+      });
+      schedule();
+    }, { rootMargin: '200% 0px 200% 0px', threshold: 0 });
+    addEventListener('scroll', () => {
+      const now = performance.now(), y = scrollY, dy = y - lastY, dt = now - lastT;
+      if (dy) dir = dy > 0 ? 1 : -1;
+      if (dt > 0) flinging = Math.abs(dy) / dt > ((innerHeight || 1) * FLING) / 1000;
+      lastY = y; lastT = now;
+      clearTimeout(settle);
+      settle = setTimeout(() => { flinging = false; schedule(); }, SETTLE_MS);
+      if (!flinging) schedule();
+    }, { passive: true });
+    $$('.g-photo img[src]').forEach((img) => {
+      if (img.complete && img.naturalWidth) return;
+      // src first: with it still on, dropping loading=lazy would start the
+      // very request this is here to schedule
+      img.dataset.src = img.getAttribute('src');
+      img.removeAttribute('src');
+      img.removeAttribute('loading');
+      img.addEventListener('load', arrived);
+      img.addEventListener('error', arrived);
+      io.observe(img.closest('.g-photo'));
+    });
+  }
+
   /* ---- the photo page: original, keyboard, lightbox, in-place steps ----
      The arrows are links to the next photo's own page. With this script a
      step fetches that page and swaps its .g-page in (the photo, title, meta,
