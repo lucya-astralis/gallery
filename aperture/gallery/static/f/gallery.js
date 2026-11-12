@@ -18,7 +18,7 @@
     if (slides.length < 2) return;
     const dots = $$('.g-reel__dot', reel);
     const name = $('[data-reel-name]', reel), file = $('[data-reel-file]', reel), open = $('[data-reel-open]', reel);
-    let cur = 0, timer = null, paused = false;
+    let cur = 0, timer = null, paused = false, seen = true;
     const show = (i) => {
       i = (i + slides.length) % slides.length;
       hydrate(slides[i]); hydrate(slides[(i + 1) % slides.length]);
@@ -30,7 +30,7 @@
       if (open) open.setAttribute('href', href);
       cur = i;
     };
-    const tick = () => { if (!paused && !document.hidden) show(cur + 1); };
+    const tick = () => { if (!paused && seen && !document.hidden) show(cur + 1); };
     const play = () => { if (!reduce) { clearInterval(timer); timer = setInterval(tick, 6000); } };
     $('[data-reel-next]', reel)?.addEventListener('click', () => { show(cur + 1); play(); });
     $('[data-reel-prev]', reel)?.addEventListener('click', () => { show(cur - 1); play(); });
@@ -39,6 +39,11 @@
     reel.addEventListener('pointerleave', () => { paused = false; });
     reel.addEventListener('focusin', () => { paused = true; });
     reel.addEventListener('focusout', () => { paused = false; });
+    // a reel scrolled out of sight stands still: it loads no further
+    // previews and changes nothing while the page below is being looked at
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(([e]) => { seen = e.isIntersecting; }, { threshold: 0.15 }).observe(reel);
+    }
     hydrate(slides[1]);
     play();
   });
