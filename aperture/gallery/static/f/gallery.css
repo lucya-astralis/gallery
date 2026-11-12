@@ -484,13 +484,6 @@ details > summary{ cursor:pointer; color:var(--text-dim); font:500 var(--fs-200)
 }
 @media (prefers-reduced-motion: reduce){ .g-reel__slide img{ transition:none } }
 
-/* On a touch screen the glass is solid and nothing is blurred (Facet's
-   fx-lite, as for prefers-reduced-transparency): Safari redraws a backdrop
-   blur over the moving photos on every frame of a scroll. */
-@media (pointer: coarse){
-  :root{ --glass:var(--glass-solid); --glass-hi:var(--glass-solid); --blur-1:none; --blur-2:none; --blur-3:none }
-}
-
 /* A photo grows under the pointer only where there is one: on a touch
    screen :hover sticks to whatever a finger touched while scrolling. */
 @media (hover: hover) and (pointer: fine){
