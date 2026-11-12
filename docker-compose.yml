@@ -99,3 +99,12 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
+    # Lucent (when it runs on this host) reaches Aperture on this network by
+    # its service name: join with --base-url http://aperture:8090.
+    networks:
+      - default
+      - lucya
+
+networks:
+  lucya:
+    name: ${LUCENT_NETWORK:-lucya}
