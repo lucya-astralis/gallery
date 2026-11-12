@@ -64,8 +64,9 @@
 {% macro photos(items, qs='', label=False) -%}
 <ul class="g-photos">
   {% for img in items %}
+  {%- set _tint = tile_tint(img) %}
   <li class="g-photo">
-    <a href="/image/{{ img.rel_path }}{{ qs }}" title="{{ img.album }} / {{ img.filename }}">
+    <a href="/image/{{ img.rel_path }}{{ qs }}" title="{{ img.album }} / {{ img.filename }}"{% if _tint %} data-tint="{{ _tint }}"{% endif %}>
       <img src="{{ media_url('thumb', img) }}" alt="{{ img.filename }}" loading="lazy" decoding="async">
       {% if img.is_showcase %}<span class="g-photo__star" aria-label="Featured"><i class="fa fa-star"></i></span>{% endif %}
       <span class="g-photo__label">{{ img.album if label else img.filename }}</span>

@@ -8,6 +8,7 @@ and the CORS JSON helper the API answers with.
 
 from __future__ import annotations
 
+import json
 from functools import partial
 
 from fastapi import Request
@@ -137,3 +138,20 @@ templates.env.globals["site_bg"] = theme.site_bg
 templates.env.globals["theme_css_url"] = theme.theme_css_url
 # /thumb/, /preview/ and /full/ addresses with the photo's version stamp
 templates.env.globals["media_url"] = scanner.media_url
+
+
+def tile_tint(img) -> str:
+    """A photo's two strongest colours ("#7e5843 #b79779"), from the palette
+    the scan stored: a tile shows them while its thumbnail is on its way or
+    being decoded, instead of a grey box. Empty when the photo has none."""
+    raw = img.get("palette") if hasattr(img, "get") else None
+    try:
+        pal = json.loads(raw) if isinstance(raw, str) else (raw or [])
+        cols = [str(c[0]) for c in pal[:2]]
+    except (ValueError, TypeError, IndexError, KeyError):
+        return ""
+    cols = [c for c in cols if c.startswith("#") and len(c) in (4, 7) and all(x in "0123456789abcdefABCDEF" for x in c[1:])]
+    return " ".join(cols)
+
+
+templates.env.globals["tile_tint"] = tile_tint

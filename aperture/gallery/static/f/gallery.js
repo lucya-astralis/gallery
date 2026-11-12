@@ -71,6 +71,17 @@
     vid.addEventListener('canplay', () => { vid.classList.add('is-on'); vid.play().catch(() => {}); }, { once: true });
   }
 
+  /* ---- a tile waits in its photo's colours, not in grey ----
+     The scan keeps each photo's palette; the tile carries its two strongest
+     colours (data-tint) and shows them as a soft gradient until the
+     thumbnail is decoded. Set through the CSSOM: the CSP allows no style
+     attribute in the markup. */
+  $$('.g-photo > a[data-tint]').forEach((a) => {
+    const [c1, c2] = a.dataset.tint.split(' ');
+    a.style.setProperty('--tint-1', c1);
+    a.style.setProperty('--tint-2', c2 || c1);
+  });
+
   /* ---- the photo grid decides what loads (the old frontend's 2.7.1) ----
      loading="lazy" starts a thumbnail for every tile a fast scroll runs past
      and never calls one off, so the tiles the scroll stops on wait behind

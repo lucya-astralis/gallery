@@ -234,6 +234,8 @@ main{ flex:1 0 auto; outline:none }
    tile's paint and rebuilds it on the way back up (2.4.3) */
 .g-photo{ position:relative; min-width:0; contain:layout style }
 .g-photo > a{ display:block; position:relative; aspect-ratio:1; border-radius:var(--r-inner); overflow:hidden; background:var(--surface-3) }
+/* the photo's own colours while it is on its way (gallery.js sets them from data-tint) */
+.g-photo > a[data-tint]{ background:linear-gradient(135deg, var(--tint-1, var(--surface-3)), var(--tint-2, var(--surface-3))) }
 .g-photo img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform var(--dur-3) var(--ease-out), opacity var(--dur-3) var(--ease) }
 .g-photo > a::after{ content:""; position:absolute; inset:0; border-radius:inherit; box-shadow:inset 0 0 0 1px light-dark(rgba(0,0,0,.06), rgba(255,255,255,.06)) }
 .g-photo__star{ position:absolute; top:8px; right:8px; width:24px; height:24px; display:grid; place-items:center; border-radius:50%;
