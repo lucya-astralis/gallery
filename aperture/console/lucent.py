@@ -146,13 +146,22 @@ def join(lucent_url: str, code: str, *, ui_url: str | None = None,
         "base_url": base_url, "ui_url": ui_url, "version": brand.VERSION,
         "redirect_uris": [f"{ui_url}/auth/lucent/callback"],
         "connector_secret": connector_secret, "id_token_alg": "HS256"})
-    data = {"issuer": answer["issuer"].rstrip("/"), "tool_id": answer["tool_id"],
+    data = {"issuer": answer["issuer"].rstrip("/"), "lucent_url": lucent_url, "tool_id": answer["tool_id"],
             "client_id": answer["client_id"], "client_secret": answer["client_secret"],
             "connector_secret_sha256": hashlib.sha256(connector_secret.encode()).hexdigest(),
             "ui_url": ui_url, "base_url": base_url, "paired_at": int(time.time())}
     _write(data)
     log.info("aperture: paired with Lucent at %s as %s", data["issuer"], data["client_id"])
     return data
+
+
+def backchannel(p: dict) -> str:
+    """Where this server calls Lucent (token exchange, poke): the address it
+    was joined with, which may be an inside one (http://lucent:8060 on the
+    `lucya` network) that no browser can reach. The issuer stays what the
+    browser is sent to and what the ID token must carry. Pairings written
+    before this was kept have only the issuer, which is then both."""
+    return (p.get("lucent_url") or p["issuer"]).rstrip("/")
 
 
 def leave() -> bool:
@@ -572,7 +581,7 @@ def _poke_soon() -> None:
         if not p:
             return
         token = base64.b64encode(f"{p['client_id']}:{p['client_secret']}".encode()).decode()
-        req = urllib.request.Request(f"{p['issuer']}/api/connect/poke", data=b"{}", method="POST",
+        req = urllib.request.Request(f"{backchannel(p)}/api/connect/poke", data=b"{}", method="POST",
                                      headers={"Authorization": f"Basic {token}", "Content-Type": "application/json"})
         try:
             urllib.request.urlopen(req, timeout=5).close()
@@ -777,7 +786,7 @@ def callback(request: Request, code: str = "", state: str = "", error: str = "",
         log.warning("aperture: Lucent sign-in answered by another issuer: %s", iss)
         return fail
     try:
-        answer = _post(f"{p['issuer']}/oidc/token", form={
+        answer = _post(f"{backchannel(p)}/oidc/token", form={
             "grant_type": "authorization_code", "code": code, "code_verifier": pending["verifier"],
             "redirect_uri": f"{p['ui_url']}/auth/lucent/callback"},
             basic=(p["client_id"], p["client_secret"]))

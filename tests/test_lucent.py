@@ -326,3 +326,30 @@ def test_lucent_manages_tags_albums_and_links(paired, monkeypatch):
         for rel, tags in before.items():
             console.lib.write_tags(rel, tags)
         console.lib.write_desc("berlin", "de", desc_before)
+
+
+def test_joined_from_inside_the_network_talks_to_lucent_there(indexed, monkeypatch):
+    """Joined at Lucent's inside address (http://lucent:8060 on the `lucya`
+    network): the browser still goes to the issuer, but the token exchange
+    goes to the address the join used, which the browser may never reach."""
+    fake = FakeLucent()
+    monkeypatch.setattr(lucent, "_post", fake)
+    security.set_password(PASSWORD)
+    security.reset()
+    lucent._pending.clear()
+    lucent.join("http://lucent:8060/", "ABCD-EFGH-JKLM", ui_url="http://testserver")
+    try:
+        p = lucent.pairing()
+        assert p["issuer"] == ISSUER and lucent.backchannel(p) == "http://lucent:8060"
+        c = TestClient(console_app)
+        q = _start(c)                      # the browser: to the issuer
+        fake.claims = {"nonce": q["nonce"]}
+        c.get("/auth/lucent/callback", params={"code": "abc", "state": q["state"], "iss": ISSUER})
+        assert fake.sent[-1][0] == "http://lucent:8060/oidc/token"
+        assert c.get("/api/session").json()["signed_in"]
+        # a pairing from before the join address was kept: the issuer is both
+        assert lucent.backchannel({"issuer": ISSUER + "/"}) == ISSUER
+    finally:
+        lucent.leave()
+        security.clear_password()
+        security.reset()
