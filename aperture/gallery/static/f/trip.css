@@ -208,7 +208,11 @@ a.g-leg__in:focus-visible{ outline:none; box-shadow:var(--ring) }
   /* a leg becomes a row: a small picture left, the words right */
   .g-trip__legs{ gap:var(--s-3) }
   .g-leg__in{ grid-template-rows:none; grid-template-columns:92px minmax(0, 1fr) }
-  .g-leg__media, .g-leg--side .g-leg__media{ aspect-ratio:auto; min-height:100% }
+  /* the strip on the left is as tall as the card's words, never as tall
+     as its photo: a portrait cover laid out in flow made that card taller
+     than its neighbours. The picture fills the strip instead. */
+  .g-leg__media, .g-leg--side .g-leg__media{ aspect-ratio:auto; min-height:84px }
+  .g-leg__media img{ position:absolute; inset:0 }
   .g-leg--side .g-leg__glyph{ font-size:22px }
   .g-leg__glyph{ font-size:22px }
   .g-leg__state{ top:auto; bottom:var(--s-2); left:50%; right:auto; transform:translateX(-50%); height:20px; padding:0 var(--s-2) }

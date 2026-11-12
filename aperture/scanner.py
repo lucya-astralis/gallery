@@ -349,13 +349,44 @@ def _derivative_exif(credit: str | None) -> bytes:
 # a single half-written upload on the share must never escape as an exception,
 # because in full_scan() it would abort the whole walk (see there) and in the
 # /thumb route it surfaces as a 500 with a traceback instead of a skipped file.
+#
+# Building a derivative decodes the WHOLE source: a 48 MP PNG off a phone
+# (6048×8064) is about 3 s of CPU and 200 MB of RAM, however small the result.
+# The /thumb and /preview routes run in Starlette's thread pool (40 threads),
+# so an album of such photos opened while its derivatives are missing or
+# stale (fresh upload, the startup scan still walking) asked for dozens of
+# those at once: the box swapped or killed the worker, and the page "loaded
+# forever" or came up half done (seen first on iOS, which asks for a whole
+# column of tiles at a time). Two builds at a time, then, for every caller in
+# this process; the rest wait their turn and are answered in order.
+_BUILD_GATE = threading.BoundedSemaphore(2)
+# One build per destination: a tile asked for while the scan (or another
+# request) is already writing it waits for that build instead of decoding the
+# same source a second time. Striped, so the table never grows.
+_DST_LOCKS = [threading.Lock() for _ in range(64)]
+
+
+def _dst_lock(dst: Path) -> threading.Lock:
+    return _DST_LOCKS[hash(str(dst)) % len(_DST_LOCKS)]
+
+
 def make_thumbnail(src: Path, dst: Path, size: int) -> bool:
+    with _dst_lock(dst), _BUILD_GATE:
+        return _make_thumbnail(src, dst, size)
+
+
+def _make_thumbnail(src: Path, dst: Path, size: int) -> bool:
     tmp = None
     try:
         dst.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(src) as img:
-            img = ImageOps.exif_transpose(img)   # upright, see the note above
+            # Shrunk first, turned upright after: the
+            # box is square, so the order changes nothing in the result, and
+            # exif_transpose on the full frame made a second full-size copy
+            # (twice the memory of the decode itself). thumbnail() keeps the
+            # EXIF the orientation is read from.
             img.thumbnail((size, size), Image.LANCZOS)
+            img = ImageOps.exif_transpose(img)
             if img.mode in ("RGBA", "P", "LA"):
                 bg = Image.new("RGB", img.size, (20, 20, 20))
                 bg.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
@@ -943,6 +974,10 @@ def ensure_thumb(photos_dir: Path, thumbs_dir: Path, rel_path: str, size: int,
     dst = (thumbs_dir / rel_path).with_suffix(ext)
     if not needs_rebuild(dst, src):
         return dst
-    if make_thumbnail(src, dst, size):
-        return dst
+    with _dst_lock(dst):
+        if not needs_rebuild(dst, src):   # built while this one waited
+            return dst
+        with _BUILD_GATE:
+            if _make_thumbnail(src, dst, size):
+                return dst
     return None

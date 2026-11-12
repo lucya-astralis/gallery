@@ -81,7 +81,7 @@
       </nav>
       <form action="/search" method="get" class="g-search" role="search">
         <button type="submit" class="g-search__go" aria-label="{{ t('nav.search_go') }}" title="{{ t('nav.search_open') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5 20 20"/></svg></button>
-        <input type="search" name="q" placeholder="{{ t('nav.search_ph') }}" value="{{ query or '' }}" autocomplete="off" aria-label="{{ t('nav.search_open') }}">
+        <input type="search" name="q" placeholder="{{ t('nav.search_ph') }}" data-ph-short="{{ t('nav.search_ph_short') }}" value="{{ query or '' }}" autocomplete="off" aria-label="{{ t('nav.search_open') }}">
       </form>
       <div class="g-tools">
         {% set _mode = t('nav.theme.' ~ theme) %}

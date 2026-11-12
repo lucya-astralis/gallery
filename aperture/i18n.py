@@ -43,7 +43,7 @@ STRINGS: dict[str, tuple[str, str, str]] = {
     "nav.search_ph": ("Albums, files, tags, cameras, colours", "Alben, Dateien, Tags, Kameras, Farben", "アルバム・ファイル・タグ・カメラ・色"),
     # short form swapped in on phones (app.js), where the full hint is too long
     # for the narrow field — see the data-ph-short attribute in base.html
-    "nav.search_ph_short": ("Search", "Suchen", "検索"),
+    "nav.search_ph_short": ("Search", "Suche", "検索"),
     "nav.lang_label": ("Language", "Sprache", "言語"),
     "nav.theme": ("Appearance: {mode}", "Darstellung: {mode}", "表示: {mode}"),
     "nav.theme.system": ("system", "System", "システム"),
