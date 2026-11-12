@@ -293,7 +293,7 @@
         {% for img in items %}
           <li class="image-tile{% if img.is_showcase %} image-tile--showcase{% endif %}">
             <a href="/image/{{ img.rel_path }}{{ img_qs }}">
-              <img src="{{ media_url('thumb', img) }}" alt="{{ img.filename }}" loading="lazy">
+              <img src="{{ media_url('thumb', img) }}" alt="{{ img.filename }}" loading="lazy" decoding="sync">
               {% if img.is_showcase %}<span class="image-tile__star" aria-label="Featured"><i class="fa fa-star"></i></span>{% endif %}
               <div class="image-tile__overlay"><span>Open<i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i></span></div>
             </a>

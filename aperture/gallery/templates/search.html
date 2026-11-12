@@ -148,7 +148,7 @@
         {% for img in images %}
           <li class="image-tile">
             <a href="/image/{{ img.rel_path }}{% if current_sort != default_sort %}?sort={{ current_sort }}{% endif %}" title="{{ img.album }} / {{ img.filename }}">
-              <img src="{{ media_url('thumb', img) }}" alt="{{ img.filename }}" loading="lazy">
+              <img src="{{ media_url('thumb', img) }}" alt="{{ img.filename }}" loading="lazy" decoding="sync">
               <div class="image-tile__overlay"><span>{{ img.album }}</span></div>
             </a>
           </li>
@@ -169,7 +169,7 @@
         {% for img in look %}
           <li class="image-tile">
             <a href="/image/{{ img.rel_path }}" title="{{ img.album }} / {{ img.filename }}">
-              <img src="{{ media_url('thumb', img) }}" alt="{{ img.filename }}" loading="lazy">
+              <img src="{{ media_url('thumb', img) }}" alt="{{ img.filename }}" loading="lazy" decoding="sync">
               <div class="image-tile__overlay"><span>{{ img.album }}</span></div>
             </a>
           </li>

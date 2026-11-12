@@ -20,7 +20,7 @@
 <li class="g-card">
   <a href="/album/{{ a.album }}">
     <div class="g-card__cover">
-      {% if a.cover %}<img src="{{ media_url('thumb', a.cover) }}" alt="" loading="lazy" decoding="async">
+      {% if a.cover %}<img src="{{ media_url('thumb', a.cover) }}" alt="" loading="lazy" decoding="sync">
       {% else %}<span class="g-card__none">{{ t('card.no_cover') }}</span>{% endif %}
       {% if a.sub_count %}<span class="g-card__badge"><i class="fa fa-folder" aria-hidden="true"></i>{{ a.sub_count }}</span>{% endif %}
     </div>
@@ -67,7 +67,10 @@
   {%- set _tint = tile_tint(img) %}
   <li class="g-photo">
     <a href="/image/{{ img.rel_path }}{{ qs }}" title="{{ img.album }} / {{ img.filename }}"{% if _tint %} data-tint="{{ _tint }}"{% endif %}>
-      <img src="{{ media_url('thumb', img) }}" alt="{{ img.filename }}" loading="lazy" decoding="async">
+      {#- decoding sync: a thumbnail WebKit dropped from its decoded cache is
+          decoded again before the tile is drawn, instead of the tile drawn empty
+          while scrolling (480 px: a millisecond or two) #}
+      <img src="{{ media_url('thumb', img) }}" alt="{{ img.filename }}" loading="lazy" decoding="sync">
       {% if img.is_showcase %}<span class="g-photo__star" aria-label="Featured"><i class="fa fa-star"></i></span>{% endif %}
       <span class="g-photo__label">{{ img.album if label else img.filename }}</span>
     </a>

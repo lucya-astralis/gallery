@@ -67,7 +67,7 @@
     <li class="g-leg" data-stop data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}"{% if s.jp %} data-city-jp="{{ s.jp }}"{% endif %}>
       {% if s.href %}<a class="g-leg__in" href="{{ s.href }}">{% else %}<div class="g-leg__in">{% endif %}
         <span class="g-leg__media{% if s.cover %} g-leg__media--photo{% endif %}" aria-hidden="true">
-          {% if s.cover %}<img src="{{ media_url('thumb', s.cover) }}" alt="" loading="lazy" decoding="async">{% elif s.jp %}<span class="g-leg__glyph" lang="ja">{{ s.jp }}</span>{% endif %}
+          {% if s.cover %}<img src="{{ media_url('thumb', s.cover) }}" alt="" loading="lazy" decoding="sync">{% elif s.jp %}<span class="g-leg__glyph" lang="ja">{{ s.jp }}</span>{% endif %}
           <span class="g-leg__n">{{ '%02d' | format(loop.index) }}</span>
           <span class="g-leg__state" data-stop-meta></span>
         </span>
@@ -103,7 +103,7 @@
       <li class="g-leg g-leg--side" data-side data-start="{{ s.start }}" data-end="{{ s.end }}" data-city="{{ s.city }}" data-from="{{ s.from }}"{% if s.region %} data-region="{{ s.region }}"{% endif %}{% if s.revisit %} data-revisit{% endif %}>
         {% if s.href %}<a class="g-leg__in" href="{{ s.href }}">{% else %}<div class="g-leg__in">{% endif %}
           <span class="g-leg__media{% if s.cover %} g-leg__media--photo{% endif %}" aria-hidden="true">
-            {% if s.cover %}<img src="{{ media_url('thumb', s.cover) }}" alt="" loading="lazy" decoding="async">{% elif s.jp %}<span class="g-leg__glyph" lang="ja">{{ s.jp }}</span>{% endif %}
+            {% if s.cover %}<img src="{{ media_url('thumb', s.cover) }}" alt="" loading="lazy" decoding="sync">{% elif s.jp %}<span class="g-leg__glyph" lang="ja">{{ s.jp }}</span>{% endif %}
             <span class="g-leg__n">↗</span>
             <span class="g-leg__state" data-side-meta></span>
           </span>
