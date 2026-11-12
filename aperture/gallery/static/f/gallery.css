@@ -348,7 +348,7 @@ main{ flex:1 0 auto; outline:none }
 /* ---------------- photo page ---------------- */
 .g-shot{ display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:var(--s-5); align-items:start }
 .g-stage{ position:relative; display:grid; place-items:center; color-scheme:dark; background:#000; border-radius:var(--r-overlay);
-  overflow:hidden; min-height:min(70dvh, 760px) }
+  overflow:hidden; min-height:min(70dvh, 760px); touch-action:pan-y pinch-zoom }
 .g-stage img{ max-width:100%; max-height:min(80dvh, 1000px); width:auto; height:auto; display:block; cursor:zoom-in;
   transition:filter var(--dur-3) var(--ease) }
 .g-stage img.is-loading{ filter:blur(6px) saturate(.6) }
@@ -375,14 +375,17 @@ details > summary{ cursor:pointer; color:var(--text-dim); font:500 var(--fs-200)
 /* the lightbox: a <dialog>, the picture alone */
 .g-lb{ width:100vw; height:100dvh; max-width:none; max-height:none; margin:0; padding:0; border:0; background:#000; color:#fff; color-scheme:dark }
 .g-lb::backdrop{ background:#000 }
-.g-lb[open]{ display:grid; grid-template-rows:minmax(0,1fr) auto; animation:f-fade var(--dur-3) var(--ease) both }
-.g-lb__stage{ position:relative; display:grid; place-items:center; min-height:0 }
+.g-lb[open]{ display:grid; grid-template-rows:minmax(0,1fr) auto; grid-template-columns:minmax(0,1fr);
+  animation:f-fade var(--dur-3) var(--ease) both }
+.g-lb__stage{ position:relative; display:grid; place-items:center; min-height:0; min-width:0; touch-action:pan-y pinch-zoom }
 .g-lb__stage img{ max-width:100vw; max-height:calc(100dvh - 64px); object-fit:contain; transition:opacity var(--dur-2) var(--ease) }
 .g-lb__stage img.is-loading{ opacity:.35 }
-.g-lb__bar{ display:flex; align-items:center; gap:var(--s-3); height:64px; padding:0 var(--s-5); background:rgba(0,0,0,.6) }
+.g-lb__bar{ display:flex; align-items:center; gap:var(--s-3); min-height:64px; min-width:0; padding:0 var(--s-5) env(safe-area-inset-bottom);
+  background:rgba(0,0,0,.6) }
+.g-lb__bar .g-btn{ flex:none }
 .g-lb__count{ font:500 var(--fs-200)/1 var(--mono); color:rgba(255,255,255,.7); font-variant-numeric:tabular-nums }
 .g-lb__title{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:rgba(255,255,255,.88); font:400 var(--fs-300)/1 var(--sans) }
-.g-lb__close{ position:absolute; top:var(--s-4); right:var(--s-4); z-index:2 }
+.g-lb__close{ position:absolute; top:calc(var(--s-4) + env(safe-area-inset-top)); right:var(--s-4); z-index:2 }
 .g-lb .g-stage__arrow{ z-index:2 }
 
 /* ---------------- search ---------------- */
@@ -496,6 +499,23 @@ details > summary{ cursor:pointer; color:var(--text-dim); font:500 var(--fs-200)
   .g-reel__file{ display:none }
   .g-lost{ grid-template-columns:1fr; gap:var(--s-4) }
   .g-foot__meta{ margin-left:0 }
+  /* the photo page: the photo edge to edge and only as tall as it is, the
+     arrows out of its way, the three buttons one row */
+  .g-shot{ gap:var(--s-5) }
+  .g-stage{ min-height:0; margin-inline:calc(-1 * var(--page-pad)); border-radius:0 }
+  .g-stage img{ max-height:72dvh }
+  .g-stage__arrow{ width:36px; height:36px; opacity:.6 }
+  .g-stage__arrow--prev{ left:var(--s-2) } .g-stage__arrow--next{ right:var(--s-2) }
+  .g-stage__q{ top:var(--s-3); left:var(--s-3) }
+  .g-actions{ flex-wrap:nowrap }
+  .g-actions .g-btn{ flex:1 1 auto; justify-content:center; min-width:0; padding-inline:var(--s-2); white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis }
+  .g-side .g-panel{ padding:var(--s-4) }
+  /* the lightbox: the count, the name as far as it goes, two icon buttons */
+  .g-lb__bar{ gap:var(--s-2); padding-inline:var(--s-4) }
+  .g-lb__lbl{ display:none }
+  .g-lb__bar .g-btn{ width:40px; padding:0; justify-content:center }
+  .g-lb .g-stage__arrow{ width:36px; height:36px }
 }
 
 /* Album icons are drawn for a dark ground (most are white marks). Where one

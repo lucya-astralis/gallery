@@ -104,7 +104,16 @@
   };
   const step = (d) => { if (!data) return; at = (at + d + data.rels.length) % data.rels.length; paint(); };
   $('#open-fullscreen-btn')?.addEventListener('click', openLb);
-  stage.addEventListener('click', openLb);
+  // a swipe on the photo goes to the one before or after; a tap opens it big
+  let sx = null, swiped = false;
+  const box = stage.closest('.g-stage') || stage;
+  box.addEventListener('pointerdown', (e) => { sx = e.pointerType === 'mouse' ? null : e.clientX; swiped = false; });
+  box.addEventListener('pointerup', (e) => {
+    if (sx === null) return; const dx = e.clientX - sx; sx = null;
+    if (Math.abs(dx) > 60) { swiped = true; $(dx < 0 ? '[data-next]' : '[data-prev]')?.click(); }
+  });
+  box.addEventListener('pointercancel', () => { sx = null; });
+  stage.addEventListener('click', () => { if (!swiped) openLb(); swiped = false; });
   $('[data-lb-prev]')?.addEventListener('click', () => step(-1));
   $('[data-lb-next]')?.addEventListener('click', () => step(1));
   $('[data-lb-close]')?.addEventListener('click', () => lb.close());

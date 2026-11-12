@@ -95,8 +95,8 @@
   <div class="g-lb__bar">
     <span class="g-lb__count" id="lb-count"></span>
     <span class="g-lb__title" id="lb-title"></span>
-    <button type="button" class="g-btn g-btn--sm g-btn--glass" id="lb-full"><i class="fa fa-image" aria-hidden="true"></i>{{ t('btn.load_original') }}</button>
-    <a class="g-btn g-btn--sm g-btn--glass" id="lb-dl" href="" download=""><i class="fa fa-download" aria-hidden="true"></i>{{ t('btn.download') }}</a>
+    <button type="button" class="g-btn g-btn--sm g-btn--glass" id="lb-full" aria-label="{{ t('btn.load_original') }}"><i class="fa fa-image" aria-hidden="true"></i><span class="g-lb__lbl">{{ t('btn.load_original') }}</span></button>
+    <a class="g-btn g-btn--sm g-btn--glass" id="lb-dl" href="" download="" aria-label="{{ t('btn.download') }}"><i class="fa fa-download" aria-hidden="true"></i><span class="g-lb__lbl">{{ t('btn.download') }}</span></a>
   </div>
 </dialog>
 {% endblock %}
