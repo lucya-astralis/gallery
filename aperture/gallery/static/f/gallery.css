@@ -229,7 +229,10 @@ main{ flex:1 0 auto; outline:none }
 /* ---------------- photo grid ---------------- */
 .g-photos{ list-style:none; margin:0; padding:0; display:grid; gap:var(--s-3);
   grid-template-columns:repeat(auto-fill, minmax(min(46%, 200px), 1fr)) }
-.g-photo{ position:relative; min-width:0; content-visibility:auto; contain-intrinsic-size:auto 220px }
+/* a tile is a layout boundary (a photo arriving lays out the tile, not the
+   page: 2.7.2), and nothing skips its painting: WebKit drops a skipped
+   tile's paint and rebuilds it on the way back up (2.4.3) */
+.g-photo{ position:relative; min-width:0; contain:layout style }
 .g-photo > a{ display:block; position:relative; aspect-ratio:1; border-radius:var(--r-inner); overflow:hidden; background:var(--surface-3) }
 .g-photo img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform var(--dur-3) var(--ease-out), opacity var(--dur-3) var(--ease) }
 .g-photo > a::after{ content:""; position:absolute; inset:0; border-radius:inherit; box-shadow:inset 0 0 0 1px light-dark(rgba(0,0,0,.06), rgba(255,255,255,.06)) }
@@ -450,12 +453,19 @@ details > summary{ cursor:pointer; color:var(--text-dim); font:500 var(--fs-200)
 :root[data-theme="light"] :is(.g-brand, .g-foot__brand) img{ filter:invert(1) hue-rotate(180deg) }
 @media (prefers-color-scheme: light){ :root:not([data-theme="dark"]) :is(.g-brand, .g-foot__brand) img{ filter:invert(1) hue-rotate(180deg) } }
 
-/* ---------------- entrances ---------------- */
+/* ---------------- entrances ----------------
+   The gallery's own rise: opacity and a short slide, no blur, and nothing
+   held once it has run (fill backwards). A filter or a held transform keeps
+   each element on a GPU layer of its own; on a long album that is a layer
+   the size of the photo grid plus one per tile, and iOS Safari, out of
+   memory, drops the painting of what it already drew: the page goes black
+   below the fold (the same failure 2.4.1 fixed in the old frontend). Tiles
+   rise only on the first screen; the rest are simply there. */
+@keyframes g-rise{ from{ opacity:0; transform:translateY(14px) } }
 @media (prefers-reduced-motion: no-preference){
-  .g-page > *{ animation:f-rise var(--dur-4) var(--ease-out) both }
+  .g-page > *{ animation:g-rise var(--dur-4) var(--ease-out) backwards }
   .g-page > :nth-child(2){ animation-delay:60ms } .g-page > :nth-child(3){ animation-delay:120ms } .g-page > :nth-child(4){ animation-delay:180ms }
-  .g-cards > li, .g-photos > li, .g-posters > li{ animation:f-rise var(--dur-3) var(--ease-out) both }
-  .g-photos > li:nth-child(-n+24){ animation-delay:calc(var(--i, 0) * 0ms) }
+  :is(.g-cards, .g-photos, .g-posters) > li:nth-child(-n+12){ animation:g-rise var(--dur-3) var(--ease-out) backwards }
 }
 @media (prefers-reduced-motion: reduce){ .g-reel__slide img{ transition:none } }
 
