@@ -43,11 +43,13 @@ from . import lucent, security
 
 router = APIRouter()
 
+# `after` sets each page among Lucent's own parts (Fotos, Tags, Links) in the
+# console's order: Übersicht, Fotos, Alben, Tags, Website, Links, System.
 PAGES = [
-    {"id": "uebersicht", "label": "Übersicht", "icon": "chart"},
-    {"id": "alben", "label": "Alben", "icon": "folder"},
-    {"id": "website", "label": "Website", "icon": "globe"},
-    {"id": "system", "label": "System", "icon": "server"},
+    {"id": "uebersicht", "label": "Übersicht", "icon": "chart", "after": "start"},
+    {"id": "alben", "label": "Alben", "icon": "folder", "after": "media"},
+    {"id": "website", "label": "Website", "icon": "globe", "after": "tags"},
+    {"id": "system", "label": "System", "icon": "server", "after": "links"},
 ]
 
 # media detail and selection actions (manifest media.actions / media.bulk)
@@ -94,6 +96,11 @@ SITE_TABS = [
 SYSTEM_TABS = [("indexer", "Indexer"), ("speicher", "Speicher"), ("pruefung", "Prüfung"),
                ("datenschutz", "Datenschutz"), ("sicherung", "Sicherung"), ("aktivitaet", "Aktivität"),
                ("tags", "Tags"), ("passwort", "Passwort"), ("ueber", "Über")]
+# the console's System side list: its groups and marks, for Lucent's side list
+SYSTEM_GROUPS = {"indexer": ("Maschine", "server"), "speicher": ("Maschine", "folder"),
+                 "pruefung": ("Maschine", "check"), "datenschutz": ("Daten", "info"),
+                 "sicherung": ("Daten", "down"), "aktivitaet": ("Daten", "clock"), "tags": ("Daten", "tag"),
+                 "passwort": ("Aperture", "user"), "ueber": ("Aperture", "info")}
 
 DOCTOR_LABELS = {
     "missing_file": "Datei fehlt", "unindexed": "Nicht im Index", "stale_index": "Index veraltet",
@@ -977,7 +984,8 @@ def page_system(view: dict) -> dict:
         actions = [_act("update_check", "Erneut prüfen", icon="clock")]
     return {"title": "System", "meta": f"Aperture {brand.VERSION}" + (" · nur lesen" if ro else ""),
             "choose": [{"name": "tab", "label": "Teil", "value": tab,
-                        "options": [{"value": t, "label": l} for t, l in SYSTEM_TABS]}],
+                        "options": [{"value": t, "label": l, "group": SYSTEM_GROUPS[t][0], "icon": SYSTEM_GROUPS[t][1]}
+                                    for t, l in SYSTEM_TABS]}],
             "actions": actions, "sections": sections}
 
 
